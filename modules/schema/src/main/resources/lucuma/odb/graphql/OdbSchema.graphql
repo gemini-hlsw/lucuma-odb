@@ -1082,7 +1082,9 @@ input CloneObservationInput {
   """
   Which steps, if any, of the source's materialized sequences to copy into the
   clone.  Any mode other than NONE cannot be combined with an observing mode or
-  science requirements edit in SET.
+  science requirements edit in SET.  When SET edits the asterism, only the
+  science sequence is copied and the acquisition is generated for the new
+  targets; copied science steps keep their exposure times regardless.
   """
   sequence: CloneSequenceMode! = NONE
 }

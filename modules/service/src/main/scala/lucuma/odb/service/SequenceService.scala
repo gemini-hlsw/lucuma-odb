@@ -12,6 +12,7 @@ import cats.syntax.applicative.*
 import cats.syntax.apply.*
 import cats.syntax.either.*
 import cats.syntax.flatMap.*
+import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
 import eu.timepit.refined.types.string.NonEmptyString
@@ -289,14 +290,15 @@ trait SequenceService[F[_]]:
   )(using Transaction[F]): F[Result[Unit]]
 
   /**
-   * Copies the materialized acquisition and science sequences of `source` into
-   * `clone`, as pending steps, according to `mode`.  A sequence type that is not
+   * Copies the materialized `sequenceTypes` sequences of `source` into `clone`,
+   * as pending steps, according to `mode`.  A sequence type that is not
    * materialized, or that has nothing to copy, is left to be generated.
    */
   def cloneSequence(
-    source: Observation.Id,
-    clone:  Observation.Id,
-    mode:   CloneSequenceMode
+    source:        Observation.Id,
+    clone:         Observation.Id,
+    mode:          CloneSequenceMode,
+    sequenceTypes: List[SequenceType]
   )(using Transaction[F]): F[Result[Unit]]
 
 object SequenceService:
@@ -1035,9 +1037,10 @@ object SequenceService:
         )
 
       override def cloneSequence(
-        source: Observation.Id,
-        clone:  Observation.Id,
-        mode:   CloneSequenceMode
+        source:        Observation.Id,
+        clone:         Observation.Id,
+        mode:          CloneSequenceMode,
+        sequenceTypes: List[SequenceType]
       )(using Transaction[F]): F[Result[Unit]] =
 
         def copy[D](
@@ -1078,8 +1081,7 @@ object SequenceService:
           observationService.selectInstrument(source).flatMap:
             case None             => Result.unit.pure[F]
             case Some(instrument) =>
-              (copyIfMaterialized(instrument, SequenceType.Acquisition, pendingOnly) *>
-               copyIfMaterialized(instrument, SequenceType.Science, pendingOnly)).value
+              sequenceTypes.traverse_(copyIfMaterialized(instrument, _, pendingOnly)).value
 
         mode match
           case CloneSequenceMode.None         => Result.unit.pure[F]

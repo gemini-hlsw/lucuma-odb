@@ -205,16 +205,22 @@ class cloneObservationSequence extends query.ExecutionTestSupportForGmos with Re
       assert(a1, "acquisition not copied")
       assert(!f1, "frozen ITC result copied")
 
-  test("editing the targets while copying the sequence is allowed"):
+  test("editing the targets while copying the sequence copies only the science sequence"):
     for
       p  <- createProgram
       t  <- createTargetWithProfileAs(pi, p)
       t2 <- createTargetWithProfileAs(pi, p)
       o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
       _  <- replaceScience(o, atomInput("A", stepInput(GPrime)))
+      _  <- recordVisitAs(serviceUser, o)
+      a0 <- isMaterialized(o, SequenceType.Acquisition)
       c  <- cloneAs(o, Some("ALL_STEPS"), Some(s"""{ targetEnvironment: { asterism: ["$t2"] } }"""))
       s  <- storedScience(c)
-    yield assertEquals(s, List("A" -> filterTag(GPrime)))
+      a1 <- isMaterialized(c, SequenceType.Acquisition)
+    yield
+      assert(a0, "source setup")
+      assertEquals(s, List("A" -> filterTag(GPrime)))
+      assert(!a1, "acquisition copied despite a target edit")
 
   test("editing the observing mode while copying the sequence fails"):
     longSlit.flatMap: o =>

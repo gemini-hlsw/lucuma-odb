@@ -27,6 +27,7 @@ import lucuma.core.enums.ObservationPriority
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.SchedulingMode
 import lucuma.core.enums.ScienceBand
+import lucuma.core.enums.SequenceType
 import lucuma.core.enums.SkyBackground
 import lucuma.core.enums.SpectroscopyCapability
 import lucuma.core.enums.TooActivation
@@ -839,9 +840,14 @@ object ObservationService {
                             r => transaction.rollback.unlessA(r.hasValue)
                           }
                   // Copied after the update so that it is validated against
-                  // the clone's final configuration (e.g. splittability).
+                  // the clone's final configuration (e.g. splittability).  The
+                  // acquisition is tuned to the target, so a target edit regenerates it.
                   val cloneSequence: F[Result[Unit]] =
-                    sequenceService.cloneSequence(observationId, oid2, sequence)
+                    val editsAsterism = SET.flatMap(_.targetEnvironment).exists(!_.asterism.isAbsent)
+                    val types         =
+                      if editsAsterism then List(SequenceType.Science)
+                      else List(SequenceType.Acquisition, SequenceType.Science)
+                    sequenceService.cloneSequence(observationId, oid2, sequence, types)
 
                   (
                     for
