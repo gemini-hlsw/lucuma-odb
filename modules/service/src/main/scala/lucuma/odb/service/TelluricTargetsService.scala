@@ -554,7 +554,7 @@ object TelluricTargetsService:
                 requestReady(none, errorMsg.some, paramsHash.some)
 
         def handleMissingParams(msg: String): F[Option[TelluricTargets.Meta]] =
-          error"$msg" *>
+          warn"$msg" *>
             (if pending.failureCount < 5 then
               retryRequest(pending.failureCount, msg)
             else

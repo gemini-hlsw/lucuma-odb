@@ -169,10 +169,12 @@ class perScienceObservationCalibrations
   // The fake ITC measures the ticket's S/N of 116, so a telluric sized from it lands at 232.
   override def fakeSignalToNoiseAt(w: Wavelength): SignalToNoiseAt =
     // 116 everywhere but 1650nm, which measures 50, so per-wavelength sizing is visible,
-    // and 1550nm, which measures 30, so the telluric minimum is used.
+    // 1550nm, which measures 30, so the telluric minimum is used, and 2200nm, which
+    // measures 0, as the ITC reports for a target too faint to detect.
     val total =
       if w === Wavelength.fromIntNanometers(1650).get then 50
       else if w === Wavelength.fromIntNanometers(1550).get then 30
+      else if w === Wavelength.fromIntNanometers(2200).get then 0
       else 116
     SignalToNoiseAt(
       w,
@@ -2180,7 +2182,7 @@ class perScienceObservationCalibrations
         List((1650, 100), (1600, 232)).some
       )
 
-  test("daytime pinhole sn has no floor"):
+  test("daytime pinhole sn is fixed"):
     for {
       pid    <- createProgramAs(pi)
       tid    <- createTargetWithProfileAs(pi, pid)
@@ -2191,8 +2193,25 @@ class perScienceObservationCalibrations
       pinOpt <- selectDaytimePinholeObservationFor(oid)
       sns    <- pinOpt.traverse(scienceEtmSignalToNoise)
     } yield
-      // 2 x the requested 10; the floor is for tellurics only.
-      assertEquals(sns.map(_.distinct), List(SignalToNoise.unsafeFromBigDecimalExact(20).some).some)
+      // Not 2 x the requested 10: a pinhole's exposure comes from SmartGcal.
+      assertEquals(sns.map(_.distinct), List(SignalToNoise.unsafeFromBigDecimalExact(100).some).some)
+
+  test("calibrations of a txc science the ITC measures at 0 s/n get a positive s/n"):
+    for {
+      pid    <- createProgramAs(pi)
+      tid    <- createTargetWithProfileAs(pi, pid)
+      _      <- seedGnirsXdSmartGcal
+      oid    <- createGnirsXdObservationAs(pi, pid, tid, wavelengthsNm = List(2200))
+      _      <- runObscalcUpdate(pid, oid)
+      _      <- recalculateCalibrations(pid, when, oid)
+      telOpt <- selectTelluricObservationFor(oid)
+      tSns   <- telOpt.traverse(scienceEtmSignalToNoise)
+      pinOpt <- selectDaytimePinholeObservationFor(oid)
+      pSns   <- pinOpt.traverse(scienceEtmSignalToNoise)
+    } yield
+      val hundred = List(SignalToNoise.unsafeFromBigDecimalExact(100).some).some
+      assertEquals(tSns.map(_.distinct), hundred)
+      assertEquals(pSns.map(_.distinct), hundred)
 
   test("telluric etm is updated when science etm changes"):
     val wavelength1 = Wavelength.fromIntNanometers(500).get
