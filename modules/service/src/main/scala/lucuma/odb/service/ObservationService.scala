@@ -19,6 +19,7 @@ import lucuma.core.enums.AltairMode
 import lucuma.core.enums.AltairNdFilter
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.CassRotator
+import lucuma.core.enums.CloneSequenceMode
 import lucuma.core.enums.FieldLens
 import lucuma.core.enums.FocalPlane
 import lucuma.core.enums.GuideProbe
@@ -54,7 +55,6 @@ import lucuma.core.model.User
 import lucuma.core.syntax.string.*
 import lucuma.odb.data.AltairConfiguration
 import lucuma.odb.data.BlindOffsetType
-import lucuma.odb.data.CloneSequenceMode
 import lucuma.odb.data.Cone
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ExposureTimeModeRole

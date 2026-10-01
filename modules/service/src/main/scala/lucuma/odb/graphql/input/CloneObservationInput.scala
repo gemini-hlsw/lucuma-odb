@@ -7,10 +7,10 @@ package input
 
 import cats.data.NonEmptyList
 import cats.syntax.all.*
+import lucuma.core.enums.CloneSequenceMode
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationReference
 import lucuma.core.model.Target
-import lucuma.odb.data.CloneSequenceMode
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.*
 
@@ -27,9 +27,6 @@ final case class CloneObservationInput(
 }
 
 object CloneObservationInput {
-
-  val CloneSequenceModeBinding: Matcher[CloneSequenceMode] =
-    enumeratedBinding[CloneSequenceMode]
 
   val Binding: Matcher[CloneObservationInput] =
     ObjectFieldsBinding.rmap {

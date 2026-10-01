@@ -12,11 +12,11 @@ import eu.timepit.refined.types.numeric.NonNegShort
 import grackle.Result
 import grackle.ResultT
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.CloneSequenceMode
 import lucuma.core.model.Access
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
-import lucuma.odb.data.CloneSequenceMode
 import lucuma.odb.data.Existence
 import lucuma.odb.data.GroupTree
 import lucuma.odb.data.GroupTree.Branch

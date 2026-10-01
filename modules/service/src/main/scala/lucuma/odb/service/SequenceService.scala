@@ -23,6 +23,7 @@ import grackle.Result
 import grackle.ResultT
 import lucuma.core.enums.Breakpoint
 import lucuma.core.enums.ChargeClass
+import lucuma.core.enums.CloneSequenceMode
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
@@ -48,7 +49,6 @@ import lucuma.core.model.sequence.gnirs.GnirsStaticConfig
 import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig
 import lucuma.core.model.sequence.igrins2.Igrins2StaticConfig
 import lucuma.core.util.TimeSpan
-import lucuma.odb.data.CloneSequenceMode
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.mapping.AccessControl.CheckedWithId
