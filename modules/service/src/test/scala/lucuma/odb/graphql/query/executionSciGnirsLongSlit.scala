@@ -158,6 +158,43 @@ class executionSciGnirsLongSlit extends ExecutionTestSupportForGnirs:
           ).asRight
       )
 
+  test("[gnirs] shallow-well thermal-IR 0.30\" slit config (flat, no arc) generates"):
+    // The real GNIRS_FLAT table has a shallow-well 0.05"/pix D10 MIRROR 2.8-4.2 µm
+    // 0.30" slit row (10 x 0.3s, 2 coadds) with no matching GNIRS_ARC row.  The
+    // sequence must still generate, with flats only.
+    val setup: IO[Observation.Id] =
+      for
+        oid <- gnirsObs
+        _   <- configureGnirsThermalIr(oid, fpu = "LONG_SLIT_0_30", wellDepth = "SHALLOW")
+      yield oid
+
+    val snapshot: GnirsDynamicSnapshot =
+      ThermalIrSnapshot.copy(fpuSlit = Some("LONG_SLIT_0_30"))
+
+    // Ten flats, no trailing arc, taken at the last (long-camera) offset.
+    val flatOnlyCalAtom: Json =
+      gnirsExpectedCalAtom(snapshot, 0, -1, TimeSpan.unsafeFromMicroseconds(300_000L), 2, 10, 10.secondTimeSpan, 3, 0)
+
+    setup.flatMap: oid =>
+      expect(
+        user     = pi,
+        query    = gnirsScienceQuery(oid),
+        expected =
+          Json.obj(
+            "executionConfig" -> Json.obj(
+              "gnirs" -> Json.obj(
+                "science" -> Json.obj(
+                  "nextAtom" -> gnirsExpectedScienceAtom(snapshot,
+                    (0, -1, Enabled), (0, 5, Enabled), (0, 5, Enabled), (0, -1, Enabled)
+                  ),
+                  "possibleFuture" -> List(flatOnlyCalAtom).asJson,
+                  "hasMore"        -> false.asJson
+                )
+              )
+            )
+          ).asRight
+      )
+
   test("[gnirs] 111/LXD long camera yields arc-only calibrations, no flat"):
     // 0.05"/pix + 111/LXD + 0.675" has arcs but no slit flat (the 111/LXD flat
     // block only covers 0.10" + pinhole), which science confirmed is correct.
