@@ -186,6 +186,11 @@ object ObservationWorkflowService {
                   ObservationValidationCode.TooActivationUnapproved          => Unapproved
             case _: ObservationValidationCode.Warning                        => Defined // with warnings
 
+        // Warnings that the program has not dismissed.
+        val hasWarnings: Boolean =
+          val warnings = codes.flatMap(_.asWarning)
+          !warnings.forall(info.dismissedWarnings.contains)
+
         def userStatus(validationStatus: ValidationState): Option[UserState] =
           info.effectiveUserState.flatMap:
             case Inactive => Some(Inactive)       // Inactive overrides validation errors
@@ -193,7 +198,9 @@ object ObservationWorkflowService {
               validationStatus match              // Validation errors override Ready
                 case Undefined  => None
                 case Unapproved => None
-                case Defined    => Some(Ready)
+                // Undismissed warnings override Ready too.  As with errors the
+                // user state is kept, so Ready returns once they're dismissed.
+                case Defined    => Option.unless(hasWarnings)(Ready)
 
         // Our final state is the execution state (if any), else the user state (if any), else the validation state,
         val state: ObservationWorkflowState =
@@ -221,11 +228,6 @@ object ObservationWorkflowService {
             case Undefined  => List(Inactive)
             case Unapproved => List(Inactive)
             case Defined    =>
-
-              // Can't move forward with non-dismissed warnings
-              val hasWarnings = 
-                val warnings = codes.flatMap(_.asWarning)
-                !warnings.forall(info.dismissedWarnings.contains)
 
               // Exchange observations run at Keck/Subaru, not Gemini; they have no
               // Ready/Ongoing/Completed lifecycle, so Inactive is the only transition.

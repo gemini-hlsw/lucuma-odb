@@ -18096,7 +18096,10 @@ type Program {
   resourceCount: NonNegInt!
 
   """
-  List of validation codes that have been dismissed for this program.
+  List of validation codes that have been dismissed for this program.  An
+  observation with a warning that has not been dismissed cannot be made READY,
+  and a READY observation that picks one up reverts to DEFINED until it is
+  dismissed.
   """
   dismissedWarnings: [ObservationValidationCode!]!
 
