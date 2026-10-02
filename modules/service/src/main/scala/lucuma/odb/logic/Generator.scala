@@ -393,8 +393,7 @@ object Generator:
 
         // EitherT[F, OdbError, StreamingExecutionConfig[F, A, B] forSome { type A, type B }] but we can't write that anymore
         val stream =
-          if isUnresolvedTelluric(ctx) || ctx.params.isSpecPhotoProposal then noSequence
-          else ctx.params.observingMode.modeType match
+          ctx.params.observingMode.modeType match
             case _: ExchangeObservingModeType         => noSequence
             case ObservingModeType.Flamingos2Imaging  => EitherT(streaming.selectOrGenerateFlamingos2Imaging(ctx))
             case ObservingModeType.Flamingos2LongSlit => EitherT(streaming.selectOrGenerateFlamingos2LongSlit(ctx))
@@ -414,15 +413,19 @@ object Generator:
             case ObservingModeType.Igrins2LongSlit    => EitherT(streaming.selectOrGenerateIgrins2LongSlit(ctx))
             case _: VisitorObservingModeType          => noSequence
 
-        (checkSequence *> stepCount).flatMap: sc =>
-          val base = sc.value
-          stream
-            .map: s =>
-              s.science
-               .mapAccumulate(base): (nextStart, atom) =>
-                 val digest = AtomDigest.fromAtom(NonNegInt.unsafeFrom(nextStart))(atom)
-                 (nextStart + digest.stepCount.value, digest)
-               .map(_._2)
+        // A placeholder has no sequence, so the length limit cannot apply to it.
+        if isUnresolvedTelluric(ctx) || ctx.params.isSpecPhotoProposal then
+          EitherT.rightT(Stream.empty)
+        else
+          (checkSequence *> stepCount).flatMap: sc =>
+            val base = sc.value
+            stream
+              .map: s =>
+                s.science
+                 .mapAccumulate(base): (nextStart, atom) =>
+                   val digest = AtomDigest.fromAtom(NonNegInt.unsafeFrom(nextStart))(atom)
+                   (nextStart + digest.stepCount.value, digest)
+                 .map(_._2)
 
       override def obscalc(
         observationId: Observation.Id
