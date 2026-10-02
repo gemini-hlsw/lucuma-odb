@@ -74,11 +74,6 @@ class GnirsWavelengthOccurrenceSuite extends FunSuite:
   test("exposure check messages carry the ordinal when the wavelength repeats"):
     assert(
       GnirsSpectroscopyValidator
-        .exposureTooShort(GnirsReadMode.VeryFaint, ws(2200).head, Some(1))
-        .endsWith("(at 2.200 µm #1).")
-    )
-    assert(
-      GnirsSpectroscopyValidator
         .exposureUnusuallyLong(GnirsReadMode.VeryBright, 1.secTimeSpan, ws(2200).head, Some(2))
         .endsWith("(at 2.200 µm #2).")
     )

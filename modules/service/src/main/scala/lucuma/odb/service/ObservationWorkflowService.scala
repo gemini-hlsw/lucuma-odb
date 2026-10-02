@@ -26,6 +26,7 @@ import lucuma.odb.data.ObservationValidationMap
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.mapping.AccessControl
+import lucuma.odb.sequence.ExposureTimeIssue
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.util.Codecs.*
@@ -66,9 +67,10 @@ sealed trait ObservationWorkflowService[F[_]] {
    * `Transaction`.
    */
   def getCalculatedWorkflow(
-    oid:  Observation.Id,
-    itc:  Option[Itc],
-    exec: Option[CoreExecutionState]
+    oid:      Observation.Id,
+    itc:      Option[Itc],
+    exec:     Option[CoreExecutionState],
+    exposure: List[ExposureTimeIssue]
   )(using Transaction[F]): F[Result[ObservationWorkflow]]
 
   def setWorkflowState(
@@ -360,12 +362,15 @@ object ObservationWorkflowService {
               case None     => OdbError.InvalidObservation(oid, Some(s"Could not compute workflow for $oid.")).asFailure
 
       override def getCalculatedWorkflow(
-        oid:  Observation.Id,
-        itc:  Option[Itc],
-        exec0: Option[CoreExecutionState]
+        oid:      Observation.Id,
+        itc:      Option[Itc],
+        exec0:    Option[CoreExecutionState],
+        exposure: List[ExposureTimeIssue]
       )(using Transaction[F]): F[Result[ObservationWorkflow]] =
         (for
-          infos <- ResultT.liftF(ObservationValidationInfo.fetch(List(oid)))
+          // Use the exposure time issues just found rather than those stored
+          // with the previous calculation.
+          infos <- ResultT.liftF(ObservationValidationInfo.fetch(List(oid))).map(_.view.mapValues(_.copy(exposureTimeIssues = exposure)).toMap)
           errs  <- ObservationValidator.validate(infos, _ => itc)
           exec = exec0.filter:
             case a: DeclaredExecutionState => true // always ok

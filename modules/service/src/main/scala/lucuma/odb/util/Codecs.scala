@@ -81,6 +81,7 @@ import lucuma.odb.data.TooTrigger
 import lucuma.odb.data.TooTriggerStatus
 import lucuma.odb.data.UserType
 import lucuma.odb.json.all.query.given
+import lucuma.odb.sequence.ExposureTimeIssue
 import lucuma.odb.sequence.data.VisitOrigin
 import lucuma.odb.service.ObservationWorkflowService
 import lucuma.odb.syntax.exposureTimeMode.*
@@ -448,6 +449,11 @@ trait Codecs extends CoreCodecs {
   val _observation_validation: Codec[List[ObservationValidation]] =
     jsonb.eimap(
       _.as[List[ObservationValidation]].leftMap(f => s"Could not decode ObservationValidation array: ${f.message}.")
+    )(_.asJson)
+
+  val _exposure_time_issue: Codec[List[ExposureTimeIssue]] =
+    jsonb.eimap(
+      _.as[List[ExposureTimeIssue]].leftMap(f => s"Could not decode ExposureTimeIssue array: ${f.message}.")
     )(_.asJson)
 
   val calculation_state: Codec[CalculationState] =

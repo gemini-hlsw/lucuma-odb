@@ -6,14 +6,18 @@ package query
 
 import cats.effect.IO
 import cats.syntax.all.*
+import eu.timepit.refined.types.numeric.PosInt
 import io.circe.syntax.*
 import lucuma.core.enums.GnirsDecker
 import lucuma.core.enums.GnirsFilter
 import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.ObservationValidationCode
+import lucuma.core.enums.SequenceType
 import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
 import lucuma.core.syntax.timespan.*
+import lucuma.odb.sequence.ExposureTimeIssue
+import lucuma.odb.service.workflow.validator.ExposureTimeValidator
 import lucuma.odb.service.workflow.validator.GnirsSpectroscopyValidator
 
 class observation_workflow_gnirs extends ExecutionTestSupportForGnirs:
@@ -124,6 +128,20 @@ class observation_workflow_gnirs extends ExecutionTestSupportForGnirs:
   private def warning(msgs: String*): (ObservationValidationCode, List[String]) =
     (ObservationValidationCode.ConfigurationWarning, msgs.toList)
 
+  // Reported per sequence by the ExposureTimeValidator rather than per
+  // wavelength by the GNIRS validator.
+  private def veryFaintTooShort(steps: Int): String =
+    ExposureTimeValidator.message(
+      ExposureTimeIssue(
+        SequenceType.Science,
+        ExposureTimeIssue.Kind.BelowMinimum,
+        "GNIRS Very faint read mode",
+        GnirsReadMode.VeryFaint.minimumExposureTime,
+        PosInt.unsafeFrom(steps),
+        5.secTimeSpan
+      )
+    )
+
   private def nm(n: Int): Wavelength =
     Wavelength.fromIntNanometers(n).get
 
@@ -201,7 +219,7 @@ class observation_workflow_gnirs extends ExecutionTestSupportForGnirs:
   test("explicit read mode with an exposure below its minimum is an error"):
     expectConfigurationValidations(
       gnirsLongSlit(seconds = 5, explicitReadMode = "VERY_FAINT".some),
-      error(GnirsSpectroscopyValidator.exposureTooShort(GnirsReadMode.VeryFaint, nm(2200)))
+      error(veryFaintTooShort(4))
     )
 
   test("explicit read mode with an unusually long exposure is a warning"):
@@ -213,7 +231,7 @@ class observation_workflow_gnirs extends ExecutionTestSupportForGnirs:
   test("a configuration warning does not hide an exposure error"):
     expectConfigurationValidations(
       gnirsLongSlit(filter = "ORDER4", seconds = 5, explicitReadMode = "VERY_FAINT".some),
-      error(GnirsSpectroscopyValidator.exposureTooShort(GnirsReadMode.VeryFaint, nm(2200))),
+      error(veryFaintTooShort(4)),
       warning(GnirsSpectroscopyValidator.filterMismatch(GnirsFilter.Order4, nm(2200)))
     )
 

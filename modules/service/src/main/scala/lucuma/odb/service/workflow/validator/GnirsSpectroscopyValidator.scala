@@ -76,9 +76,6 @@ object GnirsSpectroscopyValidator:
   def filterMismatch(filter: GnirsFilter, wavelength: Wavelength, occurrence: Option[Int] = None): String =
     s"Filter ${filter.shortName} does not cover the central wavelength ${formatWavelength(wavelength, occurrence)}."
 
-  def exposureTooShort(readMode: GnirsReadMode, wavelength: Wavelength, occurrence: Option[Int] = None): String =
-    s"Exposure times for ${readMode.shortName} read mode must be at least ${formatSeconds(readMode.minimumExposureTime)} s (at ${formatWavelength(wavelength, occurrence)})."
-
   def exposureUnusuallyLong(readMode: GnirsReadMode, max: TimeSpan, wavelength: Wavelength, occurrence: Option[Int] = None): String =
     s"Exposure times for ${readMode.shortName} read mode are normally less than ${formatSeconds(max)} s; consider using a lower read noise mode (at ${formatWavelength(wavelength, occurrence)})."
 
@@ -172,9 +169,9 @@ object GnirsSpectroscopyValidator:
   ): ObservationValidationMap =
     val readMode: GnirsReadMode =
       c.explicitReadMode.getOrElse(GnirsReadMode.forExposureTime(exposure))
-    if exposure < readMode.minimumExposureTime then error(exposureTooShort(readMode, wavelength, occurrence))
-    else
-      UsualMaximumExposureTime
-        .get(readMode)
-        .filter(exposure > _)
-        .foldMap(max => warning(exposureUnusuallyLong(readMode, max, wavelength, occurrence)))
+    // Exposures shorter than the read mode minimum are reported by the
+    // ExposureTimeValidator, which checks the sequence steps themselves.
+    UsualMaximumExposureTime
+      .get(readMode)
+      .filter(exposure > _)
+      .foldMap(max => warning(exposureUnusuallyLong(readMode, max, wavelength, occurrence)))

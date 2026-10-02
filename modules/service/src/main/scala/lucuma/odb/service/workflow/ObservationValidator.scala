@@ -77,6 +77,7 @@ object ObservationValidator:
       TooActivationValidator                   |+|
       OpportunityTargetValidator               |+|
       OtherConfigErrorValidator                |+|
+      ExposureTimeValidator                    |+|
       ConditionsProbabilityValidator
 
     val scienceValidator2: ObservationValidator =

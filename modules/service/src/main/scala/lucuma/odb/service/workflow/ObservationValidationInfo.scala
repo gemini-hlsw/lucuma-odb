@@ -43,6 +43,7 @@ import lucuma.core.model.Target
 import lucuma.core.util.DateInterval
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.AltairConfiguration
+import lucuma.odb.sequence.ExposureTimeIssue
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.service.ObservationWorkflowService.UserState
 import lucuma.odb.syntax.instrument.*
@@ -88,7 +89,8 @@ case class ObservationValidationInfo(
   keckInstrument:         Option[KeckInstrument] = None,   // set for exchange_keck observations
   subaruInstrument:       Option[SubaruInstrument] = None, // set for exchange_subaru observations
   explicitGuideProbe:     Option[GuideProbe] = None,
-  altair:                 Option[AltairConfiguration]
+  altair:                 Option[AltairConfiguration],
+  exposureTimeIssues:     List[ExposureTimeIssue] = Nil
 ) {
 
   def isDeclaredComplete: Boolean =
@@ -313,6 +315,23 @@ object ObservationValidationInfo {
               info.map(in => in.copy(otherConfigErrors = msg :: in.otherConfigErrors))
           }
 
+    // Exposure times are checked when obscalc walks the sequence, which isn't
+    // done here.  Use what the last calculation found, just as the ITC result
+    // comes from its cache.
+    def addExposureTimeIssues(input: Map[Observation.Id, ObservationValidationInfo]): F[Map[Observation.Id, ObservationValidationInfo]] =
+      NonEmptyList.fromList(input.keys.toList) match
+        case None      => input.pure[F]
+        case Some(nel) =>
+          val enc = observation_id.nel(nel)
+          session
+            .stream(Statements.ExposureTimeIssues(enc))(nel, 1024)
+            .compile
+            .toList
+            .map: list =>
+              list.foldLeft(input):
+                case (m, (oid, issues)) =>
+                  m.updatedWith(oid)(_.map(_.copy(exposureTimeIssues = issues)))
+
     NonEmptyList.fromList(oids) match
       case None      =>
         Map.empty.pure
@@ -325,6 +344,7 @@ object ObservationValidationInfo {
           .flatMap(addProgramAllocations)
           .flatMap(addCoordinates)
           .flatMap(addOtherConfigErrors)
+          .flatMap(addExposureTimeIssues)
   }
 
   object Statements {
@@ -432,6 +452,15 @@ object ObservationValidationInfo {
         WHERE
           c_program_id IN ($enc)
       """.query(program_id *: science_band)
+
+    def ExposureTimeIssues[A <: NonEmptyList[Observation.Id]](enc: Encoder[A]): Query[A, (Observation.Id, List[ExposureTimeIssue])] =
+      sql"""
+        SELECT
+          c_observation_id,
+          c_exposure_time_issues
+        FROM t_obscalc
+        WHERE c_observation_id IN ($enc)
+      """.query(observation_id *: _exposure_time_issue)
 
     def CfpInfos[A <: NonEmptyList[CallForProposals.Id]](enc: Encoder[A]): Query[A, (CfpInfo, Option[Instrument])] =
       sql"""

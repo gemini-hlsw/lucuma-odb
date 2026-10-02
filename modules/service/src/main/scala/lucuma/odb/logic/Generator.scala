@@ -23,6 +23,7 @@ import lucuma.core.enums.ExchangeObservingModeType
 import lucuma.core.enums.ExecutionState
 import lucuma.core.enums.GuideProbe
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.enums.SequenceType
 import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Atom
@@ -42,6 +43,8 @@ import lucuma.odb.data.Itc
 import lucuma.odb.data.ItcAcquisition
 import lucuma.odb.data.Md5Hash
 import lucuma.odb.data.OdbError
+import lucuma.odb.sequence.ExposureTimeIssue
+import lucuma.odb.sequence.ExposureTimeLimits
 import lucuma.odb.sequence.ObservingMode.Syntax.*
 import lucuma.odb.sequence.SetupTimeEstimateCalculator
 import lucuma.odb.sequence.data.GeneratorParams
@@ -88,11 +91,12 @@ sealed trait Generator[F[_]]:
    * along with the ITC result they were calculated from. Behind Altair the ITC
    * is modelled from the guide star the generator resolves, so obscalc takes the
    * result from here rather than looking one up of its own. The digest is always
-   * calculated afresh and cached once performed.
+   * calculated afresh and cached once performed.  The exposure time issues
+   * are found in the same pass over the steps.
    */
   def obscalc(
     observationId: Observation.Id
-  )(using NoTransaction[F], Services.ServiceAccess): F[(Either[OdbError, Itc], Either[OdbError, (ExecutionDigest, Stream[F, AtomDigest])])]
+  )(using NoTransaction[F], Services.ServiceAccess): F[(Either[OdbError, Itc], Either[OdbError, (ExecutionDigest, List[ExposureTimeIssue], Stream[F, AtomDigest])])]
 
   /**
    * Generates the execution config if the observation is found and defined
@@ -209,7 +213,7 @@ object Generator:
         transactionallyWithContext(oid, commitHash): ctx =>
           for
             d0 <- ExecutionDigestCache.lookupOne(ctx)
-            d1 <- d0.fold(calcDigestThenCache(ctx))(d => EitherT.pure(d))
+            d1 <- d0.fold(calcDigestThenCache(ctx).map(_._1))(d => EitherT.pure(d))
             d  <- EitherT.fromEither[F](altairChecked(ctx, d1))
           yield d
 
@@ -219,15 +223,15 @@ object Generator:
         transactionallyWithContext(oid, commitHash): ctx =>
           for
             d0  <- ExecutionDigestCache.lookupOne(ctx)
-            d1  <- d0.fold(calcDigestThenCache(ctx))(d => EitherT.pure(d))
+            d1  <- d0.fold(calcDigestThenCache(ctx).map(_._1))(d => EitherT.pure(d))
           yield (d1, ctx.params, ctx.guideStarHash)
 
       private def calcDigestThenCache(
         ctx: GeneratorContext
-      )(using Transaction[F]): EitherT[F, OdbError, ExecutionDigest] =
+      )(using Transaction[F]): EitherT[F, OdbError, (ExecutionDigest, ExposureTimeIssue.Accumulator)] =
         for
           d <- calcDigestFromContext(ctx)
-          _ <- ExecutionDigestCache.store(ctx, d)
+          _ <- ExecutionDigestCache.store(ctx, d._1)
         yield d
 
       // No target means no sequence, so charge a fixed time instead.
@@ -255,33 +259,43 @@ object Generator:
 
       private def calcDigestFromContext(
         ctx: GeneratorContext
-      )(using Transaction[F]): EitherT[F, OdbError, ExecutionDigest] =
+      )(using Transaction[F]): EitherT[F, OdbError, (ExecutionDigest, ExposureTimeIssue.Accumulator)] =
 
-        def digest[S, D](
+        // The exposure time limits are checked in the same pass over the steps
+        // that computes the digest.
+        def digest[S, D: ExposureTimeLimits.Exposures](
           stream:    StreamingExecutionConfig[F, S, D],
           estimator: SetupTimeEstimateCalculator
-        ): EitherT[F, OdbError, ExecutionDigest] =
+        ): EitherT[F, OdbError, (ExecutionDigest, ExposureTimeIssue.Accumulator)] =
 
-          def sequenceDigest(s: Stream[F, Atom[D]]): F[Either[OdbError, SequenceDigest]] =
-            s.fold(SequenceDigest.Zero.copy(executionState = ExecutionState.Completed).asRight[OdbError]) { case (eDigest, atom) =>
-              eDigest.flatMap: digest =>
+          def sequenceDigest(
+            sequenceType: SequenceType,
+            s:            Stream[F, Atom[D]],
+            issues:       ExposureTimeIssue.Accumulator
+          ): F[Either[OdbError, (SequenceDigest, ExposureTimeIssue.Accumulator)]] =
+            s.fold((SequenceDigest.Zero.copy(executionState = ExecutionState.Completed), issues).asRight[OdbError]) { case (eDigest, atom) =>
+              eDigest.flatMap: (digest, acc) =>
                 Either.cond(
                   digest.atomCount.value < SequenceAtomLimit,
-                  digest.add(atom).copy(executionState = ctx.params.executionState),
+                  (digest.add(atom).copy(executionState = ctx.params.executionState), acc.add(sequenceType, atom)),
                   GeneratorError.sequenceTooLong(ctx.oid)
                 )
             }.compile.onlyOrError
 
           // Compute the SequenceDigests.
           for
-            a <- EitherT(sequenceDigest(stream.acquisition))
-            s <- EitherT(sequenceDigest(stream.science))
+            (a, ia) <- EitherT(sequenceDigest(SequenceType.Acquisition, stream.acquisition, ExposureTimeIssue.Accumulator.Empty))
+            (s, is) <- EitherT(sequenceDigest(SequenceType.Science, stream.science, ia))
             c  = if ctx.params.isSplittable then estimator.estimateSetupCount(s.timeEstimate.sum)
                  else NonNegInt.unsafeFrom(1)
             // Recentering is needed whether or not the observation may be split.
             r  = estimator.estimateReacquisitionCount(s.timeEstimate.sum)
             n  = ObsExtract.calibrationCount(ctx.params.observingMode, ctx.params.calibrationRole, s.timeEstimate.sum)
-          yield ExecutionDigest(estimator.estimateSetupTime, c, r, n, a, s)
+          yield (ExecutionDigest(estimator.estimateSetupTime, c, r, n, a, s), is)
+
+        // Observations without a sequence have no exposures to check.
+        def noSequence(d: ExecutionDigest): (ExecutionDigest, ExposureTimeIssue.Accumulator) =
+          (d, ExposureTimeIssue.Accumulator.Empty)
 
         // Setting up GNIRS behind the Altair laser costs more than the nominal setup.
         def gnirsSetup(nominal: SetupTimeEstimateCalculator): SetupTimeEstimateCalculator =
@@ -307,9 +321,9 @@ object Generator:
               SequenceDigest.Zero.copy(executionState = ExecutionState.DeclaredComplete)
             )
 
-        if ctx.params.declaredState == Some(ExecutionState.DeclaredComplete) then done
-        else if isUnresolvedTelluric(ctx) then EitherT.pure(unresolvedTelluricDigest(ctx))
-        else if ctx.params.isSpecPhotoProposal then EitherT.pure(flatDigest(ctx, SpecPhotoTimeEstimate))
+        if ctx.params.declaredState == Some(ExecutionState.DeclaredComplete) then done.map(noSequence)
+        else if isUnresolvedTelluric(ctx) then EitherT.pure(noSequence(unresolvedTelluricDigest(ctx)))
+        else if ctx.params.isSpecPhotoProposal then EitherT.pure(noSequence(flatDigest(ctx, SpecPhotoTimeEstimate)))
         else
           ctx.params.observingMode.modeType match
             case ObservingModeType.Flamingos2Imaging  =>
@@ -353,13 +367,13 @@ object Generator:
                     exposureTimeModeService
                       .selectRequirement(List(ctx.oid))
                       .map: etms =>
-                        VisitorExecutionDigestCalculator.residentDigest(over, etms.get(ctx.oid), state)
+                        noSequence(VisitorExecutionDigestCalculator.residentDigest(over, etms.get(ctx.oid), state))
                 case None =>
                   val totalRequestTime = ctx.params.observingMode match
                     case VisitorConfig(totalRequestTime = t) => t
                     case _                                   => none
                   EitherT.pure[F, OdbError]:
-                    VisitorExecutionDigestCalculator.alienDigest(totalRequestTime, state)
+                    noSequence(VisitorExecutionDigestCalculator.alienDigest(totalRequestTime, state))
 
             case _: ExchangeObservingModeType         =>
               // There is no sequence for exchange observations; we compute the
@@ -369,7 +383,7 @@ object Generator:
                 case ExchangeConfig(totalRequestTime = t) => t.some
                 case _                                    => none
               EitherT.pure[F, OdbError]:
-                VisitorExecutionDigestCalculator.alienDigest(totalRequestTime, state)
+                noSequence(VisitorExecutionDigestCalculator.alienDigest(totalRequestTime, state))
 
       private def calculateScienceAtomDigests(
         ctx: GeneratorContext
@@ -426,16 +440,16 @@ object Generator:
 
       override def obscalc(
         observationId: Observation.Id
-      )(using NoTransaction[F], Services.ServiceAccess): F[(Either[OdbError, Itc], Either[OdbError, (ExecutionDigest, Stream[F, AtomDigest])])] =
+      )(using NoTransaction[F], Services.ServiceAccess): F[(Either[OdbError, Itc], Either[OdbError, (ExecutionDigest, List[ExposureTimeIssue], Stream[F, AtomDigest])])] =
         GeneratorContext.lookup(observationId, commitHash).flatMap:
           case Left(error) =>
-            (error.asLeft[Itc], error.asLeft[(ExecutionDigest, Stream[F, AtomDigest])]).pure[F]
+            (error.asLeft[Itc], error.asLeft[(ExecutionDigest, List[ExposureTimeIssue], Stream[F, AtomDigest])]).pure[F]
           case Right(ctx)  =>
             transactionallyEitherT:
               for
-                d <- calcDigestThenCache(ctx)
-                a <- calculateScienceAtomDigests(ctx)
-                r <- EitherT.fromEither[F](altairChecked(ctx, (d, a)))
+                (d, x) <- calcDigestThenCache(ctx)
+                a      <- calculateScienceAtomDigests(ctx)
+                r      <- EitherT.fromEither[F](altairChecked(ctx, (d, x.toList, a)))
               yield r
             .value.map((ctx.itcRes, _))
 
@@ -662,7 +676,7 @@ object Generator:
       override def calculateDigest(
         ctx: GeneratorContext
       )(using Transaction[F]): F[Either[OdbError, ExecutionDigest]] =
-        calcDigestFromContext(ctx).value
+        calcDigestFromContext(ctx).map(_._1).value
 
       override def materializeAndThen[A](
         oid:  Observation.Id

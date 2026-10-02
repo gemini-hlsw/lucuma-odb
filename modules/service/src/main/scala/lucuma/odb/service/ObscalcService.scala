@@ -39,6 +39,7 @@ import lucuma.odb.data.Itc
 import lucuma.odb.data.Obscalc
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
+import lucuma.odb.sequence.ExposureTimeIssue
 import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs.*
@@ -247,16 +248,17 @@ object ObscalcService:
 
       private def calculateWithAtomDigests(
         pending: Obscalc.PendingCalc
-      )(using ServiceAccess): F[(Obscalc.Result, Stream[F, AtomDigest])] =
+      )(using ServiceAccess): F[(Obscalc.Result, List[ExposureTimeIssue], Stream[F, AtomDigest])] =
 
         def workflow(
           itc: Option[Itc],
-          dig: Option[ExecutionDigest]
+          dig: Option[ExecutionDigest],
+          exp: List[ExposureTimeIssue]
         ): F[ObservationWorkflow] =
           Logger[F].info(s"${pending.observationId}: calculating workflow") *>
           services
             .transactionally:
-              observationWorkflowService.getCalculatedWorkflow(pending.observationId, itc, dig.map(_.science.executionState))
+              observationWorkflowService.getCalculatedWorkflow(pending.observationId, itc, dig.map(_.science.executionState), exp)
             .flatMap: r =>
               r.toOption.fold(Logger[F].warn(s"${pending.observationId}: failure calculating workflow: $r").as(UndefinedWorkflow))(_.pure[F])
             .flatTap: r =>
@@ -266,20 +268,21 @@ object ObscalcService:
 
         // The generator resolves the ITC itself: behind Altair its input depends on the guide
         // star, which only the generation knows, so there is nothing sensible to look up first.
-        def digest: F[(Either[OdbError, Itc], Either[OdbError, (ExecutionDigest, Stream[F, AtomDigest])])] =
+        def digest: F[(Either[OdbError, Itc], Either[OdbError, (ExecutionDigest, List[ExposureTimeIssue], Stream[F, AtomDigest])])] =
           Logger[F].info(s"${pending.observationId}: calculating digest") *>
           gen.obscalc(pending.observationId)
             .flatTap: (_, da) =>
               Logger[F].info(s"${pending.observationId}: finished calculting digest: $da")
 
-        val result: F[(Obscalc.Result, Stream[F, AtomDigest])] =
+        // Without a sequence there are no exposures to check.
+        val result: F[(Obscalc.Result, List[ExposureTimeIssue], Stream[F, AtomDigest])] =
           for
             (r, d) <- digest
             _      <- Logger[F].info(s"${pending.observationId}: itc: $r")
-            w      <- workflow(r.toOption, d.toOption.map(_._1))
+            w      <- workflow(r.toOption, d.toOption.map(_._1), d.toOption.foldMap(_._2))
           yield d.fold(
-            err => (Obscalc.Result.Error(err, w), Stream.empty),
-            dig => (Obscalc.Result.Success(r.fold(_ => false, _ => true), dig._1, w), dig._2)
+            err => (Obscalc.Result.Error(err, w), Nil, Stream.empty),
+            dig => (Obscalc.Result.Success(r.fold(_ => false, _ => true), dig._1, w), dig._2, dig._3)
           )
 
         Logger[F].info(s"${pending.observationId}: *** start calculating") *>
@@ -316,6 +319,7 @@ object ObscalcService:
       private def storeResult(
         pending:      Obscalc.PendingCalc,
         result:       Obscalc.Result,
+        exposure:     List[ExposureTimeIssue],
         basePosition: Option[Option[Coordinates]],
         archiveStale: Option[Boolean],
         expected:     CalculationState
@@ -332,7 +336,7 @@ object ObscalcService:
                     else if timeAccountingDirty then CalculationState.Retry
                     else                             expected
                   (newState, Option.unless(reinvalidated)(archiveStale).flatten)
-          af  = ns.map((newState, stale) => Statements.storeResult(pending, result, basePosition, stale, newState))
+          af  = ns.map((newState, stale) => Statements.storeResult(pending, result, exposure, basePosition, stale, newState))
           m  <- af.traverse(f => session.unique(f.fragment.query(Statements.obscalc_meta))(f.argument))
         yield m
 
@@ -345,7 +349,7 @@ object ObscalcService:
             Logger[F].warn(s"${pending.observationId}: failure computing base position, keeping the stored one: ${e.getMessage}").as(none)
           .flatMap: basePosition =>
             calculateWithAtomDigests(pending)
-              .flatMap: (result, atomDigests) =>
+              .flatMap: (result, exposure, atomDigests) =>
                 services.transactionally:
                   // Completion freezes the snapshot, and the stored workflow state is one cycle behind.
                   val archiveStale =
@@ -354,13 +358,13 @@ object ObscalcService:
                   sequenceService.insertAtomDigests(pending.observationId, atomDigests) *>
                   archiveStale.flatMap: stale =>
                     (result.odbError match
-                      case Some(OdbError.RemoteServiceCallError(_)) => storeResult(pending, result, basePosition, stale.some, CalculationState.Retry)
-                      case _                                        => storeResult(pending, result, basePosition, stale.some, CalculationState.Ready))
+                      case Some(OdbError.RemoteServiceCallError(_)) => storeResult(pending, result, exposure, basePosition, stale.some, CalculationState.Retry)
+                      case _                                        => storeResult(pending, result, exposure, basePosition, stale.some, CalculationState.Ready))
               .handleErrorWith: e =>
                 val result = Obscalc.Result.Error(OdbError.UpdateFailed(Option(e.getMessage)), UndefinedWorkflow)
                 services.transactionally:
                   // Staleness is left as it was: this path cannot evaluate it.
-                  storeResult(pending, result, basePosition, none, CalculationState.Retry)
+                  storeResult(pending, result, Nil, basePosition, none, CalculationState.Retry)
 
   object Statements:
     val pending_obscalc: Codec[Obscalc.PendingCalc] =
@@ -786,6 +790,7 @@ object ObscalcService:
     def storeResult(
       pending:      Obscalc.PendingCalc,
       result:       Obscalc.Result,
+      exposure:     List[ExposureTimeIssue],
       basePosition: Option[Option[Coordinates]],
       archiveStale: Option[Boolean],
       newState:     CalculationState
@@ -799,7 +804,9 @@ object ObscalcService:
       val upRetryAt      = void"c_retry_at      = " |+|
                            (if isRetry then void"now() + (interval '1 minute' * POWER(2, LEAST(c_failure_count, 5)))" else void"NULL")
 
-      val updates = upState :: upLastUpdate :: upFailureCount :: upRetryAt :: updatesForResult(result, basePosition, archiveStale)
+      val upExposure     = sql"c_exposure_time_issues = $_exposure_time_issue"(exposure)
+
+      val updates = upState :: upLastUpdate :: upFailureCount :: upRetryAt :: upExposure :: updatesForResult(result, basePosition, archiveStale)
 
       void"UPDATE t_obscalc " |+|
         void"SET " |+| updates.intercalate(void", ") |+| void" " |+|

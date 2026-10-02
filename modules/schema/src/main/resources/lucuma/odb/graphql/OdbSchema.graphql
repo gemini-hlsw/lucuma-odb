@@ -17773,6 +17773,13 @@ enum ObservationValidationCode {
   """
   CFP_WARNING
 
+  """
+  An exposure time is outside the recommended range for its instrument
+  configuration.  Exposure times that cannot be taken at all are reported as
+  CONFIGURATION_ERROR instead.
+  """
+  EXPOSURE_TIME_WARNING
+
 }
 
 """
