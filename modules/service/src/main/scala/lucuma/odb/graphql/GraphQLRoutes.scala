@@ -48,6 +48,7 @@ import org.typelevel.otel4s.trace.StatusCode
 import org.typelevel.otel4s.trace.Tracer
 import skunk.Session
 import skunk.SqlState
+import skunk.exception.TooManyParametersException
 
 import java.nio.file.Files
 import java.nio.file.Path as NIOPath
@@ -156,6 +157,8 @@ object GraphQLRoutes {
                   resolveAndRun
                     .handleError(Result.InternalError.apply)
                     .flatTap {
+                      case Result.InternalError(t: TooManyParametersException) =>
+                        error(ctx, s"Internal error: ${t.getClass.getSimpleName}: ${t.getMessage}\nCompiled query:\n${request.query.render.take(4096)}", t)
                       case Result.InternalError(t) => error(ctx, s"Internal error: ${t.getClass.getSimpleName}: ${t.getMessage}", t)
                       case _                       => debug(ctx, s"Query (success).")
                     }

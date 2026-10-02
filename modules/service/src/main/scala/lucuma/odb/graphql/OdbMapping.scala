@@ -790,7 +790,6 @@ object OdbMapping {
                     val colored   = cleanedUp.linesIterator.map(s => s"${AnsiColor.GREEN}$s${AnsiColor.RESET}").mkString("\n")
                     s"\n\n$colored\n\n"
 
-            // Both happen before the statement runs: past Short.MaxValue skunk rejects it outright.
             val wideQuery: F[Unit] =
               SlowQueryLogger.warn(s"Wide query ($paramCount parameters):\n${truncateSql(sql)}")
                 .whenA(paramCount > WideQueryParams)
