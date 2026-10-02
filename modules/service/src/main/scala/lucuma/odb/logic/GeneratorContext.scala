@@ -15,10 +15,13 @@ import grackle.Result
 import lucuma.ags.GuideStarName
 import lucuma.core.data.Zipper
 import lucuma.core.enums.AltairMode
+import lucuma.core.model.ConstraintSet
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.itc.AltairParameters
+import lucuma.itc.client.ItcConstraintsInput
+import lucuma.itc.client.ItcConstraintsInput.*
 import lucuma.odb.data.AltairConfiguration
 import lucuma.odb.data.Itc
 import lucuma.odb.data.ItcAcquisition
@@ -36,7 +39,10 @@ import lucuma.odb.service.GuideService
 import lucuma.odb.service.NoTransaction
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
+import lucuma.odb.util.Codecs.*
 import org.typelevel.log4cats.Logger
+import skunk.*
+import skunk.implicits.*
 
 import java.security.MessageDigest
 
@@ -50,6 +56,7 @@ case class GeneratorContext(
   oid:           Observation.Id,
   itcRes:        Either[OdbError, Itc],
   params:        GeneratorParams,
+  constraints:   ConstraintSet,
   commitHash:    CommitHash,
   altairProblem: Option[OdbError]
 ):
@@ -58,6 +65,11 @@ case class GeneratorContext(
 
     // Generator Params
     md5.update(params.hashBytes)
+
+    // Constraints.  The sequence does not depend on them directly, but the
+    // exposure time issues cached with the digest do.
+    given HashBytes[ItcConstraintsInput] = HashBytes.forJsonEncoder
+    md5.update(constraints.toInput.hashBytes)
 
     def addResultSet(z: Zipper[ItcResult]): Unit =
       md5.update(z.focus.value.exposureTime.hashBytes)
@@ -173,7 +185,7 @@ object GeneratorContext:
 
   private def selectParams[F[_]: Concurrent](
     oid: Observation.Id
-  )(using NoTransaction[F], Services[F]): F[Either[OdbError, (Program.Id, GeneratorParams)]] =
+  )(using NoTransaction[F], Services[F]): F[Either[OdbError, (Program.Id, GeneratorParams, ConstraintSet)]] =
     services.transactionally:
       (for
         pid <- EitherT:
@@ -184,17 +196,19 @@ object GeneratorContext:
                  generatorParamsService
                    .selectOne(pid, oid)
                    .map(_.leftMap(e => GeneratorError.sequenceUnavailable(oid, e.format)))
-      yield (pid, prm)).value
+        cs  <- EitherT.liftF(session.unique(Statements.SelectConstraintSet)(oid))
+      yield (pid, prm, cs)).value
 
   /**
    * One generation's worth of context: the cached ITC result when there is one for these exact
    * parameters, otherwise a remote call, which happens outside any transaction.
    */
   private def contextFor[F[_]: Concurrent](
-    pid:        Program.Id,
-    oid:        Observation.Id,
-    params:     GeneratorParams,
-    commitHash: CommitHash
+    pid:         Program.Id,
+    oid:         Observation.Id,
+    params:      GeneratorParams,
+    constraints: ConstraintSet,
+    commitHash:  CommitHash
   )(using NoTransaction[F], Services[F]): F[Either[OdbError, GeneratorContext]] =
     val itc = itcService
 
@@ -218,7 +232,7 @@ object GeneratorContext:
                 // Exchange / visitor modes have no ITC; this result is never consumed
                 // for them, but a Left keeps the payload type honest.
                 EitherT.pure(GeneratorError.sequenceUnavailable(oid, "ITC is not applicable for this observing mode").asLeft[Itc])
-    yield GeneratorContext(oid, as, params, commitHash, none)).value
+    yield GeneratorContext(oid, as, params, constraints, commitHash, none)).value
 
   /**
    * Behind Altair the ITC is modelled from the guide star, and the guide star is selected against
@@ -232,10 +246,11 @@ object GeneratorContext:
    * here so that every caller of the generator sees the same digest and hash.
    */
   private def settleAltairGuideStar[F[_]: Concurrent: Logger](
-    pid:        Program.Id,
-    oid:        Observation.Id,
-    commitHash: CommitHash,
-    params:     GeneratorParams
+    pid:         Program.Id,
+    oid:         Observation.Id,
+    commitHash:  CommitHash,
+    params:      GeneratorParams,
+    constraints: ConstraintSet
   )(using NoTransaction[F], Services[F]): F[Either[OdbError, GeneratorContext]] =
 
     // Each pass caches its own digest, so the one the caller asks for afterwards is a lookup.
@@ -273,7 +288,7 @@ object GeneratorContext:
         guideService.resolveGuideStar(oid, GuideService.GeneratorInfo.fromDigest(digest, ctx.params, ctx.guideStarHash))
 
     def generate(star: Option[GuideService.ResolvedGuideStar]): EitherT[F, OdbError, GeneratorContext] =
-      EitherT(contextFor(pid, oid, withAltairGuideStar(params, star), commitHash))
+      EitherT(contextFor(pid, oid, withAltairGuideStar(params, star), constraints, commitHash))
 
     def go(number: Int, ctx: GeneratorContext): EitherT[F, OdbError, GeneratorContext] =
       for
@@ -316,13 +331,13 @@ object GeneratorContext:
     commitHash: CommitHash
   )(using NoTransaction[F], Services[F]): F[Either[OdbError, GeneratorContext]] =
     (for
-      pp           <- EitherT(selectParams(oid))
-      (pid, params) = pp
-      ctx          <- EitherT:
-                        // Only Altair feeds the guide star back into the sequence; everything else
-                        // is generated once.
-                        if params.altair.isEmpty then contextFor(pid, oid, params, commitHash)
-                        else frozenOrSettled(pid, oid, commitHash, params)
+      pp                         <- EitherT(selectParams(oid))
+      (pid, params, constraints)  = pp
+      ctx                        <- EitherT:
+                                      // Only Altair feeds the guide star back into the sequence;
+                                      // everything else is generated once.
+                                      if params.altair.isEmpty then contextFor(pid, oid, params, constraints, commitHash)
+                                      else frozenOrSettled(pid, oid, commitHash, params, constraints)
     yield ctx).value
 
   /**
@@ -333,11 +348,29 @@ object GeneratorContext:
    * builds hashes exactly as the settled one would.
    */
   private def frozenOrSettled[F[_]: Concurrent: Logger](
-    pid:        Program.Id,
-    oid:        Observation.Id,
-    commitHash: CommitHash,
-    params:     GeneratorParams
+    pid:         Program.Id,
+    oid:         Observation.Id,
+    commitHash:  CommitHash,
+    params:      GeneratorParams,
+    constraints: ConstraintSet
   )(using NoTransaction[F], Services[F]): F[Either[OdbError, GeneratorContext]] =
     services.transactionally(itcService.selectFrozen(pid, oid)).flatMap:
-      case Some(itc) => GeneratorContext(oid, itc.asRight[OdbError], params, commitHash, none).asRight[OdbError].pure[F]
-      case None      => settleAltairGuideStar(pid, oid, commitHash, params)
+      case Some(itc) => GeneratorContext(oid, itc.asRight[OdbError], params, constraints, commitHash, none).asRight[OdbError].pure[F]
+      case None      => settleAltairGuideStar(pid, oid, commitHash, params, constraints)
+
+  object Statements:
+
+    val SelectConstraintSet: Query[Observation.Id, ConstraintSet] =
+      sql"""
+        SELECT
+          c_image_quality,
+          c_cloud_extinction,
+          c_sky_background,
+          c_water_vapor,
+          c_air_mass_min,
+          c_air_mass_max,
+          c_hour_angle_min,
+          c_hour_angle_max
+        FROM t_observation
+        WHERE c_observation_id = $observation_id
+      """.query(constraint_set)

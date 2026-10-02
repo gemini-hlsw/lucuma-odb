@@ -19,6 +19,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.sequence.CalibrationDigest
 import lucuma.core.model.sequence.ExecutionDigest
+import lucuma.core.model.sequence.exposure.ExposureTimeViolation
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.Md5Hash
 import lucuma.odb.service.Services.Syntax.*
@@ -26,6 +27,8 @@ import lucuma.odb.util.Codecs.*
 import org.typelevel.log4cats.Logger
 import skunk.*
 import skunk.implicits.*
+
+import scala.collection.immutable.SortedSet
 
 sealed trait ExecutionDigestService[F[_]]:
 
@@ -132,6 +135,7 @@ object ExecutionDigestService:
           digest.acquisition.steps.observing.time(ChargeClass.NonCharged),
           digest.acquisition.steps.observing.time(ChargeClass.Program),
           digest.acquisition.executionState,
+          digest.acquisition.exposureTimeViolations,
           digest.science.observeClass,
           digest.science.timeEstimate(ChargeClass.NonCharged),
           digest.science.timeEstimate(ChargeClass.Program),
@@ -155,6 +159,7 @@ object ExecutionDigestService:
           digest.science.steps.observing.time(ChargeClass.NonCharged),
           digest.science.steps.observing.time(ChargeClass.Program),
           digest.science.executionState,
+          digest.science.exposureTimeViolations,
           oid,
           hash,
           digest.setup.full,
@@ -184,6 +189,7 @@ object ExecutionDigestService:
           digest.acquisition.steps.observing.time(ChargeClass.NonCharged),
           digest.acquisition.steps.observing.time(ChargeClass.Program),
           digest.acquisition.executionState,
+          digest.acquisition.exposureTimeViolations,
           digest.science.observeClass,
           digest.science.timeEstimate(ChargeClass.NonCharged),
           digest.science.timeEstimate(ChargeClass.Program),
@@ -206,7 +212,8 @@ object ExecutionDigestService:
           digest.science.steps.observing.count,
           digest.science.steps.observing.time(ChargeClass.NonCharged),
           digest.science.steps.observing.time(ChargeClass.Program),
-          digest.science.executionState
+          digest.science.executionState,
+          digest.science.exposureTimeViolations
         )
         .void
         .recoverWith:
@@ -250,6 +257,7 @@ object ExecutionDigestService:
         "c_acq_science_non_charged_time",
         "c_acq_science_program_time",
         "c_acq_execution_state",
+        "c_acq_exposure_time_violations",
         "c_sci_obs_class",
         "c_sci_non_charged_time",
         "c_sci_program_time",
@@ -272,7 +280,8 @@ object ExecutionDigestService:
         "c_sci_science_count",
         "c_sci_science_non_charged_time",
         "c_sci_science_program_time",
-        "c_sci_execution_state"
+        "c_sci_execution_state",
+        "c_sci_exposure_time_violations"
       )
 
     val SelectOneExecutionDigest: Query[Observation.Id, (Md5Hash, ExecutionDigest)] =
@@ -337,6 +346,7 @@ object ExecutionDigestService:
       TimeSpan,
       TimeSpan,
       ExecutionState,
+      SortedSet[ExposureTimeViolation],
       ObserveClass,
       TimeSpan,
       TimeSpan,
@@ -360,6 +370,7 @@ object ExecutionDigestService:
       TimeSpan,
       TimeSpan,
       ExecutionState,
+      SortedSet[ExposureTimeViolation],
       Observation.Id,
       Md5Hash,
       TimeSpan,
@@ -389,6 +400,7 @@ object ExecutionDigestService:
       TimeSpan,
       TimeSpan,
       ExecutionState,
+      SortedSet[ExposureTimeViolation],
       ObserveClass,
       TimeSpan,
       TimeSpan,
@@ -411,7 +423,8 @@ object ExecutionDigestService:
       NonNegInt,
       TimeSpan,
       TimeSpan,
-      ExecutionState
+      ExecutionState,
+      SortedSet[ExposureTimeViolation]
     )] =
       sql"""
         INSERT INTO t_execution_digest (
@@ -445,6 +458,7 @@ object ExecutionDigestService:
           c_acq_science_non_charged_time,
           c_acq_science_program_time,
           c_acq_execution_state,
+          c_acq_exposure_time_violations,
           c_sci_obs_class,
           c_sci_non_charged_time,
           c_sci_program_time,
@@ -467,7 +481,8 @@ object ExecutionDigestService:
           c_sci_science_count,
           c_sci_science_non_charged_time,
           c_sci_science_program_time,
-          c_sci_execution_state
+          c_sci_execution_state,
+          c_sci_exposure_time_violations
         ) SELECT
           o.c_program_id,
           $observation_id,
@@ -499,6 +514,7 @@ object ExecutionDigestService:
           $time_span,
           $time_span,
           $execution_state,
+          $_exposure_time_violation,
           $obs_class,
           $time_span,
           $time_span,
@@ -521,7 +537,8 @@ object ExecutionDigestService:
           $int4_nonneg,
           $time_span,
           $time_span,
-          $execution_state
+          $execution_state,
+          $_exposure_time_violation
         FROM t_observation o
         WHERE o.c_observation_id = $observation_id
         ON CONFLICT ON CONSTRAINT t_execution_digest_pkey DO UPDATE
@@ -553,6 +570,7 @@ object ExecutionDigestService:
               c_acq_science_non_charged_time   = $time_span,
               c_acq_science_program_time       = $time_span,
               c_acq_execution_state            = $execution_state,
+              c_acq_exposure_time_violations   = $_exposure_time_violation,
               c_sci_obs_class                  = $obs_class,
               c_sci_non_charged_time           = $time_span,
               c_sci_program_time               = $time_span,
@@ -575,5 +593,6 @@ object ExecutionDigestService:
               c_sci_science_count              = $int4_nonneg,
               c_sci_science_non_charged_time   = $time_span,
               c_sci_science_program_time       = $time_span,
-              c_sci_execution_state            = $execution_state
+              c_sci_execution_state            = $execution_state,
+              c_sci_exposure_time_violations   = $_exposure_time_violation
       """.command

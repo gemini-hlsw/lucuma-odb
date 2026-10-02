@@ -92,3 +92,25 @@ class updatePrograms_dismissedWarnings extends OdbSuite:
           )
         )
 
+
+  test("exposure time warnings can be dismissed"):
+    createProgramAs(staff).flatMap: pid =>
+      expect(
+        user = staff,
+        query = updatedismissedWarningsQuery(pid, ObservationValidationCode.Warning.ExposureTimeWarning),
+        expected = Right(
+          json"""
+            {
+              "updatePrograms": {
+                "hasMore": false,
+                "programs": [
+                  {
+                    "id": $pid,
+                    "dismissedWarnings": [ "EXPOSURE_TIME_WARNING" ]
+                  }
+                ]
+              }
+            }
+          """
+        )
+      )

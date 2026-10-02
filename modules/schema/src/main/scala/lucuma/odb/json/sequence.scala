@@ -36,6 +36,7 @@ import lucuma.core.model.sequence.StepDigest
 import lucuma.core.model.sequence.StepDigests
 import lucuma.core.model.sequence.StepEstimate
 import lucuma.core.model.sequence.TelescopeConfig
+import lucuma.core.model.sequence.exposure.ExposureTimeViolation
 import lucuma.core.util.TimeSpan
 
 import scala.collection.immutable.SortedSet
@@ -133,6 +134,20 @@ trait SequenceCodec {
         "science" -> a.observing.asJson
       )
 
+  given Decoder[ExposureTimeViolation] =
+    Decoder.instance: c =>
+      for
+        v <- c.downField("severity").as[ExposureTimeViolation.Severity]
+        d <- c.downField("description").as[String]
+      yield ExposureTimeViolation(v, d)
+
+  given Encoder[ExposureTimeViolation] =
+    Encoder.instance: (a: ExposureTimeViolation) =>
+      Json.obj(
+        "severity"    -> a.severity.asJson,
+        "description" -> a.description.asJson
+      )
+
   given Decoder[SequenceDigest] =
     Decoder.instance: c =>
       // Payloads that predate the step breakdown have no `steps`; read them as
@@ -145,7 +160,8 @@ trait SequenceCodec {
         g  <- c.downField("gcalSets").as[Option[NonNegInt]].map(_.getOrElse(NonNegInt.MinValue))
         s  <- c.downField("steps").as[Option[StepDigests]].map(_.getOrElse(StepDigests.Zero.copy(observing = StepDigest(NonNegInt.MinValue, t))))
         e  <- c.downField("executionState").as[ExecutionState]
-      yield SequenceDigest(o, t, tc, n, g, s, e)
+        v  <- c.downField("exposureTimeViolations").as[Option[List[ExposureTimeViolation]]].map(_.fold(SortedSet.empty[ExposureTimeViolation])(SortedSet.from))
+      yield SequenceDigest(o, t, tc, n, g, s, e, v)
 
   given (using Encoder[Offset], Encoder[TimeSpan]): Encoder[SequenceDigest] =
     Encoder.instance: (a: SequenceDigest) =>
@@ -155,8 +171,9 @@ trait SequenceCodec {
         "telescopeConfigs" -> a.telescopeConfigs.asJson,
         "atomCount"        -> a.atomCount.asJson,
         "gcalSets"         -> a.gcalSets.asJson,
-        "steps"            -> a.steps.asJson,
-        "executionState"   -> a.executionState.asJson
+        "steps"                  -> a.steps.asJson,
+        "executionState"         -> a.executionState.asJson,
+        "exposureTimeViolations" -> a.exposureTimeViolations.toList.asJson
       )
 
   given Decoder[CalibrationEstimate] =

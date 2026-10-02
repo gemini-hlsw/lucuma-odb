@@ -40,6 +40,7 @@ import lucuma.core.model.Program
 import lucuma.core.model.SiteCoordinatesLimits
 import lucuma.core.model.StandardRole.*
 import lucuma.core.model.Target
+import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.core.util.DateInterval
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.AltairConfiguration
@@ -88,7 +89,8 @@ case class ObservationValidationInfo(
   keckInstrument:         Option[KeckInstrument] = None,   // set for exchange_keck observations
   subaruInstrument:       Option[SubaruInstrument] = None, // set for exchange_subaru observations
   explicitGuideProbe:     Option[GuideProbe] = None,
-  altair:                 Option[AltairConfiguration]
+  altair:                 Option[AltairConfiguration],
+  executionDigest:        Option[ExecutionDigest] = None
 ) {
 
   def isDeclaredComplete: Boolean =

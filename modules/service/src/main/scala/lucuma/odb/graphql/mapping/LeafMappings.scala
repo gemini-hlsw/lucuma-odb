@@ -44,6 +44,7 @@ import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.DatasetReference
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.TimeChargeCorrection
+import lucuma.core.model.sequence.exposure.ExposureTimeViolation
 import lucuma.core.util.CalculationState
 import lucuma.core.util.IdempotencyKey
 import lucuma.core.util.Timestamp
@@ -117,6 +118,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F]:
       LeafMapping[ExecutionEventType](ExecutionEventTypeType),
       LeafMapping[ExecutionState](ExecutionStateType),
       LeafMapping[Existence](ExistenceType),
+      LeafMapping[ExposureTimeViolation.Severity](ExposureTimeViolationSeverityType),
       LeafMapping[Extinction](ExtinctionType),
       LeafMapping[Flamingos2CustomSlitWidth](Flamingos2CustomSlitWidthType),
       LeafMapping[Flamingos2Disperser](Flamingos2DisperserType),
