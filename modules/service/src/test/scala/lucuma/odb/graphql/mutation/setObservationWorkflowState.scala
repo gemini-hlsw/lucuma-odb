@@ -509,6 +509,44 @@ class setObservationWorkflowState
       ) >>
       testTransitionsAs(pi, pid, oid, Defined, Inactive, Ready)
 
+  def setDismissedWarnings(pid: Program.Id, codes: String*): IO[Unit] =
+    query(
+      user  = staff,
+      query =
+        s"""
+          mutation {
+            updatePrograms(
+              input: {
+                SET: { dismissedWarnings: [ ${codes.mkString(", ")} ] }
+                WHERE: { id: { EQ: "$pid" } }
+              }
+            ) {
+              programs { id }
+            }
+          }
+        """
+    ).void
+
+  test("[Warnings]    Ready     --> Defined (undismissed warning), and back once dismissed"):
+    createPhaseTwoObservationWithWarnings.flatMap: (pid, oid) =>
+      for
+        _ <- setDismissedWarnings(pid, "LOW_TOTAL_SIGNAL_TO_NOISE")
+        _ <- runObscalcUpdate(pid, oid)
+        _ <- setObservationWorkflowState(pi, oid, Ready)
+        _ <- runObscalcUpdate(pid, oid)
+        _ <- assertIO(queryObservationWorkflowState(oid), Ready)
+
+        // The warning reappears, so Ready no longer stands.
+        _ <- setDismissedWarnings(pid)
+        _ <- runObscalcUpdate(pid, oid)
+        _ <- assertIO(queryObservationWorkflowState(oid), Defined)
+
+        // The Ready user state was kept, so dismissing restores it.
+        _ <- setDismissedWarnings(pid, "LOW_TOTAL_SIGNAL_TO_NOISE")
+        _ <- runObscalcUpdate(pid, oid)
+        _ <- assertIO(queryObservationWorkflowState(oid), Ready)
+      yield ()
+
   // sc-10485 base coordinates outside the CfP limits are a dismissable warning
   val createPhaseTwoObservationOutsideCfpLimits: IO[(Program.Id, Observation.Id)] =
     for
