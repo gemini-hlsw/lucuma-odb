@@ -753,6 +753,7 @@ object OdbMapping {
           private val SlowQueryLogger: Logger[F] = LF.getLoggerFromName("lucuma-odb-slow-query")
           private val MaxSqlLength               = 1024
           private val DumpThreshold              = 50000
+          private val WideQueryParams            = 10000
 
           private def truncateSql(s: String): String =
             if s.length <= MaxSqlLength then s
@@ -760,7 +761,8 @@ object OdbMapping {
 
           // Override `fetch` to log the SQL query. This is optional.
           override def fetch(fragment: AppliedFragment, codecs: List[(Boolean, Codec)]): F[Vector[Array[Any]]] = {
-            val sql = fragment.fragment.sql
+            val sql        = fragment.fragment.sql
+            val paramCount = fragment.fragment.encoder.types.length
 
             val big = sql.length > DumpThreshold
 
@@ -788,8 +790,14 @@ object OdbMapping {
                     val colored   = cleanedUp.linesIterator.map(s => s"${AnsiColor.GREEN}$s${AnsiColor.RESET}").mkString("\n")
                     s"\n\n$colored\n\n"
 
+            val wideQuery: F[Unit] =
+              SlowQueryLogger.warn(s"Wide query ($paramCount parameters):\n${truncateSql(sql)}")
+                .whenA(paramCount > WideQueryParams)
+
             logQuery.flatMap: dumpPath =>
               T.span("grackle.fetch").use: span =>
+                span.addAttribute(Attribute("db.parameter_count", paramCount.toLong)) >>
+                wideQuery >>
                 Temporal[F].timed(super.fetch(fragment, codecs)).flatMap: (elapsed, result) =>
                   val slowQuery = elapsed > slowQueryThreshold
 
