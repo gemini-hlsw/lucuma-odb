@@ -12,6 +12,7 @@ import cats.syntax.applicative.*
 import cats.syntax.apply.*
 import cats.syntax.either.*
 import cats.syntax.flatMap.*
+import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
 import eu.timepit.refined.types.string.NonEmptyString
@@ -22,6 +23,7 @@ import grackle.Result
 import grackle.ResultT
 import lucuma.core.enums.Breakpoint
 import lucuma.core.enums.ChargeClass
+import lucuma.core.enums.CloneSequenceMode
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
@@ -95,6 +97,7 @@ trait SequenceService[F[_]]:
     observationId:  Observation.Id,
     sequenceType:   SequenceType,
     sequence:       List[ProtoAtom[ProtoStep[Flamingos2DynamicConfig]]],
+    customized:     Boolean      = true,
     namespace:      Option[UUID] = None
   )(using Transaction[F]): F[Result[Stream[Pure, Atom[Flamingos2DynamicConfig]]]]
 
@@ -110,6 +113,7 @@ trait SequenceService[F[_]]:
     observationId:  Observation.Id,
     sequenceType:   SequenceType,
     sequence:       List[ProtoAtom[ProtoStep[GhostDynamicConfig]]],
+    customized:     Boolean      = true,
     namespace:      Option[UUID] = None
   )(using Transaction[F]): F[Result[Stream[Pure, Atom[GhostDynamicConfig]]]]
 
@@ -121,6 +125,7 @@ trait SequenceService[F[_]]:
     observationId:  Observation.Id,
     sequenceType:   SequenceType,
     sequence:       List[ProtoAtom[ProtoStep[GmosNorth]]],
+    customized:     Boolean      = true,
     namespace:      Option[UUID] = None
   )(using Transaction[F]): F[Result[Stream[Pure, Atom[GmosNorth]]]]
 
@@ -132,6 +137,7 @@ trait SequenceService[F[_]]:
     observationId:  Observation.Id,
     sequenceType:   SequenceType,
     sequence:       List[ProtoAtom[ProtoStep[GmosSouth]]],
+    customized:     Boolean      = true,
     namespace:      Option[UUID] = None
   )(using Transaction[F]): F[Result[Stream[Pure, Atom[GmosSouth]]]]
 
@@ -231,6 +237,7 @@ trait SequenceService[F[_]]:
     observationId:  Observation.Id,
     sequenceType:   SequenceType,
     sequence:       List[ProtoAtom[ProtoStep[Igrins2DynamicConfig]]],
+    customized:     Boolean      = true,
     namespace:      Option[UUID] = None
   )(using Transaction[F]): F[Result[Stream[Pure, Atom[Igrins2DynamicConfig]]]]
 
@@ -259,6 +266,7 @@ trait SequenceService[F[_]]:
     observationId:  Observation.Id,
     sequenceType:   SequenceType,
     sequence:       List[ProtoAtom[ProtoStep[GnirsDynamicConfig]]],
+    customized:     Boolean      = true,
     namespace:      Option[UUID] = None
   )(using Transaction[F]): F[Result[Stream[Pure, Atom[GnirsDynamicConfig]]]]
 
@@ -285,6 +293,18 @@ trait SequenceService[F[_]]:
 
   def deleteSequence(
     observationId: Observation.Id
+  )(using Transaction[F]): F[Result[Unit]]
+
+  /**
+   * Copies the materialized `sequenceTypes` sequences of `source` into `clone`,
+   * as pending steps, according to `mode`.  A sequence type that is not
+   * materialized, or that has nothing to copy, is left to be generated.
+   */
+  def cloneSequence(
+    source:        Observation.Id,
+    clone:         Observation.Id,
+    mode:          CloneSequenceMode,
+    sequenceTypes: List[SequenceType]
   )(using Transaction[F]): F[Result[Unit]]
 
 object SequenceService:
@@ -483,6 +503,18 @@ object SequenceService:
         def toStep(sid: Step.Id, estimate: StepEstimate): Step[D] =
           Step(sid, p.value, p.stepConfig, p.telescopeConfig, estimate, p.observeClass, p.breakpoint)
 
+      // Groups adjacent rows that share an atom id.
+      private def groupByAtom[A, B](
+        f: (Atom.Id, Option[NonEmptyString], NonEmptyList[A]) => B
+      ): Pipe[F, (Atom.Id, Option[String], A), B] =
+        _.groupAdjacentBy(_._1)
+         .map: (aid, chunk) =>
+           f(
+             aid,
+             chunk.head.flatMap(_._2).flatMap(NonEmptyString.from(_).toOption),
+             NonEmptyList.fromListUnsafe(chunk.map(_._3).toList)
+           )
+
       // Turns a stream of ProtoStep into an atom by running the time estimation
       // and grouping the steps by atom id.
       private def atomPipe[S, D](
@@ -495,13 +527,7 @@ object SequenceService:
             (lastʹ, (aid, desc, protoStep.toStep(sid, estimate)))
         }
         .map(_._2)
-        .groupAdjacentBy(_._1)
-        .map: (aid, chunk) =>
-          Atom(
-            aid,
-            chunk.head.flatMap(_._2).flatMap(NonEmptyString.from(_).toOption),
-            NonEmptyList.fromListUnsafe(chunk.map(_._3).toList)
-          )
+        .through(groupByAtom(Atom(_, _, _)))
 
       override def isMaterialized(
         observationId: Observation.Id,
@@ -523,16 +549,18 @@ object SequenceService:
 
       /**
        * Marks the sequence as materialized, or updates the timestamp of the
-       * last materialization.
+       * last materialization.  Either way, records whether the sequence is now
+       * customized (i.e., explicitly replaced rather than generated).
        *
        * @return `true` if a new row was inserted, `false` if an existing row
        *         was updated
        */
       private def markMaterializedOrUpdate(
         observationId: Observation.Id,
-        sequenceType:  SequenceType
+        sequenceType:  SequenceType,
+        customized:    Boolean
       ): F[Boolean] =
-        session.unique(Statements.MarkMaterializedOrUpdate)(observationId, sequenceType)
+        session.unique(Statements.MarkMaterializedOrUpdate)(observationId, sequenceType, customized)
 
       /**
        * Deletes the row in the t_squence_materialized table if it exists.
@@ -561,6 +589,7 @@ object SequenceService:
         observationId:    Observation.Id,
         sequenceType:     SequenceType,
         sequence:         List[ProtoAtom[ProtoStep[D]]],
+        customized:       Boolean,
         insertInstConfig: (rows: List[(Step.Id, D)]) => Command[rows.type],
         atomBuilder:      AtomBuilder[D]
       )(using Transaction[F]): ResultT[F, Stream[Pure, Atom[D]]] =
@@ -588,7 +617,7 @@ object SequenceService:
           val atoms = atomBuilder.buildStream(Stream.emits(sequence))
 
           for
-            _ <- markMaterializedOrUpdate(observationId, sequenceType)
+            _ <- markMaterializedOrUpdate(observationId, sequenceType, customized)
             _ <- abandonAndDeleteUnexecuted(observationId, sequenceType)
             _ <- insertSequence(instrument, observationId, sequenceType, atoms.covary[F], insertInstConfig)
           yield atoms
@@ -614,6 +643,7 @@ object SequenceService:
         observationId: Observation.Id,
         sequenceType:  SequenceType,
         sequence:      List[ProtoAtom[ProtoStep[Flamingos2DynamicConfig]]],
+        customized:    Boolean      = true,
         namespace:     Option[UUID] = None
       )(using Transaction[F]): F[Result[Stream[Pure, Atom[Flamingos2DynamicConfig]]]] =
 
@@ -625,6 +655,7 @@ object SequenceService:
                  observationId,
                  sequenceType,
                  sequence,
+                 customized,
                  Flamingos2SequenceService.Statements.insertDynamics,
                  b
                )
@@ -653,6 +684,7 @@ object SequenceService:
         observationId:  Observation.Id,
         sequenceType:   SequenceType,
         sequence:       List[ProtoAtom[ProtoStep[GhostDynamicConfig]]],
+        customized:     Boolean      = true,
         namespace:      Option[UUID] = None
       )(using Transaction[F]): F[Result[Stream[Pure, Atom[GhostDynamicConfig]]]] =
         (for
@@ -663,6 +695,7 @@ object SequenceService:
                  observationId,
                  sequenceType,
                  sequence,
+                 customized,
                  GhostSequenceService.Statements.insertDynamics,
                  b
                )
@@ -683,6 +716,7 @@ object SequenceService:
         observationId: Observation.Id,
         sequenceType:  SequenceType,
         sequence:      List[ProtoAtom[ProtoStep[GmosNorth]]],
+        customized:    Boolean      = true,
         namespace:     Option[UUID] = None
       )(using Transaction[F]): F[Result[Stream[Pure, Atom[GmosNorth]]]] =
         (for
@@ -693,6 +727,7 @@ object SequenceService:
                  observationId,
                  sequenceType,
                  sequence,
+                 customized,
                  GmosSequenceService.Statements.insertNorthDynamics,
                  b
                )
@@ -713,6 +748,7 @@ object SequenceService:
         observationId: Observation.Id,
         sequenceType:  SequenceType,
         sequence:      List[ProtoAtom[ProtoStep[GmosSouth]]],
+        customized:    Boolean      = true,
         namespace:     Option[UUID] = None
       )(using Transaction[F]): F[Result[Stream[Pure, Atom[GmosSouth]]]] =
         (for
@@ -723,6 +759,7 @@ object SequenceService:
                  observationId,
                  sequenceType,
                  sequence,
+                 customized,
                  GmosSequenceService.Statements.insertSouthDynamics,
                  b
                )
@@ -744,6 +781,7 @@ object SequenceService:
         observationId: Observation.Id,
         sequenceType:  SequenceType,
         sequence:      List[ProtoAtom[ProtoStep[Igrins2DynamicConfig]]],
+        customized:    Boolean      = true,
         namespace:     Option[UUID] = None
       )(using Transaction[F]): F[Result[Stream[Pure, Atom[Igrins2DynamicConfig]]]] =
         (for
@@ -754,6 +792,7 @@ object SequenceService:
                  observationId,
                  sequenceType,
                  sequence,
+                 customized,
                  Igrins2SequenceService.Statements.insertDynamics,
                  b
                )
@@ -774,6 +813,7 @@ object SequenceService:
         observationId: Observation.Id,
         sequenceType:  SequenceType,
         sequence:      List[ProtoAtom[ProtoStep[GnirsDynamicConfig]]],
+        customized:    Boolean      = true,
         namespace:     Option[UUID] = None
       )(using Transaction[F]): F[Result[Stream[Pure, Atom[GnirsDynamicConfig]]]] =
         (for
@@ -784,6 +824,7 @@ object SequenceService:
                  observationId,
                  sequenceType,
                  sequence,
+                 customized,
                  GnirsSequenceService.Statements.insertDynamics,
                  b
                )
@@ -807,7 +848,7 @@ object SequenceService:
         insert: (Observation.Id, SequenceType, Stream[F, Atom[D]]) => F[Unit]
       )(using Transaction[F], Services.ServiceAccess): F[Unit] =
         val reset = for
-          _ <- markMaterializedOrUpdate(observationId, SequenceType.Acquisition)
+          _ <- markMaterializedOrUpdate(observationId, SequenceType.Acquisition, customized = false)
           _ <- abandonAndDeleteUnexecuted(observationId, SequenceType.Acquisition)
           _ <- insert(observationId, SequenceType.Acquisition, stream)
         yield ()
@@ -1015,6 +1056,59 @@ object SequenceService:
           OdbError.InvalidArgument(s"Cannot delete sequence for observation $observationId because it has visits.".some).asFailureF,
           doDelete.map(Result.success)
         )
+
+      override def cloneSequence(
+        source:        Observation.Id,
+        clone:         Observation.Id,
+        mode:          CloneSequenceMode,
+        sequenceTypes: List[SequenceType]
+      )(using Transaction[F]): F[Result[Unit]] =
+
+        def copy[D](
+          instrument:   Instrument,
+          sequenceType: SequenceType,
+          table:        Statements.DynamicTable[D],
+          pendingOnly:  Boolean,
+          replace:      List[ProtoAtom[ProtoStep[D]]] => F[Result[Stream[Pure, Atom[D]]]]
+        ): F[Result[Unit]] =
+          session
+            .stream(Statements.selectSequenceForClone(table, pendingOnly))((instrument, source, sequenceType), BatchSize)
+            .map((aid, desc, _, step) => (aid, desc, step))
+            .through(groupByAtom((_, desc, steps) => ProtoAtom(desc, steps)))
+            .compile
+            .toList
+            .flatMap:
+              case Nil   => Result.unit.pure[F]
+              case atoms => replace(atoms).map(_.void)
+
+        // The clone inherits the source's customization: a copy of hand-edited
+        // steps is customized, a copy of generated steps is not.
+        def copySequenceType(instrument: Instrument, sequenceType: SequenceType, pendingOnly: Boolean, customized: Boolean): F[Result[Unit]] =
+          instrument match
+            case Instrument.Flamingos2 => copy(instrument, sequenceType, Statements.Flamingos2Table, pendingOnly, replaceFlamingos2Sequence(clone, sequenceType, _, customized))
+            case Instrument.Ghost      => copy(instrument, sequenceType, Statements.GhostTable,      pendingOnly, replaceGhostSequence(clone, sequenceType, _, customized))
+            case Instrument.GmosNorth  => copy(instrument, sequenceType, Statements.GmosNorthTable,  pendingOnly, replaceGmosNorthSequence(clone, sequenceType, _, customized))
+            case Instrument.GmosSouth  => copy(instrument, sequenceType, Statements.GmosSouthTable,  pendingOnly, replaceGmosSouthSequence(clone, sequenceType, _, customized))
+            case Instrument.Igrins2    => copy(instrument, sequenceType, Statements.Igrins2Table,    pendingOnly, replaceIgrins2Sequence(clone, sequenceType, _, customized))
+            case Instrument.Gnirs      => copy(instrument, sequenceType, Statements.GnirsTable,      pendingOnly, replaceGnirsSequence(clone, sequenceType, _, customized))
+            case _                     => Result.unit.pure[F]
+
+        def copyIfMaterialized(instrument: Instrument, sequenceType: SequenceType, pendingOnly: Boolean): ResultT[F, Unit] =
+          ResultT:
+            session.option(Statements.SelectIsCustomized)(source, sequenceType).flatMap:
+              case None             => Result.unit.pure[F]  // not materialized
+              case Some(customized) => copySequenceType(instrument, sequenceType, pendingOnly, customized)
+
+        def copyAll(pendingOnly: Boolean): F[Result[Unit]] =
+          observationService.selectInstrument(source).flatMap:
+            case None             => Result.unit.pure[F]
+            case Some(instrument) =>
+              sequenceTypes.traverse_(copyIfMaterialized(instrument, _, pendingOnly)).value
+
+        mode match
+          case CloneSequenceMode.None         => Result.unit.pure[F]
+          case CloneSequenceMode.AllSteps     => copyAll(pendingOnly = false)
+          case CloneSequenceMode.PendingSteps => copyAll(pendingOnly = true)
 
   object Statements:
 
@@ -1227,14 +1321,38 @@ object SequenceService:
         ORDER BY c_observation_id, c_atom_index
       """.query(atom_digest_row)
 
-    def selectSequence[D](
-      instrumentTable:   String,
-      instrumentColumns: List[String],
-      instrumentDecoder: Decoder[D]
+    final case class DynamicTable[D](
+      name:    String,
+      columns: List[String],
+      decoder: Decoder[D]
+    )
+
+    val Flamingos2Table: DynamicTable[Flamingos2DynamicConfig] =
+      DynamicTable("t_flamingos_2_dynamic", Flamingos2SequenceService.Statements.Flamingos2DynamicColumns, flamingos_2_dynamic)
+
+    val GhostTable: DynamicTable[GhostDynamicConfig] =
+      DynamicTable("t_ghost_dynamic", GhostSequenceService.Statements.DynamicColumns, ghost_dynamic)
+
+    val GmosNorthTable: DynamicTable[GmosNorth] =
+      DynamicTable("t_gmos_north_dynamic", GmosSequenceService.Statements.GmosDynamicColumns, gmos_north_dynamic)
+
+    val GmosSouthTable: DynamicTable[GmosSouth] =
+      DynamicTable("t_gmos_south_dynamic", GmosSequenceService.Statements.GmosDynamicColumns, gmos_south_dynamic)
+
+    val Igrins2Table: DynamicTable[Igrins2DynamicConfig] =
+      DynamicTable("t_igrins_2_dynamic", Igrins2SequenceService.Statements.Igrins2DynamicColumns, igrins_2_dynamic)
+
+    val GnirsTable: DynamicTable[GnirsDynamicConfig] =
+      DynamicTable("t_gnirs_dynamic", GnirsSequenceService.Statements.GnirsDynamicColumns, gnirs_dynamic)
+
+    private def selectSequence[D](
+      table:      DynamicTable[D],
+      stepFilter: String,
+      orderBy:    String
     ): Query[(Instrument, Observation.Id, SequenceType), (Atom.Id, Option[String], Step.Id, ProtoStep[D])] =
 
       val proto_step = (
-        instrumentDecoder *:
+        table.decoder     *:
         step_config       *:
         telescope_config  *:
         obs_class         *:
@@ -1246,7 +1364,7 @@ object SequenceService:
           a.c_atom_id,
           a.c_description,
           s.c_step_id,
-          #${encodeColumns("i".some, instrumentColumns)},
+          #${encodeColumns("i".some, table.columns)},
           s.c_step_type,
           #${encodeColumns("g".some, StepConfigGcalColumns)},
           #${encodeColumns("r".some, StepConfigSmartGcalColumns)},
@@ -1263,7 +1381,7 @@ object SequenceService:
 
         LEFT JOIN t_step_execution se ON se.c_step_id = s.c_step_id
 
-        JOIN #${instrumentTable} i
+        JOIN #${table.name} i
           ON i.c_step_id = s.c_step_id
 
         LEFT JOIN t_step_config_gcal g
@@ -1275,54 +1393,63 @@ object SequenceService:
         WHERE
           a.c_instrument     = $instrument      AND
           a.c_observation_id = $observation_id  AND
-          a.c_sequence_type  = $sequence_type   AND
-          (se.c_step_id IS NULL OR se.c_execution_state IN ( 'not_started', 'ongoing' ))
+          a.c_sequence_type  = $sequence_type
+          #$stepFilter
         ORDER BY
-          a.c_atom_index,
-          s.c_step_index
+          #$orderBy
       """.query(atom_id *: text.opt *: step_id *: proto_step)
 
-    val SelectFlamingos2Sequence: Query[(Instrument, Observation.Id, SequenceType), (Atom.Id, Option[String], Step.Id, ProtoStep[Flamingos2DynamicConfig])] =
+    private def selectRemainingSequence[D](
+      table: DynamicTable[D]
+    ): Query[(Instrument, Observation.Id, SequenceType), (Atom.Id, Option[String], Step.Id, ProtoStep[D])] =
       selectSequence(
-        "t_flamingos_2_dynamic",
-        Flamingos2SequenceService.Statements.Flamingos2DynamicColumns,
-        flamingos_2_dynamic
+        table,
+        "AND (se.c_step_id IS NULL OR se.c_execution_state IN ( 'not_started', 'ongoing' ))",
+        "a.c_atom_index, s.c_step_index"
       )
+
+    /**
+     * Selects a sequence to copy into a clone.  Atoms are ordered by their
+     * first executed step, then by atom index, and steps by execution order,
+     * then by step index, so unexecuted atoms and steps follow executed ones.
+     */
+    def selectSequenceForClone[D](
+      table:       DynamicTable[D],
+      pendingOnly: Boolean
+    ): Query[(Instrument, Observation.Id, SequenceType), (Atom.Id, Option[String], Step.Id, ProtoStep[D])] =
+      selectSequence(
+        table,
+        if pendingOnly then "AND (se.c_step_id IS NULL OR se.c_execution_state = 'not_started')" else "",
+        """
+          (
+            SELECT MIN(ae.c_execution_order)
+            FROM t_step ast
+            JOIN t_step_execution ae ON ae.c_step_id = ast.c_step_id
+            WHERE ast.c_atom_id = a.c_atom_id
+          ) NULLS LAST,
+          a.c_atom_index,
+          se.c_execution_order NULLS LAST,
+          s.c_step_index
+        """
+      )
+
+    val SelectFlamingos2Sequence: Query[(Instrument, Observation.Id, SequenceType), (Atom.Id, Option[String], Step.Id, ProtoStep[Flamingos2DynamicConfig])] =
+      selectRemainingSequence(Flamingos2Table)
 
     val SelectGhostSequence: Query[(Instrument, Observation.Id, SequenceType), (Atom.Id, Option[String], Step.Id, ProtoStep[GhostDynamicConfig])] =
-      selectSequence(
-        "t_ghost_dynamic",
-        GhostSequenceService.Statements.DynamicColumns,
-        ghost_dynamic
-      )
+      selectRemainingSequence(GhostTable)
 
     val SelectGmosNorthSequence: Query[(Instrument, Observation.Id, SequenceType), (Atom.Id, Option[String], Step.Id, ProtoStep[GmosNorth])] =
-      selectSequence(
-        "t_gmos_north_dynamic",
-        GmosSequenceService.Statements.GmosDynamicColumns,
-        gmos_north_dynamic
-      )
+      selectRemainingSequence(GmosNorthTable)
 
     val SelectGmosSouthSequence: Query[(Instrument, Observation.Id, SequenceType), (Atom.Id, Option[String], Step.Id, ProtoStep[GmosSouth])] =
-      selectSequence(
-        "t_gmos_south_dynamic",
-        GmosSequenceService.Statements.GmosDynamicColumns,
-        gmos_south_dynamic
-      )
+      selectRemainingSequence(GmosSouthTable)
 
     val SelectIgrins2Sequence: Query[(Instrument, Observation.Id, SequenceType), (Atom.Id, Option[String], Step.Id, ProtoStep[Igrins2DynamicConfig])] =
-      selectSequence(
-        "t_igrins_2_dynamic",
-        Igrins2SequenceService.Statements.Igrins2DynamicColumns,
-        igrins_2_dynamic
-      )
+      selectRemainingSequence(Igrins2Table)
 
     val SelectGnirsSequence: Query[(Instrument, Observation.Id, SequenceType), (Atom.Id, Option[String], Step.Id, ProtoStep[GnirsDynamicConfig])] =
-      selectSequence(
-        "t_gnirs_dynamic",
-        GnirsSequenceService.Statements.GnirsDynamicColumns,
-        gnirs_dynamic
-      )
+      selectRemainingSequence(GnirsTable)
 
     val IsMaterialized: Query[(Observation.Id, SequenceType), Boolean] =
       sql"""
@@ -1332,6 +1459,15 @@ object SequenceService:
           WHERE  c_observation_id = $observation_id
             AND  c_sequence_type  = $sequence_type
         )
+      """.query(bool)
+
+    /** Whether a materialized sequence is customized; no row if it is not materialized. */
+    val SelectIsCustomized: Query[(Observation.Id, SequenceType), Boolean] =
+      sql"""
+        SELECT c_customized
+        FROM   t_sequence_materialization
+        WHERE  c_observation_id = $observation_id
+          AND  c_sequence_type  = $sequence_type
       """.query(bool)
 
     val MarkMaterializedOrDoNothing: Query[(Observation.Id, SequenceType), Boolean] =
@@ -1350,17 +1486,18 @@ object SequenceService:
         SELECT EXISTS (SELECT 1 FROM ins) AS inserted
       """.query(bool)
 
-    val MarkMaterializedOrUpdate: Query[(Observation.Id, SequenceType), Boolean] =
+    val MarkMaterializedOrUpdate: Query[(Observation.Id, SequenceType, Boolean), Boolean] =
       sql"""
         INSERT INTO t_sequence_materialization (
           c_observation_id,
           c_sequence_type,
           c_created,
-          c_updated
+          c_updated,
+          c_customized
         )
-        VALUES ($observation_id, $sequence_type, now(), now())
+        VALUES ($observation_id, $sequence_type, now(), now(), $bool)
         ON CONFLICT (c_observation_id, c_sequence_type)
-        DO UPDATE SET c_updated = now()
+        DO UPDATE SET c_updated = now(), c_customized = EXCLUDED.c_customized
         RETURNING (xmax = 0) AS inserted
       """.query(bool)
 

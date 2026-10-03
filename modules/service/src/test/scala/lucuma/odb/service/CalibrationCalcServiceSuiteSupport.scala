@@ -38,8 +38,14 @@ trait CalibrationCalcServiceSuiteSupport extends ExecutionTestSupportForFlamingo
   def markReady(pending: PendingRecalc): IO[Unit] =
     withCalibrationCalcServiceTransactionally(_.markReady(pending))
 
-  def markRetry(oid: Observation.Id, error: String): IO[Unit] =
+  def markRetry(oid: Observation.Id, error: String): IO[Boolean] =
     withCalibrationCalcServiceTransactionally(_.markRetry(oid, error))
+
+  def invalidate(pid: Program.Id, oid: Observation.Id): IO[Unit] =
+    withSession: session =>
+      session.execute(
+        sql"CALL invalidate_calibration_calc($observation_id, $program_id, 'recalc')".command
+      )(oid, pid).void
 
   val cleanup: IO[Unit] =
     withSession: session =>

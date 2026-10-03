@@ -21,6 +21,7 @@ import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.ExchangeObservingModeType
 import lucuma.core.enums.ExecutionState
+import lucuma.core.enums.GuideProbe
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.model.Observation
@@ -239,6 +240,7 @@ object Generator:
           SetupTime.Zero,
           NonNegInt.MinValue,
           NonNegInt.MinValue,
+          NonNegInt.MinValue,
           SequenceDigest.Zero,
           SequenceDigest.Zero.copy(
             observeClass   = ctx.params.calibrationRole.sciClass,
@@ -276,17 +278,29 @@ object Generator:
             s <- EitherT(sequenceDigest(stream.science))
             c  = if ctx.params.isSplittable then estimator.estimateSetupCount(s.timeEstimate.sum)
                  else NonNegInt.unsafeFrom(1)
+            // Recentering is needed whether or not the observation may be split.
+            r  = estimator.estimateReacquisitionCount(s.timeEstimate.sum)
             n  = ObsExtract.calibrationCount(ctx.params.observingMode, ctx.params.calibrationRole, s.timeEstimate.sum)
-          yield ExecutionDigest(estimator.estimateSetupTime, c, n, a, s)
+          yield ExecutionDigest(estimator.estimateSetupTime, c, r, n, a, s)
 
         // Setting up GNIRS behind the Altair laser costs more than the nominal setup.
         def gnirsSetup(nominal: SetupTimeEstimateCalculator): SetupTimeEstimateCalculator =
           if ctx.params.altair.exists(_.mode.usesLaser) then calculator.gnirsLgsSetup else nominal
 
+        // Spectroscopy guided by a PWFS is periodically reacquired.  Imaging is
+        // not, and neither is IGRINS-2, which compensates for flexure itself.
+        def spectroscopySetup(nominal: SetupTimeEstimateCalculator): SetupTimeEstimateCalculator =
+          ctx.params.guideProbe match
+            case Some(GuideProbe.PWFS1 | GuideProbe.PWFS2) =>
+              SetupTimeEstimateCalculator.pwfsSpectroscopy(nominal.estimateSetupTime)
+            case _                                         =>
+              nominal
+
         val done =
           EitherT.pure[F, OdbError]:
             ExecutionDigest(
               SetupTime.Zero,
+              NonNegInt.MinValue,
               NonNegInt.MinValue,
               NonNegInt.MinValue,
               SequenceDigest.Zero.copy(executionState = ExecutionState.DeclaredComplete),
@@ -301,33 +315,33 @@ object Generator:
             case ObservingModeType.Flamingos2Imaging  =>
               EitherT(streaming.selectOrGenerateFlamingos2Imaging(ctx)).flatMap(digest(_, calculator.flamingos2ImagingSetup))
             case ObservingModeType.Flamingos2Mos      =>
-              EitherT(streaming.selectOrGenerateFlamingos2Mos(ctx)).flatMap(digest(_, calculator.flamingos2MosSetup))
+              EitherT(streaming.selectOrGenerateFlamingos2Mos(ctx)).flatMap(digest(_, spectroscopySetup(calculator.flamingos2MosSetup)))
             case ObservingModeType.Flamingos2LongSlit =>
-              EitherT(streaming.selectOrGenerateFlamingos2LongSlit(ctx)).flatMap(digest(_, calculator.flamingos2LongSlitSetup))
+              EitherT(streaming.selectOrGenerateFlamingos2LongSlit(ctx)).flatMap(digest(_, spectroscopySetup(calculator.flamingos2LongSlitSetup)))
             case ObservingModeType.GhostIfu           =>
-              EitherT(streaming.selectOrGenerateGhost(ctx)).flatMap(digest(_, calculator.ghostIfuSetup))
+              EitherT(streaming.selectOrGenerateGhost(ctx)).flatMap(digest(_, spectroscopySetup(calculator.ghostIfuSetup)))
             case ObservingModeType.GmosNorthImaging   =>
               EitherT(streaming.selectOrGenerateGmosNorthImaging(ctx)).flatMap(digest(_, calculator.gmosNorthImagingSetup))
             case ObservingModeType.GmosNorthLongSlit  =>
-              EitherT(streaming.selectOrGenerateGmosNorthLongSlit(ctx)).flatMap(digest(_, calculator.gmosNorthLongSlitSetup))
+              EitherT(streaming.selectOrGenerateGmosNorthLongSlit(ctx)).flatMap(digest(_, spectroscopySetup(calculator.gmosNorthLongSlitSetup)))
             case ObservingModeType.GmosNorthMos       =>
-              EitherT(streaming.selectOrGenerateGmosNorthMos(ctx)).flatMap(digest(_, calculator.gmosNorthMosSetup))
+              EitherT(streaming.selectOrGenerateGmosNorthMos(ctx)).flatMap(digest(_, spectroscopySetup(calculator.gmosNorthMosSetup)))
             case ObservingModeType.GmosSouthImaging   =>
               EitherT(streaming.selectOrGenerateGmosSouthImaging(ctx)).flatMap(digest(_, calculator.gmosSouthImagingSetup))
             case ObservingModeType.GmosSouthLongSlit  =>
-              EitherT(streaming.selectOrGenerateGmosSouthLongSlit(ctx)).flatMap(digest(_, calculator.gmosSouthLongSlitSetup))
+              EitherT(streaming.selectOrGenerateGmosSouthLongSlit(ctx)).flatMap(digest(_, spectroscopySetup(calculator.gmosSouthLongSlitSetup)))
             case ObservingModeType.GmosNorthIfu       =>
-              EitherT(streaming.selectOrGenerateGmosNorthIfu(ctx)).flatMap(digest(_, calculator.gmosNorthIfuSetup))
+              EitherT(streaming.selectOrGenerateGmosNorthIfu(ctx)).flatMap(digest(_, spectroscopySetup(calculator.gmosNorthIfuSetup)))
             case ObservingModeType.GmosSouthIfu       =>
-              EitherT(streaming.selectOrGenerateGmosSouthIfu(ctx)).flatMap(digest(_, calculator.gmosSouthIfuSetup))
+              EitherT(streaming.selectOrGenerateGmosSouthIfu(ctx)).flatMap(digest(_, spectroscopySetup(calculator.gmosSouthIfuSetup)))
             case ObservingModeType.GnirsImaging       =>
               EitherT(streaming.selectOrGenerateGnirsImaging(ctx)).flatMap(digest(_, gnirsSetup(calculator.gnirsImagingSetup)))
             case ObservingModeType.GmosSouthMos       =>
-              EitherT(streaming.selectOrGenerateGmosSouthMos(ctx)).flatMap(digest(_, calculator.gmosSouthMosSetup))
+              EitherT(streaming.selectOrGenerateGmosSouthMos(ctx)).flatMap(digest(_, spectroscopySetup(calculator.gmosSouthMosSetup)))
             case ObservingModeType.GnirsLongSlit      =>
-              EitherT(streaming.selectOrGenerateGnirsSpectroscopy(ctx)).flatMap(digest(_, gnirsSetup(calculator.gnirsLongSlitSetup)))
+              EitherT(streaming.selectOrGenerateGnirsSpectroscopy(ctx)).flatMap(digest(_, spectroscopySetup(gnirsSetup(calculator.gnirsLongSlitSetup))))
             case ObservingModeType.GnirsIfu           =>
-              EitherT(streaming.selectOrGenerateGnirsSpectroscopy(ctx)).flatMap(digest(_, gnirsSetup(calculator.gnirsIfuSetup)))
+              EitherT(streaming.selectOrGenerateGnirsSpectroscopy(ctx)).flatMap(digest(_, spectroscopySetup(gnirsSetup(calculator.gnirsIfuSetup))))
             case ObservingModeType.Igrins2LongSlit    =>
               EitherT(streaming.selectOrGenerateIgrins2LongSlit(ctx)).flatMap(digest(_, calculator.igrins2LongSlitSetup))
             case vis: VisitorObservingModeType        =>

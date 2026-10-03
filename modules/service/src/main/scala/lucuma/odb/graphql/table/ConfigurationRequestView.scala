@@ -20,6 +20,7 @@ trait ConfigurationRequestView[F[_]] extends BaseMapping[F]:
     val Feedback = col("c_feedback", text_nonempty.opt)
     val CreatedAt = col("c_created_at", core_timestamp)
     val UpdatedAt = col("c_updated_at", core_timestamp)
+    val SchedulingMode = col("c_scheduling_mode", scheduling_mode)
 
     object Conditions:
       val CloudExtinction = col("c_cloud_extinction", cloud_extinction_preset)

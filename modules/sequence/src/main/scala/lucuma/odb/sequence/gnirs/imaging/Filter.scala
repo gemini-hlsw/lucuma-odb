@@ -14,7 +14,9 @@ import lucuma.odb.sequence.util.HashBytes
 
 /**
  * One GNIRS imaging science configuration: a filter together with the exposure
- * time mode and coadds that apply to it.  Each is a separate ITC calculation.
+ * time mode and coadds that apply to it.  Each is a separate ITC calculation.  The
+ * coadds only feed the ITC request: the science steps take the coadds the ITC
+ * reports, which in time-and-count mode are these same values.
  */
 case class Filter(
   filter:           GnirsFilter,

@@ -509,5 +509,103 @@ class setObservationWorkflowState
       ) >>
       testTransitionsAs(pi, pid, oid, Defined, Inactive, Ready)
 
+  def setDismissedWarnings(pid: Program.Id, codes: String*): IO[Unit] =
+    query(
+      user  = staff,
+      query =
+        s"""
+          mutation {
+            updatePrograms(
+              input: {
+                SET: { dismissedWarnings: [ ${codes.mkString(", ")} ] }
+                WHERE: { id: { EQ: "$pid" } }
+              }
+            ) {
+              programs { id }
+            }
+          }
+        """
+    ).void
+
+  test("[Warnings]    Ready     --> Defined (undismissed warning), and back once dismissed"):
+    createPhaseTwoObservationWithWarnings.flatMap: (pid, oid) =>
+      for
+        _ <- setDismissedWarnings(pid, "LOW_TOTAL_SIGNAL_TO_NOISE")
+        _ <- runObscalcUpdate(pid, oid)
+        _ <- setObservationWorkflowState(pi, oid, Ready)
+        _ <- runObscalcUpdate(pid, oid)
+        _ <- assertIO(queryObservationWorkflowState(oid), Ready)
+
+        // The warning reappears, so Ready no longer stands.
+        _ <- setDismissedWarnings(pid)
+        _ <- runObscalcUpdate(pid, oid)
+        _ <- assertIO(queryObservationWorkflowState(oid), Defined)
+
+        // The Ready user state was kept, so dismissing restores it.
+        _ <- setDismissedWarnings(pid, "LOW_TOTAL_SIGNAL_TO_NOISE")
+        _ <- runObscalcUpdate(pid, oid)
+        _ <- assertIO(queryObservationWorkflowState(oid), Ready)
+      yield ()
+
+  // sc-10485 base coordinates outside the CfP limits are a dismissable warning
+  val createPhaseTwoObservationOutsideCfpLimits: IO[(Program.Id, Observation.Id)] =
+    for
+      // the target created by createTargetWithProfileAs is at RA 86.6°, Dec -0.1°
+      cfp <- createGeminiCallForProposalsAs(staff, otherGemini =
+               s"""
+                 coordinateLimits: {
+                   north: {
+                     raStart: { degrees: 180 }
+                     raEnd: { degrees: 270 }
+                     decStart: { degrees: 0 }
+                     decEnd: { degrees: 45 }
+                   }
+                   south: {
+                     raStart: { degrees: 180 }
+                     raEnd: { degrees: 270 }
+                     decStart: { degrees: 0 }
+                     decEnd: { degrees: 45 }
+                   }
+                 }
+               """.some
+             )
+      pid <- createProgramWithNonPartnerPi(pi, "Foo")
+      _   <- addProposal(pi, pid, Some(cfp), None)
+      _   <- addPartnerSplits(pi, pid)
+      _   <- addCoisAs(pi, pid)
+      tid <- createTargetWithProfileAs(pi, pid)
+      oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      _   <- createConfigurationRequestAs(pi, oid).flatMap(setConfigurationRequestStatusAs(staff, _, ConfigurationRequestStatus.Approved))
+      _   <- computeItcResultAs(pi, oid)
+      _   <- setProposalStatus(staff, pid, "ACCEPTED")
+      _   <- runObscalcUpdateAs(serviceUser, pid, oid)
+    yield (pid, oid)
+
+  test("[CfP Limits]  Defined   <-> Inactive (pi)"):
+    createPhaseTwoObservationOutsideCfpLimits.flatMap: (pid, oid) =>
+      assertIO(queryObservationWorkflowState(oid), Defined) >>
+      testTransitionsAs(pi, pid, oid, Defined, Inactive)
+
+  test("[CfP Limits]  Defined   <-> Inactive, Ready (pi, warning dismissed by staff)"):
+    createPhaseTwoObservationOutsideCfpLimits.flatMap: (pid, oid) =>
+      assertIO(queryObservationWorkflowState(oid), Defined) >>
+      query(
+        user  = staff,
+        query =
+          s"""
+            mutation {
+              updatePrograms(
+                input: {
+                  SET: { dismissedWarnings: [ CFP_WARNING ] }
+                  WHERE: { id: { EQ: "$pid" } }
+                }
+              ) {
+                programs { id }
+              }
+            }
+          """
+      ) >>
+      testTransitionsAs(pi, pid, oid, Defined, Inactive, Ready)
+
 
 }

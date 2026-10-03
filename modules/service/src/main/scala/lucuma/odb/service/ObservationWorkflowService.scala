@@ -20,11 +20,13 @@ import lucuma.core.model.ObservationWorkflow
 import lucuma.core.model.Program
 import lucuma.core.model.StandardRole.*
 import lucuma.core.model.Target
+import lucuma.core.util.CalculationState
 import lucuma.odb.data.Itc
 import lucuma.odb.data.ObservationValidationMap
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.mapping.AccessControl
+import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.util.Codecs.*
 import skunk.*
@@ -184,6 +186,11 @@ object ObservationWorkflowService {
                   ObservationValidationCode.TooActivationUnapproved          => Unapproved
             case _: ObservationValidationCode.Warning                        => Defined // with warnings
 
+        // Warnings that the program has not dismissed.
+        val hasWarnings: Boolean =
+          val warnings = codes.flatMap(_.asWarning)
+          !warnings.forall(info.dismissedWarnings.contains)
+
         def userStatus(validationStatus: ValidationState): Option[UserState] =
           info.effectiveUserState.flatMap:
             case Inactive => Some(Inactive)       // Inactive overrides validation errors
@@ -191,7 +198,9 @@ object ObservationWorkflowService {
               validationStatus match              // Validation errors override Ready
                 case Undefined  => None
                 case Unapproved => None
-                case Defined    => Some(Ready)
+                // Undismissed warnings override Ready too.  As with errors the
+                // user state is kept, so Ready returns once they're dismissed.
+                case Defined    => Option.unless(hasWarnings)(Ready)
 
         // Our final state is the execution state (if any), else the user state (if any), else the validation state,
         val state: ObservationWorkflowState =
@@ -220,23 +229,18 @@ object ObservationWorkflowService {
             case Unapproved => List(Inactive)
             case Defined    =>
 
-              // Can't move forward with non-dismissed warnings
-              val hasWarnings = 
-                val warnings = codes.flatMap(_.asWarning)
-                !warnings.forall(info.dismissedWarnings.contains)
-
               // Exchange observations run at Keck/Subaru, not Gemini; they have no
               // Ready/Ongoing/Completed lifecycle, so Inactive is the only transition.
               //
-              // An opportunity target blocks Ready only while it is *unresolved*.
-              // Setting a ToO Ready is what requests its trigger, so gating on the
-              // mere presence of the target would make a resolved one impossible to
-              // trigger -- the target keeps its identity after the alert arrives
-              // rather than being replaced by an ordinary one.
+              // An opportunity target blocks Ready outright.  It is a placeholder
+              // with a region and no coordinates, so there is nowhere to slew and
+              // nothing to ask an observer to do.  Setting a ToO Ready is what
+              // requests its trigger, so the real target has to take the
+              // placeholder's place in the asterism first.
               List(Inactive) ++
                 Option.when(
                   (!info.isExchange) && 
-                  (!info.hasUnresolvedTooTarget) && 
+                  (!info.hasTooTarget) && 
                   (info.isAccepted || !info.tpe.hasProposal) &&
                   (!hasWarnings)
                 )(Ready)
@@ -288,8 +292,55 @@ object ObservationWorkflowService {
               yield (infos, errs, itcRes)
             ).value
 
+        // The observations the ITC validator will fault for want of a cached result.
+        def uncached(
+          infos:  Map[Observation.Id, ObservationValidationInfo],
+          itcRes: Map[Observation.Id, Itc]
+        ): List[(Program.Id, Observation.Id, GeneratorParams)] =
+          infos.values.toList.flatMap: info =>
+            info.generatorParams.flatMap(_.toOption).collect:
+              case ps if info.calibrationRole.isEmpty && info.tpe.hasProposal &&
+                         !info.isVisitor && !info.isExchange && !itcRes.contains(info.oid) =>
+                (info.pid, info.oid, ps)
+
+        // Of the observations missing a cached result, those obscalc has finished
+        // with.  One still pending or calculating will store its own result
+        // shortly, so refilling it here would only add a remote ITC call (and an
+        // observation edit event) to the caller.
+        def settled(
+          missing: List[(Program.Id, Observation.Id, GeneratorParams)]
+        ): F[List[(Program.Id, Observation.Id, GeneratorParams)]] =
+          services
+            .transactionally(obscalcService.selectMany(missing.map(_._2)))
+            .map: entries =>
+              missing.filter: (_, oid, _) =>
+                entries.get(oid).exists(_.meta.state === CalculationState.Ready)
+
+        // The workflow reads cached ITC results only, so a missing one is
+        // indistinguishable from a failed one and the observation would look
+        // undefined.  An ITC version change purges the cache without requeueing
+        // obscalc for inactive, ongoing or completed observations, so nothing
+        // else refills it.  Refill whatever the cache is missing for settled
+        // observations and read again; normally there is nothing to do and this
+        // costs nothing.
+        val selectWarm: ResultT[F, (
+          Map[Observation.Id, ObservationValidationInfo],
+          Map[Observation.Id, ObservationValidationMap],
+          Map[Observation.Id, Itc]
+        )] =
+          ResultT(select).flatMap: (infos, errs, itcRes) =>
+            val missing = uncached(infos, itcRes)
+            if missing.isEmpty then ResultT.pure((infos, errs, itcRes))
+            else
+              ResultT.liftF(settled(missing).flatMap(itcService.warm)).flatMap: warmed =>
+                if warmed.isEmpty then ResultT.pure((infos, errs, itcRes))
+                // Runs the transaction again rather than reusing the first read:
+                // the cache now holds the refilled results, and `errs` must be
+                // revalidated against them.
+                else ResultT(select)
+
         (for
-          (infos, errs, itcRes) <- ResultT(select)
+          (infos, errs, itcRes) <- selectWarm
           errorFree              = infos.view.filterKeys(oid => errs.get(oid).forall(_.isEmpty)).toMap
           execs                  = executionStates(errorFree)
           workflows              = computeWorkflows(infos, errs, execs)

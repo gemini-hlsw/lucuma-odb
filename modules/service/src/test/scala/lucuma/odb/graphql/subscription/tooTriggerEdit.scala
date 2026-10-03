@@ -10,11 +10,9 @@ import cats.syntax.all.*
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.ObservationWorkflowState
-import lucuma.core.enums.SchedulingMode
 import lucuma.core.enums.TooActivation
 import lucuma.core.enums.TooActivation.Interrupting
 import lucuma.core.enums.TooActivation.Rapid
-import lucuma.core.enums.TooActivation.Standard
 import lucuma.core.model.Observation
 import lucuma.core.syntax.string.*
 import lucuma.odb.data.EditType
@@ -112,13 +110,13 @@ class tooTriggerEdit extends OdbSuite with SubscriptionUtils with TooTriggerSetu
         mutations =
           Right(
             for
-              (_, oid, _) <- createTooObservationAs(pi, staff, mode = SchedulingMode.Uninterruptible)
+              (_, oid, _) <- createTooObservationAs(pi, staff, activation = TooActivation.Interrupting)
               _           <- oidRef.complete(oid)
               _           <- setTooWorkflowState(pi, oid, ObservationWorkflowState.Ready)
               first       <- liveTriggerId(oid)
               _           <- firstRef.complete(first)
               _           <- IO.sleep(2.seconds) // give the client time to receive the creation
-              _           <- setSchedulingModeAs(pi, oid, SchedulingMode.Unconstrained)
+              _           <- setTooActivationAs(pi, oid, TooActivation.Rapid)
               second      <- liveTriggerId(oid)
               _           <- secondRef.complete(second)
             yield ()
@@ -126,11 +124,11 @@ class tooTriggerEdit extends OdbSuite with SubscriptionUtils with TooTriggerSetu
         expectedF =
           (oidRef.get, firstRef.get, secondRef.get).mapN: (oid, first, second) =>
             List(
-              tooTriggerEdit(EditType.Created, Requested,  first,  oid, Rapid),
+              tooTriggerEdit(EditType.Created, Requested,  first,  oid, Interrupting),
               // The predecessor closes out reporting its *own* activation, not the
               // successor's -- the value is fixed at creation.
-              tooTriggerEdit(EditType.Updated, Superseded, first,  oid, Rapid),
-              tooTriggerEdit(EditType.Created, Requested,  second, oid, Standard)
+              tooTriggerEdit(EditType.Updated, Superseded, first,  oid, Interrupting),
+              tooTriggerEdit(EditType.Created, Requested,  second, oid, Rapid)
             )
       )
 
@@ -138,16 +136,16 @@ class tooTriggerEdit extends OdbSuite with SubscriptionUtils with TooTriggerSetu
     (Deferred[IO, Observation.Id], Deferred[IO, TooTrigger.Id]).tupled.flatMap: (oidRef, ridRef) =>
       subscriptionExpectF(
         user      = pi,
-        query     = subscriptionWith("{ EQ: STANDARD }"),
+        query     = subscriptionWith("{ EQ: RAPID }"),
         mutations =
           Right(
             for
-              (_, oid, _) <- createTooObservationAs(pi, staff, mode = SchedulingMode.Uninterruptible)
+              (_, oid, _) <- createTooObservationAs(pi, staff, activation = TooActivation.Interrupting)
               _           <- oidRef.complete(oid)
-              // Both of these events carry RAPID, so neither is delivered.
+              // Both of these events carry INTERRUPTING, so neither is delivered.
               _           <- setTooWorkflowState(pi, oid, ObservationWorkflowState.Ready)
               _           <- IO.sleep(2.seconds)
-              _           <- setSchedulingModeAs(pi, oid, SchedulingMode.Unconstrained)
+              _           <- setTooActivationAs(pi, oid, TooActivation.Rapid)
               rid         <- liveTriggerId(oid)
               _           <- ridRef.complete(rid)
             yield ()
@@ -155,8 +153,8 @@ class tooTriggerEdit extends OdbSuite with SubscriptionUtils with TooTriggerSetu
         expectedF =
           (oidRef.get, ridRef.get).mapN: (oid, rid) =>
             List(
-              // Only the successor matches: it is the one requested at STANDARD.
-              tooTriggerEdit(EditType.Created, Requested, rid, oid, Standard)
+              // Only the successor matches: it is the one requested at RAPID.
+              tooTriggerEdit(EditType.Created, Requested, rid, oid, Rapid)
             )
       )
 
@@ -166,23 +164,25 @@ class tooTriggerEdit extends OdbSuite with SubscriptionUtils with TooTriggerSetu
         user      = pi,
         // The whole point of matching in memory rather than in SQL: a subscription
         // can ask an ordered question.
-        query     = subscriptionWith("{ GTE: RAPID }"),
+        query     = subscriptionWith("{ GTE: INTERRUPTING }"),
         mutations =
           Right(
             for
-              (_, oid, _) <- createTooObservationAs(pi, staff, mode = SchedulingMode.Uninterruptible)
+              // Proposed at INTERRUPTING so the ceiling it freezes admits the
+              // escalation back up at the end.
+              (_, oid, _) <- createTooObservationAs(pi, staff, activation = TooActivation.Interrupting)
               _           <- oidRef.complete(oid)
               _           <- setTooWorkflowState(pi, oid, ObservationWorkflowState.Ready)
               first       <- liveTriggerId(oid)
               _           <- firstRef.complete(first)
               _           <- IO.sleep(2.seconds)
-              // Down to STANDARD: the predecessor's closing event still carries
-              // RAPID and is delivered, but the successor's creation is not.
-              _           <- setSchedulingModeAs(pi, oid, SchedulingMode.Unconstrained)
+              // Down to RAPID: the predecessor's closing event still carries
+              // INTERRUPTING and is delivered, but the successor's creation is not.
+              _           <- setTooActivationAs(pi, oid, TooActivation.Rapid)
               _           <- IO.sleep(2.seconds)
-              // Back up to INTERRUPTING: the STANDARD row closes out below the
+              // Back up to INTERRUPTING: the RAPID row closes out below the
               // threshold and is filtered, while its successor is delivered.
-              _           <- setSchedulingModeAs(pi, oid, SchedulingMode.Interrupting)
+              _           <- setTooActivationAs(pi, oid, TooActivation.Interrupting)
               third       <- liveTriggerId(oid)
               _           <- thirdRef.complete(third)
             yield ()
@@ -190,8 +190,8 @@ class tooTriggerEdit extends OdbSuite with SubscriptionUtils with TooTriggerSetu
         expectedF =
           (oidRef.get, firstRef.get, thirdRef.get).mapN: (oid, first, third) =>
             List(
-              tooTriggerEdit(EditType.Created, Requested,  first, oid, Rapid),
-              tooTriggerEdit(EditType.Updated, Superseded, first, oid, Rapid),
+              tooTriggerEdit(EditType.Created, Requested,  first, oid, Interrupting),
+              tooTriggerEdit(EditType.Updated, Superseded, first, oid, Interrupting),
               tooTriggerEdit(EditType.Created, Requested,  third, oid, Interrupting)
             )
       )

@@ -52,7 +52,7 @@ case class ItcResult(
   peakPixel:     Option[ItcPeakPixel]
 ):
   def totalTime: Option[TimeSpan] =
-    val total = BigInt(value.exposureTime.toMicroseconds) * value.frameCount.value
+    val total = BigInt(value.exposureTime.toMicroseconds) * value.frameCount.value * value.coadds.value
     Option.when(total.isValidLong)(TimeSpan.fromMicroseconds(total.longValue)).flatten
 
 object ItcResult:

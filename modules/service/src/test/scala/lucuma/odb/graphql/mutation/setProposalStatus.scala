@@ -1240,7 +1240,7 @@ class setProposalStatus extends OdbSuite
     for
       cid <- createGeminiCallForProposalsAs(staff, GeminiCallForProposalsType.RegularSemester)
       pid <- createProgramWithNonPartnerPi(pi)
-      _   <- addProposal(pi, pid, cid.some, "queue: { explicitTooActivationCeiling: NONE, minPercentTime: 0, considerForBand3: UNSET }".some)
+      _   <- addProposal(pi, pid, cid.some, "queue: { minPercentTime: 0, considerForBand3: UNSET }".some)
       _   <- addSubmissionPrerequisites(pid)
       _   <- addPartnerSplits(pi, pid)
       _   <- addCoisAs(pi, pid)
@@ -1687,6 +1687,52 @@ class setProposalStatus extends OdbSuite
         )
       }
     }
+  }
+
+
+  test("✓ proposal submission history") {
+
+    def history(pid: Program.Id): IO[List[(Timestamp, ProposalStatus)]] =
+      query(pi, s"""
+        query {
+          program(programId: "$pid") {
+            proposal { submissionHistory { timestamp status } }
+          }
+        }
+      """).flatMap: js =>
+        js.hcursor
+          .downFields("program", "proposal", "submissionHistory")
+          .values.toList.flatten
+          .traverse: h =>
+            (h.hcursor.downField("timestamp").as[Timestamp],
+             h.hcursor.downField("status").as[ProposalStatus]).tupled
+          .leftMap(f => new RuntimeException(f.message)).liftTo[IO]
+
+    for
+      c  <- createGeminiCallForProposalsAs(staff, semester = Semester.unsafeFromString("2025A"))
+      p  <- createProgramWithNonPartnerPi(pi)
+      _  <- addProposal(pi, p)
+      _  <- addSubmissionPrerequisites(p)
+      _  <- setCallId(pi, p, c)
+      _  <- addPartnerSplits(pi, p)
+      _  <- addCoisAs(pi, p)
+      h0 <- history(p)
+      _  <- submitProposal(pi, p)
+      _  <- unsubmitProposal(pi, p)
+      _  <- submitProposal(pi, p)
+      _  <- acceptProposal(staff, p)
+      h1 <- history(p)
+    yield
+      assertEquals(h0, Nil)
+      assertEquals(
+        h1.map(_._2),
+        List(
+          ProposalStatus.Submitted,
+          ProposalStatus.NotSubmitted,
+          ProposalStatus.Submitted
+        )
+      )
+      assert(h1.zip(h1.drop(1)).forall((a, b) => a._1 <= b._1))
   }
 
 }

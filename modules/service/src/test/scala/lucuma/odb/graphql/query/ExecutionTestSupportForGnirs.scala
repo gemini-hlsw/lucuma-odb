@@ -78,6 +78,30 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
       GnirsWellDepth.Deep
     )
 
+  // The shallow-well LR 10 l/mm 2.8-4.2 µm 0.30" slit config added to the real
+  // GNIRS_FLAT table (2026-Oct-01).  As in the real tables, it has a flat but no
+  // matching arc.
+  private val gnirsThermalIrShallowKey: Gnirs.TableKey =
+    gnirsThermalIrKey.copy(
+      fpu       = GnirsFpu.Spectroscopy.Slit(GnirsFpuSlit.LongSlit_0_30),
+      wellDepth = GnirsWellDepth.Shallow
+    )
+
+  // Mirrors the real row: IR grey body - high, Open, no filter, IR diffuser,
+  // 10 x 0.3s with 2 coadds, Night baseline.
+  val gnirsThermalIrShallowFlat: SmartGcalValue.Legacy =
+    SmartGcalValue(
+      Gcal(
+        Gcal.Lamp.fromContinuum(GcalContinuum.IrGreyBodyHigh),
+        GcalFilter.None,
+        GcalDiffuser.Ir,
+        GcalShutter.Open
+      ),
+      GcalBaselineType.Night,
+      PosInt.unsafeFrom(10),
+      LegacyInstrumentConfig(TimeSpan.unsafeFromMicroseconds(300_000L), PosInt.unsafeFrom(2))
+    )
+
   // 111/LXD cross-dispersed, mirroring the real 0.05"/pix 0.675" arc row.
   //
   // It has an arc but no flat, since the real flat block only covers 0.10" +
@@ -157,6 +181,7 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
         )
       ::: List(
         Gnirs.TableRow(PosLong.unsafeFrom(1), gnirsThermalIrKey, gnirsSmartFlat),
+        Gnirs.TableRow(PosLong.unsafeFrom(1), gnirsThermalIrShallowKey, gnirsThermalIrShallowFlat),
         Gnirs.TableRow(PosLong.unsafeFrom(1), gnirsCrossDispersedArcOnlyKey, gnirsSmartArc)
       )
 
@@ -222,6 +247,37 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
    * ETM is per central wavelength, so the wavelength must be given too; it
    * defaults to the 2200 nm the test observations are created with.
    */
+  def setScienceSignalToNoise(oid: Observation.Id, value: BigDecimal, atNm: BigDecimal, centralNm: BigDecimal = BigDecimal(2200)): IO[Unit] =
+    query(
+      pi,
+      s"""
+        mutation {
+          updateObservations(input: {
+            SET: {
+              observingMode: {
+                gnirsSpectroscopy: {
+                  centralWavelengths: [
+                    {
+                      centralWavelength: { nanometers: $centralNm }
+                      exposureTimeMode: {
+                        signalToNoise: {
+                          value: $value
+                          at:    { nanometers: $atNm }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+            WHERE: { id: { EQ: "$oid" } }
+          }) {
+            observations { id }
+          }
+        }
+      """
+    ).void
+
   def setScienceTimeAndCount(oid: Observation.Id, seconds: BigDecimal, count: Int, atNm: BigDecimal, centralNm: BigDecimal = BigDecimal(2200)): IO[Unit] =
     query(
       pi,
@@ -255,7 +311,11 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
     ).void
 
 
-  def configureGnirsThermalIr(oid: Observation.Id): IO[Unit] =
+  def configureGnirsThermalIr(
+    oid:       Observation.Id,
+    fpu:       String = "LONG_SLIT_0_20",
+    wellDepth: String = "DEEP"
+  ): IO[Unit] =
     query(
       pi,
       s"""
@@ -266,7 +326,7 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
                 gnirsSpectroscopy: {
                   camera: LONG_BLUE
                   explicitGrating: D10
-                  slit: { fpu: LONG_SLIT_0_20 }
+                  slit: { fpu: $fpu }
                   centralWavelengths: [
                     {
                       centralWavelength: { nanometers: 3300 }
@@ -279,7 +339,7 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
                       }
                     }
                   ]
-                  explicitWellDepth: DEEP
+                  explicitWellDepth: $wellDepth
                 }
               }
             }

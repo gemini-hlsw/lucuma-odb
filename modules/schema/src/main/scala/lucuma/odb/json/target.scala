@@ -6,7 +6,6 @@ package lucuma.odb.json
 import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Decoder
-import io.circe.DecodingFailure
 import io.circe.Encoder
 import io.circe.HCursor
 import io.circe.Json
@@ -29,7 +28,6 @@ import lucuma.core.model.Target
 import lucuma.core.model.Target.Nonsidereal
 import lucuma.core.model.Target.Opportunity
 import lucuma.core.model.Target.Sidereal
-import lucuma.core.model.TargetResolution
 
 object target {
 
@@ -83,35 +81,14 @@ object target {
         } yield Target.Nonsidereal(name, ephemerisKey, sourceProfile)
       )
 
-    // Mirrors the TargetResolution type: exactly one arm is non-null.  An entirely
-    // absent resolution is handled one level up, by the Option decoder circe derives
-    // from this one -- that is what an unresolved target looks like.
-    given Decoder[TargetResolution] =
-      Decoder.instance: c =>
-        for {
-          s <- c.downField("sidereal").as[Option[HCursor]]
-          n <- c.downField("nonsidereal").as[Option[HCursor]]
-          r <- (s, n) match
-                 case (Some(sc), None) =>
-                   for {
-                     tracking    <- sc.as[SiderealTracking]
-                     catalogInfo <- sc.downField("catalogInfo").as[Option[CatalogInfo]]
-                   } yield TargetResolution.Sidereal(tracking, catalogInfo)
-                 case (None, Some(nc)) =>
-                   nc.downField("key").as[Ephemeris.Key].map(TargetResolution.Nonsidereal(_))
-                 case _                =>
-                   DecodingFailure("Exactly one of sidereal, nonsidereal must be given as a resolution.", c.history).asLeft
-        } yield r
-
     given Decoder[Target.Opportunity] =
       Decoder.instance(c =>
         for {
           name          <- c.downField("name").as[NonEmptyString]
           o             <- c.downField("opportunity").as[HCursor]
           region        <- o.downField("region").as[Region]
-          resolution    <- o.downField("resolution").as[Option[TargetResolution]]
           sourceProfile <- c.downField("sourceProfile").as[SourceProfile]
-        } yield Target.Opportunity(name, region, resolution, sourceProfile)
+        } yield Target.Opportunity(name, region, sourceProfile)
       )
 
     given Decoder[Target] =
@@ -168,49 +145,14 @@ object target {
         )
       }
 
-    // This only encodes the part that goes under "opportunity.resolution" in the API.
-    // Same one-of shape as Target itself: exactly one arm is non-null.
-    protected def resolutionEncoderInternal(using
-      Encoder[RightAscension],
-      Encoder[Declination],
-      Encoder[Epoch],
-      Encoder[ProperMotion],
-      Encoder[RadialVelocity],
-      Encoder[Parallax],
-      Encoder[CatalogInfo]
-    ): Encoder[TargetResolution] =
-      Encoder.instance:
-        case TargetResolution.Sidereal(tracking, catalogInfo) =>
-          Json.obj(
-            "sidereal"    -> siderealTrackingEncoderInternal(tracking)
-                               .mapObject(_.add("catalogInfo", catalogInfo.asJson)),
-            "nonsidereal" -> Json.Null
-          )
-        case TargetResolution.Nonsidereal(key)                =>
-          Json.obj(
-            "sidereal"    -> Json.Null,
-            "nonsidereal" -> Json.obj(
-              "des"     -> key.des.asJson,
-              "keyType" -> key.keyType.asJson,
-              "key"     -> key.asJson
-            )
-          )
-
-    // This only encodes the part that goes under "opportunity" in the API
-    protected def opportunityDefinitionEncoderInternal(using
-      Encoder[RightAscension],
-      Encoder[Declination],
-      Encoder[Epoch],
-      Encoder[ProperMotion],
-      Encoder[RadialVelocity],
-      Encoder[Parallax],
-      Encoder[CatalogInfo]
-    ): Encoder[Target.Opportunity] =
+    // This only encodes the part that goes under "opportunity" in the API.  A
+    // placeholder carries a region and nothing else, so unlike its two siblings
+    // this needs no tracking encoders at all.
+    protected val opportunityDefinitionEncoderInternal: Encoder[Target.Opportunity] =
       import region.query.given
       Encoder.instance: o =>
         Json.obj(
-          "region"     -> o.region.asJson,
-          "resolution" -> o.resolution.map(resolutionEncoderInternal.apply).asJson
+          "region" -> o.region.asJson
         )
 
     protected def subtypeSlice(target: Target)(using
@@ -225,7 +167,7 @@ object target {
       target match
         case s @ Sidereal(_, _, _, _) => "sidereal"    -> s.asJson(using siderealDefinitionEncoderInternal)
         case n @ Nonsidereal(_, _, _) => "nonsidereal" -> n.asJson(using nonsiderealDefinitionEncoder)
-        case o @ Opportunity(_, _, _, _) => "opportunity" -> o.asJson(using opportunityDefinitionEncoderInternal)
+        case o @ Opportunity(_, _, _) => "opportunity" -> o.asJson(using opportunityDefinitionEncoderInternal)
 
     // NOTE: This does not include the id, existence and program that are part of the Target in the API
     protected def encoderTargetInternal(using

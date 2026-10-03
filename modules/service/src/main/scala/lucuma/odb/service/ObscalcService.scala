@@ -28,6 +28,7 @@ import lucuma.core.model.CompositeTracking
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationWorkflow
 import lucuma.core.model.Program
+import lucuma.core.model.Target
 import lucuma.core.model.sequence.AtomDigest
 import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.ExecutionDigest
@@ -308,10 +309,8 @@ object ObscalcService:
                 .flatMap: targets =>
                   targets
                     .traverse:
-                      // Asking for the sidereal projection rather than testing the subtype
-                      // picks up a Target of Opportunity that resolved siderally, which has
-                      // a real position while keeping its opportunity identity.
-                      case (_, t) => t.asSidereal.map(_.tracking)
+                      case (_, Target.Sidereal(_, tracking, _, _)) => tracking.some
+                      case _                                       => none
                     .flatMap(ts => CompositeTracking(ts).at(Epoch.J2000.toInstant))
 
       private def storeResult(
@@ -418,6 +417,7 @@ object ObscalcService:
         "c_reacq_setup_time",
 
         "c_setup_count",
+        "c_reacquisition_count",
         "c_calibration_count",
 
         "c_acq_obs_class",
@@ -505,17 +505,19 @@ object ObscalcService:
         "c_obscalc_state",
         "c_full_setup_time",
         "c_setup_count",
+        "c_reacq_setup_time",
+        "c_reacquisition_count",
         "c_sci_obs_class",
         "c_sci_non_charged_time",
         "c_sci_program_time"
       )
 
     val full_categorized_time: Decoder[CategorizedTime] =
-       (time_span *: int4_nonneg *: obs_class *: time_span *: time_span).map: (setup, count, obsclass, nonCharged, program) =>
+       (time_span *: int4_nonneg *: time_span *: int4_nonneg *: obs_class *: time_span *: time_span).map: (setup, count, reacq, reacqCount, obsclass, nonCharged, program) =>
          CategorizedTime(
            ChargeClass.NonCharged -> nonCharged,
            ChargeClass.Program    -> program
-         ).sumCharge(obsclass.chargeClass, setup *| count.value)
+         ).sumCharge(obsclass.chargeClass, (setup *| count.value) +| (reacq *| reacqCount.value))
 
     val SelectOneCategorizedTime: Query[Observation.Id, CalculatedValue[CategorizedTime]] =
       sql"""
@@ -552,6 +554,7 @@ object ObscalcService:
         "c_reacq_setup_time",
 
         "c_setup_count",
+        "c_reacquisition_count",
         "c_calibration_count",
 
         "c_acq_obs_class",
@@ -691,6 +694,7 @@ object ObscalcService:
         sql"c_full_setup_time      = ${time_span.opt}"(r.digest.map(_.setup.full)),
         sql"c_reacq_setup_time     = ${time_span.opt}"(r.digest.map(_.setup.reacquisition)),
         sql"c_setup_count          = ${int4_nonneg.opt}"(r.digest.map(_.setupCount)),
+        sql"c_reacquisition_count  = ${int4_nonneg.opt}"(r.digest.map(_.reacquisitionCount)),
         sql"c_calibration_count    = ${int4_nonneg.opt}"(r.digest.map(_.calibrationCount)),
 
         // Acquisition Digest

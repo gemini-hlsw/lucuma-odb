@@ -5,15 +5,19 @@ package lucuma.odb.graphql.query
 
 import cats.effect.IO
 import cats.syntax.either.*
+import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.StepGuideState.Disabled
 import lucuma.core.enums.StepGuideState.Enabled
+import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
+import lucuma.itc.IntegrationTime
+import lucuma.itc.client.SpectroscopyInput
 import lucuma.odb.graphql.ACursorOps
 
 /**
@@ -25,6 +29,15 @@ import lucuma.odb.graphql.ACursorOps
 class executionSciGnirsLongSlit extends ExecutionTestSupportForGnirs:
 
   val ExposureTime: TimeSpan = 30.secondTimeSpan
+
+  // In S/N mode the ITC picks the coadds; 2 here, so the science steps can be told
+  // apart from the configured single coadd.  Time-and-count keeps the shared fake.
+  val SignalToNoiseCoadds: PosInt = PosInt.unsafeFrom(2)
+
+  override def fakeItcSpectroscopyResultFor(input: SpectroscopyInput): Option[IntegrationTime] =
+    input.mode.exposureTimeMode match
+      case ExposureTimeMode.SignalToNoiseMode(_, _)   => Some(IntegrationTime(ExposureTime, PosInt.unsafeFrom(3), SignalToNoiseCoadds))
+      case ExposureTimeMode.TimeAndCountMode(_, _, _) => None
 
   // Default GNIRS observation:
   //   grating=D111, prism=MIRROR, camera=SHORT_BLUE, fpu=LONG_SLIT_0_30,
@@ -135,6 +148,43 @@ class executionSciGnirsLongSlit extends ExecutionTestSupportForGnirs:
               "gnirs" -> Json.obj(
                 "science" -> Json.obj(
                   "nextAtom" -> gnirsExpectedScienceAtom(ThermalIrSnapshot,
+                    (0, -1, Enabled), (0, 5, Enabled), (0, 5, Enabled), (0, -1, Enabled)
+                  ),
+                  "possibleFuture" -> List(flatOnlyCalAtom).asJson,
+                  "hasMore"        -> false.asJson
+                )
+              )
+            )
+          ).asRight
+      )
+
+  test("[gnirs] shallow-well thermal-IR 0.30\" slit config (flat, no arc) generates"):
+    // The real GNIRS_FLAT table has a shallow-well 0.05"/pix D10 MIRROR 2.8-4.2 µm
+    // 0.30" slit row (10 x 0.3s, 2 coadds) with no matching GNIRS_ARC row.  The
+    // sequence must still generate, with flats only.
+    val setup: IO[Observation.Id] =
+      for
+        oid <- gnirsObs
+        _   <- configureGnirsThermalIr(oid, fpu = "LONG_SLIT_0_30", wellDepth = "SHALLOW")
+      yield oid
+
+    val snapshot: GnirsDynamicSnapshot =
+      ThermalIrSnapshot.copy(fpuSlit = Some("LONG_SLIT_0_30"))
+
+    // Ten flats, no trailing arc, taken at the last (long-camera) offset.
+    val flatOnlyCalAtom: Json =
+      gnirsExpectedCalAtom(snapshot, 0, -1, TimeSpan.unsafeFromMicroseconds(300_000L), 2, 10, 10.secondTimeSpan, 3, 0)
+
+    setup.flatMap: oid =>
+      expect(
+        user     = pi,
+        query    = gnirsScienceQuery(oid),
+        expected =
+          Json.obj(
+            "executionConfig" -> Json.obj(
+              "gnirs" -> Json.obj(
+                "science" -> Json.obj(
+                  "nextAtom" -> gnirsExpectedScienceAtom(snapshot,
                     (0, -1, Enabled), (0, 5, Enabled), (0, 5, Enabled), (0, -1, Enabled)
                   ),
                   "possibleFuture" -> List(flatOnlyCalAtom).asJson,
@@ -782,6 +832,33 @@ class executionSciGnirsLongSlit extends ExecutionTestSupportForGnirs:
                 "science" -> Json.obj(
                   "nextAtom"       -> sci1,
                   "possibleFuture" -> List(cal1, sci2, cal2).asJson,
+                  "hasMore"        -> false.asJson
+                )
+              )
+            )
+          ).asRight
+      )
+
+  test("[gnirs] S/N mode: science steps take the coadds the ITC chose"):
+    val setup: IO[Observation.Id] =
+      for
+        oid <- gnirsObs
+        _   <- setScienceSignalToNoise(oid, 100, 2200)
+      yield oid
+
+    setup.flatMap: oid =>
+      expect(
+        user     = pi,
+        query    = gnirsScienceQuery(oid),
+        expected =
+          Json.obj(
+            "executionConfig" -> Json.obj(
+              "gnirs" -> Json.obj(
+                "science" -> Json.obj(
+                  "nextAtom" -> gnirsExpectedScienceAtom(DynamicSnapshot.copy(coadds = SignalToNoiseCoadds.value),
+                    (0, 2, Enabled), (0, -4, Enabled), (0, -4, Enabled), (0, 2, Enabled)
+                  ),
+                  "possibleFuture" -> List(DefaultCalAtom).asJson,
                   "hasMore"        -> false.asJson
                 )
               )

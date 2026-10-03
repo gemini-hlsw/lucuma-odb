@@ -9,6 +9,7 @@ import cats.data.NonEmptyList
 import cats.syntax.applicative.*
 import cats.syntax.either.*
 import cats.syntax.option.*
+import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.data.Zipper
 import lucuma.core.enums.Band
 import lucuma.core.math.SingleSN
@@ -23,6 +24,7 @@ import lucuma.itc.TargetIntegrationTime
 import lucuma.itc.TargetIntegrationTimeOutcome
 import lucuma.itc.client.ClientCalculationResult
 import lucuma.itc.client.ImagingInput
+import lucuma.itc.client.InstrumentMode
 import lucuma.itc.client.ItcClient
 import lucuma.itc.client.SpectroscopyInput
 import lucuma.itc.client.SpectroscopyIntegrationTimeAndGraphsInput
@@ -32,6 +34,13 @@ object TestItcClient {
 
   def Version: ItcVersions =
     new ItcVersions("foo", "bar".some)
+
+  // OCS echoes the requested coadds back in its result; only GNIRS requests carry any.
+  private def requestedCoadds(mode: InstrumentMode): PosInt =
+    mode match
+      case InstrumentMode.GnirsSpectroscopy(coadds = c) => c
+      case InstrumentMode.GnirsImaging(coadds = c)      => c
+      case _                                             => PosInt.unsafeFrom(1)
 
   def withResult[F[_]: Applicative](
     result:      IntegrationTime,
@@ -48,7 +57,7 @@ object TestItcClient {
             case ExposureTimeMode.SignalToNoiseMode(_, _)   =>
               result
             case ExposureTimeMode.TimeAndCountMode(t, c, _) =>
-              IntegrationTime(t, c)
+              IntegrationTime(t, c, requestedCoadds(input.mode))
 
         val snAt = input.mode.exposureTimeMode match
           case ExposureTimeMode.SignalToNoiseMode(sn, at) =>

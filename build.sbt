@@ -20,7 +20,7 @@ val circeRefinedVersion          = "0.15.1"
 val cirisVersion                 = "3.15.1"
 val clueVersion                  = "0.60.0"
 val declineVersion               = "2.6.2"
-val flywayVersion                = "13.8.1"
+val flywayVersion                = "13.9.0"
 val fs2AwsVersion                = "6.2.0"
 val fs2Version                   = "3.14.0"
 val grackleVersion               = "0.30.0"
@@ -32,9 +32,9 @@ val jmhVersion                   = "1.37"
 val jwtVersion                   = "11.0.4"
 val keySemaphoreVersion          = "0.3.0"
 val kittensVersion               = "3.5.0"
-val logbackVersion               = "1.6.4"
+val logbackVersion               = "1.6.5"
 val log4catsVersion              = "2.8.0"
-val lucumaCoreVersion            = "0.257.1"
+val lucumaCoreVersion            = "0.261.0"
 val lucumaGraphQLRoutesVersion   = "0.16.0"
 val lucumaRefinedVersion         = "0.1.4"
 val monocleVersion               = "3.3.0"
@@ -88,7 +88,7 @@ ThisBuild / libraryDependencySchemes ++= Seq(
 ThisBuild / libraryDependencySchemes +=
   "edu.gemini" %% "clue-model" % VersionScheme.Always
 
-ThisBuild / tlBaseVersion      := "0.98"
+ThisBuild / tlBaseVersion      := "0.100"
 ThisBuild / scalaVersion       := "3.9.0"
 ThisBuild / crossScalaVersions := Seq("3.9.0")
 ThisBuild / scalacOptions     ++= Seq("-Xmax-inlines", "50") // Hash derivation fails with default of 32
@@ -105,6 +105,9 @@ ThisBuild / tlCiScalafmtCheck        := false
 ThisBuild / tlCiScalafixCheck        := false
 ThisBuild / tlCiMimaBinaryIssueCheck := false
 ThisBuild / tlCiDocCheck             := false
+
+// Steward PRs are still opened, but must be merged by hand
+ThisBuild / mergifyStewardConfig := None
 
 ThisBuild / watchOnTermination := { (action, cmd, times, state) =>
   val projNames = cmd
@@ -276,6 +279,27 @@ lazy val sbtDockerPublishLocal: List[WorkflowStep] =
       cond = Some(systemAffectedCond(system))
     )
   }
+
+// Render the sample payload in the built pdf-summary image, only when the renderer could have
+// changed: modules/pdf-summary or the pyexplore pin.
+lazy val pdfRenderChanged: WorkflowStep =
+  WorkflowStep.Run(
+    List(
+      """.github/pdf-render-changed.sh "${{ github.event.pull_request.base.sha || github.event.before }}""""
+    ),
+    id = Some("pdf-render-changed"),
+    name = Some("Detect PDF renderer changes")
+  )
+
+lazy val pdfRenderChangedCond: String =
+  "steps.pdf-render-changed.outputs.changed == 'true'"
+
+def pdfRenderCheck(cond: String): WorkflowStep =
+  WorkflowStep.Run(
+    List(".github/pdf-render-check.sh"),
+    name = Some("Check PDF summary rendering"),
+    cond = Some(cond)
+  )
 
 lazy val systems: List[String] = List("sso", "itc", "odb", "resource")
 
@@ -501,6 +525,8 @@ ThisBuild / githubWorkflowAddedJobs ++= Seq(
     setupWith(CheckoutFullWithLfs).value :::
       sbtClean ::
       sbtDockerPublishLocal :::
+      pdfRenderChanged ::
+      pdfRenderCheck(allConds(systemAffectedCond("odb"), pdfRenderChangedCond)) ::
       herokuLogin ::
       herokuPush :::
       herokuRelease :::
@@ -510,6 +536,28 @@ ThisBuild / githubWorkflowAddedJobs ++= Seq(
     javas = githubWorkflowJavaVersions.value.toList.take(1),
     needs = List(lucumaAffectedJobId),
     cond = Some(allConds(mainCond, geminiRepoCond))
+  ),
+  // Fork PRs get no PYEXPLORE_TOKEN, so they can't build the image.
+  WorkflowJob(
+    "pdf-render",
+    "Check PDF summary rendering",
+    setupWith(CheckoutFullWithLfs).value :::
+      pdfRenderChanged ::
+      WorkflowStep.Sbt(
+        List("pdfSummary/docker:publishLocal"),
+        name = Some("Build PDF summary Docker image"),
+        cond = Some(pdfRenderChangedCond)
+      ) ::
+      pdfRenderCheck(pdfRenderChangedCond) ::
+      Nil,
+    scalas = List(scalaVersion.value),
+    javas = githubWorkflowJavaVersions.value.toList.take(1),
+    cond = Some(
+      allConds(
+        "github.event_name == 'pull_request'",
+        "github.event.pull_request.head.repo.full_name == github.repository"
+      )
+    )
   )
 )
 
@@ -885,7 +933,7 @@ lazy val itcLegacyTests = project
 
 lazy val common = project
   .in(file("modules/common-middleware"))
-  .dependsOn(ssoBackendClient)
+  .dependsOn(ssoBackendClient, schema.jvm)
   .settings(
     name := "lucuma-common-middleware",
     libraryDependencies ++= Seq(
@@ -1044,6 +1092,7 @@ lazy val binding = project
       "co.fs2"        %% "fs2-core"           % fs2Version,
       "co.fs2"        %% "fs2-io"             % fs2Version,
       "edu.gemini"    %% "lucuma-core"        % lucumaCoreVersion,
+      "org.tpolecat"  %% "skunk-core"         % skunkVersion,
       "org.typelevel" %% "grackle-core"       % grackleVersion,
       "org.typelevel" %% "grackle-sql-core"   % grackleVersion,
       "org.typelevel" %% "log4cats-core"      % log4catsVersion,
@@ -1181,7 +1230,7 @@ lazy val calibrations = project
   )
 
 // Pinned so a deploy always builds the same renderer; bump by PR.
-lazy val pyexploreRef = "29b4abb0b4d0b45934eef8daf85b2ff43cbfe5cc"
+lazy val pyexploreRef = "0feeec993860db99810a86d57172b1a9dd2fa634"
 
 lazy val pdfSummary = project
   .in(file("modules/pdf-summary"))

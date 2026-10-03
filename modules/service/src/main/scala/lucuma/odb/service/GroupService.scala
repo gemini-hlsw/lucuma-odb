@@ -12,6 +12,7 @@ import eu.timepit.refined.types.numeric.NonNegShort
 import grackle.Result
 import grackle.ResultT
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.CloneSequenceMode
 import lucuma.core.model.Access
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
@@ -160,7 +161,7 @@ object GroupService {
       private def cloneObservationInto(oid: Observation.Id, dest: Option[Group.Id])(using Transaction[F]): ResultT[F, Observation.Id] =
         ResultT(
           observationService.cloneObservation(
-            Services.asSuperUser:
+            Services.asSuperUser(
               AccessControl.unchecked(
                 Some(
                   ObservationPropertiesInput.Edit.Empty.copy(
@@ -170,6 +171,8 @@ object GroupService {
                 oid,
                 observation_id
               )
+            ),
+            CloneSequenceMode.None
           )
         ).map(_.cloneId)
 

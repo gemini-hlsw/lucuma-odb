@@ -8,9 +8,9 @@ import cats.derived.*
 import cats.syntax.all.*
 import ciris.*
 import ciris.http4s.*
+import com.comcast.ip4s.Host
 import com.comcast.ip4s.Port
 import org.http4s.*
-import org.http4s.Uri.Host
 
 case class DatabaseConfiguration(
   maxConnections: Int,
@@ -39,7 +39,7 @@ object DatabaseConfiguration:
       userInfo <- uri.userInfo
       user      = userInfo.username
       password <- userInfo.password
-      host     <- uri.host
+      host     <- uri.host.map(_.value).flatMap(Host.fromString)
       port     <- uri.port.flatMap(Port.fromInt)
       database  = uri.path.renderString.stripPrefix("/")
     yield DatabaseConfiguration(

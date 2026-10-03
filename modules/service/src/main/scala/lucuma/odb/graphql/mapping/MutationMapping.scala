@@ -374,7 +374,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] with UserEnv {
             if checked.isEmpty then
               OdbError.NotAuthorized(user.id).asFailureF
             else
-              observationService.cloneObservation(checked).nestMap: ids =>
+              observationService.cloneObservation(checked, input.sequence).nestMap: ids =>
                 Filter(
                   Predicates.cloneObservationResult.newObservation.id.eql(ids.cloneId),
                   child

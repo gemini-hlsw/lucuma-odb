@@ -46,7 +46,7 @@ object ResourceMain extends IOApp.Simple {
       conf           <- ResourceConfiguration.fromCiris.load[F].toResource
       _              <- printBanner(conf).toResource
 
-      _ <- resetDatabase(conf.database).toResource
+      _ <- resetDatabase(conf.database.jdbcUrl, conf.database).toResource
       _ <- migrateDatabase(conf.database.jdbcUrl, conf.database).toResource
 
       otel                   <- OtelSetup.resource(
@@ -123,7 +123,7 @@ object ResourceMain extends IOApp.Simple {
   ): Resource[F, Resource[F, Session[F]]] =
     Session
       .Builder[F]
-      .withHost(config.host.renderString)
+      .withHost(config.host)
       .withPort(config.port)
       .withUserAndPassword(config.user, config.password)
       .withDatabase(config.database)
@@ -131,23 +131,6 @@ object ResourceMain extends IOApp.Simple {
       .withTypingStrategy(TypingStrategy.SearchPath)
       // .withDebug(true)
       .pooled(config.maxConnections)
-
-  def singleSession[F[_]: {Temporal, Console, Network}](
-    config:   DatabaseConfiguration,
-    database: Option[String] = None
-  ): Resource[F, Session[F]] =
-    given TracerProvider[F] = TracerProvider.noop
-    given MeterProvider[F]  = MeterProvider.noop
-    Session
-      .Builder[F]
-      .withHost(config.host.renderString)
-      .withPort(config.port)
-      .withUserAndPassword(config.user, config.password)
-      .withDatabase(database.getOrElse(config.database))
-      .withSSL(SSL.Trusted.withFallback(true))
-      .withTypingStrategy(TypingStrategy.SearchPath)
-      // .withDebug(true)
-      .single
 
   private def printBanner[F[_]: {Logger as L}](conf: ResourceConfiguration): F[Unit] = {
     val runtime    = Runtime.getRuntime
@@ -185,21 +168,23 @@ object ResourceMain extends IOApp.Simple {
   }
 
   /**
-   * Drop and recreate the database.
+   * Drop every object in the application schema with Flyway clean. Flyway recreates them on
+   * migrate.
    */
-  def resetDatabase[F[_]: {Temporal, Console, Network, Logger}](
-    config: DatabaseConfiguration
+  def resetDatabase[F[_]: {Sync, Logger}](
+    jdbcUrl: String,
+    config:  DatabaseConfiguration
   ): F[Unit] =
-    import skunk.*
-    import skunk.implicits.*
-
-    val drop   = sql"""DROP DATABASE IF EXISTS "#${config.database}"""".command
-    val create = sql"""CREATE DATABASE "#${config.database}"""".command
-
     (Logger[F].warn(s"Resetting database '${config.database}'") *>
-      singleSession(config, "postgres".some).use: s =>
-        s.execute(drop) *>
-          s.execute(create).void).whenA(config.resetDatabase)
+      Sync[F].delay {
+        Flyway
+          .configure()
+          .loggers("slf4j")
+          .dataSource(jdbcUrl, config.user, config.password)
+          .cleanDisabled(false)
+          .load()
+          .clean()
+      }.void).whenA(config.resetDatabase)
 
   /**
    * A startup action that runs database migrations using Flyway.

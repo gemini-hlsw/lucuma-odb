@@ -18,6 +18,7 @@ import io.circe.JsonObject
 import lucuma.core.model.User
 import lucuma.resource.test.ServerFixtures
 import munit.Location
+import munit.catseffect.IOFixture
 import org.http4s.*
 import org.http4s.client.UnexpectedStatus
 import org.http4s.headers.Authorization
@@ -26,6 +27,9 @@ import org.http4s.jdkhttpclient.JdkWSClient
 import org.http4s.server.Server
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
+import skunk.Command
+import skunk.Void
+import skunk.exception.PostgresErrorException
 
 trait ResourceGraphQLSuite extends ServerFixtures:
 
@@ -46,6 +50,35 @@ trait ResourceGraphQLSuite extends ServerFixtures:
     IO.pure(auth.some)
 
   private def defaultAuthorization: IO[Option[Authorization]] = asUser(defaultUser)
+
+  /**
+   * The rows the suite's tests read. Written once, after the database container starts and before
+   * the first test, so every test can run on its own.
+   */
+  protected def seed: IO[Unit] = IO.unit
+
+  private lazy val seedFixture: IOFixture[Unit] =
+    ResourceSuiteLocalFixture("seed", Resource.eval(IO.defer(seed)))
+
+  override def munitFixtures = super.munitFixtures ++ List(seedFixture)
+
+  /** Runs the commands, in order, on one connection to the test database. */
+  protected def exec(commands: Command[Void]*): IO[Unit] =
+    session.use(s => commands.toList.traverse_(s.execute(_)))
+
+  /**
+   * Asserts that the database rejects the operation because of the value written: a data exception
+   * (SQLSTATE class 22, for example a bad enum label) or an integrity constraint violation (class
+   * 23). A malformed statement does not pass as a working constraint.
+   */
+  protected def expectDbRejection(io: IO[?])(using Location): IO[Unit] =
+    io.attempt.map:
+      case Left(e: PostgresErrorException) =>
+        assert(e.code.startsWith("22") || e.code.startsWith("23"),
+               s"Expected a data or constraint violation, got ${e.code}: ${e.message}"
+        )
+      case Left(e)                         => fail(s"Expected a Postgres error, got $e")
+      case Right(_)                        => fail("Expected the database to reject the operation.")
 
   def expect(
     query:         String,

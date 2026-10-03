@@ -19,6 +19,7 @@ import lucuma.core.enums.AltairMode
 import lucuma.core.enums.AltairNdFilter
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.CassRotator
+import lucuma.core.enums.CloneSequenceMode
 import lucuma.core.enums.FieldLens
 import lucuma.core.enums.FocalPlane
 import lucuma.core.enums.GuideProbe
@@ -27,8 +28,10 @@ import lucuma.core.enums.ObservationPriority
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.SchedulingMode
 import lucuma.core.enums.ScienceBand
+import lucuma.core.enums.SequenceType
 import lucuma.core.enums.SkyBackground
 import lucuma.core.enums.SpectroscopyCapability
+import lucuma.core.enums.TooActivation
 import lucuma.core.enums.WaterVapor
 import lucuma.core.math.Angle
 import lucuma.core.math.Coordinates
@@ -120,7 +123,8 @@ sealed trait ObservationService[F[_]] {
   )(using Transaction[F]): F[Result[Map[Program.Id, List[Observation.Id]]]]
 
   def cloneObservation(
-    input: AccessControl.CheckedWithId[Option[ObservationPropertiesInput.Edit], Observation.Id]
+    input:    AccessControl.CheckedWithId[Option[ObservationPropertiesInput.Edit], Observation.Id],
+    sequence: CloneSequenceMode
   )(using Transaction[F]): F[Result[ObservationService.CloneIds]]
 
   def deleteCalibrationObservations(
@@ -266,13 +270,51 @@ object ObservationService {
             optF.fold(().pure[F])( f => f(oids, transaction) )
           }
 
+      // Ready observations raised above their program's ceiling (see
+      // Statements.validateTooActivation).
+      private def validateTooActivation(which: AppliedFragment): F[Result[Unit]] =
+        val af = Statements.validateTooActivation(which)
+        session
+          .prepareR(af.fragment.query(observation_id *: too_activation *: too_activation))
+          .use: p =>
+            p.stream(af.argument, chunkSize = 1024)
+             .compile
+             .toList
+          .map: problems =>
+            problems
+              .map: (oid, activation, ceiling) =>
+                OdbError.InvalidArgument(
+                  s"Cannot set the Target of Opportunity activation for observation $oid while it is Ready: ${activation.tag.toScreamingSnakeCase} is above ${ceiling.tag.toScreamingSnakeCase}, the program's ceiling. Set it back to Defined, or have staff raise the ceiling first.".some
+                ).asFailure.void
+              .combineAllOption
+              .getOrElse(Result.unit)
+
+      // The compatibility rule at creation.  Both values are known here, so this
+      // is a plain check rather than the SQL one the edit path needs.  An omitted
+      // activation is defaulted to `None`, which is compatible with every mode, and
+      // an omitted mode follows a Target of Opportunity activation to
+      // UNINTERRUPTIBLE, so only an explicit mode contradicting an explicit ToO
+      // activation can be wrong.
+      private def validateTooCompatibleOnCreate(
+        SET: ObservationPropertiesInput.Create
+      ): Result[Unit] =
+        val mode = SET.scheduling.flatMap(_.schedulingModeToWrite).getOrElse(SchedulingMode.Unconstrained)
+        SET.scheduling
+          .flatMap(_.tooActivation)
+          .filterNot(_.isCompatibleWith(mode))
+          .fold(Result.unit): a =>
+            OdbError.InvalidArgument(
+              s"Target of Opportunity activation ${a.tag.toScreamingSnakeCase} fixes the scheduling mode at UNINTERRUPTIBLE; it cannot be ${mode.tag.toScreamingSnakeCase}.".some
+            ).asFailure
+
       /** Create the observation itself, with no asterism. */
       private def createObservationImpl(
         programId: Program.Id,
         SET:       ObservationPropertiesInput.Create,
         calibrationRole: Option[CalibrationRole]
       )(using Transaction[F], SuperUserAccess): F[Result[Observation.Id]] =
-        T.span("createObservation").surround {
+        validateTooCompatibleOnCreate(SET).flatTraverse: _ =>
+         T.span("createObservation").surround {
           session.execute(sql"set constraints all deferred".command) >>
           session.prepareR(GroupService.Statements.OpenHole).use(_.unique(programId, SET.group, SET.groupIndex)).flatMap { ix =>
             val oEtm = SET.scienceRequirements.flatMap(_.exposureTimeMode.toOption)
@@ -377,22 +419,20 @@ object ObservationService {
           val modeInstrument: Option[Instrument] =
             observingModeType.flatMap(ObservingModeType.toFacility.getOption).map(_.instrument)
 
-          val instrumentCheck: F[Result[Unit]] =
-            (altair, modeInstrument).tupled.fold(Result.unit.pure[F]): (_, facilityInstrument) =>
-              session.execute(Statements.SelectAltairInstruments).map: altairInstruments =>
-                AltairRules.checkInstrument(facilityInstrument, altairInstruments.toSet)
+          val instrumentCheck: Result[Unit] =
+            (altair, modeInstrument).tupled.fold(Result.unit): (_, facilityInstrument) =>
+              AltairRules.checkInstrument(facilityInstrument)
 
-          val guidingCheck: F[Result[Unit]] =
-            instrumentCheck.map: instrumentResult =>
-              (
-                instrumentResult,
-                altair.fold(Result.unit)(AltairRules.checkConfiguration(_)),
-                (observingModeType, SET.targetEnvironment.flatMap(_.explicitGuideProbe))
-                  .tupled
-                  .fold(Result.unit)(GuideProbeRules.check(_, altair.map(_.mode), _))
-              ).parTupled.void
+          val guidingCheck: Result[Unit] =
+            (
+              instrumentCheck,
+              altair.fold(Result.unit)(AltairRules.checkConfiguration(_)),
+              (observingModeType, SET.targetEnvironment.flatMap(_.explicitGuideProbe))
+                .tupled
+                .fold(Result.unit)(GuideProbeRules.check(_, altair.map(_.mode), _))
+            ).parTupled.void
 
-          ResultT(guidingCheck)
+          ResultT(guidingCheck.pure[F])
             .flatMap(_ => ResultT(Services.asSuperUser(createObservationImpl(pid, SET, calibrationRole))))
             .flatMap: oid =>
               SET
@@ -543,30 +583,40 @@ object ObservationService {
                       .combineAllOption
                       .getOrElse(Result.unit)
 
-            // Checks that no observation is left deriving a ToO activation above
-            // the ceiling its proposal was granted.  Runs after the update, like
-            // the unsplittable check above, so it reads the activation the edit
-            // actually produced rather than predicting it; a failure rolls the
-            // transaction back.
-            //
-            // Only the explicit ceiling is enforced.  The derived default is the
-            // maximum activation among the program's own observations, so nothing
-            // can exceed it and a check against it would reject a PI raising the
-            // first observation's mode before the proposal is even submitted.
-            val validateTooActivationCeiling: ResultT[F, Unit] =
+            // Checks that no Ready observation is left above its program's
+            // ceiling.  Runs after the update, like the unsplittable check above,
+            // so it reads the activation the edit actually produced rather than
+            // predicting it; a failure rolls the transaction back.
+            val validateTooActivationAllowed: ResultT[F, Unit] =
+              ResultT(validateTooActivation(which))
+
+            val touchesTooAxes: Boolean =
+              SET.scheduling.toOption.exists: sc =>
+                sc.tooActivation.isDefined || sc.schedulingMode.isDefined
+
+            // Rejects the pair the row would end up with, before the update runs.
+            // A Rapid or Interrupting activation brings UNINTERRUPTIBLE with it
+            // when the edit names no mode, so what is left to reject is an
+            // explicit mode that contradicts a Target of Opportunity activation,
+            // whether set in the same edit or already stored.
+            val validateTooActivationCompatible: ResultT[F, Unit] =
               ResultT:
-                val af = Statements.validateTooActivationCeiling(which)
+                val af = Statements.validateTooActivationCompatible(
+                  which,
+                  SET.scheduling.toOption.flatMap(_.tooActivation),
+                  SET.scheduling.toOption.flatMap(_.schedulingModeToWrite)
+                )
                 session
-                  .prepareR(af.fragment.query(observation_id *: too_activation *: too_activation))
+                  .prepareR(af.fragment.query(observation_id *: too_activation *: scheduling_mode))
                   .use: p =>
                     p.stream(af.argument, chunkSize = 1024)
                      .compile
                      .toList
                   .map: problems =>
                     problems
-                      .map: (oid, activation, ceiling) =>
+                      .map: (oid, activation, mode) =>
                         OdbError.InvalidArgument(
-                          s"Cannot set the scheduling mode for observation $oid: Target of Opportunity activation ${activation.tag.toScreamingSnakeCase} exceeds the maximum ${ceiling.tag.toScreamingSnakeCase} allowed by the proposal.".some
+                          s"Cannot set the scheduling constraints for observation $oid: Target of Opportunity activation ${activation.tag.toScreamingSnakeCase} fixes the scheduling mode at UNINTERRUPTIBLE; it cannot be ${mode.tag.toScreamingSnakeCase}.".some
                         ).asFailure.void
                       .combineAllOption
                       .getOrElse(Result.unit)
@@ -610,14 +660,13 @@ object ObservationService {
             val validateAltairInstrument: ResultT[F, Unit] =
               ResultT:
                 val af = Statements.selectAltairObservations(which)
-                for
-                  altairInstruments <- session.execute(Statements.SelectAltairInstruments).map(_.toSet)
-                  rows              <- session
-                                         .prepareR(af.fragment.query(observation_id *: instrument.opt))
-                                         .use(_.stream(af.argument, chunkSize = 1024).compile.toList)
-                yield rows.parTraverse_ { case (oid, obsInstrument) =>
-                  obsInstrument.traverse_(AltairRules.checkInstrument(_, altairInstruments, s"Observation $oid: "))
-                }
+                session
+                  .prepareR(af.fragment.query(observation_id *: instrument.opt))
+                  .use(_.stream(af.argument, chunkSize = 1024).compile.toList)
+                  .map: rows =>
+                    rows.parTraverse_ { case (oid, obsInstrument) =>
+                      obsInstrument.traverse_(AltairRules.checkInstrument(_, s"Observation $oid: "))
+                    }
 
             val updates: ResultT[F, Map[Program.Id, List[Observation.Id]]] =
               for {
@@ -647,12 +696,13 @@ object ObservationService {
                 isSplittable = !SET.scheduling.toOption.exists(_.makesUnsplittable)
                 _ <- if isSplittable then ResultT.unit else validateUnsplittableStoredSequence
 
-                // A mode edit is the one path that can raise an observation over
-                // its program's ceiling in a single step, and the one worth
-                // refusing outright: allowing it would put a live request in front
-                // of an observer at an activation the TAC never granted.
-                setsMode = SET.scheduling.toOption.flatMap(_.schedulingMode).isDefined
-                _ <- if setsMode then validateTooActivationCeiling else ResultT.unit
+                // Checked after the update, against the values the rows now hold.
+                // Refusing means rolling the whole edit back, trigger supersession
+                // included, which is what must happen: a Ready observation raised
+                // above what was approved would otherwise put a live request in
+                // front of an observer for a disruption nobody granted.
+                setsActivation = SET.scheduling.toOption.flatMap(_.tooActivation).isDefined
+                _ <- if setsActivation then validateTooActivationAllowed else ResultT.unit
 
                 _ <- ResultT(u.map(u => Services.asSuperUser(updateObservingModes(SET.observingMode, u, e.toOption))).getOrElse(Result.unit.pure[F]))
                 // Clearing Altair (null) also changes which probes are allowed, so it counts.
@@ -676,6 +726,13 @@ object ObservationService {
             (for {
               _ <- validateAltairConfiguration
               _ <- forbidSystemGroupMove
+
+              // Ahead of the update, unlike the ceiling check below it.  A CHECK
+              // constraint backs this rule, and a constraint aborts the statement
+              // that violates it -- so validating afterwards never gets the chance
+              // to produce the better message.  An explicit mode can contradict an
+              // activation set in the same edit or one already stored.
+              _ <- if touchesTooAxes then validateTooActivationCompatible else ResultT.unit
               _ <- ResultT.liftF(session.execute(sql"set constraints all deferred".command))
               // The group move is inside the recover: a trigger may reject it
               // (e.g. a science observation leaving its calibration group).
@@ -706,7 +763,8 @@ object ObservationService {
       /** Clone the observation. We assume access has been checked already. */
       private def cloneObservationUnconditionally(
         observationId: Observation.Id,
-        SET:           Option[ObservationPropertiesInput.Edit]
+        SET:           Option[ObservationPropertiesInput.Edit],
+        sequence:      CloneSequenceMode
       )(using Transaction[F]): F[Result[(Program.Id, Observation.Id)]] = {
 
         // First we need the pid, observing mode, and grouping information
@@ -781,11 +839,22 @@ object ObservationService {
                           .flatTap {
                             r => transaction.rollback.unlessA(r.hasValue)
                           }
+                  // Copied after the update so that it is validated against
+                  // the clone's final configuration (e.g. splittability).  The
+                  // acquisition is tuned to the target, so a target edit regenerates it.
+                  val cloneSequence: F[Result[Unit]] =
+                    val editsAsterism = SET.flatMap(_.targetEnvironment).exists(!_.asterism.isAbsent)
+                    val types         =
+                      if editsAsterism then List(SequenceType.Science)
+                      else List(SequenceType.Acquisition, SequenceType.Science)
+                    sequenceService.cloneSequence(observationId, oid2, sequence, types)
+
                   (
                     for
                       _ <- ResultT.liftF(cloneRelatedItems)
                       _ <- ResultT(cloneBlindOffset)
                       r <- ResultT(doUpdate)
+                      _ <- ResultT(cloneSequence)
                     yield r
                   ).value
               }
@@ -794,7 +863,8 @@ object ObservationService {
       }
 
       def cloneObservation(
-        input: AccessControl.CheckedWithId[Option[ObservationPropertiesInput.Edit], Observation.Id]
+        input:    AccessControl.CheckedWithId[Option[ObservationPropertiesInput.Edit], Observation.Id],
+        sequence: CloneSequenceMode
       )(using Transaction[F]): F[Result[ObservationService.CloneIds]] =
         // The asterism (including any signal-to-noise target flag) is copied by
         // cloneAsterism inside cloneObservationUnconditionally. Any asterism edits
@@ -802,13 +872,17 @@ object ObservationService {
         // target, so membership is validated against the post-edit asterism.
         val cloned: F[Result[CloneIds]] =
           input.foldWithId(OdbError.InvalidArgument().asFailureF): (oSET, origOid) =>
-            cloneObservationUnconditionally(origOid, oSET).flatMap: res =>
-              res.flatTraverse: (pid, newOid) =>
-                Services.asSuperUser:
-                  (for
-                    _ <- ResultT(asterismService.setAsterism(pid, NonEmptyList.of(newOid), oSET.fold(Nullable.Absent)(_.asterism)))
-                    _ <- ResultT(asterismService.setSignalToNoiseTarget(pid, NonEmptyList.of(newOid), oSET.fold(Nullable.Absent)(_.explicitSignalToNoiseTargetId)))
-                  yield CloneIds(origOid, newOid)).value
+            val editsSequenceInputs = oSET.exists(s => !s.observingMode.isAbsent || s.scienceRequirements.isDefined)
+            if editsSequenceInputs && sequence =!= CloneSequenceMode.None then
+              OdbError.InvalidArgument("The observing mode and science requirements cannot be edited when cloning an observation's sequence.".some).asFailureF
+            else
+              cloneObservationUnconditionally(origOid, oSET, sequence).flatMap: res =>
+                res.flatTraverse: (pid, newOid) =>
+                  Services.asSuperUser:
+                    (for
+                      _ <- ResultT(asterismService.setAsterism(pid, NonEmptyList.of(newOid), oSET.fold(Nullable.Absent)(_.asterism)))
+                      _ <- ResultT(asterismService.setSignalToNoiseTarget(pid, NonEmptyList.of(newOid), oSET.fold(Nullable.Absent)(_.explicitSignalToNoiseTargetId)))
+                    yield CloneIds(origOid, newOid)).value
 
         // A single rollback covering the whole clone: this runs in one transaction
         // and `transaction.rollback` is a full rollback, so any failure (a cloned
@@ -826,7 +900,7 @@ object ObservationService {
       override def selectInstrument(
         oid: Observation.Id
       )(using Transaction[F]): F[Option[Instrument]] =
-        session.option(Statements.SelectInstrument)(oid)
+        session.option(Statements.SelectInstrument)(oid).map(_.flatten)
 
       override def selectIsSplittable(
         oid: Observation.Id
@@ -899,7 +973,8 @@ object ObservationService {
           SET.targetEnvironment.flatMap(_.explicitGuideProbe),
           SET.targetEnvironment.flatMap(_.altair),
           calibrationRole,
-          SET.scheduling.flatMap(_.schedulingMode).getOrElse(SchedulingMode.Unconstrained),
+          SET.scheduling.flatMap(_.schedulingModeToWrite).getOrElse(SchedulingMode.Unconstrained),
+          SET.scheduling.flatMap(_.tooActivation).getOrElse(TooActivation.None),
           SET.priority.getOrElse(ObservationPriority.Medium)
         )
       }
@@ -925,6 +1000,7 @@ object ObservationService {
       altair:              Option[AltairConfiguration],
       calibrationRole:     Option[CalibrationRole],
       schedulingMode:      SchedulingMode,
+      tooActivation:       TooActivation,
       priority:            ObservationPriority
     ): AppliedFragment = {
 
@@ -975,7 +1051,8 @@ object ObservationService {
            altair.map(_.cassRotator)                                                                                              ,
            altair.map(_.ndFilter)                                                                                                 ,
            calibrationRole                                                                                                        ,
-           schedulingMode                                                                                                         ,
+           schedulingMode                                                                                                          ,
+           tooActivation                                                                                                           ,
            priority
         )
       }
@@ -1029,6 +1106,7 @@ object ObservationService {
       Option[AltairNdFilter]           ,
       Option[CalibrationRole]          ,
       SchedulingMode                   ,
+      TooActivation                    ,
       ObservationPriority
     )] =
       sql"""
@@ -1073,6 +1151,7 @@ object ObservationService {
           c_altair_nd_filter,
           c_calibration_role,
           c_scheduling_mode,
+          c_too_activation,
           c_priority
         )
         SELECT
@@ -1116,6 +1195,7 @@ object ObservationService {
           ${altair_nd_filter.opt},
           ${calibration_role.opt},
           $scheduling_mode,
+          $too_activation,
           $observation_priority
       """
 
@@ -1268,6 +1348,7 @@ object ObservationService {
       val upUseBlindOffset    = sql"c_use_blind_offset = $bool"
       val upSchedulingMode    = sql"c_scheduling_mode = $scheduling_mode"
       val upPriority          = sql"c_priority = $observation_priority"
+      val upTooActivation     = sql"c_too_activation = $too_activation"
 
       val ups: List[AppliedFragment] =
         List(
@@ -1276,7 +1357,8 @@ object ObservationService {
           SET.scienceBand.foldPresent(upScienceBand),
           SET.observerNotes.foldPresent(upObserverNotes),
           SET.targetEnvironment.flatMap(_.useBlindOffset).map(upUseBlindOffset),
-          SET.scheduling.fold(SchedulingMode.Unconstrained.some, none, _.schedulingMode).map(upSchedulingMode),
+          SET.scheduling.fold(SchedulingMode.Unconstrained.some, none, _.schedulingModeToWrite).map(upSchedulingMode),
+          SET.scheduling.fold(TooActivation.None.some, none, _.tooActivation).map(upTooActivation),
           SET.priority.map(upPriority)
         ).flatten
 
@@ -1426,6 +1508,7 @@ object ObservationService {
           c_altair_cass_rotator,
           c_altair_nd_filter,
           c_scheduling_mode,
+          c_too_activation,
           c_priority
         )
         SELECT
@@ -1469,6 +1552,7 @@ object ObservationService {
           c_altair_cass_rotator,
           c_altair_nd_filter,
           c_scheduling_mode,
+          c_too_activation,
           c_priority
       FROM t_observation
       WHERE c_observation_id = $observation_id
@@ -1531,38 +1615,41 @@ object ObservationService {
         WHERE c_program_id = $program_id AND c_existence = 'present'
       """.query(observation_id *: science_band.opt)
 
-    val SelectInstrument: Query[Observation.Id, Instrument] =
+    val SelectInstrument: Query[Observation.Id, Option[Instrument]] =
       sql"""
         SELECT c_instrument
           FROM t_observation
          WHERE c_observation_id = $observation_id
-      """.query(instrument)
+      """.query(instrument.opt)
 
-    // Reads the view's derived flag so that the default and the ToO floor are
-    // both accounted for, rather than re-deriving them here.
+    // Splittability is exactly the bottom rung of the scheduling mode.  There is
+    // no floor to account for any more: the Target of Opportunity activation is a
+    // separate axis and never moves the mode.
     val SelectIsSplittable: Query[Observation.Id, Boolean] =
       sql"""
-        SELECT c_is_splittable
-          FROM v_observation
+        SELECT c_scheduling_mode = 'unconstrained'
+          FROM t_observation
          WHERE c_observation_id = $observation_id
       """.query(bool)
 
-    // Observations whose derived ToO activation exceeds their proposal's explicit
-    // ceiling.  No join to the proposal's derived default is needed, and none to
-    // the asterism: c_too_activation is a generated column on t_observation.
-    def validateTooActivationCeiling(
+    // Ready observations whose activation is above their program's ceiling, with
+    // the ceiling.  Ready is the trigger, so the raise would otherwise put a
+    // request in front of the observatory for a disruption nobody approved.  A
+    // Defined observation may be raised freely: it goes Unapproved until staff
+    // raise the ceiling.  A program with no ceiling has no restriction.
+    def validateTooActivation(
       which: AppliedFragment
     ): AppliedFragment =
       void"""
         SELECT
           o.c_observation_id,
           o.c_too_activation,
-          p.c_too_activation
+          p.c_too_activation_ceiling
         FROM t_observation o
-        JOIN t_proposal p ON p.c_program_id = o.c_program_id
+        JOIN t_program p ON p.c_program_id = o.c_program_id
         WHERE o.c_observation_id IN (""" |+| which |+| void""")
-          AND p.c_too_activation IS NOT NULL
-          AND o.c_too_activation > p.c_too_activation
+          AND o.c_workflow_user_state = 'ready'::e_workflow_user_state
+          AND o.c_too_activation > p.c_too_activation_ceiling
       """
 
     def selectExplicitGuideProbes(which: AppliedFragment): AppliedFragment =
@@ -1571,18 +1658,35 @@ object ObservationService {
         void"WHERE c_explicit_guide_probe IS NOT NULL "                                            |+|
         void"AND c_observation_id IN (" |+| which |+| void")"
 
-    val SelectAltairInstruments: Query[Void, Instrument] =
-      sql"""
-        SELECT c_tag
-          FROM t_instrument
-         WHERE c_altair
-      """.query(instrument)
-
     def selectAltairObservations(which: AppliedFragment): AppliedFragment =
       void"SELECT c_observation_id, c_instrument " |+|
         void"FROM t_observation "                  |+|
         void"WHERE c_altair_mode IS NOT NULL "     |+|
         void"AND c_observation_id IN (" |+| which |+| void")"
+
+    // The one rule relating the two axes: a rapid or interrupting Target of
+    // Opportunity must itself be uninterruptible.
+    //
+    // Checked *before* the update, unlike the ceiling.  The CHECK constraint
+    // standing behind this would abort the statement, and it would do so naming a
+    // constraint rather than the two fields the PI actually set.
+    //
+    // An edit may supply either axis alone, so what matters is the pair the row
+    // would end up with: the value being set where the edit names it, and the
+    // stored column where it does not.
+    def validateTooActivationCompatible(
+      which:      AppliedFragment,
+      activation: Option[TooActivation],
+      mode:       Option[SchedulingMode]
+    ): AppliedFragment =
+      val effActivation = activation.fold(void"c_too_activation")(a => sql"$too_activation"(a))
+      val effMode       = mode.fold(void"c_scheduling_mode")(m => sql"$scheduling_mode"(m))
+      void"SELECT c_observation_id, "                       |+| effActivation |+|
+      void", "                                              |+| effMode       |+|
+      void" FROM t_observation WHERE c_observation_id IN (" |+| which         |+|
+      void") AND "                                          |+| effActivation |+|
+      void" <> 'none'::e_too_activation AND "               |+| effMode       |+|
+      void" <> 'uninterruptible'::e_scheduling_mode"
 
     def validateUnsplittableSequence(
       which: AppliedFragment,

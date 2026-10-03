@@ -1,9 +1,9 @@
 // Copyright (c) 2016-2026 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
-package resource.model
+package lucuma.odb.graphql.binding
 
-import io.circe.Encoder
+import lucuma.core.enums.CloneSequenceMode
 
-final case class TelescopeMode(`type`: TelescopeModeType, programReference: Option[String])
-    derives Encoder.AsObject
+val CloneSequenceModeBinding: Matcher[CloneSequenceMode] =
+  enumeratedBinding

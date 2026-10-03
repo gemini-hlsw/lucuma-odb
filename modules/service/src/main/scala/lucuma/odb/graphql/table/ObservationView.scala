@@ -43,12 +43,15 @@ trait ObservationView[F[_]] extends BaseMapping[F] {
       val ConfigurationAltairMode: ColumnRef = col("c_configuration_altair_mode", altair_mode.opt)
 
       val SchedulingMode: ColumnRef        = col("c_scheduling_mode",           scheduling_mode)
-      val IsSplittable: ColumnRef          = col("c_is_splittable",             bool)
 
       val AcquisitionSequenceIsMaterialized: ColumnRef =
         col("c_acquisition_sequence_is_materialized", bool)
       val ScienceSequenceIsMaterialized: ColumnRef =
         col("c_science_sequence_is_materialized", bool)
+      val AcquisitionSequenceIsCustomized: ColumnRef =
+        col("c_acquisition_sequence_is_customized", bool)
+      val ScienceSequenceIsCustomized: ColumnRef =
+        col("c_science_sequence_is_customized", bool)
 
 
       object PosAngleConstraint {
@@ -180,6 +183,7 @@ trait ObservationView[F[_]] extends BaseMapping[F] {
         val FullSetupTime: ColumnRef       = col("c_orig_est_full_setup_time",       time_span.embedded)
         val ReacqSetupTime: ColumnRef      = col("c_orig_est_reacq_setup_time",      time_span.embedded)
         val SetupCount: ColumnRef          = col("c_orig_est_setup_count",           int4_nonneg.embedded)
+        val ReacquisitionCount: ColumnRef  = col("c_orig_est_reacquisition_count",   int4_nonneg.embedded)
         val CalibrationCount: ColumnRef    = col("c_orig_est_calibration_count",     int4_nonneg.embedded)
         val SciNonChargedTime: ColumnRef   = col("c_orig_est_sci_non_charged_time",  time_span.embedded)
         val SciProgramTime: ColumnRef      = col("c_orig_est_sci_program_time",      time_span.embedded)

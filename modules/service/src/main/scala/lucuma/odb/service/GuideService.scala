@@ -1140,6 +1140,27 @@ object GuideService {
             ).use(_.option(trackingStmt.argument)).map: tracking =>
               tracking.flatMap(_.at(instant))
 
+      def trackingSnapshotAt(oid: Observation.Id, time: Timestamp): F[Result[TrackingService.Snapshot[Tracking]]] =
+        trackingService.getTrackingSnapshot(oid, TimestampInterval.empty(time), false)
+
+      // The next transit is less than a sidereal day away, but a nonsidereal ephemeris has to cover
+      // it, and a snapshot at an instant only spans that UTC day.
+      def nextBaseTransit(oid: Observation.Id, site: Site, now: Timestamp): F[Result[Timestamp]] =
+        val transitSearchWindow: TimestampInterval =
+          TimestampInterval.between(now, now +| TimeSpan.unsafeFromDuration(2, ChronoUnit.DAYS))
+        ResultT(trackingService.getTrackingSnapshot(oid, transitSearchWindow, false))
+          .flatMap: snapshot =>
+            ResultT.fromResult:
+              snapshot.base
+                .nextTransit(site, now.toInstant)
+                .map(Timestamp.fromInstantTruncatedAndBounded)
+                .toResult(
+                  generalError(
+                    s"Unable to determine coordinates for observation $oid to default the observation time."
+                  ).asProblem
+                )
+          .value
+
       def lookupGuideStar(
         oid:                    Observation.Id,
         oGuideStarName:         Option[GuideStarName],
@@ -1161,7 +1182,7 @@ object GuideService {
                                .toResult(generalError("Visit end time out of range").asProblem)
                            )
 
-          tracking      <- ResultT(trackingService.getTrackingSnapshot(oid, TimestampInterval.empty(obsTime), false))
+          tracking      <- ResultT(trackingSnapshotAt(oid, obsTime))
           baseTracking     = tracking.base
           asterismTracking = tracking.asterism.map(_._2) // discard the target ids
 
@@ -1198,7 +1219,7 @@ object GuideService {
           angles        <- ResultT.fromResult(
                              obsInfo.posAngleConstraint
                               .anglesToTestAt(genInfo.site, baseTracking, scienceTime.toInstant, scienceDuration.toDuration)
-                              .toResult(generalError(s"No angles to test for guide target candidates for observation $oid.").asProblem)
+                              .toResult(generalError(s"Cannot compute the average parallactic angle for observation $oid: the target is not observable at the observation time, or its position is unknown then.").asProblem)
                            )
           blindOffsetOpt <- ResultT.liftF(getBlindOffsetCoordinates(oid, obsTime.toInstant))
           optUsable      <- ResultT.liftF(chooseBestGuideStar(obsInfo, genInfo.agsWavelength, genInfo, baseCoords, scienceCoords, blindOffsetOpt, angles, candidates, trackType))
@@ -1264,11 +1285,12 @@ object GuideService {
         T.span("resolveGuideStar").surround:
           (for {
             obsInfo         <- ResultT(getObservationInfo(oid))
-            // Like Explore's own AGS, an unset observation time defaults to now and an unset
-            // duration to the sequence's full time estimate, or to a nominal visit when there is
-            // no sequence yet.
+            // An unset observation time defaults to the next transit, the shared rule in core's
+            // Tracking.timeOrNextTransit, so a target below the horizon does not make the average
+            // parallactic angle uncomputable. An unset duration defaults to the sequence's full
+            // time estimate, or to a nominal visit when there is no sequence yet.
             now             <- ResultT.liftF(Timestamp.timestampNow[F])
-            obsTime          = obsInfo.optObsTime.getOrElse(now)
+            obsTime         <- ResultT(obsInfo.optObsTime.fold(nextBaseTransit(oid, generatorInfo.site, now))(_.success.pure[F]))
             obsDuration      = obsInfo.optObsDuration.getOrElse(generatorInfo.defaultObsDuration)
             scienceDuration <- ResultT.fromResult(generatorInfo.getScienceDuration(obsDuration, oid))
             scienceStart     = generatorInfo.getScienceStartTime(obsTime)
