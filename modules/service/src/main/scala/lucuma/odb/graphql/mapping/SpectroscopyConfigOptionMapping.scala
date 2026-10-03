@@ -56,6 +56,11 @@ trait SpectroscopyConfigOptionMapping[F[_]] extends SpectroscopyConfigOptionTabl
       SqlObject("gnirs", Join(List(
         SpectroscopyConfigOptionTable.Instrument -> SpectroscopyConfigOptionGnirsTable.Instrument,
         SpectroscopyConfigOptionTable.Index      -> SpectroscopyConfigOptionGnirsTable.Index
+      ))),
+
+      SqlObject("scorpio", Join(List(
+        SpectroscopyConfigOptionTable.Instrument -> SpectroscopyConfigOptionScorpioTable.Instrument,
+        SpectroscopyConfigOptionTable.Index      -> SpectroscopyConfigOptionScorpioTable.Index
       )))
 
     )
@@ -113,4 +118,12 @@ trait SpectroscopyConfigOptionMapping[F[_]] extends SpectroscopyConfigOptionTabl
       SqlField("fpuIfu",     SpectroscopyConfigOptionGnirsTable.FpuIfu),
       SqlField("prism",      SpectroscopyConfigOptionGnirsTable.Prism),
       SqlField("camera",     SpectroscopyConfigOptionGnirsTable.Camera)
+    )
+
+  lazy val SpectroscopyConfigOptionScorpioMapping: ObjectMapping =
+    ObjectMapping(SpectroscopyConfigOptionScorpioType)(
+      SqlField("instrument", SpectroscopyConfigOptionScorpioTable.Instrument, key = true, hidden = true),
+      SqlField("index",      SpectroscopyConfigOptionScorpioTable.Index, key = true, hidden = true),
+
+      SqlField("fpu",        SpectroscopyConfigOptionScorpioTable.Fpu)
     )
