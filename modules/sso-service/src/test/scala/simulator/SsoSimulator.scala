@@ -31,6 +31,7 @@ import org.http4s.HttpRoutes
 import org.http4s.Uri
 import org.http4s.client.Client
 import org.http4s.client.middleware.CookieJar
+import org.http4s.client.middleware.PublicSuffixMatcher
 import org.http4s.implicits.*
 import org.http4s.server.Router
 import org.testcontainers.containers.PostgreSQLContainer.POSTGRESQL_PORT
@@ -166,7 +167,7 @@ trait SsoSimulator extends TestContainerForAll { self: Suite =>
             _   <- Resource.eval(Logger[F].debug(s"""Response(status=${res.status}, headers=${res.headers})"""))
           } yield res
         }
-        Resource.eval(CookieJar.impl[F](clientʹ)).map { client =>
+        Resource.eval(CookieJar.impl[F](PublicSuffixMatcher.default)(clientʹ)).map { client =>
           (pool, sim, client, reader, writer)
         }
       }
