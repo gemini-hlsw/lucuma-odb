@@ -53,14 +53,14 @@ class executionDigest_calibrationEstimate
               digest {
                 value {
                   estimate {
-                    calibrationCount
                     setupCount
                     setup { full { microseconds } }
                     science { program { microseconds } }
-                    existingCalibrationCount
-                    existingCalibrationTime { program { microseconds } }
-                    expectedCalibrationCount
-                    expectedCalibrationTime { program { microseconds } }
+                    calibrations {
+                      count
+                      existing { count time { program { microseconds } } }
+                      expected { count time { program { microseconds } } }
+                    }
                     total { program { microseconds } }
                   }
                 }
@@ -72,14 +72,15 @@ class executionDigest_calibrationEstimate
     ).map: json =>
       val est    = json.hcursor
                      .downFields("observation", "execution", "digest", "value", "estimate")
-      val count  = est.downField("calibrationCount").require[Int]
+      val count  = est.downFields("calibrations", "count").require[Int]
       val setups = est.downField("setupCount").require[Int]
       val setup  = est.downFields("setup", "full", "microseconds").require[Long]
       val sci    = est.downFields("science", "program", "microseconds").require[Long]
-      val existN = est.downField("existingCalibrationCount").require[Int]
-      val exist  = est.downFields("existingCalibrationTime", "program", "microseconds").require[Long]
-      val expN   = est.downField("expectedCalibrationCount").require[Int]
-      val exp    = est.downFields("expectedCalibrationTime", "program", "microseconds").require[Long]
+      val cal    = est.downField("calibrations")
+      val existN = cal.downFields("existing", "count").require[Int]
+      val exist  = cal.downFields("existing", "time", "program", "microseconds").require[Long]
+      val expN   = cal.downFields("expected", "count").require[Int]
+      val exp    = cal.downFields("expected", "time", "program", "microseconds").require[Long]
       val total  = est.downFields("total", "program", "microseconds").require[Long]
       Estimate(count, existN, exist, expN, exp, total, sci + setup * setups)
 

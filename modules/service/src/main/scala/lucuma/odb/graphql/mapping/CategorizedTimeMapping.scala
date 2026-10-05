@@ -36,14 +36,14 @@ trait CategorizedTimeMapping[F[_]] extends ObservationView[F] with VisitTable[F]
       ),
 
       categorizedTimeMappingAtPath(
-        ExecutionType / "originalEstimate" / "existingCalibrationTime",
+        ExecutionType / "originalEstimate" / "calibrations" / "existing" / "time",
         ObservationView.OriginalEstimate.SyntheticId,
         ObservationView.OriginalEstimate.ExistCalNonChargedTime,
         ObservationView.OriginalEstimate.ExistCalProgramTime
       ),
 
       categorizedTimeMappingAtPath(
-        ExecutionType / "originalEstimate" / "expectedCalibrationTime",
+        ExecutionType / "originalEstimate" / "calibrations" / "expected" / "time",
         ObservationView.OriginalEstimate.SyntheticId,
         ObservationView.OriginalEstimate.ExpCalNonChargedTime,
         ObservationView.OriginalEstimate.ExpCalProgramTime

@@ -161,17 +161,16 @@ trait SequenceCodec {
 
   given Decoder[ExecutionDigest] =
     Decoder.instance { c =>
-      // `ExecutionDigest` has nine canonical fields: `setup`, `setupCount`,
-      // `reacquisitionCount`, the existing and expected calibration counts and
-      // times, `acquisition` and `science`.  Everything else the encoder emits --
+      // `ExecutionDigest` has six canonical fields: `setup`, `setupCount`,
+      // `reacquisitionCount`, `calibrations`, `acquisition` and `science`.  Everything else the encoder emits --
       // `fullTimeEstimate` and the entire `estimate` object (`estimate.science`,
       // `estimate.total`) -- is a derived, output-only projection with no place
       // to live in the model, so it is intentionally ignored here and recomputed
       // from the fields below.
       //
-      // `reacquisitionCount` and the calibration counts and times appear only
-      // under `estimate` and are absent from payloads that predate them, so a
-      // missing value reads as zero.
+      // `reacquisitionCount` and `calibrations` appear only under `estimate`
+      // and are absent from payloads that predate them, so a missing value
+      // reads as zero.
       //
       // `setup` and `setupCount` appear twice in the encoded form: under the
       // (current) `estimate` object and as deprecated top-level fields.  Read
@@ -185,24 +184,31 @@ trait SequenceCodec {
         if fromEstimate.isRight then fromEstimate else c.downField(name).as[A]
       def count(name: String): Decoder.Result[NonNegInt] =
         est.downField(name).as[Option[NonNegInt]].map(_.getOrElse(NonNegInt.MinValue))
-      def time(name: String): Decoder.Result[CategorizedTime] =
-        est.downField(name).as[Option[CategorizedTime]].map(_.getOrElse(CategorizedTime.Zero))
+      given Decoder[CalibrationEstimate] =
+        Decoder.forProduct2("count", "time")(CalibrationEstimate.apply)
+      given Decoder[CalibrationDigest] =
+        Decoder.forProduct2("existing", "expected")(CalibrationDigest.apply)
       for {
         t <- read[SetupTime]("setup")
         n <- read[NonNegInt]("setupCount")
         r <- count("reacquisitionCount")
-        i <- count("existingCalibrationCount")
-        x <- time("existingCalibrationTime")
-        p <- count("expectedCalibrationCount")
-        e <- time("expectedCalibrationTime")
+        k <- est.downField("calibrations").as[Option[CalibrationDigest]].map(_.getOrElse(CalibrationDigest.Zero))
         a <- c.downField("acquisition").as[SequenceDigest]
         s <- c.downField("science").as[SequenceDigest]
-      } yield ExecutionDigest(
-        t, n, r,
-        CalibrationDigest(CalibrationEstimate(i, x), CalibrationEstimate(p, e)),
-        a, s
-      )
+      } yield ExecutionDigest(t, n, r, k, a, s)
     }
+
+  given (using Encoder[TimeSpan]): Encoder[CalibrationEstimate] =
+    Encoder.instance: a =>
+      Json.obj("count" -> a.count.asJson, "time" -> a.time.asJson)
+
+  given (using Encoder[TimeSpan]): Encoder[CalibrationDigest] =
+    Encoder.instance: a =>
+      Json.obj(
+        "count"    -> a.count.asJson,
+        "existing" -> a.existing.asJson,
+        "expected" -> a.expected.asJson
+      )
 
   given (using Encoder[Offset], Encoder[TimeSpan]): Encoder[ExecutionDigest] =
     Encoder.instance { (a: ExecutionDigest) =>
@@ -211,11 +217,8 @@ trait SequenceCodec {
           "setup"                    -> a.setup.asJson,
           "setupCount"               -> a.setupCount.asJson,
           "reacquisitionCount"       -> a.reacquisitionCount.asJson,
-          "calibrationCount"         -> a.calibrations.count.asJson,
-          "existingCalibrationCount" -> a.calibrations.existing.count.asJson,
-          "existingCalibrationTime"  -> a.calibrations.existing.time.asJson,
-          "expectedCalibrationCount" -> a.calibrations.expected.count.asJson,
-          "expectedCalibrationTime"  -> a.calibrations.expected.time.asJson,
+          "calibrations"             -> a.calibrations.asJson,
+          "calibrationCount"         -> a.calibrations.count.asJson, // deprecated, use calibrations.count
           "science"                  -> a.science.timeEstimate.asJson,
           "total"                    -> a.fullTimeEstimate.asJson
         ),

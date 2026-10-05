@@ -30,13 +30,13 @@ trait CalibrationCountTestSupport extends ExecutionTestSupport:
       s"""
         query {
           observation(observationId: "$oid") {
-            execution { digest { value { estimate { calibrationCount } } } }
+            execution { digest { value { estimate { calibrations { count } } } } }
           }
         }
       """
     ).map: json =>
       json.hcursor
-        .downFields("observation", "execution", "digest", "value", "estimate", "calibrationCount")
+        .downFields("observation", "execution", "digest", "value", "estimate", "calibrations", "count")
         .require[Int]
 
   def setTelluricType(oid: Observation.Id, tag: String): IO[Unit] =
