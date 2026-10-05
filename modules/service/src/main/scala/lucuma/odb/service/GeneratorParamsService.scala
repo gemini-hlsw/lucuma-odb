@@ -953,6 +953,7 @@ object GeneratorParamsService {
          AND   c.c_odb_error IS NULL
          AND   c.c_setup_count IS NOT NULL
         WHERE  s.c_observation_id IN (${observation_id.list(oids.size)})
+        ORDER BY s.c_observation_id, t.c_observation_id
       """.apply(oids.toList)
 
     val params: Decoder[ParamsRow] =
