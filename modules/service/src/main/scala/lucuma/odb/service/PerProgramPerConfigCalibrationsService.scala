@@ -26,7 +26,6 @@ import lucuma.odb.data.Existence
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.data.GroupTree
 import lucuma.odb.data.Nullable
-import lucuma.odb.graphql.input.CreateGroupInput
 import lucuma.odb.graphql.input.GmosLongSlitInput
 import lucuma.odb.graphql.input.GroupPropertiesInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
@@ -102,10 +101,7 @@ object PerProgramPerConfigCalibrationsService:
                   groupService.createGroup(
                       input = Services.asSuperUser:
                         AccessControl.unchecked(
-                          CreateGroupInput(
-                            programId = pid.some,
-                            proposalReference = none,
-                            programReference = none,
+                          GroupService.NewGroup(
                             SET = GroupPropertiesInput.Create(
                               name = CalibrationsGroupName.some,
                               description = CalibrationsGroupName.some,
@@ -118,7 +114,7 @@ object PerProgramPerConfigCalibrationsService:
                               parentGroupIndex = none,
                               existence = Existence.Present
                             ),
-                            Nil
+                            initialContents = Nil
                           ),
                           pid,
                           program_id

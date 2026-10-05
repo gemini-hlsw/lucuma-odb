@@ -501,13 +501,13 @@ trait AccessControl[F[_]] extends Predicates[F] {
 
   def selectForUpdate(
     input: CreateGroupInput,
-  )(using Services[F]): F[Result[AccessControl.CheckedWithId[CreateGroupInput, Program.Id]]] =
+  )(using Services[F]): F[Result[AccessControl.CheckedWithId[GroupService.NewGroup, Program.Id]]] =
     ResultT(resolvePidWritable(input.programId, input.proposalReference, input.programReference))
       .map:
         case None => AccessControl.Checked.Empty
         case Some(pid) =>
           Services.asSuperUser:
-            AccessControl.unchecked(input, pid, program_id)
+            AccessControl.unchecked(GroupService.NewGroup(input.SET, input.initialContents), pid, program_id)
       .value
 
   // A clone lands in the source group's program, so that program must be writable.

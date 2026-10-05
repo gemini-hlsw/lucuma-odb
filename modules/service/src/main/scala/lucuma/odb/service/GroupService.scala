@@ -39,7 +39,7 @@ import skunk.implicits.*
 import Services.Syntax.*
 
 trait GroupService[F[_]] {
-  def createGroup(input: AccessControl.CheckedWithId[CreateGroupInput, Program.Id], system: Boolean = false, calibrationRoles: List[CalibrationRole] = Nil)(using Transaction[F]): F[Result[Group.Id]]
+  def createGroup(input: AccessControl.CheckedWithId[GroupService.NewGroup, Program.Id], system: Boolean = false, calibrationRoles: List[CalibrationRole] = Nil)(using Transaction[F]): F[Result[Group.Id]]
   def updateGroups(SET: GroupPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F]): F[Result[List[Group.Id]]]
   def selectGroups(
     programId: Program.Id,
@@ -57,8 +57,8 @@ object GroupService {
   object GroupElement:
     type Id = Either[Group.Id, Observation.Id]
 
-  // Access control is the caller's responsibility: mutations that take an `AccessControl.Checked`
-  // have been approved, and `updateGroups` expects `which` to select only writable groups.
+  /** A group to create */
+  case class NewGroup(SET: GroupPropertiesInput.Create, initialContents: List[GroupElement.Id])
 
   def instantiate[F[_]: Concurrent](using Services[F]): GroupService[F] =
     new GroupService[F] {
@@ -101,11 +101,11 @@ object GroupService {
           pq.stream(af.argument, 512).compile.toList.map: counts =>
             counts.traverse_((gid, n) => checkMinimumRequired(minimumRequired.some, n, gid.some))
 
-      override def createGroup(input: AccessControl.CheckedWithId[CreateGroupInput, Program.Id], system: Boolean, calibrationRoles: List[CalibrationRole])(using Transaction[F]): F[Result[Group.Id]] =
+      override def createGroup(input: AccessControl.CheckedWithId[NewGroup, Program.Id], system: Boolean, calibrationRoles: List[CalibrationRole])(using Transaction[F]): F[Result[Group.Id]] =
         input.foldWithId(
-          OdbError.InvalidArgument().asFailureF // typically handled by caller
-        ): (cgi, pid) =>
-          createGroupIn(pid, cgi.SET, cgi.initialContents, system, calibrationRoles)
+          OdbError.InvalidArgument().asFailureF
+        ): (group, pid) =>
+          createGroupIn(pid, group.SET, group.initialContents, system, calibrationRoles)
 
       private def createGroupIn(pid: Program.Id, SET: GroupPropertiesInput.Create, initialContents: List[Either[Group.Id, Observation.Id]], system: Boolean, calibrationRoles: List[CalibrationRole])(using Transaction[F]): F[Result[Group.Id]] =
         (for
@@ -114,8 +114,7 @@ object GroupService {
           g <- ResultT.liftF(createGroupImpl(pid, SET, initialContents, system, calibrationRoles))
         yield g).value
 
-      // Elements can only be grouped within their own program. The database enforces this too, but
-      // only at commit, where it surfaces as an internal error.
+      // Elements can only be grouped within their own program. The database enforces this too.
       private def checkContentsIn(pid: Program.Id, contents: List[Either[Group.Id, Observation.Id]]): F[Result[Unit]] =
         val (gids, oids) = contents.separate
         val found: F[Set[Either[Group.Id, Observation.Id]]] =

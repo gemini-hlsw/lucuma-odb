@@ -31,7 +31,6 @@ import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.data.GroupTree
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.PosAngleConstraintMode
-import lucuma.odb.graphql.input.CreateGroupInput
 import lucuma.odb.graphql.input.GroupPropertiesInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
 import lucuma.odb.graphql.input.PosAngleConstraintInput
@@ -112,10 +111,7 @@ object PerScienceObservationCalibrationsService:
         groupService.createGroup(
           Services.asSuperUser:
             AccessControl.unchecked(
-              CreateGroupInput(
-                programId = pid.some,
-                proposalReference = none,
-                programReference = none,
+              GroupService.NewGroup(
                 SET = GroupPropertiesInput.Create(
                   name = groupNameForObservation(config, oid).some,
                   description = none,
