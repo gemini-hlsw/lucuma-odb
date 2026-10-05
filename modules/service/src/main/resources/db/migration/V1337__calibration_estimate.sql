@@ -255,3 +255,27 @@ CREATE TRIGGER telluric_total_obscalc_invalidate_trigger
   AFTER UPDATE OF c_last_update ON t_obscalc
   FOR EACH ROW
   EXECUTE FUNCTION telluric_total_obscalc_invalidate();
+
+-- Existing digests carry zero calibrations, so recompute the science
+-- observations of every mode that takes tellurics.
+DO $$
+DECLARE
+  obs_id d_observation_id;
+BEGIN
+  FOR obs_id IN
+    SELECT c_observation_id
+    FROM   t_observation
+    WHERE  c_existence        = 'present'
+      AND  c_calibration_role IS NULL
+      AND  c_observing_mode_type IN (
+             'flamingos_2_long_slit',
+             'flamingos_2_mos',
+             'igrins_2_long_slit',
+             'gnirs_long_slit',
+             'gnirs_ifu'
+           )
+  LOOP
+    CALL invalidate_obscalc(obs_id);
+  END LOOP;
+END;
+$$;
