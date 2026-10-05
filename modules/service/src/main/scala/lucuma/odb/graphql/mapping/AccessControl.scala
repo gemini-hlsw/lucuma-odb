@@ -34,9 +34,11 @@ import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.graphql.input.AttachmentPropertiesInput
 import lucuma.odb.graphql.input.CallForProposalsPropertiesInput
+import lucuma.odb.graphql.input.CloneGroupInput
 import lucuma.odb.graphql.input.CloneObservationInput
 import lucuma.odb.graphql.input.CloneTargetInput
 import lucuma.odb.graphql.input.CreateCallForProposalsInput
+import lucuma.odb.graphql.input.CreateGroupInput
 import lucuma.odb.graphql.input.CreateObservationInput
 import lucuma.odb.graphql.input.CreateProgramInput
 import lucuma.odb.graphql.input.CreateProgramNoteInput
@@ -70,6 +72,7 @@ import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.util.CommitHash
+import lucuma.odb.service.GroupService
 import lucuma.odb.service.NoTransaction
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.SuperUserAccess
@@ -495,6 +498,31 @@ trait AccessControl[F[_]] extends Predicates[F] {
       .value
 
   }
+
+  def selectForUpdate(
+    input: CreateGroupInput,
+  )(using Services[F]): F[Result[AccessControl.CheckedWithId[CreateGroupInput, Program.Id]]] =
+    ResultT(resolvePidWritable(input.programId, input.proposalReference, input.programReference))
+      .map:
+        case None => AccessControl.Checked.Empty
+        case Some(pid) =>
+          Services.asSuperUser:
+            AccessControl.unchecked(input, pid, program_id)
+      .value
+
+  // A clone lands in the source group's program, so that program must be writable.
+  def selectForUpdate(
+    input: CloneGroupInput,
+  )(using Services[F]): F[Result[AccessControl.CheckedWithId[CloneGroupInput, Program.Id]]] =
+    session.option(GroupService.Statements.SelectPid)(input.groupId).flatMap:
+      case None      => Result(AccessControl.Checked.Empty).pure[F]
+      case Some(pid) =>
+        selectForProgramUpdateImpl(None, List(pid)).map: r =>
+          r.map:
+            case Nil => AccessControl.Checked.Empty
+            case _   =>
+              Services.asSuperUser:
+                AccessControl.unchecked(input, pid, program_id)
 
   def selectForUpdate(
     input: CreateTargetInput,

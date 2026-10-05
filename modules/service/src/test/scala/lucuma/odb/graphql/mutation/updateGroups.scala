@@ -25,13 +25,51 @@ import skunk.syntax.all.*
 class updateGroups extends OdbSuite {
 
   val pi: User = TestUsers.Standard.pi(nextId, nextId)
+  val pi2: User = TestUsers.Standard.pi(nextId, nextId)
+  val guest: User = TestUsers.guest(nextId)
   val service  = TestUsers.service(6)
-  override lazy val validUsers: List[User] = List(pi, service)
+  override lazy val validUsers: List[User] = List(pi, pi2, guest, service)
 
   val inputIntervalError =
     "Argument 'input.SET' is invalid: Minimum interval must be less than or equal maximum interval."
   val odbIntervalError =
     "Minimum interval must be less than or equal maximum interval."
+
+  private def renameGroupAs(user: User, gid: Group.Id, name: String): IO[Json] =
+    query(
+      user = user,
+      query = s"""
+        mutation {
+          updateGroups(input: {
+            WHERE: { id: { EQ: "$gid" } }
+            SET: { name: "$name" }
+          }) {
+            groups { id }
+          }
+        }
+      """
+    )
+
+  private def groupNameAs(user: User, gid: Group.Id): IO[Option[String]] =
+    query(
+      user = user,
+      query = s"""
+        query {
+          group(groupId: "$gid") { name }
+        }
+      """
+    ).map(_.hcursor.downFields("group", "name").require[Option[String]])
+
+  List(("a pi", pi2), ("a guest", guest)).foreach: (who, user) =>
+    test(s"$who cannot update a group in another user's program"):
+      for
+        pid <- createProgramAs(pi)
+        gid <- createGroupAs(pi, pid, name = "mine".some)
+        res <- renameGroupAs(user, gid, "theirs")
+        nm  <- groupNameAs(pi, gid)
+      yield
+        assertEquals(res, json"""{ "updateGroups": { "groups": [] } }""")
+        assertEquals(nm, "mine".some)
 
   test("simple bulk update") {
     for {

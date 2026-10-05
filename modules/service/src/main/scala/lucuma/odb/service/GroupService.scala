@@ -39,7 +39,7 @@ import skunk.implicits.*
 import Services.Syntax.*
 
 trait GroupService[F[_]] {
-  def createGroup(input: CreateGroupInput, system: Boolean = false, calibrationRoles: List[CalibrationRole] = Nil)(using Transaction[F]): F[Result[Group.Id]]
+  def createGroup(input: AccessControl.CheckedWithId[CreateGroupInput, Program.Id], system: Boolean = false, calibrationRoles: List[CalibrationRole] = Nil)(using Transaction[F]): F[Result[Group.Id]]
   def updateGroups(SET: GroupPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F]): F[Result[List[Group.Id]]]
   def selectGroups(
     programId: Program.Id,
@@ -47,7 +47,7 @@ trait GroupService[F[_]] {
     obsFilter: AppliedFragment = sql"c_existence = $existence"(Existence.Present)
   )(using Transaction[F]): F[GroupTree]
   def selectPid(groupId: Group.Id)(using Transaction[F]): F[Option[Program.Id]]
-  def cloneGroup(input: CloneGroupInput)(using Transaction[F]): F[Result[Group.Id]]
+  def cloneGroup(input: AccessControl.CheckedWithId[CloneGroupInput, Program.Id])(using Transaction[F]): F[Result[Group.Id]]
   def selectAllObservations(groupId: Group.Id)(using Transaction[F]): F[List[Observation.Id]]
   def deleteSystemGroup(pid: Program.Id, groupId: Group.Id)(using Transaction[F], ServiceAccess): F[Result[Unit]]
 }
@@ -57,7 +57,8 @@ object GroupService {
   object GroupElement:
     type Id = Either[Group.Id, Observation.Id]
 
-  // TODO: check access control
+  // Access control is the caller's responsibility: mutations that take an `AccessControl.Checked`
+  // have been approved, and `updateGroups` expects `which` to select only writable groups.
 
   def instantiate[F[_]: Concurrent](using Services[F]): GroupService[F] =
     new GroupService[F] {
@@ -100,13 +101,15 @@ object GroupService {
           pq.stream(af.argument, 512).compile.toList.map: counts =>
             counts.traverse_((gid, n) => checkMinimumRequired(minimumRequired.some, n, gid.some))
 
-      override def createGroup(input: CreateGroupInput, system: Boolean, calibrationRoles: List[CalibrationRole])(using Transaction[F]): F[Result[Group.Id]] =
-        val create: F[Result[Group.Id]] =
-          programService.resolvePid(input.programId, input.proposalReference, input.programReference).flatMap: r =>
-            r.traverse(createGroupImpl(_, input.SET, input.initialContents, system, calibrationRoles))
-        checkMinimumRequired(input.SET.minimumRequired, input.initialContents.size.toLong, none)
-          .traverse(_ => create)
-          .map(_.flatten)
+      override def createGroup(input: AccessControl.CheckedWithId[CreateGroupInput, Program.Id], system: Boolean, calibrationRoles: List[CalibrationRole])(using Transaction[F]): F[Result[Group.Id]] =
+        input.foldWithId(
+          OdbError.InvalidArgument().asFailureF // typically handled by caller
+        ): (cgi, pid) =>
+          createGroupIn(pid, cgi.SET, cgi.initialContents, system, calibrationRoles)
+
+      private def createGroupIn(pid: Program.Id, SET: GroupPropertiesInput.Create, initialContents: List[Either[Group.Id, Observation.Id]], system: Boolean, calibrationRoles: List[CalibrationRole])(using Transaction[F]): F[Result[Group.Id]] =
+        checkMinimumRequired(SET.minimumRequired, initialContents.size.toLong, none)
+          .traverse(_ => createGroupImpl(pid, SET, initialContents, system, calibrationRoles))
 
       // This saves a bit of annoyance below
       extension [A](self: List[A]) private def traverseNel_[F[_]: Applicative, B](f: NonEmptyList[A] => F[B]): F[Unit] =
@@ -177,22 +180,22 @@ object GroupService {
         ).map(_.cloneId)
 
       // Clone `gid` into `dest`, at the end, as an empty group.
-      private def cloneAsEmptyGroupInto(gid: Group.Id, dest: Option[Group.Id])(using Transaction[F]): ResultT[F, Group.Id] =
+      private def cloneAsEmptyGroupInto(pid: Program.Id, gid: Group.Id, dest: Option[Group.Id])(using Transaction[F]): ResultT[F, Group.Id] =
         selectGroupAsInput(gid).flatMap: (input, roles) =>
-          ResultT(createGroup(input.copy(SET = input.SET.copy(parentGroupId = dest, parentGroupIndex = None)), false, roles))
+          ResultT(createGroupIn(pid, input.SET.copy(parentGroupId = dest, parentGroupIndex = None), Nil, false, roles))
 
       // Clone `gid` into `dest`, at the end, and clone its contents too.
-      private def cloneGroupInto(gid: Group.Id, dest: Option[Group.Id])(using Transaction[F]): ResultT[F, Group.Id] =
+      private def cloneGroupInto(pid: Program.Id, gid: Group.Id, dest: Option[Group.Id])(using Transaction[F]): ResultT[F, Group.Id] =
         for
-          gid0 <- cloneAsEmptyGroupInto(gid, dest)
+          gid0 <- cloneAsEmptyGroupInto(pid, gid, dest)
           es   <- selectGroupElements(gid) // find the children of the source group
-          _    <- es.traverse(cloneGroupElementInto(_, Some(gid0))) // clone the children, recursively, into the new group
+          _    <- es.traverse(cloneGroupElementInto(pid, _, Some(gid0))) // clone the children, recursively, into the new group
         yield gid
 
       // Clone the `elem` into `dest`, at the end.
-      private def cloneGroupElementInto(elem: GroupElement.Id, dest: Option[Group.Id])(using Transaction[F]): ResultT[F, GroupElement.Id] =
+      private def cloneGroupElementInto(pid: Program.Id, elem: GroupElement.Id, dest: Option[Group.Id])(using Transaction[F]): ResultT[F, GroupElement.Id] =
         elem match
-          case Left(gid)  => cloneGroupInto(gid, dest).map(_.asLeft)
+          case Left(gid)  => cloneGroupInto(pid, gid, dest).map(_.asLeft)
           case Right(oid) => cloneObservationInto(oid, dest).map(_.asRight)
 
       /** Construct a CreateGroupInput that would clone `gid`. */
@@ -210,17 +213,20 @@ object GroupService {
             pq.stream(gid, 1024).compile.toList.map(Result.success)
 
       // Clone `gid` as a sibling.
-      private def cloneGroupImpl(input: CloneGroupInput)(using Transaction[F]): ResultT[F, Group.Id] =
+      private def cloneGroupImpl(input: CloneGroupInput, pid: Program.Id)(using Transaction[F]): ResultT[F, Group.Id] =
         for
           (cgi, roles) <- selectGroupAsInput(input.groupId)
-          cgiʹ          = cgi.copy(SET = input.SET.foldLeft(cgi.SET)(_.withEdit(_)))
-          clone        <- ResultT(createGroup(cgiʹ, false, roles))
+          setʹ          = input.SET.foldLeft(cgi.SET)(_.withEdit(_))
+          clone        <- ResultT(createGroupIn(pid, setʹ, Nil, false, roles))
           elems        <- selectGroupElements(input.groupId)
-          _            <- elems.traverse(cloneGroupElementInto(_, Some(clone)))
+          _            <- elems.traverse(cloneGroupElementInto(pid, _, Some(clone)))
         yield clone
 
-      def cloneGroup(input: CloneGroupInput)(using Transaction[F]): F[Result[Group.Id]] =
-        cloneGroupImpl(input).value
+      def cloneGroup(input: AccessControl.CheckedWithId[CloneGroupInput, Program.Id])(using Transaction[F]): F[Result[Group.Id]] =
+        input.foldWithId(
+          OdbError.InvalidArgument().asFailureF // typically handled by caller
+        ): (cgi, pid) =>
+          cloneGroupImpl(cgi, pid).value
 
       // Applying the same move to a list of groups will put them all together in the
       // destination group (or at the top level) in no particular order. Returns the ids of

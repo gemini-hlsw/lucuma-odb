@@ -110,24 +110,29 @@ object PerScienceObservationCalibrationsService:
         parentIndex:   Option[NonNegShort]
       )(using Transaction[F]): F[Group.Id] =
         groupService.createGroup(
-          CreateGroupInput(
-            programId = pid.some,
-            proposalReference = none,
-            programReference = none,
-            SET = GroupPropertiesInput.Create(
-              name = groupNameForObservation(config, oid).some,
-              description = none,
-              minimumRequired = none,
-              ordered = false,
-              minimumInterval = none,
-              maximumInterval = TimeSpan.Zero.some,
-              sameNight = false,
-              parentGroupId = parentGroupId,
-              parentGroupIndex = parentIndex,
-              existence = Existence.Present
+          Services.asSuperUser:
+            AccessControl.unchecked(
+              CreateGroupInput(
+                programId = pid.some,
+                proposalReference = none,
+                programReference = none,
+                SET = GroupPropertiesInput.Create(
+                  name = groupNameForObservation(config, oid).some,
+                  description = none,
+                  minimumRequired = none,
+                  ordered = false,
+                  minimumInterval = none,
+                  maximumInterval = TimeSpan.Zero.some,
+                  sameNight = false,
+                  parentGroupId = parentGroupId,
+                  parentGroupIndex = parentIndex,
+                  existence = Existence.Present
+                ),
+                initialContents = List(Right(oid))
+              ),
+              pid,
+              program_id
             ),
-            initialContents = List(Right(oid))
-          ),
           system = true,
           calibrationRoles = obsCalibrationGroupRoles(config)
         ).orError

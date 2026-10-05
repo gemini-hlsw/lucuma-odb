@@ -360,11 +360,16 @@ trait MutationMapping[F[_]] extends AccessControl[F] with UserEnv {
   private lazy val CloneGroup: MutationField =
     MutationField("cloneGroup", CloneGroupInput.Binding): (input, child) =>
       services.useTransactionally:
-        groupService.cloneGroup(input).nestMap: id =>
-          Filter(
-            Predicates.cloneGroupResult.newGroup.id.eql(id),
-            child
-          )
+        selectForUpdate(input).flatMap: r =>
+          r.flatTraverse:
+            case AccessControl.Checked.Empty =>
+              OdbError.NotAuthorized(user.id).asFailureF
+            case other =>
+              groupService.cloneGroup(other).nestMap: id =>
+                Filter(
+                  Predicates.cloneGroupResult.newGroup.id.eql(id),
+                  child
+                )
 
   private lazy val CloneObservation: MutationField =
     MutationField("cloneObservation", CloneObservationInput.Binding): (input, child) =>
@@ -442,8 +447,13 @@ trait MutationMapping[F[_]] extends AccessControl[F] with UserEnv {
   private lazy val CreateGroup: MutationField =
     MutationField("createGroup", CreateGroupInput.Binding): (input, child) =>
       services.useTransactionally:
-        groupService.createGroup(input).nestMap: gid =>
-            Unique(Filter(Predicates.group.id.eql(gid), child))
+        selectForUpdate(input).flatMap: r =>
+          r.flatTraverse:
+            case AccessControl.Checked.Empty =>
+              OdbError.NotAuthorized(user.id).asFailureF
+            case other =>
+              groupService.createGroup(other).nestMap: gid =>
+                Unique(Filter(Predicates.group.id.eql(gid), child))
       .recover:
         case SqlState.RaiseException(ex) =>
           OdbError.InconsistentGroupError(Some(ex.message)).asFailure
@@ -1067,7 +1077,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] with UserEnv {
           idSelectFromPredicate(
             GroupType,
             and(List(
-              // TODO: Predicates.group.program.isWritableBy(user),
+              Predicates.group.program.isWritableBy(user),
               input.WHERE.getOrElse(True)
             ))
           ).flatTraverse: which =>
