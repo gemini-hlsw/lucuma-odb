@@ -525,8 +525,22 @@ class recordVisit extends OdbSuite with query.GenerationTestSupport with Executi
         _   <- addStepEventAs(service, sa(0), v0, StepStage.StartStep)
         _   <- addStepEventAs(service, ss(0), v0, StepStage.StartStep)
         e0  <- stepExecutionState(service, oid)
+        // A visit for another observation at the same site ends ours.
         _   <- recordVisitAs(service, o2)
-        _   <- recordVisitAs(service, oid)
         e1  <- stepExecutionState(service, oid)
       yield (e0 === List(StepExecutionState.Abandoned, StepExecutionState.Ongoing)) &&
             e1.forall(_ === StepExecutionState.Abandoned)
+
+  test("recordVisit - a visit at the other site does not abandon steps"):
+    assertIOBoolean:
+      for
+        pid <- createProgramAs(service)
+        tid <- createTargetWithProfileAs(service, pid)
+        oid <- createObservationAs(service, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
+        os  <- createObservationAs(service, pid, ObservingModeType.GmosSouthLongSlit.some, tid)
+        ss  <- firstScienceAtomStepIds(service, oid)
+        v0  <- recordVisitAs(service, oid)
+        _   <- addStepEventAs(service, ss(0), v0, StepStage.StartStep)
+        _   <- recordVisitAs(service, os)
+        e   <- stepExecutionState(service, oid)
+      yield e === List(StepExecutionState.Ongoing)
