@@ -207,7 +207,7 @@ object GroupService {
           gid0 <- cloneAsEmptyGroupInto(pid, gid, dest)
           es   <- selectGroupElements(gid) // find the children of the source group
           _    <- es.traverse(cloneGroupElementInto(pid, _, Some(gid0))) // clone the children, recursively, into the new group
-        yield gid
+        yield gid0
 
       // Clone the `elem` into `dest`, at the end.
       private def cloneGroupElementInto(pid: Program.Id, elem: GroupElement.Id, dest: Option[Group.Id])(using Transaction[F]): ResultT[F, GroupElement.Id] =
