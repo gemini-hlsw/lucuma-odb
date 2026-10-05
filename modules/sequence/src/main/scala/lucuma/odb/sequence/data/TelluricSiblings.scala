@@ -16,7 +16,8 @@ import lucuma.odb.sequence.util.HashBytes
 /**
  * What a science observation's group already holds in tellurics: whether the
  * PI has declined one, and for each active telluric whether it is still
- * unobserved and its digest total (none while it has no digest yet).
+ * unobserved and its total: the digest's while unobserved, the original
+ * estimate's once visited (none while it has neither).
  */
 case class TelluricSiblings(
   declined: Boolean,

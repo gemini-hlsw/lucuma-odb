@@ -254,10 +254,16 @@ object GeneratorParamsService {
           .fold(params.pure): oids =>
             val af = Statements.selectTelluricSiblings(oids)
             session
-              .prepareR(af.fragment.query(observation_id *: bool *: bool *: Statements.telluric_total.opt))
+              .prepareR(af.fragment.query(
+                observation_id *: bool *: bool *: Statements.telluric_total.opt *: categorized_time.opt
+              ))
               .use(_.stream(af.argument, 64).compile.toList)
               .map: rows =>
-                val byObs = rows.groupMap(_._1)(r => (r._2, r._3, r._4)).view.mapValues: ts =>
+                // A spent telluric's digest only covers what is left of it, so
+                // its original estimate stands for what it cost.
+                val byObs = rows.groupMap(_._1): (_, unobserved, declined, current, original) =>
+                  (unobserved, declined, if unobserved then current else original)
+                .view.mapValues: ts =>
                   TelluricSiblings(
                     ts.exists(_._2),
                     ts.collect { case (u, false, t) => TelluricSibling(u, t) }
@@ -937,7 +943,8 @@ object GeneratorParamsService {
           ).sumCharge(obsclass.chargeClass, setup *| count.value)
 
     // One row per telluric in the science observation's group: whether it is
-    // still unobserved, whether it was declined, and its digest total if any.
+    // still unobserved, whether it was declined, its digest total if any, and
+    // its original estimate total if it has been visited.
     def selectTelluricSiblings(oids: NonEmptyList[Observation.Id]): AppliedFragment =
       sql"""
         SELECT s.c_observation_id,
@@ -947,7 +954,9 @@ object GeneratorParamsService {
                c.c_setup_count,
                c.c_sci_obs_class,
                c.c_sci_non_charged_time,
-               c.c_sci_program_time
+               c.c_sci_program_time,
+               t.c_orig_est_total_non_charged_time,
+               t.c_orig_est_total_program_time
         FROM   t_observation s
         JOIN   t_observation t
           ON   t.c_group_id         = s.c_group_id

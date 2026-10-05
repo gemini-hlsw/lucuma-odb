@@ -158,8 +158,8 @@ object ObsExtract:
 
   /**
    * The estimate covers the work left, so only unobserved tellurics count as
-   * existing; observed ones belong to visits already done, though their totals
-   * still feed the average.  An existing telluric costs what its own digest
+   * existing; observed ones belong to visits already done, though their
+   * original estimates still feed the average.  An existing telluric costs what its own digest
    * says, or the placeholder while it has none.  Each telluric still to come
    * costs the average of those with a digest, or the placeholder when none has
    * one yet.  A declined telluric means none more are expected.

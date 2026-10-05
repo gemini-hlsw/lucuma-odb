@@ -125,6 +125,27 @@ class executionDigest_calibrationEstimate
       assertEquals(e3.expected, totals.sum / totals.size)
       assertEquals(e3.total - e3.scienceAndSetups, e3.expected)
 
+  test("a spent telluric feeds the average at its original estimate, not what is left of it"):
+    for
+      p         <- createProgramAs(pi)
+      t         <- createTargetWithProfileAs(pi, p)
+      o         <- createFlamingos2LongSlitObservationAs(pi, p, List(t))
+      _         <- setExposureTime(o, 240, 12)
+      _         <- recalculateCalibrations(p, when, o)
+      tellurics <- telluricsOf(o)
+      _         <- sleep >> resolveTelluricTargets
+      totals    <- tellurics.traverse(estimate(p, _)).map(_.map(_.total))
+      _         <- recordVisitAs(serviceUser, tellurics.head)
+      _         <- declareCompleteDirectly(tellurics.head)
+      spent     <- estimate(p, tellurics.head)
+      e         <- estimate(p, o)
+    yield
+      assertEquals(spent.total, 0L)
+      assertEquals(e.existingCount, 1)
+      assertEquals(e.existing, totals(1))
+      assertEquals(e.expectedCount, 2)
+      assertEquals(e.expected, (totals.sum / 2) * 2)
+
   test("a declined telluric means no expected calibrations, the count is what exists"):
     for
       p            <- createProgramAs(pi)
