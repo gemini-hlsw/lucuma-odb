@@ -86,10 +86,9 @@ DROP VIEW v_observation;
 ALTER TABLE t_observation
   DROP COLUMN c_orig_est_calibration_count;
 
--- Body copied verbatim from V1324.
+-- Body copied verbatim from V1335.
 CREATE VIEW v_observation AS
   SELECT o.*,
-  (o.c_scheduling_mode = 'unconstrained'::e_scheduling_mode) AS c_is_splittable,
   CASE WHEN o.c_explicit_ra              IS NOT NULL THEN o.c_observation_id END AS c_explicit_base_id,
   CASE WHEN o.c_air_mass_min             IS NOT NULL THEN o.c_observation_id END AS c_air_mass_id,
   CASE WHEN o.c_hour_angle_min           IS NOT NULL THEN o.c_observation_id END AS c_hour_angle_id,
@@ -126,7 +125,21 @@ CREATE VIEW v_observation AS
     WHERE a.c_observation_id = o.c_observation_id
       AND a.c_is_signal_to_noise_target
   ) AS c_signal_to_noise_target_id,
-  o.c_altair_mode AS c_configuration_altair_mode
+  o.c_altair_mode AS c_configuration_altair_mode,
+  EXISTS (
+    SELECT 1
+    FROM t_sequence_materialization m
+    WHERE m.c_observation_id = o.c_observation_id
+      AND m.c_sequence_type = 'science'::e_sequence_type
+      AND m.c_customized
+  ) AS c_science_sequence_is_customized,
+  EXISTS (
+    SELECT 1
+    FROM t_sequence_materialization m
+    WHERE m.c_observation_id = o.c_observation_id
+      AND m.c_sequence_type = 'acquisition'::e_sequence_type
+      AND m.c_customized
+  ) AS c_acquisition_sequence_is_customized
   FROM t_observation o
   LEFT JOIN t_proposal p on p.c_program_id = o.c_program_id
   LEFT JOIN t_cfp c on p.c_cfp_id = c.c_cfp_id;
