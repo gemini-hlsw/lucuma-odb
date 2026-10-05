@@ -7,6 +7,7 @@ package mutation
 import cats.effect.IO
 import cats.syntax.either.*
 import cats.syntax.option.*
+import cats.syntax.show.*
 import eu.timepit.refined.types.numeric.NonNegShort
 import io.circe.Json
 import io.circe.literal.*
@@ -201,6 +202,27 @@ class createGroup extends OdbSuite with query.ObservingModeSetupOperations {
       ids  <- groupElementsAs(pi, pid, Some(g2))
     } yield assertEquals(ids, List(Right(o1), Left(g1), Right(o2)))
   }
+
+  test("cannot create a group with initial contents from another program"):
+    for
+      pid  <- createProgramAs(pi)
+      pid2 <- createProgramAs(pi)
+      oid  <- createObservationAs(pi, pid2)
+      _    <- expectOdbError(
+                user     = pi,
+                query    = s"""
+                  mutation {
+                    createGroup(input: {
+                      programId: "$pid"
+                      initialContents: [ { observationId: "$oid" } ]
+                    }) {
+                      group { id }
+                    }
+                  }
+                """,
+                expected = { case OdbError.InvalidArgument(Some(m)) if m.contains(oid.show) => }
+              )
+    yield ()
 
   test("cannot create group with minimumRequired of zero"):
     createProgramAs(pi).flatMap { pid =>

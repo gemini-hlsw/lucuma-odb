@@ -108,8 +108,25 @@ object GroupService {
           createGroupIn(pid, cgi.SET, cgi.initialContents, system, calibrationRoles)
 
       private def createGroupIn(pid: Program.Id, SET: GroupPropertiesInput.Create, initialContents: List[Either[Group.Id, Observation.Id]], system: Boolean, calibrationRoles: List[CalibrationRole])(using Transaction[F]): F[Result[Group.Id]] =
-        checkMinimumRequired(SET.minimumRequired, initialContents.size.toLong, none)
-          .traverse(_ => createGroupImpl(pid, SET, initialContents, system, calibrationRoles))
+        (for
+          _ <- ResultT.fromResult(checkMinimumRequired(SET.minimumRequired, initialContents.size.toLong, none))
+          _ <- ResultT(checkContentsIn(pid, initialContents))
+          g <- ResultT.liftF(createGroupImpl(pid, SET, initialContents, system, calibrationRoles))
+        yield g).value
+
+      // Elements can only be grouped within their own program. The database enforces this too, but
+      // only at commit, where it surfaces as an internal error.
+      private def checkContentsIn(pid: Program.Id, contents: List[Either[Group.Id, Observation.Id]]): F[Result[Unit]] =
+        val (gids, oids) = contents.separate
+        val found: F[Set[Either[Group.Id, Observation.Id]]] =
+          (
+            NonEmptyList.fromList(gids).foldMapM(nel => session.execute(Statements.selectGroupsInProgram(nel.size))((pid, nel.toList)).map(_.map(_.asLeft[Observation.Id]).toSet)),
+            NonEmptyList.fromList(oids).foldMapM(nel => session.execute(Statements.selectObservationsInProgram(nel.size))((pid, nel.toList)).map(_.map(_.asRight[Group.Id]).toSet))
+          ).mapN(_ ++ _)
+        found.map: found =>
+          contents.filterNot(found) match
+            case Nil     => Result.unit
+            case missing => OdbError.InvalidArgument(s"Initial contents must belong to program $pid: ${missing.map(_.fold(_.show, _.show)).mkString(", ")}.".some).asFailure
 
       // This saves a bit of annoyance below
       extension [A](self: List[A]) private def traverseNel_[F[_]: Applicative, B](f: NonEmptyList[A] => F[B]): F[Unit] =
@@ -461,6 +478,20 @@ object GroupService {
           c_program_id = $program_id
       """.apply(pid) |+|
       (if filter.fragment.sql.isEmpty then void"" else void" AND " |+| filter)
+
+    def selectGroupsInProgram(n: Int): Query[(Program.Id, List[Group.Id]), Group.Id] =
+      sql"""
+        SELECT c_group_id
+        FROM t_group
+        WHERE c_program_id = $program_id AND c_group_id IN (${group_id.list(n)})
+      """.query(group_id)
+
+    def selectObservationsInProgram(n: Int): Query[(Program.Id, List[Observation.Id]), Observation.Id] =
+      sql"""
+        SELECT c_observation_id
+        FROM t_observation
+        WHERE c_program_id = $program_id AND c_observation_id IN (${observation_id.list(n)})
+      """.query(observation_id)
 
     val SelectPid: Query[Group.Id, Program.Id] =
       sql"""
