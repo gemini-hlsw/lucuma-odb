@@ -656,10 +656,10 @@ GHOST	HR-IFU	ifu	HR-IFU	1.20	1.20	echelle	none	0.347	1.060	0.655	0.713	76000	no	
 Visitor @ GN	Visitor @ GN												yes		n		
 Visitor @ GN	Visitor @ GS												no		s		
 MAROON-X	IFU	ifu	fiber	0.77	0.77	echelle	none	0.500	0.920	0.710	0.420	85000	no		n		
-SCORPIO	slit	singleslit	slit	0.36	180	multiple	dichroic	0.385	2.28	1.3325	1.895	6000	no		s		
-SCORPIO	slit	singleslit	slit	0.54	180	multiple	dichroic	0.385	2.28	1.3325	1.895	4000	no		s		
-SCORPIO	slit	singleslit	slit	0.72	180	multiple	dichroic	0.385	2.28	1.3325	1.895	3000	no		s		
-SCORPIO	slit	singleslit	slit	1.08	180	multiple	dichroic	0.385	2.28	1.3325	1.895	2000	no		s		
-SCORPIO	slit	singleslit	slit	1.44	180	multiple	dichroic	0.385	2.28	1.3325	1.895	1500	no		s		
-SCORPIO	slit	singleslit	slit	2.16	180	multiple	dichroic	0.385	2.28	1.3325	1.895	1000	no		s		
-SCORPIO	slit	singleslit	slit	4.32	180	multiple	dichroic	0.385	2.28	1.3325	1.895	500	no		s		
+SCORPIO	0.36"	singleslit	0.36"	0.36	180	multiple	dichroic	0.385	2.28	1.3325	1.895	6000	no		s		
+SCORPIO	0.54"	singleslit	0.54"	0.54	180	multiple	dichroic	0.385	2.28	1.3325	1.895	4000	no		s		
+SCORPIO	0.72"	singleslit	0.72"	0.72	180	multiple	dichroic	0.385	2.28	1.3325	1.895	3000	no		s		
+SCORPIO	1.08"	singleslit	1.08"	1.08	180	multiple	dichroic	0.385	2.28	1.3325	1.895	2000	no		s		
+SCORPIO	1.44"	singleslit	1.44"	1.44	180	multiple	dichroic	0.385	2.28	1.3325	1.895	1500	no		s		
+SCORPIO	2.16"	singleslit	2.16"	2.16	180	multiple	dichroic	0.385	2.28	1.3325	1.895	1000	no		s		
+SCORPIO	4.32"	singleslit	4.32"	4.32	180	multiple	dichroic	0.385	2.28	1.3325	1.895	500	no		s		

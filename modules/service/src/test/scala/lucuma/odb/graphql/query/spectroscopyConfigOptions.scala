@@ -45,7 +45,7 @@ class spectroscopyConfigOptions extends OdbSuite {
         s.execute(sql"insert into t_spectroscopy_config_option_gmos_south (c_instrument, c_index, c_fpu, c_custom_slit_width, c_grating, c_filter) values('GmosSouth', 9002, NULL, 'CustomWidth_1_50', 'R150_G5326', NULL)".command) *>
         s.execute(sql"""insert into t_spectroscopy_config_option (c_instrument, c_index, c_name, c_focal_plane, c_fpu_label, c_slit_width, c_slit_length, c_disperser_label, c_filter_label, c_wavelength_min, c_wavelength_max, c_wavelength_optimal, c_wavelength_coverage, c_resolution, c_ao, c_capability, c_site) values('Flamingos2', 9003, 'R3K + H + MOS', 'multiple_slit', 'MOS 8px', 144000, 263000000, 'R3000', 'H', 1486000, 1775000, 1630500, 289000, 700, false, NULL, 'gs')""".command) *>
         s.execute(sql"insert into t_spectroscopy_config_option_f2 (c_instrument, c_index, c_fpu, c_custom_slit_width, c_disperser, c_filter) values('Flamingos2', 9003, NULL, 'CustomWidth_8_pix', 'R3000', 'H')".command) *>
-        s.execute(sql"insert into t_spectroscopy_config_option values('Scorpio', 1, 'slit', 'single_slit', 'slit', 360000, 180000000, 'multiple', 'dichroic', 385000, 2280000, 1332500, 1895000, 6000, false, NULL, 'gs')".command) *>
+        s.execute(sql"""insert into t_spectroscopy_config_option values('Scorpio', 1, '0.36"', 'single_slit', '0.36"', 360000, 180000000, 'multiple', 'dichroic', 385000, 2280000, 1332500, 1895000, 6000, false, NULL, 'gs')""".command) *>
         s.execute(sql"insert into t_spectroscopy_config_option_scorpio (c_instrument, c_index, c_fpu) values('Scorpio', 1, 'LongSlit_0_36')".command)
       ).void
     )
@@ -846,7 +846,7 @@ class spectroscopyConfigOptions extends OdbSuite {
         {
           "spectroscopyConfigOptions": [
             {
-              "name": "slit",
+              "name": "0.36\"",
               "scorpio": {
                 "fpu": "LONG_SLIT_0_36"
               }
