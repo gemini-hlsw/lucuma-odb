@@ -28,6 +28,8 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.TelluricType
+import lucuma.core.model.sequence.CalibrationDigest
+import lucuma.core.model.sequence.CalibrationEstimate
 import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
@@ -149,9 +151,9 @@ object ObsExtract:
     role:     Option[CalibrationRole],
     count:    NonNegInt,
     siblings: TelluricSiblings
-  ): CalibrationEstimate =
+  ): CalibrationDigest =
     if role.isDefined || !modeRequiresTelluric(mode) || !modeTakesTelluric(mode)
-    then CalibrationEstimate.Zero
+    then CalibrationDigest.Zero
     else telluricEstimate(count, siblings)
 
   /**
@@ -162,28 +164,21 @@ object ObsExtract:
    * costs the average of those with a digest, or the placeholder when none has
    * one yet.  A declined telluric means none more are expected.
    */
-  def telluricEstimate(count: NonNegInt, siblings: TelluricSiblings): CalibrationEstimate =
+  def telluricEstimate(count: NonNegInt, siblings: TelluricSiblings): CalibrationDigest =
     val existing = siblings.unobserved
     val pending  =
       if siblings.declined then 0 else math.max(0, count.value - existing.size)
     val unit     = siblings.unitCost.getOrElse(TelluricPlaceholderCharge)
-    CalibrationEstimate(
-      NonNegInt.unsafeFrom(existing.size),
-      existing.map(_.total.getOrElse(TelluricPlaceholderCharge)).combineAll,
-      NonNegInt.unsafeFrom(pending),
-      CategorizedTime(ChargeClass.values.toList.map(cc => cc -> (unit(cc) *| pending))*)
+    CalibrationDigest(
+      CalibrationEstimate(
+        NonNegInt.unsafeFrom(existing.size),
+        existing.map(_.total.getOrElse(TelluricPlaceholderCharge)).combineAll
+      ),
+      CalibrationEstimate(
+        NonNegInt.unsafeFrom(pending),
+        CategorizedTime(ChargeClass.values.toList.map(cc => cc -> (unit(cc) *| pending))*)
+      )
     )
-
-  case class CalibrationEstimate(
-    existingCount: NonNegInt,
-    existingTime:  CategorizedTime,
-    expectedCount: NonNegInt,
-    expectedTime:  CategorizedTime
-  )
-
-  object CalibrationEstimate:
-    val Zero: CalibrationEstimate =
-      CalibrationEstimate(NonNegInt.MinValue, CategorizedTime.Zero, NonNegInt.MinValue, CategorizedTime.Zero)
 
   /** Tellurics materialised for one visit: one after, or one before and one after for a long visit. */
   def telluricsForVisit(visitTime: TimeSpan): NonNegInt =

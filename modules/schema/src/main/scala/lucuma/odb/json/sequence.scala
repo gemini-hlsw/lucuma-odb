@@ -20,6 +20,8 @@ import lucuma.core.enums.ObserveClass
 import lucuma.core.math.Offset
 import lucuma.core.math.Wavelength
 import lucuma.core.model.sequence.Atom
+import lucuma.core.model.sequence.CalibrationDigest
+import lucuma.core.model.sequence.CalibrationEstimate
 import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.ExecutionConfig
@@ -195,7 +197,11 @@ trait SequenceCodec {
         e <- time("expectedCalibrationTime")
         a <- c.downField("acquisition").as[SequenceDigest]
         s <- c.downField("science").as[SequenceDigest]
-      } yield ExecutionDigest(t, n, r, i, x, p, e, a, s)
+      } yield ExecutionDigest(
+        t, n, r,
+        CalibrationDigest(CalibrationEstimate(i, x), CalibrationEstimate(p, e)),
+        a, s
+      )
     }
 
   given (using Encoder[Offset], Encoder[TimeSpan]): Encoder[ExecutionDigest] =
@@ -205,11 +211,11 @@ trait SequenceCodec {
           "setup"                    -> a.setup.asJson,
           "setupCount"               -> a.setupCount.asJson,
           "reacquisitionCount"       -> a.reacquisitionCount.asJson,
-          "calibrationCount"         -> a.calibrationCount.asJson,
-          "existingCalibrationCount" -> a.existingCalibrationCount.asJson,
-          "existingCalibrationTime"  -> a.existingCalibrationTime.asJson,
-          "expectedCalibrationCount" -> a.expectedCalibrationCount.asJson,
-          "expectedCalibrationTime"  -> a.expectedCalibrationTime.asJson,
+          "calibrationCount"         -> a.calibrations.count.asJson,
+          "existingCalibrationCount" -> a.calibrations.existing.count.asJson,
+          "existingCalibrationTime"  -> a.calibrations.existing.time.asJson,
+          "expectedCalibrationCount" -> a.calibrations.expected.count.asJson,
+          "expectedCalibrationTime"  -> a.calibrations.expected.time.asJson,
           "science"                  -> a.science.timeEstimate.asJson,
           "total"                    -> a.fullTimeEstimate.asJson
         ),

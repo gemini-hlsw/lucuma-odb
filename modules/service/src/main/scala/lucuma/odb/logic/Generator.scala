@@ -27,6 +27,7 @@ import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.AtomDigest
+import lucuma.core.model.sequence.CalibrationDigest
 import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.ExecutionConfig
 import lucuma.core.model.sequence.ExecutionDigest
@@ -240,10 +241,7 @@ object Generator:
           SetupTime.Zero,
           NonNegInt.MinValue,
           NonNegInt.MinValue,
-          NonNegInt.MinValue,
-          CategorizedTime.Zero,
-          NonNegInt.MinValue,
-          CategorizedTime.Zero,
+          CalibrationDigest.Zero,
           SequenceDigest.Zero,
           SequenceDigest.Zero.copy(
             observeClass   = ctx.params.calibrationRole.sciClass,
@@ -287,11 +285,7 @@ object Generator:
             k  = ObsExtract.calibrationEstimate(
                    ctx.params.observingMode, ctx.params.calibrationRole, n, ctx.params.tellurics
                  )
-          yield ExecutionDigest(
-            estimator.estimateSetupTime, c, r,
-            k.existingCount, k.existingTime, k.expectedCount, k.expectedTime,
-            a, s
-          )
+          yield ExecutionDigest(estimator.estimateSetupTime, c, r, k, a, s)
 
         // Setting up GNIRS behind the Altair laser costs more than the nominal setup.
         def gnirsSetup(nominal: SetupTimeEstimateCalculator): SetupTimeEstimateCalculator =
@@ -312,10 +306,7 @@ object Generator:
               SetupTime.Zero,
               NonNegInt.MinValue,
               NonNegInt.MinValue,
-              NonNegInt.MinValue,
-              CategorizedTime.Zero,
-              NonNegInt.MinValue,
-              CategorizedTime.Zero,
+              CalibrationDigest.Zero,
               SequenceDigest.Zero.copy(executionState = ExecutionState.DeclaredComplete),
               SequenceDigest.Zero.copy(executionState = ExecutionState.DeclaredComplete)
             )

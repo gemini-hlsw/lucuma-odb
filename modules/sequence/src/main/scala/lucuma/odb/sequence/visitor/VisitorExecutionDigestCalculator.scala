@@ -8,6 +8,7 @@ import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.ExecutionState
 import lucuma.core.enums.ObserveClass
 import lucuma.core.model.ExposureTimeMode
+import lucuma.core.model.sequence.CalibrationDigest
 import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.core.model.sequence.SequenceDigest
@@ -55,10 +56,7 @@ object VisitorExecutionDigestCalculator:
       SetupTime(overheads.setup, TimeSpan.Zero),
       NonNegInt.unsafeFrom(if count > 0 then 1 else 0),
       NonNegInt.MinValue,
-      NonNegInt.MinValue,
-      CategorizedTime.Zero,
-      NonNegInt.MinValue,
-      CategorizedTime.Zero,
+      CalibrationDigest.Zero,
       SequenceDigest.Zero.copy(executionState = state),
       scienceDigest
     )
@@ -84,10 +82,7 @@ object VisitorExecutionDigestCalculator:
       SetupTime.Zero, // no info about setup time
       NonNegInt.unsafeFrom(0),
       NonNegInt.MinValue,
-      NonNegInt.MinValue,
-      CategorizedTime.Zero,
-      NonNegInt.MinValue,
-      CategorizedTime.Zero,
+      CalibrationDigest.Zero,
       SequenceDigest.Zero.copy(executionState = state),
       scienceDigest
     )

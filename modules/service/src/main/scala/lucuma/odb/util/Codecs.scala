@@ -34,6 +34,8 @@ import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
 import lucuma.core.model.*
 import lucuma.core.model.sequence.Atom
+import lucuma.core.model.sequence.CalibrationDigest
+import lucuma.core.model.sequence.CalibrationEstimate
 import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.DatasetReference
@@ -722,8 +724,14 @@ trait Codecs extends CoreCodecs {
       )
     }
 
+  lazy val calibration_estimate: Codec[CalibrationEstimate] =
+    (int4_nonneg *: categorized_time).to[CalibrationEstimate]
+
+  lazy val calibration_digest: Codec[CalibrationDigest] =
+    (calibration_estimate *: calibration_estimate).to[CalibrationDigest]
+
   lazy val execution_digest: Codec[ExecutionDigest] =
-    (setup_time *: int4_nonneg *: int4_nonneg *: int4_nonneg *: categorized_time *: int4_nonneg *: categorized_time *: sequence_digest *: sequence_digest)
+    (setup_time *: int4_nonneg *: int4_nonneg *: calibration_digest *: sequence_digest *: sequence_digest)
       .to[ExecutionDigest]
 
   val step_type: Codec[StepType] =

@@ -59,7 +59,7 @@ class CalibrationCountSuite extends FunSuite:
       TelluricSibling(unobserved, total.map(m => CategorizedTime(ChargeClass.Program -> minutes(m))))
     def estimate(count: Int, declined: Boolean, tellurics: TelluricSibling*) =
       val e = ObsExtract.telluricEstimate(NonNegInt.unsafeFrom(count), TelluricSiblings(declined, tellurics.toList))
-      (e.expectedCount.value, e.expectedTime(ChargeClass.Program).toMinutes.toLong)
+      (e.expected.count.value, e.expected.time(ChargeClass.Program).toMinutes.toLong)
     // The placeholder until a telluric has a digest, then the average.
     assertEquals(estimate(7, false), (7, 105L))
     assertEquals(estimate(7, false, sibling(true, None), sibling(true, None)), (5, 75L))
@@ -77,10 +77,11 @@ class CalibrationCountSuite extends FunSuite:
       TelluricSibling(false, Some(CategorizedTime(ChargeClass.Program -> minutes(20))))
     ))
     val e = ObsExtract.telluricEstimate(NonNegInt.unsafeFrom(3), siblings)
-    assertEquals(e.existingCount.value, 2)
-    assertEquals(e.existingTime(ChargeClass.Program).toMinutes.toLong, 55L)
-    assertEquals(e.expectedCount.value, 1)
-    assertEquals(e.expectedTime(ChargeClass.Program).toMinutes.toLong, 30L)
+    assertEquals(e.existing.count.value, 2)
+    assertEquals(e.existing.time(ChargeClass.Program).toMinutes.toLong, 55L)
+    assertEquals(e.expected.count.value, 1)
+    assertEquals(e.expected.time(ChargeClass.Program).toMinutes.toLong, 30L)
+    assertEquals(e.count.value, 3)
 
   test("the unit cost is the mean of the tellurics per charge class"):
     val a = CategorizedTime(ChargeClass.Program -> minutes(30), ChargeClass.NonCharged -> minutes(2))
