@@ -40,7 +40,9 @@ class imagingConfigOptions extends OdbSuite {
       s.execute(sql"insert into t_imaging_config_option_flamingos_2 values('Flamingos2', 5, 'Y')".command) *>
       s.execute(sql"insert into t_imaging_config_option_flamingos_2 values('Flamingos2', 6, 'KShort')".command) *>
       s.execute(sql"insert into t_imaging_config_option_gnirs values('Gnirs', 7, 'Order4', 'ShortBlue')".command) *>
-      s.execute(sql"insert into t_imaging_config_option_gnirs values('Gnirs', 8, 'Y', 'LongBlue')".command)).void
+      s.execute(sql"insert into t_imaging_config_option_gnirs values('Gnirs', 8, 'Y', 'LongBlue')".command) *>
+      s.execute(sql"insert into t_imaging_config_option (c_instrument, c_index, c_fov, c_filter_label, c_ao, c_site) values('Scorpio', 9, 180000000, 'g', false, 'gs')".command) *>
+      s.execute(sql"insert into t_imaging_config_option (c_instrument, c_index, c_fov, c_filter_label, c_ao, c_site) values('Scorpio', 10, 180000000, 'J', false, 'gs')".command)).void
   }
 
   case class ConfigOption(
@@ -110,6 +112,32 @@ class imagingConfigOptions extends OdbSuite {
 
   val allOptions: IO[List[ConfigOption]] =
     optionsWhere("")
+
+  test("scorpio returns only visible channels") {
+    expect(
+      user = pi,
+      query = s"""
+        query {
+          imagingConfigOptions(
+            WHERE: {
+              instrument: { EQ: SCORPIO }
+            }
+          ) {
+            filterLabel
+          }
+        }
+      """,
+      expected = json"""
+        {
+          "imagingConfigOptions": [
+            {
+              "filterLabel": "g"
+            }
+          ]
+        }
+      """.asRight
+    )
+  }
 
   test("simple query") {
     expect(

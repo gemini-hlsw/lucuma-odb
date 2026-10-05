@@ -26,6 +26,7 @@ import grackle.syntax.*
 import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.enums.Instrument
+import lucuma.core.enums.ScorpioFilter
 import lucuma.core.model
 import lucuma.core.model.Access
 import lucuma.core.model.CallForProposals
@@ -892,6 +893,14 @@ trait QueryMapping[F[_]] extends Predicates[F] with UserEnv {
 
   private lazy val ImagingConfigOptions: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
     val WhereOptions = WhereImagingConfigOption.binding(Path.from(ImagingConfigOptionType))
+
+    // SCORPIO infrared channels are loaded but not offered as imaging options yet.
+    val hideScorpioInfrared: Predicate =
+      Not(And(
+        Eql(ImagingConfigOptionType / "instrument", Const(Instrument.Scorpio)),
+        In(ImagingConfigOptionType / "filterLabel", ScorpioFilter.infrared.toList.map(_.shortName))
+      ))
+
     {
       case (QueryType, "imagingConfigOptions", List(
         WhereOptions.Option("WHERE", rWHERE)
@@ -903,7 +912,7 @@ trait QueryMapping[F[_]] extends Predicates[F] with UserEnv {
                 OrderSelection[Instrument](ImagingConfigOptionType / "instrument"),
                 OrderSelection[String](ImagingConfigOptionType / "filterLabel"),
               )),
-              Filter(where.getOrElse(True), child)
+              Filter(And(hideScorpioInfrared, where.getOrElse(True)), child)
             )
           }
         }
