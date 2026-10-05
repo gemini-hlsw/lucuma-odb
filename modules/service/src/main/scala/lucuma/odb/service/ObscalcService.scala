@@ -507,8 +507,11 @@ object ObscalcService:
       """.query(obscalc_entry)
 
     private def categorizedTimeColumns(prefix: String): String =
+      s"$prefix.c_obscalc_state,\n${fullCategorizedTimeColumns(prefix)}"
+
+    /** The columns `full_categorized_time` decodes. */
+    def fullCategorizedTimeColumns(prefix: String): String =
       prefixedColumns(prefix.some,
-        "c_obscalc_state",
         "c_full_setup_time",
         "c_setup_count",
         "c_reacq_setup_time",

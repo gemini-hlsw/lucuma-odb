@@ -230,11 +230,15 @@ DECLARE
   telluric_group_id d_group_id;
 BEGIN
   IF NEW.c_last_update IS DISTINCT FROM OLD.c_last_update
-     AND (   NEW.c_full_setup_time      IS DISTINCT FROM OLD.c_full_setup_time
-          OR NEW.c_setup_count          IS DISTINCT FROM OLD.c_setup_count
-          OR NEW.c_sci_obs_class        IS DISTINCT FROM OLD.c_sci_obs_class
-          OR NEW.c_sci_non_charged_time IS DISTINCT FROM OLD.c_sci_non_charged_time
-          OR NEW.c_sci_program_time     IS DISTINCT FROM OLD.c_sci_program_time) THEN
+     AND (   NEW.c_full_setup_time          IS DISTINCT FROM OLD.c_full_setup_time
+          OR NEW.c_setup_count              IS DISTINCT FROM OLD.c_setup_count
+          OR NEW.c_reacq_setup_time         IS DISTINCT FROM OLD.c_reacq_setup_time
+          OR NEW.c_reacquisition_count      IS DISTINCT FROM OLD.c_reacquisition_count
+          OR NEW.c_sci_obs_class            IS DISTINCT FROM OLD.c_sci_obs_class
+          OR NEW.c_sci_non_charged_time     IS DISTINCT FROM OLD.c_sci_non_charged_time
+          OR NEW.c_sci_program_time         IS DISTINCT FROM OLD.c_sci_program_time
+          OR NEW.c_exp_cal_non_charged_time IS DISTINCT FROM OLD.c_exp_cal_non_charged_time
+          OR NEW.c_exp_cal_program_time     IS DISTINCT FROM OLD.c_exp_cal_program_time) THEN
     SELECT c_group_id INTO telluric_group_id
     FROM   t_observation
     WHERE  c_observation_id  = NEW.c_observation_id

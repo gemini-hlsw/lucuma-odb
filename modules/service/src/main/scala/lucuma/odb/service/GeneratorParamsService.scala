@@ -23,7 +23,6 @@ import cats.syntax.traverse.*
 import lucuma.core.enums.AltairNdFilter
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.CassRotator
-import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.DeclaredExecutionState
 import lucuma.core.enums.ExecutionState
 import lucuma.core.enums.Flamingos2ReadMode
@@ -45,7 +44,6 @@ import lucuma.core.model.Target
 import lucuma.core.model.UnnormalizedSED
 import lucuma.core.model.User
 import lucuma.core.model.probes
-import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.util.Timestamp
 import lucuma.itc.ItcGhostDetector
 import lucuma.itc.client.Flamingos2CustomMask
@@ -62,11 +60,11 @@ import lucuma.odb.json.sourceprofile.given
 import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.ItcInput
-import lucuma.odb.sequence.data.TelluricSibling
-import lucuma.odb.sequence.data.TelluricSiblings
 import lucuma.odb.sequence.data.ItcInputDerivation
 import lucuma.odb.sequence.data.MissingParam
 import lucuma.odb.sequence.data.MissingParamSet
+import lucuma.odb.sequence.data.TelluricSibling
+import lucuma.odb.sequence.data.TelluricSiblings
 import lucuma.odb.sequence.exchange
 import lucuma.odb.sequence.flamingos2
 import lucuma.odb.sequence.ghost
@@ -255,7 +253,8 @@ object GeneratorParamsService {
             val af = Statements.selectTelluricSiblings(oids)
             session
               .prepareR(af.fragment.query(
-                observation_id *: bool *: bool *: Statements.telluric_total.opt *: categorized_time.opt
+                observation_id *: bool *: bool *:
+                  ObscalcService.Statements.full_categorized_time.opt *: categorized_time.opt
               ))
               .use(_.stream(af.argument, 64).compile.toList)
               .map: rows =>
@@ -933,15 +932,6 @@ object GeneratorParamsService {
         sp.as[SourceProfile].leftMap(f => s"Could not decode SourceProfile: ${f.message}")
       }
 
-    // A telluric's total as its digest stores it: science time plus every setup.
-    val telluric_total: Decoder[CategorizedTime] =
-      (time_span *: int4_nonneg *: obs_class *: time_span *: time_span).map:
-        (setup, count, obsclass, nonCharged, program) =>
-          CategorizedTime(
-            ChargeClass.NonCharged -> nonCharged,
-            ChargeClass.Program    -> program
-          ).sumCharge(obsclass.chargeClass, setup *| count.value)
-
     // One row per telluric in the science observation's group: whether it is
     // still unobserved, whether it was declined, its digest total if any, and
     // its original estimate total if it has been visited.
@@ -950,11 +940,7 @@ object GeneratorParamsService {
         SELECT s.c_observation_id,
                NOT EXISTS (SELECT 1 FROM t_visit v WHERE v.c_observation_id = t.c_observation_id),
                COALESCE(t.c_workflow_user_state = 'inactive', false),
-               c.c_full_setup_time,
-               c.c_setup_count,
-               c.c_sci_obs_class,
-               c.c_sci_non_charged_time,
-               c.c_sci_program_time,
+               #${ObscalcService.Statements.fullCategorizedTimeColumns("c")},
                t.c_orig_est_total_non_charged_time,
                t.c_orig_est_total_program_time
         FROM   t_observation s
