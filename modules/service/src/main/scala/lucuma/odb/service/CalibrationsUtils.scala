@@ -89,10 +89,6 @@ object ObsExtract:
       case c: GnirsSpectroscopyConfig => c.telluricType =!= TelluricType.NoTelluric
       case _                          => true
 
-  /** Modes whose science observations are accompanied by tellurics. */
-  def modeTakesTelluric(mode: ObservingMode): Boolean =
-    calibrationSetInterval(mode).isDefined
-
   /** Wavelength from which infrared calibrations repeat hourly rather than every 90 minutes. 2.6 microns */
   val LongWavelengthCutoff: Wavelength = Wavelength.unsafeFromIntPicometers(2_600_000)
 
@@ -122,19 +118,6 @@ object ObsExtract:
     NonNegInt.unsafeFrom:
       math.ceil(scienceTime.toMicroseconds.toDouble / interval.toMicroseconds.toDouble).toInt
 
-  /**
-   * Calibration sets carried in the time estimate.  Zero for calibration
-   * observations and for modes that take no telluric; independent of the
-   * telluric type, which only decides whether each set costs a telluric.
-   */
-  def calibrationCount(
-    mode:        ObservingMode,
-    role:        Option[CalibrationRole],
-    scienceTime: TimeSpan
-  ): NonNegInt =
-    if role.isDefined then NonNegInt.MinValue
-    else calibrationSetInterval(mode).fold(NonNegInt.MinValue)(calibrationSets(_, scienceTime))
-
   /** Placeholder charge for a telluric that has no sequence to estimate from. */
   val TelluricPlaceholderTime: TimeSpan = 15.minTimeSpan
 
@@ -142,27 +125,30 @@ object ObsExtract:
     CategorizedTime.Zero.sumCharge(ChargeClass.Program, TelluricPlaceholderTime)
 
   /**
-   * The unobserved tellurics already in the group and those the calibration
-   * count still predicts, with their time.  All zero for calibration
-   * observations and modes without tellurics, or with a NoTelluric type.
+   * The unobserved tellurics already in the group and those still predicted,
+   * one calibration set per interval of science time, with their time.  All
+   * zero for calibration observations and modes without tellurics, or with a
+   * NoTelluric type.
    */
   def calibrationEstimate(
-    mode:     ObservingMode,
-    role:     Option[CalibrationRole],
-    count:    NonNegInt,
-    siblings: TelluricSiblings
+    mode:        ObservingMode,
+    role:        Option[CalibrationRole],
+    scienceTime: TimeSpan,
+    siblings:    TelluricSiblings
   ): CalibrationDigest =
-    if role.isDefined || !modeRequiresTelluric(mode) || !modeTakesTelluric(mode)
-    then CalibrationDigest.Zero
-    else telluricEstimate(count, siblings)
+    calibrationSetInterval(mode)
+      .filter(_ => role.isEmpty && modeRequiresTelluric(mode))
+      .fold(CalibrationDigest.Zero): interval =>
+        telluricEstimate(calibrationSets(interval, scienceTime), siblings)
 
   /**
    * The estimate covers the work left, so only unobserved tellurics count as
    * existing; observed ones belong to visits already done, though their
-   * original estimates still feed the average.  An existing telluric costs what its own digest
-   * says, or the placeholder while it has none.  Each telluric still to come
-   * costs the average of those with a digest, or the placeholder when none has
-   * one yet.  A declined telluric means none more are expected.
+   * original estimates still feed the average.  An existing telluric costs
+   * what its own digest says, or the placeholder while it has none.  Each
+   * telluric still to come costs the average of those with a total, or the
+   * placeholder when none has one yet.  A declined telluric means none more
+   * are expected.
    */
   def telluricEstimate(count: NonNegInt, siblings: TelluricSiblings): CalibrationDigest =
     val existing = siblings.unobserved
@@ -176,7 +162,7 @@ object ObsExtract:
       ),
       CalibrationEstimate(
         NonNegInt.unsafeFrom(pending),
-        CategorizedTime(ChargeClass.values.toList.map(cc => cc -> (unit(cc) *| pending))*)
+        unit.combineN(pending)
       )
     )
 

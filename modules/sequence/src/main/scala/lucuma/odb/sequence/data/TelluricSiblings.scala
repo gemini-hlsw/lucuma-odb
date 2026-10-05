@@ -10,7 +10,6 @@ import cats.syntax.all.*
 import lucuma.core.enums.ChargeClass
 import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.util.TimeSpan
-import lucuma.odb.sequence.syntax.all.*
 import lucuma.odb.sequence.util.HashBytes
 
 /**
@@ -27,7 +26,7 @@ case class TelluricSiblings(
   def unobserved: List[TelluricSibling] =
     tellurics.filter(_.unobserved)
 
-  // Mean total of the tellurics with a digest, what one more is expected to cost.
+  // Mean total of the tellurics that have one, what one more is expected to cost.
   def unitCost: Option[CategorizedTime] =
     TelluricSiblings.average(tellurics.flatMap(_.total))
 
@@ -38,7 +37,7 @@ case class TelluricSibling(
 
 object TelluricSiblings:
 
-  val None: TelluricSiblings =
+  val Empty: TelluricSiblings =
     TelluricSiblings(false, Nil)
 
   def average(totals: List[CategorizedTime]): Option[CategorizedTime] =
@@ -52,14 +51,8 @@ object TelluricSiblings:
           *
         ).some
 
-  given HashBytes[CategorizedTime] with
-    def hashBytes(a: CategorizedTime): Array[Byte] =
-      Array.concat(ChargeClass.values.toList.map(cc => a(cc).hashBytes)*)
+  given HashBytes[TelluricSibling] =
+    HashBytes.by2(_.unobserved, _.total)
 
-  given HashBytes[TelluricSibling] with
-    def hashBytes(a: TelluricSibling): Array[Byte] =
-      Array.concat(a.unobserved.hashBytes, a.total.hashBytes)
-
-  given HashBytes[TelluricSiblings] with
-    def hashBytes(a: TelluricSiblings): Array[Byte] =
-      Array.concat(a.declined.hashBytes, a.tellurics.hashBytes)
+  given HashBytes[TelluricSiblings] =
+    HashBytes.by2(_.declined, _.tellurics)

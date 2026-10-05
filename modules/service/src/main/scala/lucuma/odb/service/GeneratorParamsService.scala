@@ -846,7 +846,7 @@ object GeneratorParamsService {
     explicitGuideProbe:    Option[GuideProbe],
     isNonsidereal:         Boolean,
     customSedTimestamp:    Option[Timestamp] = none,
-    tellurics:             TelluricSiblings = TelluricSiblings.None
+    tellurics:             TelluricSiblings = TelluricSiblings.Empty
   )
 
   case class TargetParams(

@@ -281,9 +281,11 @@ object Generator:
                  else NonNegInt.unsafeFrom(1)
             // Recentering is needed whether or not the observation may be split.
             r  = estimator.estimateReacquisitionCount(s.timeEstimate.sum)
-            n  = ObsExtract.calibrationCount(ctx.params.observingMode, ctx.params.calibrationRole, s.timeEstimate.sum)
             k  = ObsExtract.calibrationEstimate(
-                   ctx.params.observingMode, ctx.params.calibrationRole, n, ctx.params.tellurics
+                   ctx.params.observingMode,
+                   ctx.params.calibrationRole,
+                   s.timeEstimate.sum,
+                   ctx.params.tellurics
                  )
           yield ExecutionDigest(estimator.estimateSetupTime, c, r, k, a, s)
 

@@ -80,6 +80,6 @@ trait ObservationTimeEstimateMapping[F[_]] extends ObservationView[F]:
         for
           i <- cursor.fieldAs[NonNegInt]("existingCount")
           p <- cursor.fieldAs[NonNegInt]("expectedCount")
-        yield NonNegInt.unsafeFrom(math.min(i.value.toLong + p.value.toLong, Int.MaxValue).toInt),
+        yield NonNegInt.unsafeFrom(i.value + p.value),
       List("existingCount", "expectedCount")
     )

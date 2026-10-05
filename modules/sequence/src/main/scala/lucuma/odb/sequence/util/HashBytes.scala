@@ -16,6 +16,7 @@ import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.TelluricType
+import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.util.Enumerated
 import lucuma.core.util.Gid
@@ -108,6 +109,9 @@ object HashBytes:
 
   given HashBytes[TimeSpan] =
     HashBytes.by(_.toMicroseconds)
+
+  given HashBytes[CategorizedTime] =
+    HashBytes.by2(_.programTime, _.nonCharged)
 
   given HashBytes[Angle] =
     HashBytes.by(_.toMicroarcseconds)

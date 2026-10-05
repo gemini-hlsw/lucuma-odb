@@ -712,20 +712,16 @@ object ObscalcService:
         sql"c_reacq_setup_time     = ${time_span.opt}"(r.digest.map(_.setup.reacquisition)),
         sql"c_setup_count          = ${int4_nonneg.opt}"(r.digest.map(_.setupCount)),
         sql"c_reacquisition_count  = ${int4_nonneg.opt}"(r.digest.map(_.reacquisitionCount)),
-        sql"c_exist_cal_count            = ${int4_nonneg.opt}"(r.digest.map(_.calibrations.existing.count)),
-        sql"c_exist_cal_non_charged_time = ${time_span.opt}"(
-          r.digest.map(_.calibrations.existing.time(ChargeClass.NonCharged))
-        ),
-        sql"c_exist_cal_program_time     = ${time_span.opt}"(
-          r.digest.map(_.calibrations.existing.time(ChargeClass.Program))
-        ),
-        sql"c_exp_cal_count              = ${int4_nonneg.opt}"(r.digest.map(_.calibrations.expected.count)),
-        sql"c_exp_cal_non_charged_time   = ${time_span.opt}"(
-          r.digest.map(_.calibrations.expected.time(ChargeClass.NonCharged))
-        ),
-        sql"c_exp_cal_program_time       = ${time_span.opt}"(
-          r.digest.map(_.calibrations.expected.time(ChargeClass.Program))
-        ),
+        sql"""
+          (
+            c_exist_cal_count,
+            c_exist_cal_non_charged_time,
+            c_exist_cal_program_time,
+            c_exp_cal_count,
+            c_exp_cal_non_charged_time,
+            c_exp_cal_program_time
+          ) = (${calibration_digest.opt})
+        """(r.digest.map(_.calibrations)),
 
         // Acquisition Digest
         sql"c_acq_obs_class                  = ${obs_class.opt}"(r.digest.map(_.acquisition.observeClass)),
