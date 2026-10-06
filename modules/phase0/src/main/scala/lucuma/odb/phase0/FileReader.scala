@@ -102,5 +102,6 @@ class FileReader[F[_]](fileName: String)(using ApplicativeError[F, Throwable]):
   val scorpioSpectroscopy: Pipe[F, Byte, (ScorpioSpectroscopyRow, PosInt)] =
     read(Instrument.Scorpio, ScorpioSpectroscopyRow.scorpio)
 
+  // SCORPIO images every channel at once, so one row lists them all.
   val scorpioImaging: Pipe[F, Byte, (ImagingRow, PosInt)] =
-    read(Instrument.Scorpio, ImagingRow.rows)
+    read(Instrument.Scorpio, ImagingRow.singleRow)
