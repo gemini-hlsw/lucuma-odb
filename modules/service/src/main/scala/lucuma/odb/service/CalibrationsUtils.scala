@@ -47,8 +47,8 @@ import lucuma.odb.graphql.input.TargetEnvironmentInput
 import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.sequence.ObservingMode.Syntax.*
-import lucuma.odb.sequence.data.ItcInput
 import lucuma.odb.sequence.data.CalibrationGroupTellurics
+import lucuma.odb.sequence.data.ItcInput
 import lucuma.odb.sequence.flamingos2.longslit.Config as Flamingos2Config
 import lucuma.odb.sequence.flamingos2.mos.Config as Flamingos2MosConfig
 import lucuma.odb.sequence.gmos.ifu.Config.GmosNorth as GmosNorthIfu

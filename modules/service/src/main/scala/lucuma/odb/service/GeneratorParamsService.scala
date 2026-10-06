@@ -58,13 +58,13 @@ import lucuma.itc.client.TargetInput
 import lucuma.odb.data.AltairConfiguration
 import lucuma.odb.json.sourceprofile.given
 import lucuma.odb.sequence.ObservingMode
+import lucuma.odb.sequence.data.CalibrationGroupTelluric
+import lucuma.odb.sequence.data.CalibrationGroupTellurics
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.ItcInput
 import lucuma.odb.sequence.data.ItcInputDerivation
 import lucuma.odb.sequence.data.MissingParam
 import lucuma.odb.sequence.data.MissingParamSet
-import lucuma.odb.sequence.data.CalibrationGroupTelluric
-import lucuma.odb.sequence.data.CalibrationGroupTellurics
 import lucuma.odb.sequence.exchange
 import lucuma.odb.sequence.flamingos2
 import lucuma.odb.sequence.ghost
