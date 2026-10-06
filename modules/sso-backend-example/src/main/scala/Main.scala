@@ -5,6 +5,8 @@ package lucuma.sso.example
 
 import cats.*
 import cats.effect.*
+import cats.effect.std.SecureRandom
+import cats.effect.std.UUIDGen
 import com.comcast.ip4s.Host
 import com.comcast.ip4s.Port
 import fs2.io.net.Network
@@ -73,7 +75,10 @@ object Main extends IOApp {
 
   // Traces go to the log; swap this for a real exporter in a production service.
   def entryPoint[F[_]: Sync: Logger]: Resource[F, EntryPoint[F]] =
-    Resource.pure(Log.entryPoint[F]("backend-example"))
+    Resource.eval(SecureRandom.javaSecuritySecureRandom[F]).map { sr =>
+      given UUIDGen[F] = UUIDGen.fromSecureRandom(using Sync[F], sr)
+      Log.entryPoint[F]("backend-example")
+    }
 
   def log[F[_]: Async](@unused r: Request[F], t: Throwable): F[Unit] =
     Async[F].delay(t.printStackTrace())
