@@ -1,10 +1,8 @@
 -- Calibration estimate: the unobserved tellurics already in the group (each at
 -- its own estimate) and those still predicted (each at the group's average),
 -- as counts and times.  Together they are the calibration count, which is no
--- longer stored.  Only the expected time joins the observation's total, since
--- existing tellurics are observations of their own.  Computed by the generator,
--- so stored beside the other digest values in both digest tables and frozen in
--- the original estimate.
+-- longer stored.  Stored beside the other digest values in both digest tables
+-- and frozen in the original estimate.
 
 ALTER TABLE t_obscalc
   DROP COLUMN c_calibration_count,
@@ -26,19 +24,18 @@ UPDATE t_obscalc
        c_exp_cal_program_time       = interval '0 seconds'
  WHERE c_setup_count IS NOT NULL;
 
--- Cached digests keep their rows and read as zero until regenerated.
+-- The generator params hash now covers the group's tellurics, so no cached
+-- digest can be hit again.
+TRUNCATE TABLE t_execution_digest;
+
 ALTER TABLE t_execution_digest
   DROP COLUMN c_calibration_count,
-  ADD COLUMN c_exist_cal_count            int4     NOT NULL DEFAULT 0 CHECK (c_exist_cal_count >= 0),
-  ADD COLUMN c_exist_cal_non_charged_time interval NOT NULL DEFAULT interval '0 seconds'
-    CHECK (c_exist_cal_non_charged_time >= interval '0 seconds'),
-  ADD COLUMN c_exist_cal_program_time     interval NOT NULL DEFAULT interval '0 seconds'
-    CHECK (c_exist_cal_program_time     >= interval '0 seconds'),
-  ADD COLUMN c_exp_cal_count              int4     NOT NULL DEFAULT 0 CHECK (c_exp_cal_count >= 0),
-  ADD COLUMN c_exp_cal_non_charged_time   interval NOT NULL DEFAULT interval '0 seconds'
-    CHECK (c_exp_cal_non_charged_time   >= interval '0 seconds'),
-  ADD COLUMN c_exp_cal_program_time       interval NOT NULL DEFAULT interval '0 seconds'
-    CHECK (c_exp_cal_program_time       >= interval '0 seconds');
+  ADD COLUMN c_exist_cal_count            int4     NOT NULL CHECK (c_exist_cal_count            >= 0),
+  ADD COLUMN c_exist_cal_non_charged_time interval NOT NULL CHECK (c_exist_cal_non_charged_time >= interval '0 seconds'),
+  ADD COLUMN c_exist_cal_program_time     interval NOT NULL CHECK (c_exist_cal_program_time     >= interval '0 seconds'),
+  ADD COLUMN c_exp_cal_count              int4     NOT NULL CHECK (c_exp_cal_count              >= 0),
+  ADD COLUMN c_exp_cal_non_charged_time   interval NOT NULL CHECK (c_exp_cal_non_charged_time   >= interval '0 seconds'),
+  ADD COLUMN c_exp_cal_program_time       interval NOT NULL CHECK (c_exp_cal_program_time       >= interval '0 seconds');
 
 -- Original estimate: joins the all-or-none set, so recorded estimates take 0.
 ALTER TABLE t_observation

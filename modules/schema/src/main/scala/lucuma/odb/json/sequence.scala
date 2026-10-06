@@ -214,13 +214,13 @@ trait SequenceCodec {
     Encoder.instance { (a: ExecutionDigest) =>
       Json.obj(
         "estimate"         -> Json.obj(
-          "setup"                    -> a.setup.asJson,
-          "setupCount"               -> a.setupCount.asJson,
-          "reacquisitionCount"       -> a.reacquisitionCount.asJson,
-          "calibrations"             -> a.calibrations.asJson,
-          "calibrationCount"         -> a.calibrations.count.asJson, // deprecated, use calibrations.count
-          "science"                  -> a.science.timeEstimate.asJson,
-          "total"                    -> a.fullTimeEstimate.asJson
+          "setup"              -> a.setup.asJson,
+          "setupCount"         -> a.setupCount.asJson,
+          "reacquisitionCount" -> a.reacquisitionCount.asJson,
+          "calibrations"       -> a.calibrations.asJson,
+          "calibrationCount"   -> a.calibrations.count.asJson, // deprecated, use calibrations.count
+          "science"            -> a.science.timeEstimate.asJson,
+          "total"              -> a.fullTimeEstimate.asJson
         ),
         "setup"            -> a.setup.asJson,        // deprecated, use estimate.setup
         "setupCount"       -> a.setupCount.asJson,   // deprecated, use estimate.setupCount

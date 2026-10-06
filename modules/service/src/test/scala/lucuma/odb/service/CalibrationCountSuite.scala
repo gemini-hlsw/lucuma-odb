@@ -8,8 +8,8 @@ import lucuma.core.enums.ChargeClass
 import lucuma.core.math.Wavelength
 import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.util.TimeSpan
-import lucuma.odb.sequence.data.TelluricSibling
-import lucuma.odb.sequence.data.TelluricSiblings
+import lucuma.odb.sequence.data.CalibrationGroupTelluric
+import lucuma.odb.sequence.data.CalibrationGroupTellurics
 import munit.FunSuite
 
 // Boundary arithmetic only; the mode and role gating is covered end to end in
@@ -55,28 +55,34 @@ class CalibrationCountSuite extends FunSuite:
 
   // The mode and role gating is covered end to end in executionDigest_calibrationEstimate.
   test("expected calibrations charge each telluric still to come"):
-    def sibling(unobserved: Boolean, total: Option[Long]): TelluricSibling =
-      TelluricSibling(unobserved, total.map(m => CategorizedTime(ChargeClass.Program -> minutes(m))))
-    def estimate(count: Int, declined: Boolean, tellurics: TelluricSibling*) =
-      val e = ObsExtract.telluricEstimate(NonNegInt.unsafeFrom(count), TelluricSiblings(declined, tellurics.toList))
+    def telluric(unobserved: Boolean, total: Option[Long]): CalibrationGroupTelluric =
+      CalibrationGroupTelluric(
+        unobserved,
+        total.map(m => CategorizedTime(ChargeClass.Program -> minutes(m)))
+      )
+    def estimate(count: Int, declined: Boolean, tellurics: CalibrationGroupTelluric*) =
+      val e = ObsExtract.telluricEstimate(
+        NonNegInt.unsafeFrom(count),
+        CalibrationGroupTellurics(declined, tellurics.toList)
+      )
       (e.expected.count.value, e.expected.time(ChargeClass.Program).toMinutes.toLong)
     // The placeholder until a telluric has a digest, then the average.
     assertEquals(estimate(7, false), (7, 105L))
-    assertEquals(estimate(7, false, sibling(true, None), sibling(true, None)), (5, 75L))
-    assertEquals(estimate(7, false, sibling(true, Some(30)), sibling(true, Some(50))), (5, 200L))
-    assertEquals(estimate(1, false, sibling(true, Some(40)), sibling(true, Some(40))), (0, 0L))
+    assertEquals(estimate(7, false, telluric(true, None), telluric(true, None)), (5, 75L))
+    assertEquals(estimate(7, false, telluric(true, Some(30)), telluric(true, Some(50))), (5, 200L))
+    assertEquals(estimate(1, false, telluric(true, Some(40)), telluric(true, Some(40))), (0, 0L))
     assertEquals(estimate(0, false), (0, 0L))
-    assertEquals(estimate(7, true, sibling(true, Some(40))), (0, 0L))
+    assertEquals(estimate(7, true, telluric(true, Some(40))), (0, 0L))
     // Observed tellurics are not subtracted, but their totals feed the average.
-    assertEquals(estimate(7, false, sibling(false, Some(40))), (7, 280L))
+    assertEquals(estimate(7, false, telluric(false, Some(40))), (7, 280L))
 
   test("existing calibrations are the unobserved ones, each at its own estimate or the placeholder"):
-    val siblings = TelluricSiblings(false, List(
-      TelluricSibling(true,  Some(CategorizedTime(ChargeClass.Program -> minutes(40)))),
-      TelluricSibling(true,  None),
-      TelluricSibling(false, Some(CategorizedTime(ChargeClass.Program -> minutes(20))))
+    val group = CalibrationGroupTellurics(false, List(
+      CalibrationGroupTelluric(true,  Some(CategorizedTime(ChargeClass.Program -> minutes(40)))),
+      CalibrationGroupTelluric(true,  None),
+      CalibrationGroupTelluric(false, Some(CategorizedTime(ChargeClass.Program -> minutes(20))))
     ))
-    val e = ObsExtract.telluricEstimate(NonNegInt.unsafeFrom(3), siblings)
+    val e = ObsExtract.telluricEstimate(NonNegInt.unsafeFrom(3), group)
     assertEquals(e.existing.count.value, 2)
     assertEquals(e.existing.time(ChargeClass.Program).toMinutes.toLong, 55L)
     assertEquals(e.expected.count.value, 1)
@@ -86,9 +92,9 @@ class CalibrationCountSuite extends FunSuite:
   test("the unit cost is the mean of the tellurics per charge class"):
     val a = CategorizedTime(ChargeClass.Program -> minutes(30), ChargeClass.NonCharged -> minutes(2))
     val b = CategorizedTime(ChargeClass.Program -> minutes(50), ChargeClass.NonCharged -> minutes(4))
-    assertEquals(TelluricSiblings.average(Nil), None)
+    assertEquals(CalibrationGroupTellurics.average(Nil), None)
     assertEquals(
-      TelluricSiblings.average(List(a, b)),
+      CalibrationGroupTellurics.average(List(a, b)),
       Some(CategorizedTime(ChargeClass.Program -> minutes(40), ChargeClass.NonCharged -> minutes(3)))
     )
 

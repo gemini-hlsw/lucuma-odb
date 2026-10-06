@@ -46,7 +46,7 @@ import lucuma.odb.graphql.input.TargetEnvironmentInput
 import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.sequence.data.ItcInput
-import lucuma.odb.sequence.data.TelluricSiblings
+import lucuma.odb.sequence.data.CalibrationGroupTellurics
 import lucuma.odb.sequence.flamingos2.longslit.Config as Flamingos2Config
 import lucuma.odb.sequence.flamingos2.mos.Config as Flamingos2MosConfig
 import lucuma.odb.sequence.gmos.ifu.Config.GmosNorth as GmosNorthIfu
@@ -100,11 +100,11 @@ object ObsExtract:
     if wavelength < LongWavelengthCutoff then ShortWavelengthSetInterval else LongWavelengthSetInterval
 
   /**
-   * Calibration set interval for a mode, if it takes night-time calibrations.
+   * Duration of science to require a telluric.
    * GNIRS follows its longest central wavelength; the other infrared modes
-   * never reach the cutoff and keep the 90-minute interval.
+   * never reach the cutoff and keep the 90-minute scienceSpan.
    */
-  def calibrationSetInterval(mode: ObservingMode): Option[TimeSpan] =
+  def telluricPerScience(mode: ObservingMode): Option[TimeSpan] =
     mode match
       case c: GnirsSpectroscopyConfig =>
         calibrationSetInterval(c.wavelengths.map(_.centralWavelength).maximum).some
@@ -113,10 +113,10 @@ object ObsExtract:
       case _ =>
         none
 
-  /** Calibration sets over the lifetime of an observation: ceil(scienceTime / interval). */
-  def calibrationSets(interval: TimeSpan, scienceTime: TimeSpan): NonNegInt =
+  /** Calibration sets over the lifetime of an observation: ceil(scienceTime / scienceSpan). */
+  def calibrationSets(scienceSpan: TimeSpan, scienceTime: TimeSpan): NonNegInt =
     NonNegInt.unsafeFrom:
-      math.ceil(scienceTime.toMicroseconds.toDouble / interval.toMicroseconds.toDouble).toInt
+      math.ceil(scienceTime.toMicroseconds.toDouble / scienceSpan.toMicroseconds.toDouble).toInt
 
   /** Placeholder charge for a telluric that has no sequence to estimate from. */
   val TelluricPlaceholderTime: TimeSpan = 15.minTimeSpan
@@ -126,7 +126,7 @@ object ObsExtract:
 
   /**
    * The unobserved tellurics already in the group and those still predicted,
-   * one calibration set per interval of science time, with their time.  All
+   * one calibration set per scienceSpan of science time, with their time.  All
    * zero for calibration observations and modes without tellurics, or with a
    * NoTelluric type.
    */
@@ -134,27 +134,26 @@ object ObsExtract:
     mode:        ObservingMode,
     role:        Option[CalibrationRole],
     scienceTime: TimeSpan,
-    siblings:    TelluricSiblings
+    tellurics:   CalibrationGroupTellurics
   ): CalibrationDigest =
-    calibrationSetInterval(mode)
+    telluricPerScience(mode)
       .filter(_ => role.isEmpty && modeRequiresTelluric(mode))
-      .fold(CalibrationDigest.Zero): interval =>
-        telluricEstimate(calibrationSets(interval, scienceTime), siblings)
+      .fold(CalibrationDigest.Zero): scienceSpan =>
+        telluricEstimate(calibrationSets(scienceSpan, scienceTime), tellurics)
 
   /**
-   * The estimate covers the work left, so only unobserved tellurics count as
-   * existing; observed ones belong to visits already done, though their
-   * original estimates still feed the average.  An existing telluric costs
-   * what its own digest says, or the placeholder while it has none.  Each
-   * telluric still to come costs the average of those with a total, or the
-   * placeholder when none has one yet.  A declined telluric means none more
-   * are expected.
+   * Returns a digest of calibrations (specifically tellurics) for the scienc.
+   * The count is the number of tellurics expected for the science time, and include
+   * existing one in the group, including; observed already visited.
+   * Also includes an estimate of how many more tellurics are expected, and their 
+   * total time.  The time estimate is the average of the existing tellurics time.
    */
-  def telluricEstimate(count: NonNegInt, siblings: TelluricSiblings): CalibrationDigest =
-    val existing = siblings.unobserved
+  def telluricEstimate(count: NonNegInt, tellurics: CalibrationGroupTellurics): CalibrationDigest =
+    val existing = tellurics.unobserved
     val pending  =
-      if siblings.declined then 0 else math.max(0, count.value - existing.size)
-    val unit     = siblings.unitCost.getOrElse(TelluricPlaceholderCharge)
+      if tellurics.declined then 0 else math.max(0, count.value - existing.size)
+    val unit     = tellurics.unitCost.getOrElse(TelluricPlaceholderCharge)
+
     CalibrationDigest(
       CalibrationEstimate(
         NonNegInt.unsafeFrom(existing.size),

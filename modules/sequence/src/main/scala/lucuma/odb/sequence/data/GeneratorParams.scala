@@ -35,7 +35,7 @@ case class GeneratorParams(
   isSplittable:     Boolean,
   altair:           Option[AltairConfiguration],
   guideProbe:       Option[GuideProbe],
-  tellurics:        TelluricSiblings
+  tellurics:        CalibrationGroupTellurics
 ):
 
   // The standard star is chosen to suit the observation time, so a real

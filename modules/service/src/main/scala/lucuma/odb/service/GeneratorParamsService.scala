@@ -63,8 +63,8 @@ import lucuma.odb.sequence.data.ItcInput
 import lucuma.odb.sequence.data.ItcInputDerivation
 import lucuma.odb.sequence.data.MissingParam
 import lucuma.odb.sequence.data.MissingParamSet
-import lucuma.odb.sequence.data.TelluricSibling
-import lucuma.odb.sequence.data.TelluricSiblings
+import lucuma.odb.sequence.data.CalibrationGroupTelluric
+import lucuma.odb.sequence.data.CalibrationGroupTellurics
 import lucuma.odb.sequence.exchange
 import lucuma.odb.sequence.flamingos2
 import lucuma.odb.sequence.ghost
@@ -228,7 +228,7 @@ object GeneratorParamsService {
           .prepareR(af.fragment.query(Statements.params))
           .use(_.stream(af.argument, chunkSize = 64).compile.to(List))
           .flatMap(addCustomSedTimestamps)
-          .flatMap(addTelluricSiblings)
+          .flatMap(addCalibrationGroupTellurics)
 
       // If the user uploads a new custom sed in place of an existing one, that needs to
       // invalidate the cache. So, we include the timestamp of the attachment (if any) in
@@ -245,12 +245,11 @@ object GeneratorParamsService {
           )
 
       // The expected calibrations charge depends on the tellurics already in
-      // the science observation's group and their totals, so they are part of
-      // the params (and the hash).
-      private def addTelluricSiblings(params: List[ParamsRow]): F[List[ParamsRow]] =
+      // the science observation's group and their totals.
+      private def addCalibrationGroupTellurics(params: List[ParamsRow]): F[List[ParamsRow]] =
         NonEmptyList.fromList(params.filter(_.calibrationRole.isEmpty).map(_.observationId).distinct)
           .fold(params.pure): oids =>
-            val af = Statements.selectTelluricSiblings(oids)
+            val af = Statements.selectCalibrationGroupTellurics(oids)
             session
               .prepareR(af.fragment.query(
                 observation_id *: bool *: bool *:
@@ -263,9 +262,9 @@ object GeneratorParamsService {
                 val byObs = rows.groupMap(_._1): (_, unobserved, declined, current, original) =>
                   (unobserved, declined, if unobserved then current else original)
                 .view.mapValues: ts =>
-                  TelluricSiblings(
+                  CalibrationGroupTellurics(
                     ts.exists(_._2),
-                    ts.collect { case (u, false, t) => TelluricSibling(u, t) }
+                    ts.collect { case (u, false, t) => CalibrationGroupTelluric(u, t) }
                   )
                 params.map(p => byObs.get(p.observationId).fold(p)(t => p.copy(tellurics = t)))
 
@@ -846,7 +845,7 @@ object GeneratorParamsService {
     explicitGuideProbe:    Option[GuideProbe],
     isNonsidereal:         Boolean,
     customSedTimestamp:    Option[Timestamp] = none,
-    tellurics:             TelluricSiblings = TelluricSiblings.Empty
+    tellurics:             CalibrationGroupTellurics = CalibrationGroupTellurics.Empty
   )
 
   case class TargetParams(
@@ -873,7 +872,7 @@ object GeneratorParamsService {
     schedulingMode:        SchedulingMode,
     altair:                Option[AltairConfiguration],
     guideProbe:            Option[GuideProbe],
-    tellurics:             TelluricSiblings
+    tellurics:             CalibrationGroupTellurics
   )
 
   object ObsParams {
@@ -935,7 +934,7 @@ object GeneratorParamsService {
     // One row per telluric in the science observation's group: whether it is
     // still unobserved, whether it was declined, its digest total if any, and
     // its original estimate total if it has been visited.
-    def selectTelluricSiblings(oids: NonEmptyList[Observation.Id]): AppliedFragment =
+    def selectCalibrationGroupTellurics(oids: NonEmptyList[Observation.Id]): AppliedFragment =
       sql"""
         SELECT s.c_observation_id,
                NOT EXISTS (SELECT 1 FROM t_visit v WHERE v.c_observation_id = t.c_observation_id),

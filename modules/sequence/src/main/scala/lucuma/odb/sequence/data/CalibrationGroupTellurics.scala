@@ -18,27 +18,27 @@ import lucuma.odb.sequence.util.HashBytes
  * unobserved and its total: the digest's while unobserved, the original
  * estimate's once visited (none while it has neither).
  */
-case class TelluricSiblings(
+case class CalibrationGroupTellurics(
   declined: Boolean,
-  tellurics: List[TelluricSibling]
+  tellurics: List[CalibrationGroupTelluric]
 ) derives Eq:
 
-  def unobserved: List[TelluricSibling] =
+  def unobserved: List[CalibrationGroupTelluric] =
     tellurics.filter(_.unobserved)
 
   // Mean total of the tellurics that have one, what one more is expected to cost.
   def unitCost: Option[CategorizedTime] =
-    TelluricSiblings.average(tellurics.flatMap(_.total))
+    CalibrationGroupTellurics.average(tellurics.flatMap(_.total))
 
-case class TelluricSibling(
+case class CalibrationGroupTelluric(
   unobserved: Boolean,
   total:      Option[CategorizedTime]
 ) derives Eq
 
-object TelluricSiblings:
+object CalibrationGroupTellurics:
 
-  val Empty: TelluricSiblings =
-    TelluricSiblings(false, Nil)
+  val Empty: CalibrationGroupTellurics =
+    CalibrationGroupTellurics(false, Nil)
 
   def average(totals: List[CategorizedTime]): Option[CategorizedTime] =
     totals match
@@ -51,8 +51,8 @@ object TelluricSiblings:
           *
         ).some
 
-  given HashBytes[TelluricSibling] =
+  given HashBytes[CalibrationGroupTelluric] =
     HashBytes.by2(_.unobserved, _.total)
 
-  given HashBytes[TelluricSiblings] =
+  given HashBytes[CalibrationGroupTellurics] =
     HashBytes.by2(_.declined, _.tellurics)

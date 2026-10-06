@@ -33,20 +33,20 @@ trait ArbGeneratorParams:
   import ArbInstrumentMode.given
   import ArbItcInput.given
 
-  private val genTelluric: Gen[TelluricSibling] =
+  private val genTelluric: Gen[CalibrationGroupTelluric] =
     for
       u <- arbitrary[Boolean]
       t <- Gen.option(Gen.choose(0L, 3_600_000_000L).map(us =>
              CategorizedTime(ChargeClass.Program -> TimeSpan.unsafeFromMicroseconds(us))
            ))
-    yield TelluricSibling(u, t)
+    yield CalibrationGroupTelluric(u, t)
 
-  private val genTellurics: Gen[TelluricSiblings] =
+  private val genTellurics: Gen[CalibrationGroupTellurics] =
     for
       d  <- arbitrary[Boolean]
       n  <- Gen.choose(0, 4)
       ts <- Gen.listOfN(n, genTelluric)
-    yield TelluricSiblings(d, ts)
+    yield CalibrationGroupTellurics(d, ts)
 
   private val genAltair: Gen[Option[AltairConfiguration]] =
     Gen.option(arbitrary[AltairConfiguration])
