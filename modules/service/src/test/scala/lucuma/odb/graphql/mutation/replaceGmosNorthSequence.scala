@@ -269,6 +269,46 @@ class replaceGmosNorthSequence extends query.ExecutionTestSupportForGmos with Re
         ).asLeft
       )
 
+  test("multi-atom acquisition sequence for unsplittable observation"):
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthImagingObservationAs(pi, p, t)
+        _ <- setIsSplittableAs(pi, o, isSplittable = false)
+      yield o
+
+    setup.flatMap: oid =>
+      val inputString = input(
+        oid,
+        SequenceType.Acquisition,
+        atomInput("Atom1", stepInput(GmosNorthFilter.GPrime)),
+        atomInput("Atom2", stepInput(GmosNorthFilter.IPrime))
+      )
+
+      expect(
+        user     = pi,
+        query    = s"""
+          mutation {
+            replaceGmosNorthSequence(input: $inputString) {
+              sequence {
+                description
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "replaceGmosNorthSequence": {
+              "sequence": [
+                { "description": "Atom1" },
+                { "description": "Atom2" }
+              ]
+            }
+          }
+        """.asRight
+      )
+
   private def failToMakeUnsplittable(
     o: Observation.Id,
     e: String
@@ -340,4 +380,23 @@ class replaceGmosNorthSequence extends query.ExecutionTestSupportForGmos with Re
           o,
           s"Cannot make observation $o unsplittable: An unsplittable observation's atom may not contain more than ${UnsplittableAtom.StepLimit.value} steps."
         )
+      yield ()
+
+  test("can set isSplittable=false with multi-atom materialized acquisition sequence"):
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthImagingObservationAs(pi, p, t)
+        _ <- query(
+          user  = pi,
+          query = replaceSequenceQuery(
+            input(
+              o,
+              SequenceType.Acquisition,
+              atomInput("Atom1", stepInput(GmosNorthFilter.GPrime)),
+              atomInput("Atom2", stepInput(GmosNorthFilter.IPrime))
+            )
+          )
+        )
+        _ <- setIsSplittableAs(pi, o, isSplittable = false)
       yield ()

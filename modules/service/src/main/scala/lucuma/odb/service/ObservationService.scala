@@ -1723,7 +1723,8 @@ object ObservationService {
           END AS c_error_message
         FROM t_atom a
         LEFT JOIN t_step s ON s.c_atom_id = a.c_atom_id
-        WHERE a.c_observation_id IN (""".apply(limit) |+| which |+| sql""")
+        WHERE a.c_sequence_type = 'science'
+          AND a.c_observation_id IN (""".apply(limit) |+| which |+| sql""")
         GROUP BY a.c_observation_id
         HAVING
           COUNT(DISTINCT a.c_atom_id) > 1 OR
