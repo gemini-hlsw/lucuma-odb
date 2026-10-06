@@ -8,6 +8,7 @@ import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.numeric.PosLong
 import io.circe.Encoder
+import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.StepGuideState
 import lucuma.core.math.Angle
 import lucuma.core.math.Coordinates
@@ -111,7 +112,7 @@ object HashBytes:
     HashBytes.by(_.toMicroseconds)
 
   given HashBytes[CategorizedTime] =
-    HashBytes.by2(_.programTime, _.nonCharged)
+    HashBytes.by(t => ChargeClass.values.toList.map(t.apply))
 
   given HashBytes[Angle] =
     HashBytes.by(_.toMicroarcseconds)

@@ -73,8 +73,7 @@ class CalibrationCountSuite extends FunSuite:
     assertEquals(estimate(7, telluric(true, Some(30)), telluric(true, Some(50))), (5, 200L))
     assertEquals(estimate(1, telluric(true, Some(40)), telluric(true, Some(40))), (0, 0L))
     assertEquals(estimate(0), (0, 0L))
-    // A declined telluric fills its slot but leaves the rest expected, and its
-    // total does not feed the average.
+    // A declined telluric fills its slot but does not change the average.
     assertEquals(estimate(7, telluric(true, Some(40), declined = true)), (6, 90L))
     assertEquals(estimate(3, telluric(true, Some(40)), telluric(true, Some(60), declined = true)), (1, 40L))
     // Observed tellurics are not subtracted, but their totals feed the average.

@@ -96,7 +96,7 @@ object ObsExtract:
 
   val LongWavelengthSetInterval: TimeSpan = 60.minTimeSpan
 
-  inline def calibrationSetInterval(wavelength: Wavelength): TimeSpan =
+  def calibrationSetInterval(wavelength: Wavelength): TimeSpan =
     if wavelength < LongWavelengthCutoff then ShortWavelengthSetInterval else LongWavelengthSetInterval
 
   /**
@@ -142,13 +142,11 @@ object ObsExtract:
         telluricEstimate(calibrationSets(scienceSpan, scienceTime), tellurics)
 
   /**
-   * Returns a digest of calibrations (specifically tellurics) for the scienc.
+   * Returns a digest of calibrations (specifically tellurics) for the science.
    * The count is the number of tellurics expected for the science time, and include
-   * existing one in the group, including; observed already visited.
+   * existing one in the group, including those already visited.
    * Also includes an estimate of how many more tellurics are expected, and their
    * total time.  The time estimate is the average of the existing tellurics time.
-   * A declined telluric still fills its slot, so none is expected in its place,
-   * but it costs nothing.
    */
   def telluricEstimate(count: NonNegInt, tellurics: CalibrationGroupTellurics): CalibrationDigest =
     val existing = tellurics.existing
