@@ -260,12 +260,8 @@ object GeneratorParamsService {
                 // A spent telluric's digest only covers what is left of it, so
                 // its original estimate stands for what it cost.
                 val byObs = rows.groupMap(_._1): (_, unobserved, declined, current, original) =>
-                  (unobserved, declined, if unobserved then current else original)
-                .view.mapValues: ts =>
-                  CalibrationGroupTellurics(
-                    ts.exists(_._2),
-                    ts.collect { case (u, false, t) => CalibrationGroupTelluric(u, t) }
-                  )
+                  CalibrationGroupTelluric(unobserved, declined, if unobserved then current else original)
+                .view.mapValues(CalibrationGroupTellurics(_))
                 params.map(p => byObs.get(p.observationId).fold(p)(t => p.copy(tellurics = t)))
 
       private def observingMode(

@@ -145,13 +145,14 @@ object ObsExtract:
    * Returns a digest of calibrations (specifically tellurics) for the scienc.
    * The count is the number of tellurics expected for the science time, and include
    * existing one in the group, including; observed already visited.
-   * Also includes an estimate of how many more tellurics are expected, and their 
+   * Also includes an estimate of how many more tellurics are expected, and their
    * total time.  The time estimate is the average of the existing tellurics time.
+   * A declined telluric still fills its slot, so none is expected in its place,
+   * but it costs nothing.
    */
   def telluricEstimate(count: NonNegInt, tellurics: CalibrationGroupTellurics): CalibrationDigest =
-    val existing = tellurics.unobserved
-    val pending  =
-      if tellurics.declined then 0 else math.max(0, count.value - existing.size)
+    val existing = tellurics.existing
+    val pending  = math.max(0, count.value - tellurics.unobserved.size)
     val unit     = tellurics.unitCost.getOrElse(TelluricPlaceholderCharge)
 
     CalibrationDigest(

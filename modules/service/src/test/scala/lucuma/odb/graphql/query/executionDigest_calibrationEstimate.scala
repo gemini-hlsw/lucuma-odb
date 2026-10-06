@@ -146,7 +146,7 @@ class executionDigest_calibrationEstimate
       assertEquals(e.expectedCount, 2)
       assertEquals(e.expected, (totals.sum / 2) * 2)
 
-  test("a declined telluric means no expected calibrations, the count is what exists"):
+  test("a declined telluric fills its slot at no cost, the later ones are still expected"):
     for
       p            <- createProgramAs(pi)
       t            <- createTargetWithProfileAs(pi, p)
@@ -157,11 +157,12 @@ class executionDigest_calibrationEstimate
       _            <- setObservationWorkflowState(pi, tellurics.head, Inactive)
       e            <- estimate(p, o)
     yield
-      assertEquals(e.count, 1)
+      // Three sets and a long visit's pair, one of them declined.
+      assertEquals(e.count, 2)
       assertEquals(e.existingCount, 1)
-      assertEquals(e.expectedCount, 0)
-      assertEquals(e.expected, 0L)
-      assertEquals(e.restMinutes, 0L)
+      assertEquals(e.expectedCount, 1)
+      assertEquals(e.expectedMinutes, 15L)
+      assertEquals(e.restMinutes, 15L)
 
   test("no telluric type means no calibrations at all"):
     for

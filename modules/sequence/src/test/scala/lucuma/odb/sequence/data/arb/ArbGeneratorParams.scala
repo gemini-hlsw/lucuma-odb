@@ -36,17 +36,17 @@ trait ArbGeneratorParams:
   private val genTelluric: Gen[CalibrationGroupTelluric] =
     for
       u <- arbitrary[Boolean]
+      d <- arbitrary[Boolean]
       t <- Gen.option(Gen.choose(0L, 3_600_000_000L).map(us =>
              CategorizedTime(ChargeClass.Program -> TimeSpan.unsafeFromMicroseconds(us))
            ))
-    yield CalibrationGroupTelluric(u, t)
+    yield CalibrationGroupTelluric(u, d, t)
 
   private val genTellurics: Gen[CalibrationGroupTellurics] =
     for
-      d  <- arbitrary[Boolean]
       n  <- Gen.choose(0, 4)
       ts <- Gen.listOfN(n, genTelluric)
-    yield CalibrationGroupTellurics(d, ts)
+    yield CalibrationGroupTellurics(ts)
 
   private val genAltair: Gen[Option[AltairConfiguration]] =
     Gen.option(arbitrary[AltairConfiguration])

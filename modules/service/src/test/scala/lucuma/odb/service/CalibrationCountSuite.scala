@@ -55,34 +55,39 @@ class CalibrationCountSuite extends FunSuite:
 
   // The mode and role gating is covered end to end in executionDigest_calibrationEstimate.
   test("expected calibrations charge each telluric still to come"):
-    def telluric(unobserved: Boolean, total: Option[Long]): CalibrationGroupTelluric =
+    def telluric(unobserved: Boolean, total: Option[Long], declined: Boolean = false): CalibrationGroupTelluric =
       CalibrationGroupTelluric(
         unobserved,
+        declined,
         total.map(m => CategorizedTime(ChargeClass.Program -> minutes(m)))
       )
-    def estimate(count: Int, declined: Boolean, tellurics: CalibrationGroupTelluric*) =
+    def estimate(count: Int, tellurics: CalibrationGroupTelluric*) =
       val e = ObsExtract.telluricEstimate(
         NonNegInt.unsafeFrom(count),
-        CalibrationGroupTellurics(declined, tellurics.toList)
+        CalibrationGroupTellurics(tellurics.toList)
       )
       (e.expected.count.value, e.expected.time(ChargeClass.Program).toMinutes.toLong)
     // The placeholder until a telluric has a digest, then the average.
-    assertEquals(estimate(7, false), (7, 105L))
-    assertEquals(estimate(7, false, telluric(true, None), telluric(true, None)), (5, 75L))
-    assertEquals(estimate(7, false, telluric(true, Some(30)), telluric(true, Some(50))), (5, 200L))
-    assertEquals(estimate(1, false, telluric(true, Some(40)), telluric(true, Some(40))), (0, 0L))
-    assertEquals(estimate(0, false), (0, 0L))
-    assertEquals(estimate(7, true, telluric(true, Some(40))), (0, 0L))
+    assertEquals(estimate(7), (7, 105L))
+    assertEquals(estimate(7, telluric(true, None), telluric(true, None)), (5, 75L))
+    assertEquals(estimate(7, telluric(true, Some(30)), telluric(true, Some(50))), (5, 200L))
+    assertEquals(estimate(1, telluric(true, Some(40)), telluric(true, Some(40))), (0, 0L))
+    assertEquals(estimate(0), (0, 0L))
+    // A declined telluric fills its slot but leaves the rest expected, and its
+    // total does not feed the average.
+    assertEquals(estimate(7, telluric(true, Some(40), declined = true)), (6, 90L))
+    assertEquals(estimate(3, telluric(true, Some(40)), telluric(true, Some(60), declined = true)), (1, 40L))
     // Observed tellurics are not subtracted, but their totals feed the average.
-    assertEquals(estimate(7, false, telluric(false, Some(40))), (7, 280L))
+    assertEquals(estimate(7, telluric(false, Some(40))), (7, 280L))
 
-  test("existing calibrations are the unobserved ones, each at its own estimate or the placeholder"):
-    val group = CalibrationGroupTellurics(false, List(
-      CalibrationGroupTelluric(true,  Some(CategorizedTime(ChargeClass.Program -> minutes(40)))),
-      CalibrationGroupTelluric(true,  None),
-      CalibrationGroupTelluric(false, Some(CategorizedTime(ChargeClass.Program -> minutes(20))))
+  test("existing calibrations are the unobserved active ones, each at its own estimate or the placeholder"):
+    val group = CalibrationGroupTellurics(List(
+      CalibrationGroupTelluric(true,  false, Some(CategorizedTime(ChargeClass.Program -> minutes(40)))),
+      CalibrationGroupTelluric(true,  false, None),
+      CalibrationGroupTelluric(true,  true,  Some(CategorizedTime(ChargeClass.Program -> minutes(90)))),
+      CalibrationGroupTelluric(false, false, Some(CategorizedTime(ChargeClass.Program -> minutes(20))))
     ))
-    val e = ObsExtract.telluricEstimate(NonNegInt.unsafeFrom(3), group)
+    val e = ObsExtract.telluricEstimate(NonNegInt.unsafeFrom(4), group)
     assertEquals(e.existing.count.value, 2)
     assertEquals(e.existing.time(ChargeClass.Program).toMinutes.toLong, 55L)
     assertEquals(e.expected.count.value, 1)

@@ -13,32 +13,37 @@ import lucuma.core.util.TimeSpan
 import lucuma.odb.sequence.util.HashBytes
 
 /**
- * What a science observation's group already holds in tellurics: whether the
- * PI has declined one, and for each active telluric whether it is still
- * unobserved and its total: the digest's while unobserved, the original
- * estimate's once visited (none while it has neither).
+ * The tellurics in a science observation's group: for each, whether it is
+ * still unobserved, whether the PI declined it, and its total: the digest's
+ * while unobserved, the original estimate's once visited (none while it has
+ * neither).
  */
 case class CalibrationGroupTellurics(
-  declined: Boolean,
   tellurics: List[CalibrationGroupTelluric]
 ) derives Eq:
 
+  // Covers a slot of the next visit, declined or not.
   def unobserved: List[CalibrationGroupTelluric] =
     tellurics.filter(_.unobserved)
 
-  // Mean total of the tellurics that have one, what one more is expected to cost.
+  // Unobserved and still to be observed.
+  def existing: List[CalibrationGroupTelluric] =
+    unobserved.filterNot(_.declined)
+
+  // Mean total of the active tellurics that have one, what one more is expected to cost.
   def unitCost: Option[CategorizedTime] =
-    CalibrationGroupTellurics.average(tellurics.flatMap(_.total))
+    CalibrationGroupTellurics.average(tellurics.filterNot(_.declined).flatMap(_.total))
 
 case class CalibrationGroupTelluric(
   unobserved: Boolean,
+  declined:   Boolean,
   total:      Option[CategorizedTime]
 ) derives Eq
 
 object CalibrationGroupTellurics:
 
   val Empty: CalibrationGroupTellurics =
-    CalibrationGroupTellurics(false, Nil)
+    CalibrationGroupTellurics(Nil)
 
   def average(totals: List[CategorizedTime]): Option[CategorizedTime] =
     totals match
@@ -51,8 +56,13 @@ object CalibrationGroupTellurics:
           *
         ).some
 
-  given HashBytes[CalibrationGroupTelluric] =
-    HashBytes.by2(_.unobserved, _.total)
+  given HashBytes[CalibrationGroupTelluric] with
+    def hashBytes(a: CalibrationGroupTelluric): Array[Byte] =
+      Array.concat(
+        HashBytes[Boolean].hashBytes(a.unobserved),
+        HashBytes[Boolean].hashBytes(a.declined),
+        HashBytes[Option[CategorizedTime]].hashBytes(a.total)
+      )
 
   given HashBytes[CalibrationGroupTellurics] =
-    HashBytes.by2(_.declined, _.tellurics)
+    HashBytes.by(_.tellurics)
