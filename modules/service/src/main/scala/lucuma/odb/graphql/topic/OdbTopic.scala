@@ -8,6 +8,7 @@ import cats.effect.Resource
 import cats.effect.Temporal
 import cats.effect.std.Supervisor
 import cats.syntax.applicativeError.*
+import cats.syntax.apply.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import fs2.Stream
@@ -28,14 +29,21 @@ trait OdbTopic[E]:
   /** Creates the topic (with a no-op consumer attached). Its feed is started separately via `OdbTopic.runFeeds`. */
   def create[F[_]: Concurrent: Logger](sup: Supervisor[F]): F[Topic[F, E]]
 
-  /** A stream that LISTENs on the given session and publishes decoded events to the topic. */
+  /** A stream that LISTENs on `sessions.listen` and publishes decoded events to the topic. */
   def feed[F[_]: Concurrent: Logger: Tracer](
-    s:         Session[F],
+    sessions:  OdbTopic.Sessions[F],
     maxQueued: Int,
     top:       Topic[F, E]
   ): Stream[F, Unit]
 
 object OdbTopic:
+
+  /**
+   * Never query `listen`: its read loop stops while a feed's notification
+   * queue is full, so a query awaiting a response during a burst of
+   * notifications deadlocks silently. Lookups go to `lookup`.
+   */
+  final case class Sessions[F[_]](listen: Session[F], lookup: Session[F])
 
   private val InitialRetryDelay: FiniteDuration = 1.second
   private val MaxRetryDelay: FiniteDuration     = 1.minute
@@ -59,23 +67,26 @@ object OdbTopic:
       )
 
   /**
-   * Runs the given topic feeds together on a single session checked out from
-   * `pool`. If any feed fails, or they somehow all terminate, the session is
-   * released and all the feeds are restarted (with backoff) on a fresh
-   * session. The topics themselves survive restarts, so existing subscribers
-   * are unaffected beyond missing any events notified while disconnected.
+   * Runs the given topic feeds together on a pair of sessions checked out from
+   * `pool`. If any feed fails, or they somehow all terminate, the sessions are
+   * released and all the feeds are restarted (with backoff) on fresh ones. The
+   * topics themselves survive restarts, so existing subscribers are unaffected
+   * beyond missing any events notified while disconnected.
    */
   def runFeeds[F[_]: Temporal: Logger](
     name:  String,
     pool:  Resource[F, Session[F]],
     sup:   Supervisor[F],
-    feeds: Session[F] => List[Stream[F, Unit]]
+    feeds: Sessions[F] => List[Stream[F, Unit]]
   ): F[Unit] =
+    val sessions: Resource[F, Sessions[F]] =
+      (pool, pool).mapN(Sessions.apply)
+
     def go(delay: FiniteDuration): F[Unit] =
       val next: F[FiniteDuration] =
         for
           start   <- Temporal[F].monotonic
-          outcome <- pool
+          outcome <- sessions
                       .use: s =>
                         Stream.emits(feeds(s)).parJoinUnbounded.compile.drain
                       .attempt
@@ -109,12 +120,12 @@ object OdbTopic:
             .fold(Stream.exec(Logger[F].warn(s"Invalid $name event: $n")))(Stream(_))
 
       def elements[F[_]: Logger: Tracer](
-        s:         Session[F],
+        sessions:  Sessions[F],
         maxQueued: Int
       ): Stream[F, E] =
         for
-          up <- updates(s, maxQueued)
-          us <- Stream.eval(selectProgramUsers(s, pid(up)))
+          up <- updates(sessions.listen, maxQueued)
+          us <- Stream.eval(selectProgramUsers(sessions.lookup, pid(up)))
           e   = element(up, us)
           _  <- Stream.eval(Logger[F].info(s"$name channel: $e"))
         yield e
@@ -122,11 +133,11 @@ object OdbTopic:
       // publish1 (unlike the publish pipe) never closes the topic, so the
       // feed can be restarted against the same topic after a failure.
       def feed[F[_]: Concurrent: Logger: Tracer](
-        s:         Session[F],
+        sessions:  Sessions[F],
         maxQueued: Int,
         top:       Topic[F, E]
       ): Stream[F, Unit] =
-        elements(s, maxQueued).evalMap(e => top.publish1(e).void)
+        elements(sessions, maxQueued).evalMap(e => top.publish1(e).void)
 
       def create[F[_]: Concurrent: Logger](sup: Supervisor[F]): F[Topic[F, E]] =
         for
