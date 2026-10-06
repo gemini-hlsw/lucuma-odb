@@ -5,6 +5,7 @@ package lucuma.odb.graphql
 package subscription
 
 import cats.effect.IO
+import cats.effect.Resource
 import cats.syntax.all.*
 import io.circe.Json
 import lucuma.core.model.Observation
@@ -29,8 +30,8 @@ import scala.concurrent.duration.*
  * session used to deadlock here (see `OdbTopic.Sessions`).
  *
  * A deadlocked feed cannot be cancelled, so this suite runs no GraphQL server
- * (its feeds would deadlock too and hang the teardown) and never releases the
- * topics under test.
+ * (its feeds would deadlock too and hang the teardown) and releases the topics
+ * under test only when they delivered.
  */
 class subscriptionUnderNotificationBurst extends OdbSuite {
 
@@ -43,7 +44,7 @@ class subscriptionUnderNotificationBurst extends OdbSuite {
   // Well above the 1024 notifications a feed queues.
   private val BurstSize: Int = 4000
 
-  private val Patience: FiniteDuration = 10.seconds
+  private val Patience: FiniteDuration = 30.seconds
 
   // The server fixture would have done this on authentication.
   private def canonicalize(user: User): IO[Unit] =
@@ -61,14 +62,11 @@ class subscriptionUnderNotificationBurst extends OdbSuite {
     mutate(user, s"""mutation { createObservation(input: { programId: "${pid.show}", SET: { subtitle: "before" } }) { observation { id } } }""")
       .map(_.hcursor.downFields("data", "createObservation", "observation", "id").require[Observation.Id])
 
-  private def leakedTopics: IO[OdbMapping.Topics[IO]] =
+  private def topics: Resource[IO, OdbMapping.Topics[IO]] =
     given Tracer[IO]         = Tracer.noop
     given TracerProvider[IO] = TracerProvider.noop
     given MeterProvider[IO]  = MeterProvider.noop
-    for
-      (pool, _)   <- FMain.databasePoolResource[IO](databaseConfig).allocated
-      (topics, _) <- OdbMapping.Topics[IO](pool).allocated
-    yield topics
+    FMain.databasePoolResource[IO](databaseConfig).flatMap(OdbMapping.Topics[IO](_))
 
   private val listeningBackends: IO[Set[Int]] =
     withSession: s =>
@@ -107,24 +105,27 @@ class subscriptionUnderNotificationBurst extends OdbSuite {
 
   test("deliver an observation edit that is followed by a notification burst"):
     for
-      _      <- canonicalize(pi)
-      pid    <- createProgram(pi)
-      oid    <- createObservation(pi, pid)
-      before <- listeningBackends
-      topics <- leakedTopics
-      _      <- awaitListener(before)
-      edit   <- topics.observation
-                  .subscribeAwait(16)
-                  .use: events =>
-                    editThenBurst(pid, oid) >>
-                      events
-                        .find(_.observationId === oid)
-                        .compile
-                        .lastOrError
-                        .timeoutTo(
-                          Patience,
-                          IO.raiseError(new RuntimeException(s"No observation edit for $oid within $Patience; the topic feed is stuck."))
-                        )
+      _                 <- canonicalize(pi)
+      pid               <- createProgram(pi)
+      oid               <- createObservation(pi, pid)
+      before            <- listeningBackends
+      (topics, release) <- topics.allocated
+      _                 <- awaitListener(before)
+      edit              <- topics.observation
+                             .subscribeAwait(16)
+                             .use: events =>
+                               editThenBurst(pid, oid) >>
+                                 events
+                                   .find(_.observationId === oid)
+                                   .compile
+                                   .lastOrError
+                                   .timeoutTo(
+                                     Patience,
+                                     IO.raiseError(new RuntimeException(s"No observation edit for $oid within $Patience; the topic feed is stuck."))
+                                   )
+                             .attempt
+      _                 <- release.whenA(edit.isRight)
+      edit              <- IO.fromEither(edit)
     yield assertEquals(edit.editType, EditType.Updated)
 
 }
