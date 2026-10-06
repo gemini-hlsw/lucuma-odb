@@ -13,6 +13,7 @@ import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.ExecutionState
 import lucuma.core.enums.ObservationWorkflowState
+import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.Site
 import lucuma.core.math.Angle
@@ -45,6 +46,7 @@ import lucuma.odb.graphql.input.SpectroscopyScienceRequirementsInput
 import lucuma.odb.graphql.input.TargetEnvironmentInput
 import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.sequence.ObservingMode
+import lucuma.odb.sequence.ObservingMode.Syntax.*
 import lucuma.odb.sequence.data.ItcInput
 import lucuma.odb.sequence.data.CalibrationGroupTellurics
 import lucuma.odb.sequence.flamingos2.longslit.Config as Flamingos2Config
@@ -99,6 +101,14 @@ object ObsExtract:
   def calibrationSetInterval(wavelength: Wavelength): TimeSpan =
     if wavelength < LongWavelengthCutoff then ShortWavelengthSetInterval else LongWavelengthSetInterval
 
+  /** Modes whose science observations are accompanied by tellurics. */
+  def modeTakesTelluric(modeType: ObservingModeType): Boolean =
+    modeType match
+      case ObservingModeType.Flamingos2LongSlit | ObservingModeType.Flamingos2Mos |
+           ObservingModeType.Igrins2LongSlit | ObservingModeType.GnirsLongSlit |
+           ObservingModeType.GnirsIfu => true
+      case _                          => false
+
   /**
    * Duration of science to require a telluric.
    * GNIRS follows its longest central wavelength; the other infrared modes
@@ -108,7 +118,7 @@ object ObsExtract:
     mode match
       case c: GnirsSpectroscopyConfig =>
         calibrationSetInterval(c.wavelengths.map(_.centralWavelength).maximum).some
-      case _: Flamingos2Config | _: Flamingos2MosConfig | _: Igrins2Config =>
+      case _ if modeTakesTelluric(mode.modeType) =>
         ShortWavelengthSetInterval.some
       case _ =>
         none
@@ -136,17 +146,18 @@ object ObsExtract:
     scienceTime: TimeSpan,
     tellurics:   CalibrationGroupTellurics
   ): CalibrationDigest =
-    telluricPerScience(mode)
-      .filter(_ => role.isEmpty && modeRequiresTelluric(mode))
-      .fold(CalibrationDigest.Zero): scienceSpan =>
+    if role.isDefined || !modeRequiresTelluric(mode) then CalibrationDigest.Zero
+    else
+      telluricPerScience(mode).fold(CalibrationDigest.Zero): scienceSpan =>
         telluricEstimate(calibrationSets(scienceSpan, scienceTime), tellurics)
 
   /**
-   * Returns a digest of calibrations (specifically tellurics) for the science.
-   * The count is the number of tellurics expected for the science time, and include
-   * existing one in the group, including those already visited.
-   * Also includes an estimate of how many more tellurics are expected, and their
-   * total time.  The time estimate is the average of the existing tellurics time.
+   * The science's telluric estimate, given the tellurics `count` predicted for
+   * its remaining science time.  Existing: the unobserved, undeclined tellurics
+   * in the group, each at its own total or the placeholder.  Expected: `count`
+   * less the unobserved tellurics, declined or not, each at the mean total of
+   * the undeclined tellurics or the placeholder.  Spent tellurics only feed
+   * that mean.
    */
   def telluricEstimate(count: NonNegInt, tellurics: CalibrationGroupTellurics): CalibrationDigest =
     val existing = tellurics.existing

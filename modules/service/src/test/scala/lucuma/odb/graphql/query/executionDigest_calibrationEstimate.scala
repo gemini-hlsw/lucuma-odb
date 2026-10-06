@@ -8,6 +8,7 @@ import cats.effect.IO
 import cats.syntax.all.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ObservationWorkflowState.Inactive
+import lucuma.core.enums.SlewStage
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.odb.graphql.feature.TelluricCalibrationsTestSupport
@@ -145,6 +146,24 @@ class executionDigest_calibrationEstimate
       assertEquals(e.existing, totals(1))
       assertEquals(e.expectedCount, 2)
       assertEquals(e.expected, (totals.sum / 2) * 2)
+
+  test("a telluric with only a slew visit is not spent"):
+    for
+      p         <- createProgramAs(pi)
+      t         <- createTargetWithProfileAs(pi, p)
+      o         <- createFlamingos2LongSlitObservationAs(pi, p, List(t))
+      _         <- setExposureTime(o, 240, 12)
+      _         <- recalculateCalibrations(p, when, o)
+      tellurics <- telluricsOf(o)
+      _         <- sleep >> resolveTelluricTargets
+      totals    <- tellurics.traverse(estimate(p, _)).map(_.map(_.total))
+      _         <- addSlewEventAs(serviceUser, tellurics.head, SlewStage.StartSlew)
+      e         <- estimate(p, o)
+    yield
+      assertEquals(e.existingCount, 2)
+      assertEquals(e.existing, totals.sum)
+      assertEquals(e.expectedCount, 1)
+      assertEquals(e.expected, totals.sum / totals.size)
 
   test("a declined telluric fills its slot at no cost, the later ones are still expected"):
     for

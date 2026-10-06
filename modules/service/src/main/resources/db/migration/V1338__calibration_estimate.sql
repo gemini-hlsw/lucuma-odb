@@ -204,9 +204,12 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- A telluric is spent from its first observe visit, which may be a slew visit
+-- claimed for observe.
 CREATE TRIGGER telluric_visit_obscalc_invalidate_trigger
-  AFTER INSERT ON t_visit
+  AFTER INSERT OR UPDATE OF c_origin ON t_visit
   FOR EACH ROW
+  WHEN (NEW.c_origin = 'observe' :: e_visit_origin)
   EXECUTE FUNCTION telluric_visit_obscalc_invalidate();
 
 -- Only a changed total re-runs the science, which stops the science -> telluric

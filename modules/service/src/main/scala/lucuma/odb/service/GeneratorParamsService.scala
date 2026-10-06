@@ -245,9 +245,15 @@ object GeneratorParamsService {
           )
 
       // The expected calibrations charge depends on the tellurics already in
-      // the science observation's group and their totals.
+      // the science observation's group and their totals.  Only science in a
+      // mode that takes tellurics can have any.
       private def addCalibrationGroupTellurics(params: List[ParamsRow]): F[List[ParamsRow]] =
-        NonEmptyList.fromList(params.filter(_.calibrationRole.isEmpty).map(_.observationId).distinct)
+        NonEmptyList.fromList(
+          params
+            .filter(p => p.calibrationRole.isEmpty && p.observingMode.exists(ObsExtract.modeTakesTelluric))
+            .map(_.observationId)
+            .distinct
+        )
           .fold(params.pure): oids =>
             val af = Statements.selectCalibrationGroupTellurics(oids)
             session
@@ -928,12 +934,16 @@ object GeneratorParamsService {
       }
 
     // One row per telluric in the science observation's group: whether it is
-    // still unobserved, whether it was declined, its digest total if any, and
-    // its original estimate total if it has been visited.
+    // still unobserved (no observe visit; a slew starts nothing), whether it
+    // was declined, its digest total if any, and its original estimate total.
     def selectCalibrationGroupTellurics(oids: NonEmptyList[Observation.Id]): AppliedFragment =
       sql"""
         SELECT s.c_observation_id,
-               NOT EXISTS (SELECT 1 FROM t_visit v WHERE v.c_observation_id = t.c_observation_id),
+               NOT EXISTS (
+                 SELECT 1 FROM t_visit v
+                  WHERE v.c_observation_id = t.c_observation_id
+                    AND v.c_origin = 'observe' :: e_visit_origin
+               ),
                COALESCE(t.c_workflow_user_state = 'inactive', false),
                #${ObscalcService.Statements.fullCategorizedTimeColumns("c")},
                t.c_orig_est_total_non_charged_time,
