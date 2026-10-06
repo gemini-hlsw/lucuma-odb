@@ -11,6 +11,7 @@ import cats.effect.std.UUIDGen
 import cats.syntax.applicative.*
 import cats.syntax.apply.*
 import cats.syntax.either.*
+import cats.syntax.eq.*
 import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
@@ -601,17 +602,21 @@ object SequenceService:
               .InvalidArgument(s"Execution sequences containing over $SequenceAtomLimit atoms are not supported.".some)
               .asFailureF
 
+        // Only the science sequence is collapsed into a single atom for
+        // unsplittable observations (see StreamingExecutionConfig.unsplit);
+        // acquisition sequences are multi-atom by design.
         val checkUnsplittable: ResultT[F, Unit] =
-           ResultT.liftF(observationService.selectIsSplittable(observationId)).flatMap:
-             case Some(false) => // means that the observation is not dividable into multiple atoms
-               val stepLimit = UnsplittableAtom.StepLimit.value
-               val message   = sequence match
-                 case a :: Nil => Option.when(a.steps.size > stepLimit)(s"An unsplittable observation's atom may not contain more than $stepLimit steps.")
-                 case Nil      => none
-                 case _        => s"Unsplittable observations may only contain a single atom.".some
-               message.fold(ResultT.unit)(m => ResultT(OdbError.InvalidArgument(m.some).asFailureF))
-             case _           =>
-               ResultT.unit
+          if sequenceType =!= SequenceType.Science then ResultT.unit
+          else ResultT.liftF(observationService.selectIsSplittable(observationId)).flatMap:
+            case Some(false) => // means that the observation is not dividable into multiple atoms
+              val stepLimit = UnsplittableAtom.StepLimit.value
+              val message   = sequence match
+                case a :: Nil => Option.when(a.steps.size > stepLimit)(s"An unsplittable observation's atom may not contain more than $stepLimit steps.")
+                case Nil      => none
+                case _        => s"Unsplittable observations may only contain a single atom.".some
+              message.fold(ResultT.unit)(m => ResultT(OdbError.InvalidArgument(m.some).asFailureF))
+            case _           =>
+              ResultT.unit
 
         val doReplace: F[Stream[Pure, Atom[D]]] =
           val atoms = atomBuilder.buildStream(Stream.emits(sequence))
