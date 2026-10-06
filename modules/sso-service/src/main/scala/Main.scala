@@ -4,18 +4,16 @@
 package lucuma.sso.service
 
 import cats.*
-import cats.data.Kleisli
 import cats.data.Validated
 import cats.effect.*
 import cats.effect.std.Console
-import cats.effect.std.SecureRandom
-import cats.effect.std.UUIDGen
 import cats.implicits.*
 import com.comcast.ip4s.Host
 import com.comcast.ip4s.Port
 import com.monovore.decline.*
 import com.monovore.decline.effect.CommandIOApp
 import fs2.io.net.Network
+import buildinfo.BuildInfo
 import lucuma.common.middleware.LoggingMiddleware
 import lucuma.core.model.StandardRole
 import lucuma.core.model.StandardUser
@@ -23,12 +21,10 @@ import lucuma.core.util.Gid
 import lucuma.sso.service.config.*
 import lucuma.sso.service.database.Database
 import lucuma.sso.service.graphql.GraphQLRoutes
+import lucuma.otel.OtelServices
+import lucuma.otel.OtelSetup
 import lucuma.sso.service.orcid.OrcidService
-import natchez.EntryPoint
 import natchez.Trace
-import natchez.honeycomb.Honeycomb
-import natchez.http4s.implicits.*
-import natchez.log.Log
 import org.flywaydb.core.Flyway
 import org.flywaydb.core.api.output.MigrateResult
 import org.http4s.*
@@ -42,7 +38,6 @@ import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import org.typelevel.otel4s.metrics.MeterProvider
 import org.typelevel.otel4s.trace.Tracer
-import org.typelevel.otel4s.trace.Tracer.Implicits.noop
 import org.typelevel.otel4s.trace.TracerProvider
 import skunk.{Command as _, *}
 
@@ -181,21 +176,9 @@ object FMain extends AnsiColor {
     //   }
     //   .build
 
-  /**
-   * A resource that yields a Natchez tracing entry point, either a Honeycomb endpoint if `config`
-   * is defined, otherwise a log endpoint.
-   */
-  def entryPointResource[F[_]: Sync: Logger: SecureRandom](config: Option[HoneycombConfig]): Resource[F, EntryPoint[F]] =
-    given UUIDGen[F] = UUIDGen.fromSecureRandom
-    config.fold(Log.entryPoint(ServiceName).pure[Resource[F, *]]) { cfg =>
-      Honeycomb.entryPoint(ServiceName) { cb =>
-          Sync[F].delay {
-            cb.setWriteKey(cfg.writeKey)
-            cb.setDataset(cfg.dataset)
-            cb.build()
-          }
-        }
-    }
+  /** OpenTelemetry services, exporting via OTLP when configured and otherwise silent. */
+  def otelResource[F[_]: Async: LiftIO](config: Config): Resource[F, OtelServices[F]] =
+    OtelSetup.resource(ServiceName, BuildInfo.gitHeadCommit.getOrElse("unknown"), config.otel)
 
   /** A resource that yields an OrcidService. */
   def orcidServiceResource[F[_]: Async: Trace: Network](config: OrcidConfig, env: Environment) =
@@ -205,7 +188,7 @@ object FMain extends AnsiColor {
         OrcidService(config.orcidHost, config.clientId, config.clientSecret, client)
 
   /** A resource that yields our HttpRoutes, wrapped in accessory middleware. */
-  def routesResource[F[_]: Async: Trace: Tracer: Logger: Network: Console](config: Config): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
+  def routesResource[F[_]: Async: Trace: Tracer: TracerProvider: Logger: Network: Console](config: Config): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
     for {
       pool        <- databasePoolResource[F](config.database)
       orcid      <- orcidServiceResource(config.orcid, config.environment)
@@ -213,7 +196,8 @@ object FMain extends AnsiColor {
       dbPool       = pool.map(Database.fromSession(_))
       serviceUser <- Resource.eval(dbPool.use(_.getSsoServiceUser))
       service     <- GraphQLRoutes.service(pool)
-    } yield wsb => ServerMiddleware[F](config).apply {
+      middleware  <- Resource.eval(ServerMiddleware[F](config))
+    } yield wsb => middleware {
       val localClient = LocalSsoClient(config.ssoJwtReader, dbPool).collect { case su: StandardUser => su }
       val odb = OdbClient[F](httpClient, config.ssoJwtWriter, config.odbRootUri, serviceUser)
       Routes[F](
@@ -256,9 +240,6 @@ object FMain extends AnsiColor {
         .load()
         .migrate()
     }
-
-  implicit def kleisliLogger[F[_]: Logger, A]: Logger[Kleisli[F, A, *]] =
-    Logger[F].mapK(Kleisli.liftK)
 
   private def dbSessionBuilder[F[_]: Temporal: Console: Network](
     config: DatabaseConfig,
@@ -307,8 +288,11 @@ object FMain extends AnsiColor {
       _  <- Resource.eval(banner[IO](c))
       _  <- Applicative[Resource[IO, *]].whenA(reset.isRequested)(Resource.eval(resetDatabase[IO](c.database)))
       _  <- Applicative[Resource[IO, *]].unlessA(skipMigration.isRequested)(Resource.eval(migrateDatabase[IO](c.database)))
-      ep <- entryPointResource[IO](c.honeycomb)
-      ap <- ep.wsLiftR(routesResource(c)).map(_.map(_.orNotFound))
+      ot <- otelResource[IO](c)
+      given Trace[IO]          = ot.trace
+      given Tracer[IO]         = ot.tracer
+      given TracerProvider[IO] = ot.tracerProvider
+      ap <- routesResource[IO](c).map(_.map(_.orNotFound))
       _  <- serverResource(c.httpPort, ap)
     yield ExitCode.Success
 

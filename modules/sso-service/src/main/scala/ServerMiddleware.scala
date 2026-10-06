@@ -5,25 +5,34 @@ package lucuma.sso.service
 
 import cats.*
 import cats.effect.*
+import cats.syntax.all.*
 import lucuma.common.middleware.CorsMiddleware
 import lucuma.common.middleware.LoggingMiddleware
+import lucuma.common.middleware.TracingMiddleware
 import lucuma.sso.service.config.Config
 import lucuma.sso.service.config.Environment
 import lucuma.sso.service.config.Environment.*
-import natchez.Trace
-import natchez.http4s.NatchezMiddleware
 import org.http4s.HttpRoutes
+import org.http4s.otel4s.middleware.trace.redact.HeaderRedactor
+import org.http4s.otel4s.middleware.trace.server.ServerMiddleware as OtelServerMiddleware
+import org.http4s.otel4s.middleware.trace.server.ServerSpanDataProvider
 import org.http4s.server.middleware.ErrorAction
 import org.typelevel.log4cats.Logger
+import org.typelevel.otel4s.trace.TracerProvider
 
 /** A module of all the middlewares we apply to the server routes. */
 object ServerMiddleware {
 
   type Middleware[F[_]] = Endo[HttpRoutes[F]]
 
-  /** A middleware that adds distributed tracing. */
-  def natchez[F[_]: Trace](implicit ev: MonadCancel[F, Throwable]): Middleware[F] =
-    NatchezMiddleware.server[F]
+  /** A middleware that adds distributed tracing via OpenTelemetry. */
+  def tracing[F[_]: Async: TracerProvider]: F[Middleware[F]] =
+    val spanDataProvider =
+      ServerSpanDataProvider
+        .openTelemetry(TracingMiddleware.redactor)
+        .optIntoHttpRequestHeaders(HeaderRedactor.default)
+        .optIntoHttpResponseHeaders(HeaderRedactor.default)
+    OtelServerMiddleware.builder[F](spanDataProvider).build.map(_.asHttpRoutesMiddleware)
 
   /** A middleware that logs request and response. Sensitive headers are redacted outside Local. */
   def logging[F[_]: Async](
@@ -44,14 +53,16 @@ object ServerMiddleware {
     )
 
   /** A middleware that composes all the others defined in this module. */
-  def apply[F[_]: Async: Trace: Logger](
+  def apply[F[_]: Async: TracerProvider: Logger](
     config: Config,
-  ): Middleware[F] =
-    List[Middleware[F]](
-      CorsMiddleware.cors(domain = List(config.cookieDomain)),
-      logging(config.environment),
-      natchez,
-      errorReporting,
-    ).reduce(_ andThen _) // N.B. the monoid for Endo uses `compose`
+  ): F[Middleware[F]] =
+    tracing[F].map { tracing =>
+      List[Middleware[F]](
+        CorsMiddleware.cors(domain = List(config.cookieDomain)),
+        logging(config.environment),
+        tracing,
+        errorReporting,
+      ).reduce(_ andThen _) // N.B. the monoid for Endo uses `compose`
+    }
 
 }

@@ -609,7 +609,7 @@ lazy val ssoBackendClient = project
 
 lazy val ssoService = project
   .in(file("modules/sso-service"))
-  .dependsOn(ssoBackendClient, binding, common)
+  .dependsOn(ssoBackendClient, binding, common, otel)
   .enablePlugins(NoPublishPlugin, LucumaDockerPlugin, JavaAppPackaging, BuildInfoPlugin)
   .settings(buildInfoSettings)
   .settings(
@@ -631,9 +631,7 @@ lazy val ssoService = project
       "org.typelevel"       %% "log4cats-slf4j"             % log4catsVersion,
       "ch.qos.logback"       % "logback-classic"            % logbackVersion,
       "io.circe"            %% "circe-generic"              % circeVersion,
-      "org.tpolecat"        %% "natchez-honeycomb"          % natchezVersion,
-      "org.tpolecat"        %% "natchez-http4s"             % natchezHttp4sVersion,
-      "org.tpolecat"        %% "natchez-log"                % natchezVersion,
+      "org.http4s"          %% "http4s-otel4s-middleware-trace-server" % http4sOtel4sVersion,
       "edu.gemini"          %% "lucuma-graphql-routes"      % lucumaGraphQLRoutesVersion,
 
       "io.circe"            %% "circe-literal"                   % circeVersion               % Test,
@@ -1072,6 +1070,7 @@ lazy val otel = project
     },
     Compile / compile := (Compile / compile).dependsOn(checkOtelVersion).value,
     libraryDependencies ++= Seq(
+      "is.cir"                           %% "ciris"                                     % cirisVersion,
       "org.tpolecat"                     %% "natchez-core"                              % natchezVersion,
       "org.tpolecat"                     %% "natchez-noop"                              % natchezVersion,
       "org.typelevel"                    %% "otel4s-oteljava"                           % otel4sVersion,
