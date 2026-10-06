@@ -220,6 +220,23 @@ object CalcMain extends MainParams:
           Logger[F].debug(s"Stored obscalc result for ${pc.observationId}. Current status: $meta.")
         .void
 
+    // Refreshes the calibration estimate of ready observations whose tellurics
+    // changed, without recalculating them.  A failure is logged and retried on
+    // the next poll rather than stopping the daemon.
+    val refreshCalibrationsStream: Stream[F, Unit] =
+      Stream
+        .awakeEvery(pollPeriod)
+        .evalMap: _ =>
+          T.noopScope:
+            services
+              .useTransactionally:
+                requireServiceAccessOrThrow:
+                  obscalcService.refreshCalibrations(1024)
+              .flatMap: n =>
+                Logger[F].debug(s"Refreshed the calibration estimate of $n observations.").whenA(n > 0)
+              .handleErrorWith: t =>
+                Logger[F].warn(t)("Calibration estimate refresh failed")
+
     for
       _ <- Resource.eval(Logger[F].info("Processing PendingCalc"))
       _ <- Resource.eval:
@@ -227,7 +244,7 @@ object CalcMain extends MainParams:
                services.useTransactionally:
                  requireServiceAccessOrThrow:
                    obscalcService.reset
-      o <- calcAndUpdateStream.compile.drain.background
+      o <- calcAndUpdateStream.merge(refreshCalibrationsStream).compile.drain.background
     yield o
 
   def services[F[_]: Async: Parallel: UUIDGen: Tracer: Logger: LoggerFactory](

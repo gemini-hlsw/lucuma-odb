@@ -134,21 +134,41 @@ _Avoid_: telluric standard (names the target star, not the observation).
 A telluric a PI has explicitly declined, held inactive so it will not be observed even when its science observation is active. Reversible — reinstating the telluric resumes its science observation's lifecycle. Distinct from a Telluric Type of NoTelluric, which is declarative and prevents generation up front: the type governs whether tellurics exist, the decline governs whether an existing one is observed. The two are uncoupled — setting NoTelluric deletes tellurics (unless they have visits or execution), taking any decline state with them; restoring a real type never reinstates a declined telluric.
 _Avoid_: disabled telluric, skipped telluric, deleted telluric, opted-out telluric.
 
-**Calibration Epoch**:
-A stretch of roughly 90 minutes of science time (the Calibration Epoch Interval) after which an observation's night-time calibrations are assumed to need repeating: a fresh SmartGCal flat and arc set and, unless the Telluric Type is `NoTelluric`, a telluric. An estimating unit, not a scheduling one — epochs do not line up with visits (a visit can hold more or less than an epoch), so the Calibration Count and the setup count disagree by design.
-_Avoid_: visit (a scheduling unit), calibration set, telluric interval.
+**Calibration Set**:
+The night-time calibrations one interval of science is expected to consume: a telluric (unless the Telluric Type is `NoTelluric`) and, depending on the instrument, a GCAL Set (flats and arcs) as well. An estimating unit, not a scheduling one — sets do not line up with visits (a visit can hold more or less than a set), so the Calibration Count and the setup count disagree by design.
+_Avoid_: calibration epoch (an epoch is a reference instant, as in coordinate epochs), visit (a scheduling unit), telluric interval.
+
+**Calibration Set Interval**:
+How much science time one Calibration Set covers: 90 minutes when the science is shorter than the Long Wavelength Cutoff, 60 minutes at or beyond it. GNIRS is judged by the longest central wavelength in its configuration; Flamingos-2 and IGRINS-2 cannot reach the cutoff and always take the 90-minute interval. Distinct from the Multi-Telluric Threshold, which happens to share the 90-minute value.
+_Avoid_: calibration frequency (the inverse), epoch interval, telluric interval, visit length.
+
+**Long Wavelength Cutoff**:
+The wavelength, 2.6 µm, from which infrared calibrations are assumed to decay faster and so are repeated every hour instead of every 90 minutes. Strict: 2.6 µm itself takes the shorter interval. Agreed jointly by the Flamingos-2 and GNIRS teams.
+_Avoid_: thermal cutoff (the GNIRS red/blue camera boundary is 2.7 µm and unrelated), K-band limit.
 
 **Multi-Telluric Threshold**:
-The visit length (90 minutes today) above which a science observation is given two tellurics, one before and one after the science, instead of one after. The visit length is the observation's planned duration when one is set, otherwise its science time. A scheduling rule applied by the calibrations service when tellurics are materialised; it shares its value with the Calibration Epoch Interval by coincidence, and the two are separate constants so they may diverge. The requirement is met by unobserved tellurics only (see Spent Telluric).
-_Avoid_: telluric threshold, 1.5 h rule, epoch interval (the estimating constant).
+The visit length (90 minutes today) above which a science observation is given two tellurics, one before and one after the science, instead of one after. The visit length is the observation's planned duration when one is set, otherwise its science time. A scheduling rule applied by the calibrations service when tellurics are materialised; it shares its value with the short-wavelength Calibration Set Interval by coincidence, and the two are separate constants so they may diverge. The requirement is met by unobserved tellurics only (see Spent Telluric).
+_Avoid_: telluric threshold, 1.5 h rule, set interval (the estimating constant).
 
 **Spent Telluric**:
 A telluric that has a visit. It stays in its group but no longer counts toward what the next visit needs; that is met by the unobserved tellurics, which are replaced as a set whenever the required orders change (even mid-night, so a duration edit can remove an unobserved telluric already queued for the visit), so an observation can accumulate more tellurics than one visit needs. This keeps applying while the science observation is ongoing: between visits the unobserved tellurics still follow the planned duration, but the configuration of existing tellurics is left alone. A spent telluric never has its configuration synced from the science again, so its observing mode, telluric type included, stays as it was observed. A kept telluric whose recorded duration no longer matches searches for its star again, since the star search depends on the duration.
 _Avoid_: executed telluric (execution state is broader than having a visit), used telluric.
 
 **Calibration Count**:
-The number of calibration epochs an observation is expected to need over its remaining science time, roughly one per 90 minutes, carried in its time estimate. Each epoch is expected to bring a SmartGCal flat and arc set and, unless the Telluric Type is `NoTelluric`, a telluric. Zero for calibration observations themselves and for modes that take no telluric. Independent of the Telluric Type, which decides what an epoch costs, not how many there are. Distinct from the number of tellurics materialised per visit (one, or two above the multi-telluric threshold), which is a scheduling rule, not an estimate. It does not yet feed the time estimate.
-_Avoid_: telluric count (the concept is broader than tellurics), number of calibrations.
+The number of tellurics an observation still needs over its remaining science time, carried in its time estimate as the Existing Calibrations plus the Expected Calibrations rather than stored on its own. The prediction behind it is one telluric per Calibration Set, one set per Calibration Set Interval rounded up. It counts tellurics only: the GCAL Sets some instruments repeat with each Calibration Set are neither counted nor charged yet. Zero for calibration observations themselves, for modes that take no telluric, and when the Telluric Type is `NoTelluric`, even though such an observation still has Calibration Sets; a Declined Telluric is left out, since it will not be observed. Distinct from the number of tellurics materialised per visit (one, or two above the multi-telluric threshold), which is a scheduling rule, not an estimate.
+_Avoid_: set count (a `NoTelluric` observation has sets but a zero count), number of calibrations, epoch count.
+
+**Existing Calibrations**:
+The still unobserved tellurics already in an observation's group that have not been declined, carried in its estimate as a count and a time: each at its own digest total, or at the Telluric Placeholder Time while it has none. Like the rest of the estimate they are work left to do, so Spent Tellurics are excluded. With the Expected Calibrations they add up to the Calibration Count. Not part of the observation's total, since each telluric is an observation of its own with its own estimate; the UI adds it to the total to show what the observation costs with its calibrations. Zero for calibration observations, for modes without tellurics, and when the Telluric Type is `NoTelluric`. Frozen in the original estimate with the rest.
+_Avoid_: generated tellurics, materialised tellurics (both describe how they came to be, not that they count).
+
+**Expected Calibrations**:
+The tellurics an observation's Calibration Count predicts but that are not in its group yet, carried in its estimate as a count and a time: the count less the unobserved tellurics in the group, declined or not (they cover the next visit), each at the mean total of the group's tellurics that have one, or at the Telluric Placeholder Time while none has. An unobserved telluric counts at its digest total; a Spent Telluric at its original estimate, since its digest only covers what is left of it. Spent tellurics belong to visits already done and are not subtracted, but they do count toward the mean; a Declined Telluric does not. A Declined Telluric still fills its slot, so none is expected in its place, but declining one does not stop later tellurics being expected. Zero for calibration observations, for modes without tellurics, and when the Telluric Type is `NoTelluric`. Included in the observation's total and so in the program's planned time; frozen in the original estimate with the rest.
+_Avoid_: possible calibrations (they are expected, not optional), pending tellurics (pending is a calculation state), telluric estimate.
+
+**Telluric Placeholder Time**:
+The fixed 15 minutes assumed for a telluric that cannot be estimated. An unresolved Target of Opportunity telluric takes it as its own total, since it has no target and so no sequence. An Existing Calibration without a digest yet takes it too. The Expected Calibrations use it for each predicted telluric while no telluric in the group has a digest to average; once one does, the mean replaces it.
+_Avoid_: telluric unit cost, default telluric time, unresolved telluric time (the old name of the constant, narrower than its use).
 
 **Telluric Type**:
 *What kind* of standard star a telluric should observe (`Hot`, `A0V`, `Solar`, `Manual`), or `NoTelluric` for no telluric at all. A property of the observing-mode config. Setting `NoTelluric` overwrites the previous choice (a `Manual` star list is not remembered across it), and changing the observing mode resets the type to its default (`Hot`) — a "no tellurics" decision for one mode must not be assumed to carry to another.
@@ -165,7 +185,7 @@ For one kind of step within a sequence (bias, dark, arc, flat or science): how m
 _Avoid_: GCAL digest (the buckets are not only GCAL steps), calibration digest (calibrations also means telluric observations), flat/arc time (loses the count).
 
 **GCAL Set**:
-An atom that contains at least one GCAL step, counted per sequence as `gcalSets`. GMOS puts an arc and a flat in every science atom, so it has one set per atom; Flamingos-2 and GNIRS put theirs in a single calibration atom, which may hold only a flat or only an arc. Not deducible from the arc and flat step counts, since a set need not contain one of each. It is what a Calibration Epoch is expected to bring, so the cost of one set and the sets left in a sequence both come from it.
+An atom that contains at least one GCAL step, counted per sequence as `gcalSets`. GMOS puts an arc and a flat in every science atom, so it has one set per atom; Flamingos-2 and GNIRS put theirs in a single calibration atom, which may hold only a flat or only an arc. Not deducible from the arc and flat step counts, since a set need not contain one of each. It is what a Calibration Set brings on instruments that repeat their lamp calibrations, so the cost of one set and the sets left in a sequence both come from it.
 _Avoid_: calibration set (calibrations also means telluric observations), flat/arc pair (a set may hold only one).
 
 **Science Steps**:

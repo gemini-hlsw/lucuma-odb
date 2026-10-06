@@ -16,6 +16,7 @@ import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
+import cats.syntax.semigroup.*
 import cats.syntax.traverse.*
 import fs2.Stream
 import grackle.Result
@@ -30,10 +31,12 @@ import lucuma.core.model.ObservationWorkflow
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.sequence.AtomDigest
+import lucuma.core.model.sequence.CalibrationDigest
 import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.core.util.CalculatedValue
 import lucuma.core.util.CalculationState
+import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.Itc
 import lucuma.odb.data.Obscalc
@@ -114,6 +117,13 @@ sealed trait ObscalcService[F[_]]:
    * the state of the entries to `calculating` before they are returned.
    */
   def load(max: Int)(using ServiceAccess, Transaction[F]): F[List[Obscalc.PendingCalc]]
+
+  /**
+   * Refreshes the calibration estimate of up to `max` `ready` observations
+   * whose tellurics changed, leaving their calculation state alone, and returns
+   * how many were handled.
+   */
+  def refreshCalibrations(max: Int)(using ServiceAccess, Transaction[F]): F[Int]
 
   /**
    * Loads the PendingCalc entry for the given observation, if it exists and is
@@ -239,6 +249,22 @@ object ObscalcService:
         observationId: Observation.Id
       )(using ServiceAccess, Transaction[F]): F[Option[Obscalc.PendingCalc]] =
         session.option(Statements.LoadPendingCalcFor)(observationId)
+
+      // The stale rows stay locked until commit, so a telluric change made
+      // meanwhile waits and marks its science stale again afterwards.
+      override def refreshCalibrations(
+        max: Int
+      )(using ServiceAccess, Transaction[F]): F[Int] =
+        session.execute(Statements.LockStaleCalibrations)(max).flatMap: stale =>
+          generatorParamsService.selectMany(stale.map(_._1)).flatMap: params =>
+            stale
+              .traverse_ { (oid, scienceTime) =>
+                (scienceTime, params.get(oid).flatMap(_.toOption))
+                  .tupled
+                  .fold(session.execute(Statements.ClearCalibrationsStale)(oid)): (t, p) =>
+                    session.execute(Statements.UpdateCalibrations)(ObsExtract.calibrationEstimate(p, t), oid)
+              }
+              .as(stale.size)
 
       override def calculateOnly(
         pending: Obscalc.PendingCalc
@@ -418,7 +444,12 @@ object ObscalcService:
 
         "c_setup_count",
         "c_reacquisition_count",
-        "c_calibration_count",
+        "c_exist_cal_count",
+        "c_exist_cal_non_charged_time",
+        "c_exist_cal_program_time",
+        "c_exp_cal_count",
+        "c_exp_cal_non_charged_time",
+        "c_exp_cal_program_time",
 
         "c_acq_obs_class",
         "c_acq_non_charged_time",
@@ -501,23 +532,29 @@ object ObscalcService:
       """.query(obscalc_entry)
 
     private def categorizedTimeColumns(prefix: String): String =
+      s"$prefix.c_obscalc_state,\n${fullCategorizedTimeColumns(prefix)}"
+
+    /** The columns `full_categorized_time` decodes. */
+    def fullCategorizedTimeColumns(prefix: String): String =
       prefixedColumns(prefix.some,
-        "c_obscalc_state",
         "c_full_setup_time",
         "c_setup_count",
         "c_reacq_setup_time",
         "c_reacquisition_count",
         "c_sci_obs_class",
         "c_sci_non_charged_time",
-        "c_sci_program_time"
+        "c_sci_program_time",
+        "c_exp_cal_non_charged_time",
+        "c_exp_cal_program_time"
       )
 
     val full_categorized_time: Decoder[CategorizedTime] =
-       (time_span *: int4_nonneg *: time_span *: int4_nonneg *: obs_class *: time_span *: time_span).map: (setup, count, reacq, reacqCount, obsclass, nonCharged, program) =>
-         CategorizedTime(
-           ChargeClass.NonCharged -> nonCharged,
-           ChargeClass.Program    -> program
-         ).sumCharge(obsclass.chargeClass, (setup *| count.value) +| (reacq *| reacqCount.value))
+       (time_span *: int4_nonneg *: time_span *: int4_nonneg *: obs_class *: time_span *: time_span *: categorized_time).map:
+         (setup, count, reacq, reacqCount, obsclass, nonCharged, program, expectedCals) =>
+           CategorizedTime(
+             ChargeClass.NonCharged -> nonCharged,
+             ChargeClass.Program    -> program
+           ).sumCharge(obsclass.chargeClass, (setup *| count.value) +| (reacq *| reacqCount.value)) |+| expectedCals
 
     val SelectOneCategorizedTime: Query[Observation.Id, CalculatedValue[CategorizedTime]] =
       sql"""
@@ -555,7 +592,12 @@ object ObscalcService:
 
         "c_setup_count",
         "c_reacquisition_count",
-        "c_calibration_count",
+        "c_exist_cal_count",
+        "c_exist_cal_non_charged_time",
+        "c_exist_cal_program_time",
+        "c_exp_cal_count",
+        "c_exp_cal_non_charged_time",
+        "c_exp_cal_program_time",
 
         "c_acq_obs_class",
         "c_acq_non_charged_time",
@@ -633,6 +675,42 @@ object ObscalcService:
         WHERE c_obscalc_state = 'calculating'
       """.command
 
+    // The science time is missing when there is no digest to refresh.
+    val LockStaleCalibrations: Query[Int, (Observation.Id, Option[TimeSpan])] =
+      sql"""
+        SELECT c_observation_id,
+               CASE WHEN c_setup_count IS NOT NULL
+                    THEN c_sci_non_charged_time + c_sci_program_time
+               END
+        FROM   t_obscalc
+        WHERE  c_calibrations_stale
+          AND  c_obscalc_state = 'ready'
+        LIMIT  $int4
+        FOR UPDATE SKIP LOCKED
+      """.query(observation_id *: time_span.opt)
+
+    val UpdateCalibrations: Command[(CalibrationDigest, Observation.Id)] =
+      sql"""
+        UPDATE t_obscalc
+        SET (
+              c_exist_cal_count,
+              c_exist_cal_non_charged_time,
+              c_exist_cal_program_time,
+              c_exp_cal_count,
+              c_exp_cal_non_charged_time,
+              c_exp_cal_program_time
+            ) = ($calibration_digest),
+            c_calibrations_stale = false
+        WHERE c_observation_id = $observation_id
+      """.command
+
+    val ClearCalibrationsStale: Command[Observation.Id] =
+      sql"""
+        UPDATE t_obscalc
+        SET    c_calibrations_stale = false
+        WHERE  c_observation_id = $observation_id
+      """.command
+
     val LoadPendingCalc: Query[Int, Obscalc.PendingCalc] =
       sql"""
         WITH tasks AS (
@@ -695,7 +773,16 @@ object ObscalcService:
         sql"c_reacq_setup_time     = ${time_span.opt}"(r.digest.map(_.setup.reacquisition)),
         sql"c_setup_count          = ${int4_nonneg.opt}"(r.digest.map(_.setupCount)),
         sql"c_reacquisition_count  = ${int4_nonneg.opt}"(r.digest.map(_.reacquisitionCount)),
-        sql"c_calibration_count    = ${int4_nonneg.opt}"(r.digest.map(_.calibrationCount)),
+        sql"""
+          (
+            c_exist_cal_count,
+            c_exist_cal_non_charged_time,
+            c_exist_cal_program_time,
+            c_exp_cal_count,
+            c_exp_cal_non_charged_time,
+            c_exp_cal_program_time
+          ) = (${calibration_digest.opt})
+        """(r.digest.map(_.calibrations)),
 
         // Acquisition Digest
         sql"c_acq_obs_class                  = ${obs_class.opt}"(r.digest.map(_.acquisition.observeClass)),

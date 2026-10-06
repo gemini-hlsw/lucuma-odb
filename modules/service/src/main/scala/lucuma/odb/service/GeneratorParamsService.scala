@@ -58,6 +58,8 @@ import lucuma.itc.client.TargetInput
 import lucuma.odb.data.AltairConfiguration
 import lucuma.odb.json.sourceprofile.given
 import lucuma.odb.sequence.ObservingMode
+import lucuma.odb.sequence.data.CalibrationGroupTelluric
+import lucuma.odb.sequence.data.CalibrationGroupTellurics
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.ItcInput
 import lucuma.odb.sequence.data.ItcInputDerivation
@@ -226,6 +228,7 @@ object GeneratorParamsService {
           .prepareR(af.fragment.query(Statements.params))
           .use(_.stream(af.argument, chunkSize = 64).compile.to(List))
           .flatMap(addCustomSedTimestamps)
+          .flatMap(addCalibrationGroupTellurics)
 
       // If the user uploads a new custom sed in place of an existing one, that needs to
       // invalidate the cache. So, we include the timestamp of the attachment (if any) in
@@ -240,6 +243,32 @@ object GeneratorParamsService {
               )
             )
           )
+
+      // The expected calibrations charge depends on the tellurics already in
+      // the science observation's group and their totals.  Only science in a
+      // mode that takes tellurics can have any.
+      private def addCalibrationGroupTellurics(params: List[ParamsRow]): F[List[ParamsRow]] =
+        NonEmptyList.fromList(
+          params
+            .filter(p => p.calibrationRole.isEmpty && p.observingMode.exists(ObsExtract.modeTakesTelluric))
+            .map(_.observationId)
+            .distinct
+        )
+          .fold(params.pure): oids =>
+            val af = Statements.selectCalibrationGroupTellurics(oids)
+            session
+              .prepareR(af.fragment.query(
+                observation_id *: bool *: bool *:
+                  ObscalcService.Statements.full_categorized_time.opt *: categorized_time.opt
+              ))
+              .use(_.stream(af.argument, 64).compile.toList)
+              .map: rows =>
+                // A spent telluric's digest only covers what is left of it, so
+                // its original estimate stands for what it cost.
+                val byObs = rows.groupMap(_._1): (_, unobserved, declined, current, original) =>
+                  CalibrationGroupTelluric(unobserved, declined, if unobserved then current else original)
+                .view.mapValues(CalibrationGroupTellurics(_))
+                params.map(p => byObs.get(p.observationId).fold(p)(t => p.copy(tellurics = t)))
 
       private def observingMode(
         params:          NonEmptyList[TargetParams],
@@ -307,7 +336,7 @@ object GeneratorParamsService {
             .leftMap(MissingParamSet.fromParams)
             .toEither
 
-          GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, obsMode, obsParams.calibrationRole, obsParams.proposalStatus, hasTarget, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable, obsParams.altair, obsParams.guideProbe)
+          GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, obsMode, obsParams.calibrationRole, obsParams.proposalStatus, hasTarget, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable, obsParams.altair, obsParams.guideProbe, obsParams.tellurics)
 
         /**
          * Modes with no acquisition sequence are costed on science alone.
@@ -326,7 +355,7 @@ object GeneratorParamsService {
               .leftMap(MissingParamSet.fromParams)
               .toEither
 
-          GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, obsMode, obsParams.calibrationRole, obsParams.proposalStatus, hasTarget, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable, obsParams.altair, obsParams.guideProbe)
+          GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, obsMode, obsParams.calibrationRole, obsParams.proposalStatus, hasTarget, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable, obsParams.altair, obsParams.guideProbe, obsParams.tellurics)
 
         /**
          * GNIRS spectroscopy takes spectra at one or more central wavelengths,
@@ -363,7 +392,7 @@ object GeneratorParamsService {
             .leftMap(MissingParamSet.fromParams)
             .toEither
 
-          GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, obsMode, obsParams.calibrationRole, obsParams.proposalStatus, hasTarget, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable, obsParams.altair, obsParams.guideProbe)
+          GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, obsMode, obsParams.calibrationRole, obsParams.proposalStatus, hasTarget, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable, obsParams.altair, obsParams.guideProbe, obsParams.tellurics)
 
         // Shared by long slit and MOS.  Signal-to-noise is solved by the ITC, so
         // the read mode it is given is ignored; only Time & Count needs a real one.
@@ -390,7 +419,8 @@ object GeneratorParamsService {
               obsParams.stepCount,
               obsParams.schedulingMode.isSplittable,
               obsParams.altair,
-              obsParams.guideProbe
+              obsParams.guideProbe,
+              obsParams.tellurics
             ).asRight
 
           case f2: flamingos2.longslit.Config =>
@@ -446,7 +476,7 @@ object GeneratorParamsService {
                 .leftMap(MissingParamSet.fromParams)
                 .toEither
 
-            GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, f2, obsParams.calibrationRole, obsParams.proposalStatus, hasTarget, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable, obsParams.altair, obsParams.guideProbe).asRight
+            GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, f2, obsParams.calibrationRole, obsParams.proposalStatus, hasTarget, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable, obsParams.altair, obsParams.guideProbe, obsParams.tellurics).asRight
 
           case gnm @ gnirs.imaging.Config(filters = fs) =>
             // An input per filter. In S/N mode the read mode is derived per step from
@@ -511,7 +541,7 @@ object GeneratorParamsService {
                 .leftMap(MissingParamSet.fromParams)
                 .toEither
 
-            GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, gnm, obsParams.calibrationRole, obsParams.proposalStatus, hasTarget, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable, obsParams.altair, obsParams.guideProbe).asRight
+            GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, gnm, obsParams.calibrationRole, obsParams.proposalStatus, hasTarget, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable, obsParams.altair, obsParams.guideProbe, obsParams.tellurics).asRight
 
           case gh @ ghost.ifu.Config(stepCnt, resolutionMode, red, blue, _, _, _, _) =>
             (
@@ -654,7 +684,7 @@ object GeneratorParamsService {
                 .leftMap(MissingParamSet.fromParams)
                 .toEither
 
-            GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, gn, obsParams.calibrationRole, obsParams.proposalStatus, hasTarget, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable, obsParams.altair, obsParams.guideProbe).asRight
+            GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, gn, obsParams.calibrationRole, obsParams.proposalStatus, hasTarget, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable, obsParams.altair, obsParams.guideProbe, obsParams.tellurics).asRight
 
           case gs @ gmos.imaging.Config.GmosSouth(_, fs, _) =>
             // An input per filter.
@@ -672,7 +702,7 @@ object GeneratorParamsService {
                 .leftMap(MissingParamSet.fromParams)
                 .toEither
 
-            GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, gs, obsParams.calibrationRole, obsParams.proposalStatus, hasTarget, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable, obsParams.altair, obsParams.guideProbe).asRight
+            GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, gs, obsParams.calibrationRole, obsParams.proposalStatus, hasTarget, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable, obsParams.altair, obsParams.guideProbe, obsParams.tellurics).asRight
 
           case gn: gnirs.spectroscopy.Config =>
             // Acquisition (imaging) filter for the ITC: the explicit acquisition
@@ -754,7 +784,8 @@ object GeneratorParamsService {
               obsParams.stepCount,
               obsParams.schedulingMode.isSplittable,
               obsParams.altair,
-              obsParams.guideProbe
+              obsParams.guideProbe,
+              obsParams.tellurics
             ).asRight
 
 
@@ -815,7 +846,8 @@ object GeneratorParamsService {
     altair:                Option[AltairConfiguration],
     explicitGuideProbe:    Option[GuideProbe],
     isNonsidereal:         Boolean,
-    customSedTimestamp:    Option[Timestamp] = none
+    customSedTimestamp:    Option[Timestamp] = none,
+    tellurics:             CalibrationGroupTellurics = CalibrationGroupTellurics.Empty
   )
 
   case class TargetParams(
@@ -841,7 +873,8 @@ object GeneratorParamsService {
     stepCount:             Long,
     schedulingMode:        SchedulingMode,
     altair:                Option[AltairConfiguration],
-    guideProbe:            Option[GuideProbe]
+    guideProbe:            Option[GuideProbe],
+    tellurics:             CalibrationGroupTellurics
   )
 
   object ObsParams {
@@ -873,7 +906,8 @@ object GeneratorParamsService {
           oParams.head.stepCount,
           oParams.head.schedulingMode,
           oParams.head.altair,
-          guideProbe
+          guideProbe,
+          oParams.head.tellurics
         )
       .toMap
   }
@@ -898,6 +932,34 @@ object GeneratorParamsService {
       jsonb.emap { sp =>
         sp.as[SourceProfile].leftMap(f => s"Could not decode SourceProfile: ${f.message}")
       }
+
+    // One row per telluric in the science observation's group: whether it is
+    // still unobserved (no observe visit; a slew starts nothing), whether it
+    // was declined, its digest total if any, and its original estimate total.
+    def selectCalibrationGroupTellurics(oids: NonEmptyList[Observation.Id]): AppliedFragment =
+      sql"""
+        SELECT s.c_observation_id,
+               NOT EXISTS (
+                 SELECT 1 FROM t_visit v
+                  WHERE v.c_observation_id = t.c_observation_id
+                    AND v.c_origin = 'observe' :: e_visit_origin
+               ),
+               COALESCE(t.c_workflow_user_state = 'inactive', false),
+               #${ObscalcService.Statements.fullCategorizedTimeColumns("c")},
+               t.c_orig_est_total_non_charged_time,
+               t.c_orig_est_total_program_time
+        FROM   t_observation s
+        JOIN   t_observation t
+          ON   t.c_group_id         = s.c_group_id
+         AND   t.c_calibration_role = 'telluric'
+         AND   t.c_existence        = 'present'
+        LEFT JOIN t_obscalc c
+          ON   c.c_observation_id = t.c_observation_id
+         AND   c.c_odb_error IS NULL
+         AND   c.c_setup_count IS NOT NULL
+        WHERE  s.c_observation_id IN (${observation_id.list(oids.size)})
+        ORDER BY s.c_observation_id, t.c_observation_id
+      """.apply(oids.toList)
 
     val params: Decoder[ParamsRow] =
       (observation_id          *:

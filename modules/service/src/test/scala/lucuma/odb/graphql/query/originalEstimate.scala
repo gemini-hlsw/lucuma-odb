@@ -50,7 +50,11 @@ class originalEstimate extends ExecutionTestSupportForGmos with ReplaceGmosNorth
               }
               setupCount
               reacquisitionCount
-              calibrationCount
+              calibrations {
+                count
+                existing { count time { program { seconds } } }
+                expected { count time { program { seconds } } }
+              }
               science {
                 program { seconds }
                 nonCharged { seconds }
@@ -90,7 +94,11 @@ class originalEstimate extends ExecutionTestSupportForGmos with ReplaceGmosNorth
               },
               "setupCount": 2,
               "reacquisitionCount": 0,
-              "calibrationCount": 0,
+              "calibrations": {
+                "count": 0,
+                "existing": { "count": 0, "time": { "program": { "seconds": 0.000000 } } },
+                "expected": { "count": 0, "time": { "program": { "seconds": 0.000000 } } }
+              },
               "science": {
                 "program": { "seconds": ${ProgramTime.asJson} },
                 "nonCharged": { "seconds": 0.000000 },
@@ -215,7 +223,11 @@ class originalEstimate extends ExecutionTestSupportForGmos with ReplaceGmosNorth
         }
         setupCount
         reacquisitionCount
-        calibrationCount
+        calibrations {
+          count
+          existing { count time { program { microseconds } } }
+          expected { count time { program { microseconds } } }
+        }
         science {
           program { microseconds }
           nonCharged { microseconds }

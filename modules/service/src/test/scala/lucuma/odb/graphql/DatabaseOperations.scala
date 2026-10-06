@@ -132,6 +132,13 @@ trait DatabaseOperations { this: OdbSuite =>
           srv.calculateAndUpdate(Obscalc.PendingCalc(pid, oid, t))
     .void
 
+  // Runs the obscalc daemon's calibration estimate refresh on demand.
+  def refreshCalibrationsAs(user: ServiceUser): IO[Int] =
+    withServicesForObscalc(user): services =>
+      given Services[IO] = services
+      requireServiceAccessOrThrow:
+        services.transactionally(ObscalcService.instantiate[IO].refreshCalibrations(1024))
+
   def selectCalculationStates: IO[Map[Observation.Id, CalculationState]] =
     withSession: session =>
       val states: Query[Void, (Observation.Id, CalculationState)] = sql"""

@@ -9646,19 +9646,63 @@ type ObservationTimeEstimate {
   reacquisitionCount: NonNegInt!
 
   """
-  Expected number of calibration over the remaining science time.
-  Zero for calibration observations and for modes that take no callibrations per observation.
+  Calibrations still needed over the remaining science time, existing and
+  expected.
   """
-  calibrationCount: NonNegInt!
+  calibrations: CalibrationDigest!
+
+  "Number of tellurics still needed."
+  calibrationCount: NonNegInt! @deprecated(reason: "Use `calibrations.count` instead.")
 
   "Science sequence time estimate."
   science: CategorizedTime!
 
   """
-  Total time estimate: science time plus full setup time for every setup and
-  reacquisition time for every reacquisition.
+  Total time estimate: science time plus full setup time for every setup,
+  reacquisition time for every reacquisition, and the expected calibration
+  time.  Add the existing calibration time for the cost of the observation
+  with all its calibrations.
   """
   total: CategorizedTime!
+
+}
+
+"""
+Calibrations an observation still needs over its remaining science time.
+Existing calibrations are observations of their own, so only the expected time
+is charged to the observation's total.
+"""
+type CalibrationDigest {
+
+  "Tellurics still needed: existing plus expected. Zero with no telluric."
+  count: NonNegInt!
+
+  """
+  Calibrations already generated for this observation and still to be
+  observed, each at its own estimate or a placeholder while it has none.
+  Not part of the observation's total.
+  """
+  existing: CalibrationEstimate!
+
+  """
+  Calibrations predicted but not generated yet, each at the average estimate
+  of the group's calibrations, or a placeholder while none has a digest.
+  Zero when the observation uses no telluric. A declined telluric fills its
+  slot, so none is expected in its place, but later ones still are.
+  Included in the observation's total.
+  """
+  expected: CalibrationEstimate!
+
+}
+
+"Number of calibration observations and their estimated time."
+type CalibrationEstimate {
+
+  "Number of calibration observations."
+  count: NonNegInt!
+
+  "Their estimated time, by charge class."
+  time: CategorizedTime!
 
 }
 
