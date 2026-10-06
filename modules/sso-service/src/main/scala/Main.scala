@@ -3,6 +3,7 @@
 
 package lucuma.sso.service
 
+import buildinfo.BuildInfo
 import cats.*
 import cats.data.Validated
 import cats.effect.*
@@ -13,16 +14,15 @@ import com.comcast.ip4s.Port
 import com.monovore.decline.*
 import com.monovore.decline.effect.CommandIOApp
 import fs2.io.net.Network
-import buildinfo.BuildInfo
 import lucuma.common.middleware.LoggingMiddleware
 import lucuma.core.model.StandardRole
 import lucuma.core.model.StandardUser
 import lucuma.core.util.Gid
+import lucuma.otel.OtelServices
+import lucuma.otel.OtelSetup
 import lucuma.sso.service.config.*
 import lucuma.sso.service.database.Database
 import lucuma.sso.service.graphql.GraphQLRoutes
-import lucuma.otel.OtelServices
-import lucuma.otel.OtelSetup
 import lucuma.sso.service.orcid.OrcidService
 import natchez.Trace
 import org.flywaydb.core.Flyway
