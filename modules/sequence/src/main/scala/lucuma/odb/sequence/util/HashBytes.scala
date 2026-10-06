@@ -8,7 +8,6 @@ import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.numeric.PosLong
 import io.circe.Encoder
-import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.StepGuideState
 import lucuma.core.math.Angle
 import lucuma.core.math.Coordinates
@@ -17,7 +16,6 @@ import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.TelluricType
-import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.util.Enumerated
 import lucuma.core.util.Gid
@@ -110,9 +108,6 @@ object HashBytes:
 
   given HashBytes[TimeSpan] =
     HashBytes.by(_.toMicroseconds)
-
-  given HashBytes[CategorizedTime] =
-    HashBytes.by(t => ChargeClass.values.toList.map(t.apply))
 
   given HashBytes[Angle] =
     HashBytes.by(_.toMicroarcseconds)

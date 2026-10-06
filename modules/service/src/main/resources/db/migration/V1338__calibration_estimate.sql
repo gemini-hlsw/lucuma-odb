@@ -1,8 +1,8 @@
 -- Calibration estimate: the unobserved tellurics already in the group (each at
 -- its own estimate) and those still predicted (each at the group's average),
 -- as counts and times.  Together they are the calibration count, which is no
--- longer stored.  Stored beside the other digest values in both digest tables
--- and frozen in the original estimate.
+-- longer stored.  Stored beside the other digest values in t_obscalc and
+-- frozen in the original estimate.
 
 ALTER TABLE t_obscalc
   DROP COLUMN c_calibration_count,
@@ -24,18 +24,10 @@ UPDATE t_obscalc
        c_exp_cal_program_time       = interval '0 seconds'
  WHERE c_setup_count IS NOT NULL;
 
--- The generator params hash now covers the group's tellurics, so no cached
--- digest can be hit again.
-TRUNCATE TABLE t_execution_digest;
-
+-- The digest cache leaves the calibration estimate out: it follows the
+-- group's tellurics, so the generator works it out on every read.
 ALTER TABLE t_execution_digest
-  DROP COLUMN c_calibration_count,
-  ADD COLUMN c_exist_cal_count            int4     NOT NULL CHECK (c_exist_cal_count            >= 0),
-  ADD COLUMN c_exist_cal_non_charged_time interval NOT NULL CHECK (c_exist_cal_non_charged_time >= interval '0 seconds'),
-  ADD COLUMN c_exist_cal_program_time     interval NOT NULL CHECK (c_exist_cal_program_time     >= interval '0 seconds'),
-  ADD COLUMN c_exp_cal_count              int4     NOT NULL CHECK (c_exp_cal_count              >= 0),
-  ADD COLUMN c_exp_cal_non_charged_time   interval NOT NULL CHECK (c_exp_cal_non_charged_time   >= interval '0 seconds'),
-  ADD COLUMN c_exp_cal_program_time       interval NOT NULL CHECK (c_exp_cal_program_time       >= interval '0 seconds');
+  DROP COLUMN c_calibration_count;
 
 -- Original estimate: joins the all-or-none set, so recorded estimates take 0.
 ALTER TABLE t_observation

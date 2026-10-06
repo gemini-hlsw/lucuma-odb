@@ -78,6 +78,8 @@ object GeneratorParams:
         a.ndFilter.hashBytes
       )
 
+  // Tellurics are left out so that a telluric change keeps the cached digest
+  // and guide star; the generator adds the calibration estimate on read.
   given HashBytes[GeneratorParams] with
     def hashBytes(a: GeneratorParams): Array[Byte] =
       Array.concat(
@@ -92,6 +94,5 @@ object GeneratorParams:
         a.stepCount.hashBytes,
         a.isSplittable.hashBytes,
         a.altair.hashBytes,
-        a.guideProbe.hashBytes,
-        a.tellurics.hashBytes
+        a.guideProbe.hashBytes
       )

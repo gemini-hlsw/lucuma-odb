@@ -10,7 +10,6 @@ import cats.syntax.all.*
 import lucuma.core.enums.ChargeClass
 import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.util.TimeSpan
-import lucuma.odb.sequence.util.HashBytes
 
 /**
  * The tellurics in a science observation's group: for each, whether it is
@@ -55,14 +54,3 @@ object CalibrationGroupTellurics:
             cc -> TimeSpan.unsafeFromMicroseconds(sum(cc).toMicroseconds / ts.size)
           *
         ).some
-
-  given HashBytes[CalibrationGroupTelluric] with
-    def hashBytes(a: CalibrationGroupTelluric): Array[Byte] =
-      Array.concat(
-        HashBytes[Boolean].hashBytes(a.unobserved),
-        HashBytes[Boolean].hashBytes(a.declined),
-        HashBytes[Option[CategorizedTime]].hashBytes(a.total)
-      )
-
-  given HashBytes[CalibrationGroupTellurics] =
-    HashBytes.by(_.tellurics)

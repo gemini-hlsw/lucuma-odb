@@ -175,10 +175,13 @@ object Generator:
 
       object ExecutionDigestCache:
         def lookupOne(ctx: GeneratorContext)(using Transaction[F]): EitherT[F, OdbError, Option[ExecutionDigest]] =
-          EitherT.right(executionDigestService.selectOne(ctx.oid, ctx.hash))
+          EitherT.right(executionDigestService.selectOne(ctx.oid, ctx.hash).map(_.map(withCalibrations(ctx, _))))
 
         def lookupMany(contexts: List[GeneratorContext])(using Transaction[F]): F[Map[Observation.Id, ExecutionDigest]] =
-          executionDigestService.selectMany(contexts.map(c => (c.oid, c.hash)))
+          val byOid = contexts.map(c => c.oid -> c).toMap
+          executionDigestService
+            .selectMany(contexts.map(c => (c.oid, c.hash)))
+            .map(_.map((oid, d) => oid -> byOid.get(oid).fold(d)(withCalibrations(_, d))))
 
         def store(ctx: GeneratorContext, digest: ExecutionDigest)(using Transaction[F]): EitherT[F, OdbError, Unit] =
           EitherT.right(executionDigestService.insertOrUpdate(ctx.oid, ctx.hash, digest))
@@ -254,7 +257,29 @@ object Generator:
       private def unresolvedTelluricDigest(ctx: GeneratorContext): ExecutionDigest =
         flatDigest(ctx, UnresolvedTelluricTime)
 
+      /**
+       * Adds the calibration estimate to a digest. It follows the group's tellurics, which the
+       * generator hash leaves out so that a telluric change keeps the science observation's cached
+       * digest and guide star, so it is worked out on every read rather than cached.
+       */
+      private def withCalibrations(ctx: GeneratorContext, d: ExecutionDigest): ExecutionDigest =
+        if ctx.params.declaredState == Some(ExecutionState.DeclaredComplete) then d
+        else
+          ExecutionDigest.calibrations.replace(
+            ObsExtract.calibrationEstimate(
+              ctx.params.observingMode,
+              ctx.params.calibrationRole,
+              d.science.timeEstimate.sum,
+              ctx.params.tellurics
+            )
+          )(d)
+
       private def calcDigestFromContext(
+        ctx: GeneratorContext
+      )(using Transaction[F]): EitherT[F, OdbError, ExecutionDigest] =
+        calcSequenceDigest(ctx).map(withCalibrations(ctx, _))
+
+      private def calcSequenceDigest(
         ctx: GeneratorContext
       )(using Transaction[F]): EitherT[F, OdbError, ExecutionDigest] =
 
@@ -281,13 +306,7 @@ object Generator:
                  else NonNegInt.unsafeFrom(1)
             // Recentering is needed whether or not the observation may be split.
             r  = estimator.estimateReacquisitionCount(s.timeEstimate.sum)
-            k  = ObsExtract.calibrationEstimate(
-                   ctx.params.observingMode,
-                   ctx.params.calibrationRole,
-                   s.timeEstimate.sum,
-                   ctx.params.tellurics
-                 )
-          yield ExecutionDigest(estimator.estimateSetupTime, c, r, k, a, s)
+          yield ExecutionDigest(estimator.estimateSetupTime, c, r, CalibrationDigest.Zero, a, s)
 
         // Setting up GNIRS behind the Altair laser costs more than the nominal setup.
         def gnirsSetup(nominal: SetupTimeEstimateCalculator): SetupTimeEstimateCalculator =

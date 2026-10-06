@@ -109,7 +109,6 @@ object ExecutionDigestService:
           digest.setup.reacquisition,
           digest.setupCount,
           digest.reacquisitionCount,
-          digest.calibrations,
           digest.acquisition.observeClass,
           digest.acquisition.timeEstimate(ChargeClass.NonCharged),
           digest.acquisition.timeEstimate(ChargeClass.Program),
@@ -162,7 +161,6 @@ object ExecutionDigestService:
           digest.setup.reacquisition,
           digest.setupCount,
           digest.reacquisitionCount,
-          digest.calibrations,
           digest.acquisition.observeClass,
           digest.acquisition.timeEstimate(ChargeClass.NonCharged),
           digest.acquisition.timeEstimate(ChargeClass.Program),
@@ -217,18 +215,18 @@ object ExecutionDigestService:
 
   object Statements:
 
+    // The calibration estimate is not cached; the generator adds it on read.
+    private val cached_execution_digest: Decoder[ExecutionDigest] =
+      (setup_time *: int4_nonneg *: int4_nonneg *: sequence_digest *: sequence_digest).map:
+        case (setup, setupCount, reacqCount, acq, sci) =>
+          ExecutionDigest(setup, setupCount, reacqCount, CalibrationDigest.Zero, acq, sci)
+
     private val DigestColumns: List[String] =
       List(
         "c_full_setup_time",
         "c_reacq_setup_time",
         "c_setup_count",
         "c_reacquisition_count",
-        "c_exist_cal_count",
-        "c_exist_cal_non_charged_time",
-        "c_exist_cal_program_time",
-        "c_exp_cal_count",
-        "c_exp_cal_non_charged_time",
-        "c_exp_cal_program_time",
         "c_acq_obs_class",
         "c_acq_non_charged_time",
         "c_acq_program_time",
@@ -284,7 +282,7 @@ object ExecutionDigestService:
           #${DigestColumns.mkString(",\n")}
         FROM t_execution_digest
         WHERE c_observation_id = $observation_id
-      """.query(md5_hash *: execution_digest)
+      """.query(md5_hash *: cached_execution_digest)
 
     val SelectAllExecutionDigest: Query[Program.Id, (Observation.Id, Md5Hash, ExecutionDigest)] =
       sql"""
@@ -296,7 +294,7 @@ object ExecutionDigestService:
         JOIN t_observation o ON o.c_observation_id = e.c_observation_id
         WHERE
           o.c_program_id = $program_id
-      """.query(observation_id *: md5_hash *: execution_digest)
+      """.query(observation_id *: md5_hash *: cached_execution_digest)
 
     def selectManyExecutionDigest[A <: NonEmptyList[Observation.Id]](enc: Encoder[A]): Query[A, (Observation.Id, Md5Hash, ExecutionDigest)] =
       sql"""
@@ -307,7 +305,7 @@ object ExecutionDigestService:
         FROM t_execution_digest
         WHERE
           c_observation_id in ($enc)
-      """.query(observation_id *: md5_hash *: execution_digest)
+      """.query(observation_id *: md5_hash *: cached_execution_digest)
 
     val InsertOrUpdateExecutionDigest: Command[(
       Observation.Id,
@@ -316,7 +314,6 @@ object ExecutionDigestService:
       TimeSpan,
       NonNegInt,
       NonNegInt,
-      CalibrationDigest,
       ObserveClass,
       TimeSpan,
       TimeSpan,
@@ -369,7 +366,6 @@ object ExecutionDigestService:
       TimeSpan,
       NonNegInt,
       NonNegInt,
-      CalibrationDigest,
       ObserveClass,
       TimeSpan,
       TimeSpan,
@@ -426,12 +422,6 @@ object ExecutionDigestService:
           c_reacq_setup_time,
           c_setup_count,
           c_reacquisition_count,
-          c_exist_cal_count,
-          c_exist_cal_non_charged_time,
-          c_exist_cal_program_time,
-          c_exp_cal_count,
-          c_exp_cal_non_charged_time,
-          c_exp_cal_program_time,
           c_acq_obs_class,
           c_acq_non_charged_time,
           c_acq_program_time,
@@ -486,7 +476,6 @@ object ExecutionDigestService:
           $time_span,
           $int4_nonneg,
           $int4_nonneg,
-          $calibration_digest,
           $obs_class,
           $time_span,
           $time_span,
@@ -541,14 +530,6 @@ object ExecutionDigestService:
               c_reacq_setup_time               = $time_span,
               c_setup_count                    = $int4_nonneg,
               c_reacquisition_count            = $int4_nonneg,
-              (
-                c_exist_cal_count,
-                c_exist_cal_non_charged_time,
-                c_exist_cal_program_time,
-                c_exp_cal_count,
-                c_exp_cal_non_charged_time,
-                c_exp_cal_program_time
-              )                                = ($calibration_digest),
               c_acq_obs_class                  = $obs_class,
               c_acq_non_charged_time           = $time_span,
               c_acq_program_time               = $time_span,
