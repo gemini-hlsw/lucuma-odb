@@ -7,6 +7,7 @@ package mutation
 import cats.effect.IO
 import cats.syntax.either.*
 import cats.syntax.option.*
+import cats.syntax.show.*
 import eu.timepit.refined.types.numeric.NonNegShort
 import io.circe.Json
 import io.circe.literal.*
@@ -17,9 +18,44 @@ import lucuma.odb.data.OdbError
 class createGroup extends OdbSuite with query.ObservingModeSetupOperations {
 
   val pi = TestUsers.Standard.pi(nextId, nextId)
+  val pi2 = TestUsers.Standard.pi(nextId, nextId)
+  val guest = TestUsers.guest(nextId)
   val staff = TestUsers.Standard.staff(nextId, nextId)
+  val service = TestUsers.service(nextId)
 
-  lazy val validUsers = List(pi, staff)
+  lazy val validUsers = List(pi, pi2, guest, staff, service)
+
+  private def createEmptyGroupQuery(pid: lucuma.core.model.Program.Id): String =
+    s"""
+      mutation {
+        createGroup(input: { programId: "$pid" }) {
+          group { id }
+        }
+      }
+    """
+
+  test("a pi cannot create a group in another pi's program"):
+    createProgramAs(pi).flatMap: pid =>
+      expectOdbError(
+        user     = pi2,
+        query    = createEmptyGroupQuery(pid),
+        expected = { case OdbError.NotAuthorized(pi2.id, _) => }
+      )
+
+  test("a guest cannot create a group in another user's program"):
+    createProgramAs(pi).flatMap: pid =>
+      expectOdbError(
+        user     = guest,
+        query    = createEmptyGroupQuery(pid),
+        expected = { case OdbError.NotAuthorized(guest.id, _) => }
+      )
+
+  test("a service user can create a group in any program"):
+    for
+      pid <- createProgramAs(pi)
+      gid <- createGroupAs(service, pid)
+      ids <- groupElementsAs(pi, pid, None)
+    yield assertEquals(ids, List(Left(gid)))
 
   test("simple group creation") {
     createProgramAs(pi).flatMap { pid =>
@@ -166,6 +202,27 @@ class createGroup extends OdbSuite with query.ObservingModeSetupOperations {
       ids  <- groupElementsAs(pi, pid, Some(g2))
     } yield assertEquals(ids, List(Right(o1), Left(g1), Right(o2)))
   }
+
+  test("cannot create a group with initial contents from another program"):
+    for
+      pid  <- createProgramAs(pi)
+      pid2 <- createProgramAs(pi)
+      oid  <- createObservationAs(pi, pid2)
+      _    <- expectOdbError(
+                user     = pi,
+                query    = s"""
+                  mutation {
+                    createGroup(input: {
+                      programId: "$pid"
+                      initialContents: [ { observationId: "$oid" } ]
+                    }) {
+                      group { id }
+                    }
+                  }
+                """,
+                expected = { case OdbError.InvalidArgument(Some(m)) if m.contains(oid.show) => }
+              )
+    yield ()
 
   test("cannot create group with minimumRequired of zero"):
     createProgramAs(pi).flatMap { pid =>
