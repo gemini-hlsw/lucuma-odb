@@ -159,6 +159,36 @@ trait SequenceCodec {
         "executionState"   -> a.executionState.asJson
       )
 
+  given Decoder[CalibrationEstimate] =
+    Decoder.instance: c =>
+      for
+        n <- c.downField("count").as[NonNegInt]
+        t <- c.downField("time").as[CategorizedTime]
+      yield CalibrationEstimate(n, t)
+
+  given (using Encoder[TimeSpan]): Encoder[CalibrationEstimate] =
+    Encoder.instance: (a: CalibrationEstimate) =>
+      Json.obj(
+        "count" -> a.count.asJson,
+        "time"  -> a.time.asJson
+      )
+
+  // `count` is derived from the two estimates, so it is written but not read.
+  given Decoder[CalibrationDigest] =
+    Decoder.instance: c =>
+      for
+        i <- c.downField("existing").as[CalibrationEstimate]
+        p <- c.downField("expected").as[CalibrationEstimate]
+      yield CalibrationDigest(i, p)
+
+  given (using Encoder[TimeSpan]): Encoder[CalibrationDigest] =
+    Encoder.instance: (a: CalibrationDigest) =>
+      Json.obj(
+        "count"    -> a.count.asJson,
+        "existing" -> a.existing.asJson,
+        "expected" -> a.expected.asJson
+      )
+
   given Decoder[ExecutionDigest] =
     Decoder.instance { c =>
       // `ExecutionDigest` has six canonical fields: `setup`, `setupCount`,
@@ -182,33 +212,15 @@ trait SequenceCodec {
       def read[A: Decoder](name: String): Decoder.Result[A] =
         val fromEstimate = est.downField(name).as[A]
         if fromEstimate.isRight then fromEstimate else c.downField(name).as[A]
-      def count(name: String): Decoder.Result[NonNegInt] =
-        est.downField(name).as[Option[NonNegInt]].map(_.getOrElse(NonNegInt.MinValue))
-      given Decoder[CalibrationEstimate] =
-        Decoder.forProduct2("count", "time")(CalibrationEstimate.apply)
-      given Decoder[CalibrationDigest] =
-        Decoder.forProduct2("existing", "expected")(CalibrationDigest.apply)
       for {
         t <- read[SetupTime]("setup")
         n <- read[NonNegInt]("setupCount")
-        r <- count("reacquisitionCount")
+        r <- est.downField("reacquisitionCount").as[Option[NonNegInt]].map(_.getOrElse(NonNegInt.MinValue))
         k <- est.downField("calibrations").as[Option[CalibrationDigest]].map(_.getOrElse(CalibrationDigest.Zero))
         a <- c.downField("acquisition").as[SequenceDigest]
         s <- c.downField("science").as[SequenceDigest]
       } yield ExecutionDigest(t, n, r, k, a, s)
     }
-
-  given (using Encoder[TimeSpan]): Encoder[CalibrationEstimate] =
-    Encoder.instance: a =>
-      Json.obj("count" -> a.count.asJson, "time" -> a.time.asJson)
-
-  given (using Encoder[TimeSpan]): Encoder[CalibrationDigest] =
-    Encoder.instance: a =>
-      Json.obj(
-        "count"    -> a.count.asJson,
-        "existing" -> a.existing.asJson,
-        "expected" -> a.expected.asJson
-      )
 
   given (using Encoder[Offset], Encoder[TimeSpan]): Encoder[ExecutionDigest] =
     Encoder.instance { (a: ExecutionDigest) =>
