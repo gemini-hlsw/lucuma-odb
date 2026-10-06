@@ -21,7 +21,7 @@ import org.typelevel.log4cats.Logger
 import org.typelevel.otel4s.trace.TracerProvider
 
 /** A module of all the middlewares we apply to the server routes. */
-object ServerMiddleware {
+object ServerMiddleware:
 
   type Middleware[F[_]] = Endo[HttpRoutes[F]]
 
@@ -38,7 +38,7 @@ object ServerMiddleware {
   def logging[F[_]: Async](
     env:          Environment,
   ): Middleware[F] =
-    LoggingMiddleware.logging[F](revealSensitiveHeaders = 
+    LoggingMiddleware.logging[F](revealSensitiveHeaders =
       env match
         case Local                         => true
         case Review | Staging | Production => false
@@ -56,13 +56,10 @@ object ServerMiddleware {
   def apply[F[_]: Async: TracerProvider: Logger](
     config: Config,
   ): F[Middleware[F]] =
-    tracing[F].map { tracing =>
+    tracing[F].map: tracing =>
       List[Middleware[F]](
         CorsMiddleware.cors(domain = List(config.cookieDomain)),
         logging(config.environment),
         tracing,
         errorReporting,
       ).reduce(_ andThen _) // N.B. the monoid for Endo uses `compose`
-    }
-
-}

@@ -191,7 +191,7 @@ object FMain extends AnsiColor {
   def routesResource[F[_]: Async: Trace: Tracer: TracerProvider: Logger: Network: Console](config: Config): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
     for {
       pool        <- databasePoolResource[F](config.database)
-      orcid      <- orcidServiceResource(config.orcid, config.environment)
+      orcid       <- orcidServiceResource(config.orcid, config.environment)
       httpClient  <- EmberClientBuilder.default[F].build
       dbPool       = pool.map(Database.fromSession(_))
       serviceUser <- Resource.eval(dbPool.use(_.getSsoServiceUser))
@@ -284,16 +284,16 @@ object FMain extends AnsiColor {
     skipMigration: MainArgs.SkipMigration
   )(using Logger[IO]): Resource[IO, ExitCode] =
     for
-      c  <- Resource.eval(Config.config.load[IO])
-      _  <- Resource.eval(banner[IO](c))
-      _  <- Applicative[Resource[IO, *]].whenA(reset.isRequested)(Resource.eval(resetDatabase[IO](c.database)))
-      _  <- Applicative[Resource[IO, *]].unlessA(skipMigration.isRequested)(Resource.eval(migrateDatabase[IO](c.database)))
-      ot <- otelResource[IO](c)
+      c                        <- Resource.eval(Config.config.load[IO])
+      _                        <- Resource.eval(banner[IO](c))
+      _                        <- Applicative[Resource[IO, *]].whenA(reset.isRequested)(Resource.eval(resetDatabase[IO](c.database)))
+      _                        <- Applicative[Resource[IO, *]].unlessA(skipMigration.isRequested)(Resource.eval(migrateDatabase[IO](c.database)))
+      ot                       <- otelResource[IO](c)
       given Trace[IO]          = ot.trace
       given Tracer[IO]         = ot.tracer
       given TracerProvider[IO] = ot.tracerProvider
-      ap <- routesResource[IO](c).map(_.map(_.orNotFound))
-      _  <- serverResource(c.httpPort, ap)
+      ap                       <- routesResource[IO](c).map(_.map(_.orNotFound))
+      _                        <- serverResource(c.httpPort, ap)
     yield ExitCode.Success
 
   /** Our main server, which runs forever. */
