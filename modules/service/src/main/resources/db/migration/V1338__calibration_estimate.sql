@@ -64,6 +64,7 @@ ALTER TABLE t_observation
       c_orig_est_full_setup_time,
       c_orig_est_reacq_setup_time,
       c_orig_est_setup_count,
+      c_orig_est_reacquisition_count,
       c_orig_est_exist_cal_count,
       c_orig_est_exist_cal_non_charged_time,
       c_orig_est_exist_cal_program_time,
@@ -74,7 +75,7 @@ ALTER TABLE t_observation
       c_orig_est_sci_program_time,
       c_orig_est_total_non_charged_time,
       c_orig_est_total_program_time
-    ) IN (0, 13)
+    ) IN (0, 14)
   );
 
 -- v_observation selects o.*, so it must be recreated to pick up the new columns.
