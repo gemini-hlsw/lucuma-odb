@@ -49,6 +49,36 @@ class cloneGroup extends OdbSuite {
              )
     yield ()
 
+  test("can't clone into a group in another program"):
+    for
+      pid1 <- createProgramAs(pi)
+      gid1 <- createGroupAs(pi, pid1)
+      pid2 <- createProgramAs(pi)
+      gid2 <- createGroupAs(pi, pid2)
+      _    <- expectOdbError(
+                user = pi,
+                query = s"""
+                  mutation {
+                    cloneGroup(input: {
+                      groupId: "$gid1",
+                      SET: {
+                        parentGroup: "$gid2"
+                      }
+                    }) {
+                      newGroup { id }
+                    }
+                  }
+                """,
+                expected = {
+                  case OdbError.InvalidArgument(Some(s"Group $gid2 is not in program $pid1.")) => ()
+                }
+              )
+      ids1 <- groupElementsAs(pi, pid1, None)
+      ids2 <- groupElementsAs(pi, pid2, Some(gid2))
+    yield
+      assertEquals(ids1, List(Left(gid1)))
+      assertEquals(ids2, Nil)
+
   test("simple clone of empty top-level group") {
     createProgramAs(pi).flatMap: pid =>
       createGroupAs(pi, pid) >> createGroupAs(pi, pid, None, None, Some(NonNegShort.unsafeFrom(42))).flatMap: gid =>

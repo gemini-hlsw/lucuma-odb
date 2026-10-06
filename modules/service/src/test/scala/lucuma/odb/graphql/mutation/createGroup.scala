@@ -279,6 +279,34 @@ class createGroup extends OdbSuite with query.ObservingModeSetupOperations {
              )
     yield ()
 
+  test("can't create a group in a parent group from another program"):
+    for
+      pid1 <- createProgramAs(pi)
+      pid2 <- createProgramAs(pi)
+      gid2 <- createGroupAs(pi, pid2)
+      _    <- expectOdbError(
+                user = pi,
+                query = s"""
+                  mutation {
+                    createGroup(
+                      input: {
+                        programId: "$pid1"
+                        SET: {
+                          parentGroup: "$gid2"
+                        }
+                      }
+                    ) {
+                      group { id }
+                    }
+                  }
+                """,
+                expected = {
+                  case OdbError.InvalidArgument(Some(s"Group $gid2 is not in program $pid1.")) => ()
+                }
+              )
+      ids2 <- groupElementsAs(pi, pid2, Some(gid2))
+    yield assertEquals(ids2, Nil)
+
   test("can create group requiring all of its initial contents"):
     for
       pid <- createProgramAs(pi)
