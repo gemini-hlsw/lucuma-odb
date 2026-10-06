@@ -47,6 +47,7 @@ trait GroupService[F[_]] {
     obsFilter: AppliedFragment = sql"c_existence = $existence"(Existence.Present)
   )(using Transaction[F]): F[GroupTree]
   def selectPid(groupId: Group.Id)(using Transaction[F]): F[Option[Program.Id]]
+  def checkGroupInProgram(pid: Program.Id, gid: Group.Id)(using Transaction[F]): F[Result[Unit]]
   def cloneGroup(input: AccessControl.CheckedWithId[CloneGroupInput, Program.Id])(using Transaction[F]): F[Result[Group.Id]]
   def selectAllObservations(groupId: Group.Id)(using Transaction[F]): F[List[Observation.Id]]
   def deleteSystemGroup(pid: Program.Id, groupId: Group.Id)(using Transaction[F], ServiceAccess): F[Result[Unit]]
@@ -110,9 +111,25 @@ object GroupService {
       private def createGroupIn(pid: Program.Id, SET: GroupPropertiesInput.Create, initialContents: List[Either[Group.Id, Observation.Id]], system: Boolean, calibrationRoles: List[CalibrationRole])(using Transaction[F]): F[Result[Group.Id]] =
         (for
           _ <- ResultT.fromResult(checkMinimumRequired(SET.minimumRequired, initialContents.size.toLong, none))
+          _ <- SET.parentGroupId.traverse_(gid => ResultT(checkGroupInProgram(pid, gid)))
           _ <- ResultT(checkContentsIn(pid, initialContents))
           g <- ResultT.liftF(createGroupImpl(pid, SET, initialContents, system, calibrationRoles))
         yield g).value
+
+      // A group can only hold elements of its own program. The database enforces this too, but
+      // only at commit and resulting in a generic error to clients otherwise.
+      override def checkGroupInProgram(pid: Program.Id, gid: Group.Id)(using Transaction[F]): F[Result[Unit]] =
+        selectPid(gid).map:
+          case Some(`pid`) => Result.unit
+          case _           => OdbError.InvalidArgument(s"Group $gid is not in program $pid.".some).asFailure
+
+      // Parent group must be in the same program.
+      private def checkSameProgram(which: AppliedFragment, dest: Group.Id)(using Transaction[F]): F[Result[Unit]] =
+        val af: AppliedFragment = Statements.selectProgramsOf(which)
+        session.execute(af.fragment.query(program_id))(af.argument).flatMap:
+          case Nil        => Result.unit.pure[F]
+          case pid :: Nil => checkGroupInProgram(pid, dest)
+          case _          => OdbError.InvalidArgument("Cannot move groups from different programs into one group.".some).asFailureF
 
       // Elements can only be grouped within their own program. The database enforces this too.
       private def checkContentsIn(pid: Program.Id, contents: List[Either[Group.Id, Observation.Id]]): F[Result[Unit]] =
@@ -284,9 +301,11 @@ object GroupService {
             }
 
         // Validate against the groups' current contents before touching anything.
-        SET.minimumRequired.toOption
-          .fold(Result.unit.pure[F])(checkMinimumRequiredOf(_, which, accessPredicate))
-          .flatMap(_.traverse(_ => update).map(_.flatten))
+        (for
+          _   <- ResultT(SET.parentGroupId.toOption.fold(Result.unit.pure[F])(checkSameProgram(which, _)))
+          _   <- ResultT(SET.minimumRequired.toOption.fold(Result.unit.pure[F])(checkMinimumRequiredOf(_, which, accessPredicate)))
+          ids <- ResultT(update)
+        yield ids).value
 
       def openHole(pid: Program.Id, gid: Option[Group.Id], index: Option[NonNegShort]): F[NonNegShort] =
         session.prepareR(Statements.OpenHole).use(_.unique(pid, gid, index))
@@ -429,6 +448,13 @@ object GroupService {
         FROM t_group
         WHERE c_group_id IN (
       """ |+| which |+| void")" |+| accessPredicate
+
+    def selectProgramsOf(which: AppliedFragment): AppliedFragment =
+      void"""
+        SELECT DISTINCT c_program_id
+        FROM t_group
+        WHERE c_group_id IN (
+      """ |+| which |+| void")"
 
     def moveGroups(gid: Option[Group.Id], index: Option[NonNegShort], which: AppliedFragment, access: AppliedFragment): AppliedFragment =
       sql"""
