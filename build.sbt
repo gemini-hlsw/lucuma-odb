@@ -665,7 +665,7 @@ lazy val ssoBackendExample = project
       "org.http4s"   %% "http4s-ember-server" % http4sVersion,
       "org.slf4j"    %  "slf4j-simple"        % slf4jVersion,
       "org.tpolecat" %% "natchez-http4s"      % natchezHttp4sVersion,
-      "org.tpolecat" %% "natchez-honeycomb"   % natchezVersion,
+      "org.tpolecat" %% "natchez-log"         % natchezVersion,
     )
   )
 

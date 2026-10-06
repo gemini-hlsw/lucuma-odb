@@ -133,14 +133,6 @@ yMvjw3Rl9GQnMoTGYsNsunNy4Q==
               value = secretValues.DATABASE_URL;
             }
             {
-              name = "ODB_HONEYCOMB_WRITE_KEY";
-              value = "";
-            }
-            {
-              name = "ODB_HONEYCOMB_DATASET";
-              value = "";
-            }
-            {
               name = "ODB_SERVICE_JWT";
               value = secretValues.ODB_SERVICE_JWT;
             }
