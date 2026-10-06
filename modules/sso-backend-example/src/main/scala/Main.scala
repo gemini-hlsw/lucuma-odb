@@ -5,6 +5,8 @@ package lucuma.sso.example
 
 import cats.*
 import cats.effect.*
+import cats.effect.std.SecureRandom
+import cats.effect.std.UUIDGen
 import com.comcast.ip4s.Host
 import com.comcast.ip4s.Port
 import fs2.io.net.Network
@@ -13,9 +15,9 @@ import lucuma.sso.client.SsoClient
 import lucuma.sso.client.SsoMiddleware
 import natchez.EntryPoint
 import natchez.Trace
-import natchez.honeycomb.Honeycomb
 import natchez.http4s.NatchezMiddleware
 import natchez.http4s.implicits.*
+import natchez.log.Log
 import org.http4s.*
 import org.http4s.dsl.Http4sDsl
 import org.http4s.ember.server.EmberServerBuilder
@@ -71,13 +73,11 @@ object Main extends IOApp {
       NatchezMiddleware.server(SsoMiddleware(userClient)(routes[F](userClient)))
     }
 
-  def entryPoint[F[_]: Sync](cfg: Config): Resource[F, EntryPoint[F]] =
-    Honeycomb.entryPoint("backend-example") { cb =>
-      Sync[F].delay {
-        cb.setWriteKey(cfg.hcWriteKey)
-        cb.setDataset(cfg.hcDataset)
-        cb.build()
-      }
+  // Traces go to the log; swap this for a real exporter in a production service.
+  def entryPoint[F[_]: Sync: Logger]: Resource[F, EntryPoint[F]] =
+    Resource.eval(SecureRandom.javaSecuritySecureRandom[F]).map { sr =>
+      given UUIDGen[F] = UUIDGen.fromSecureRandom(using Sync[F], sr)
+      Log.entryPoint[F]("backend-example")
     }
 
   def log[F[_]: Async](@unused r: Request[F], t: Throwable): F[Unit] =
@@ -95,7 +95,7 @@ object Main extends IOApp {
     cfg: Config
   ): Resource[IO, Server] =
     for {
-      ep      <- entryPoint[IO](cfg)
+      ep      <- entryPoint[IO]
       routes  <- ep.liftR(wrappedRoutes(cfg))
       httpApp  = ErrorAction.httpRoutes(cors(routes, "lucuma.xyz"), log[IO]).orNotFound
       server  <- serverResource(cfg.port, httpApp)

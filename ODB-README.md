@@ -184,13 +184,15 @@ Mailgun sets other variables in the Heroku app, but they are for things we are n
 
 Services support exporting traces and metrics via OTLP.
 Telemetry is enabled when both `ODB_OTEL_ENDPOINT` and `ODB_OTEL_KEY` are set; otherwise it is a no-op.
+On Heroku (detected via `DYNO`) both are required and startup fails without them.
+SSO uses the same loader with the `LUCUMA_SSO_OTEL_*` prefix; see the SSO README.
 
 ### Environment Variables
 
 | Variable | Required | Description |
 |---|---|---|
-| `ODB_OTEL_ENDPOINT` | Yes | OTLP HTTP endpoint (e.g. `http://localhost:4318`) |
-| `ODB_OTEL_KEY` | Yes | Value for the `Authorization` header (e.g. `Basic dXNlcjpwYXNz`) |
+| `ODB_OTEL_ENDPOINT` | On Heroku | OTLP HTTP endpoint (e.g. `http://localhost:4318`) |
+| `ODB_OTEL_KEY` | On Heroku | Value for the `Authorization` header (e.g. `Basic dXNlcjpwYXNz`) |
 | `ODB_ENVIRONMENT` | No | Deployment environment name (`local`, `dev`, `staging`, `production`). Defaults to `local` or set in heroku|
 
 ### Using an OTLP Collector
