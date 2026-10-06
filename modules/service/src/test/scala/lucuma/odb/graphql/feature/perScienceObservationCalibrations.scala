@@ -67,7 +67,7 @@ import lucuma.odb.graphql.query.ObservingModeSetupOperations
 import lucuma.odb.graphql.subscription.SubscriptionUtils
 import lucuma.odb.json.time.transport.given
 import lucuma.odb.json.wavelength.decoder.given
-import lucuma.odb.logic.Generator
+import lucuma.odb.service.ObsExtract
 import lucuma.odb.service.Services
 import lucuma.odb.service.TelluricTargetsServiceSuiteSupport
 import lucuma.odb.smartgcal.data.Gnirs
@@ -1617,7 +1617,7 @@ class perScienceObservationCalibrations
                     _.flatMap(_.result).flatMap(_.digest)
     yield
       assertEquals(meta.flatMap(_.resolvedTargetId), None)
-      assertEquals(dig.map(_.fullTimeEstimate.sum), Generator.UnresolvedTelluricTime.some)
+      assertEquals(dig.map(_.fullTimeEstimate.sum), ObsExtract.TelluricPlaceholderTime.some)
       assertEquals(dig.map(_.science.steps.time), dig.map(_.science.timeEstimate), "the step digests must sum to the estimate")
 
   test("coordinate change triggers re-resolution with new hash"):

@@ -143,9 +143,6 @@ object Generator:
   // a reasonable upper limit on the number of atoms in a sequence.
   val SequenceAtomLimit = 1000
 
-  // Placeholder charge for a telluric whose target is not yet resolved.
-  val UnresolvedTelluricTime: TimeSpan = ObsExtract.TelluricPlaceholderTime
-
   // Placeholder charge for a spectrophotometric standard whose proposal has yet
   // to be accepted.  No sequence is produced for one, so there is nothing to
   // derive a real estimate from.  See GeneratorParams.isSpecPhotoProposal.
@@ -255,7 +252,7 @@ object Generator:
         )
 
       private def unresolvedTelluricDigest(ctx: GeneratorContext): ExecutionDigest =
-        flatDigest(ctx, UnresolvedTelluricTime)
+        flatDigest(ctx, ObsExtract.TelluricPlaceholderTime)
 
       /**
        * Adds the calibration estimate to a digest. It follows the group's tellurics, which the
