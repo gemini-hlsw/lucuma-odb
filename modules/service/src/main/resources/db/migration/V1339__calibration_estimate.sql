@@ -134,11 +134,20 @@ CREATE VIEW v_observation AS
   LEFT JOIN t_proposal p on p.c_program_id = o.c_program_id
   LEFT JOIN t_cfp c on p.c_cfp_id = c.c_cfp_id;
 
--- The charge depends on the tellurics in the science observation's group and
--- their totals, so a telluric appearing, disappearing, being declined or
--- reinstated, getting its first visit, or settling on a different total
--- invalidates the science observation's digest.
-CREATE OR REPLACE FUNCTION invalidate_science_obscalc_for_telluric(
+-- The calibration estimate depends on the tellurics in the science
+-- observation's group and their totals, so a telluric appearing, disappearing,
+-- being declined or reinstated, getting its first observe visit, or settling on
+-- a different total marks the science's estimate stale.  Only the estimate is
+-- refreshed (by the obscalc daemon): invalidating the whole digest would move
+-- the science to pending, which the calibrations service reads as inactive.
+ALTER TABLE t_obscalc
+  ADD COLUMN c_calibrations_stale boolean NOT NULL DEFAULT false;
+
+CREATE INDEX t_obscalc_calibrations_stale_idx
+  ON t_obscalc (c_observation_id)
+  WHERE c_calibrations_stale;
+
+CREATE OR REPLACE FUNCTION mark_science_calibrations_stale(
   telluric_group_id d_group_id
 ) RETURNS void AS $$
 DECLARE
@@ -154,17 +163,20 @@ BEGIN
     AND  c_existence        = 'present'
   LIMIT 1;
   IF FOUND THEN
-    CALL invalidate_obscalc(science_id);
+    UPDATE t_obscalc
+       SET c_calibrations_stale = true
+     WHERE c_observation_id = science_id
+       AND NOT c_calibrations_stale;
   END IF;
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION telluric_change_obscalc_invalidate()
+CREATE OR REPLACE FUNCTION telluric_change_calibrations_stale()
 RETURNS TRIGGER AS $$
 BEGIN
   IF TG_OP = 'DELETE' THEN
     IF OLD.c_calibration_role = 'telluric' THEN
-      PERFORM invalidate_science_obscalc_for_telluric(OLD.c_group_id);
+      PERFORM mark_science_calibrations_stale(OLD.c_group_id);
     END IF;
     RETURN OLD;
   END IF;
@@ -174,21 +186,21 @@ BEGIN
     OR NEW.c_workflow_user_state IS DISTINCT FROM OLD.c_workflow_user_state
     OR NEW.c_group_id            IS DISTINCT FROM OLD.c_group_id
   ) THEN
-    PERFORM invalidate_science_obscalc_for_telluric(NEW.c_group_id);
+    PERFORM mark_science_calibrations_stale(NEW.c_group_id);
     IF TG_OP = 'UPDATE' AND NEW.c_group_id IS DISTINCT FROM OLD.c_group_id THEN
-      PERFORM invalidate_science_obscalc_for_telluric(OLD.c_group_id);
+      PERFORM mark_science_calibrations_stale(OLD.c_group_id);
     END IF;
   END IF;
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER telluric_change_obscalc_invalidate_trigger
+CREATE TRIGGER telluric_change_calibrations_stale_trigger
   AFTER INSERT OR DELETE OR UPDATE OF c_existence, c_workflow_user_state, c_group_id ON t_observation
   FOR EACH ROW
-  EXECUTE FUNCTION telluric_change_obscalc_invalidate();
+  EXECUTE FUNCTION telluric_change_calibrations_stale();
 
-CREATE OR REPLACE FUNCTION telluric_visit_obscalc_invalidate()
+CREATE OR REPLACE FUNCTION telluric_visit_calibrations_stale()
 RETURNS TRIGGER AS $$
 DECLARE
   telluric_group_id d_group_id;
@@ -198,7 +210,7 @@ BEGIN
   WHERE  c_observation_id  = NEW.c_observation_id
     AND  c_calibration_role = 'telluric';
   IF FOUND THEN
-    PERFORM invalidate_science_obscalc_for_telluric(telluric_group_id);
+    PERFORM mark_science_calibrations_stale(telluric_group_id);
   END IF;
   RETURN NEW;
 END;
@@ -206,15 +218,14 @@ $$ LANGUAGE plpgsql;
 
 -- A telluric is spent from its first observe visit, which may be a slew visit
 -- claimed for observe.
-CREATE TRIGGER telluric_visit_obscalc_invalidate_trigger
+CREATE TRIGGER telluric_visit_calibrations_stale_trigger
   AFTER INSERT OR UPDATE OF c_origin ON t_visit
   FOR EACH ROW
   WHEN (NEW.c_origin = 'observe' :: e_visit_origin)
-  EXECUTE FUNCTION telluric_visit_obscalc_invalidate();
+  EXECUTE FUNCTION telluric_visit_calibrations_stale();
 
--- Only a changed total re-runs the science, which stops the science -> telluric
--- resolution -> telluric digest -> science cycle once the numbers settle.
-CREATE OR REPLACE FUNCTION telluric_total_obscalc_invalidate()
+-- Only a telluric whose total changed matters to the science's estimate.
+CREATE OR REPLACE FUNCTION telluric_total_calibrations_stale()
 RETURNS TRIGGER AS $$
 DECLARE
   telluric_group_id d_group_id;
@@ -234,17 +245,17 @@ BEGIN
     WHERE  c_observation_id  = NEW.c_observation_id
       AND  c_calibration_role = 'telluric';
     IF FOUND THEN
-      PERFORM invalidate_science_obscalc_for_telluric(telluric_group_id);
+      PERFORM mark_science_calibrations_stale(telluric_group_id);
     END IF;
   END IF;
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER telluric_total_obscalc_invalidate_trigger
+CREATE TRIGGER telluric_total_calibrations_stale_trigger
   AFTER UPDATE OF c_last_update ON t_obscalc
   FOR EACH ROW
-  EXECUTE FUNCTION telluric_total_obscalc_invalidate();
+  EXECUTE FUNCTION telluric_total_calibrations_stale();
 
 -- Existing digests carry zero calibrations, so recompute the science
 -- observations of every mode that takes tellurics.

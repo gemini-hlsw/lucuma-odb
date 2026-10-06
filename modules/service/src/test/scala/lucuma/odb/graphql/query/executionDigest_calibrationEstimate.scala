@@ -13,6 +13,10 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.odb.graphql.feature.TelluricCalibrationsTestSupport
 import lucuma.odb.graphql.subscription.SubscriptionUtils
+import lucuma.odb.util.Codecs.observation_id
+import skunk.codec.boolean.bool
+import skunk.codec.text.text
+import skunk.syntax.all.*
 
 import java.time.Instant
 
@@ -44,7 +48,10 @@ class executionDigest_calibrationEstimate
     def restMinutes: Long     = (total - scienceAndSetups) / 60_000_000L
 
   private def estimate(pid: Program.Id, oid: Observation.Id): IO[Estimate] =
-    runObscalcUpdate(pid, oid) *>
+    runObscalcUpdate(pid, oid) *> storedEstimate(oid)
+
+  // What the stored digest says, without recalculating it.
+  private def storedEstimate(oid: Observation.Id): IO[Estimate] =
     query(
       pi,
       s"""
@@ -84,6 +91,16 @@ class executionDigest_calibrationEstimate
       val exp    = cal.downFields("expected", "time", "program", "microseconds").require[Long]
       val total  = est.downFields("total", "program", "microseconds").require[Long]
       Estimate(count, existN, exist, expN, exp, total, sci + setup * setups)
+
+  private def obscalcStateAndStale(oid: Observation.Id): IO[(String, Boolean)] =
+    withSession: s =>
+      s.unique(
+        sql"""
+          SELECT c_obscalc_state::text, c_calibrations_stale
+          FROM   t_obscalc
+          WHERE  c_observation_id = $observation_id
+        """.query(text *: bool)
+      )(oid)
 
   private def telluricsOf(oid: Observation.Id): IO[List[Observation.Id]] =
     queryObservation(oid).flatMap: obs =>
@@ -164,6 +181,33 @@ class executionDigest_calibrationEstimate
       assertEquals(e.existing, totals.sum)
       assertEquals(e.expectedCount, 1)
       assertEquals(e.expected, totals.sum / totals.size)
+
+  test("a telluric change marks the science's estimate stale, and a refresh updates it"):
+    for
+      p         <- createProgramAs(pi)
+      t         <- createTargetWithProfileAs(pi, p)
+      o         <- createFlamingos2LongSlitObservationAs(pi, p, List(t))
+      _         <- setExposureTime(o, 240, 12)
+      _         <- recalculateCalibrations(p, when, o)
+      tellurics <- telluricsOf(o)
+      _         <- runObscalcUpdate(p, o) *> refreshCalibrationsAs(serviceUser)
+      settled   <- obscalcStateAndStale(o)
+      _         <- setObservationWorkflowState(pi, tellurics.head, Inactive)
+      declined  <- obscalcStateAndStale(o)
+      stale     <- storedEstimate(o)
+      _         <- refreshCalibrationsAs(serviceUser)
+      refreshed <- obscalcStateAndStale(o)
+      e         <- storedEstimate(o)
+    yield
+      // Declining marks the estimate stale but keeps the digest ready, so the
+      // calibrations service still sees the science as active.
+      assertEquals(settled, ("ready", false))
+      assertEquals(declined, ("ready", true))
+      assertEquals(stale.existingCount, 2)
+      assertEquals(refreshed, ("ready", false))
+      assertEquals(e.count, 2)
+      assertEquals(e.existingCount, 1)
+      assertEquals(e.expectedCount, 1)
 
   test("a declined telluric fills its slot at no cost, the later ones are still expected"):
     for

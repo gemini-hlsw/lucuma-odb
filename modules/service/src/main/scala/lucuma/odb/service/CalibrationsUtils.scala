@@ -48,6 +48,7 @@ import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.sequence.ObservingMode.Syntax.*
 import lucuma.odb.sequence.data.CalibrationGroupTellurics
+import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.ItcInput
 import lucuma.odb.sequence.flamingos2.longslit.Config as Flamingos2Config
 import lucuma.odb.sequence.flamingos2.mos.Config as Flamingos2MosConfig
@@ -133,6 +134,15 @@ object ObsExtract:
 
   val TelluricPlaceholderCharge: CategorizedTime =
     CategorizedTime.Zero.sumCharge(ChargeClass.Program, TelluricPlaceholderTime)
+
+  /**
+   * The calibration estimate for an observation with `scienceTime` left, as the
+   * generator and the stale-estimate refresh both work it out.  Zero once the
+   * observation is declared complete.
+   */
+  def calibrationEstimate(params: GeneratorParams, scienceTime: TimeSpan): CalibrationDigest =
+    if params.declaredState == Some(ExecutionState.DeclaredComplete) then CalibrationDigest.Zero
+    else calibrationEstimate(params.observingMode, params.calibrationRole, scienceTime, params.tellurics)
 
   /**
    * The unobserved tellurics already in the group and those still predicted,

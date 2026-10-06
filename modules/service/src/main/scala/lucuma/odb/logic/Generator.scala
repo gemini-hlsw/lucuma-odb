@@ -260,16 +260,9 @@ object Generator:
        * digest and guide star, so it is worked out on every read rather than cached.
        */
       private def withCalibrations(ctx: GeneratorContext, d: ExecutionDigest): ExecutionDigest =
-        if ctx.params.declaredState == Some(ExecutionState.DeclaredComplete) then d
-        else
-          ExecutionDigest.calibrations.replace(
-            ObsExtract.calibrationEstimate(
-              ctx.params.observingMode,
-              ctx.params.calibrationRole,
-              d.science.timeEstimate.sum,
-              ctx.params.tellurics
-            )
-          )(d)
+        ExecutionDigest.calibrations.replace(
+          ObsExtract.calibrationEstimate(ctx.params, d.science.timeEstimate.sum)
+        )(d)
 
       private def calcDigestFromContext(
         ctx: GeneratorContext
