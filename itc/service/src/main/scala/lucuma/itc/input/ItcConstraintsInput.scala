@@ -16,7 +16,6 @@ import lucuma.itc.service.ItcObservingConditions
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.graphql.binding.BigDecimalBinding
 import lucuma.odb.graphql.input.*
-import lucuma.odb.graphql.input.ConstraintSetInput.NominalConstraints
 
 extension (iqi: ImageQualityInput) {
   def toArcSeconds: Result[BigDecimal] =
@@ -58,10 +57,10 @@ case class ItcConstraintsInput(
 object ItcConstraintsInput:
   val Default: ItcConstraintsInput =
     ItcConstraintsInput(
-      CloudExtinctionInput.preset(NominalConstraints.cloudExtinction),
-      ImageQualityInput.preset(NominalConstraints.imageQuality),
-      NominalConstraints.skyBackground,
-      NominalConstraints.waterVapor,
+      CloudExtinctionInput.preset(CloudExtinction.Preset.PointThree),
+      ImageQualityInput.preset(ImageQuality.Preset.PointEight),
+      SkyBackground.Bright,
+      WaterVapor.Wet,
       ElevationRangeInput.Default
     )
 
