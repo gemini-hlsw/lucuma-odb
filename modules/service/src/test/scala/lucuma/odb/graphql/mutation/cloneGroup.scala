@@ -6,13 +6,48 @@ package mutation
 
 import eu.timepit.refined.types.numeric.NonNegShort
 import io.circe.literal.*
+import lucuma.core.model.Group
 import lucuma.core.model.User
 import lucuma.odb.data.OdbError
 
 class cloneGroup extends OdbSuite {
 
   val pi: User = TestUsers.Standard.pi(nextId, nextId)
-  val validUsers: List[User] = List(pi)
+  val pi2 = TestUsers.Standard.pi(nextId, nextId)
+  val guest = TestUsers.guest(nextId)
+  val validUsers: List[User] = List(pi, pi2, guest)
+
+  private def cloneGroupQuery(gid: Group.Id): String =
+    s"""
+      mutation {
+        cloneGroup(input: { groupId: "$gid" }) {
+          newGroup { id }
+        }
+      }
+    """
+
+  test("a pi cannot clone a group in another pi's program"):
+    for
+      pid <- createProgramAs(pi)
+      gid <- createGroupAs(pi, pid)
+      _   <- expectOdbError(
+               user     = pi2,
+               query    = cloneGroupQuery(gid),
+               expected = { case OdbError.NotAuthorized(pi2.id, _) => }
+             )
+      ids <- groupElementsAs(pi, pid, None)
+    yield assertEquals(ids, List(Left(gid)))
+
+  test("a guest cannot clone a group in another user's program"):
+    for
+      pid <- createProgramAs(pi)
+      gid <- createGroupAs(pi, pid)
+      _   <- expectOdbError(
+               user     = guest,
+               query    = cloneGroupQuery(gid),
+               expected = { case OdbError.NotAuthorized(guest.id, _) => }
+             )
+    yield ()
 
   test("simple clone of empty top-level group") {
     createProgramAs(pi).flatMap: pid =>
