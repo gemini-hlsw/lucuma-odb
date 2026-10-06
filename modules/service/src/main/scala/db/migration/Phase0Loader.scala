@@ -21,6 +21,7 @@ import lucuma.odb.phase0.GmosSpectroscopyRow
 import lucuma.odb.phase0.GnirsImagingRow
 import lucuma.odb.phase0.GnirsSpectroscopyRow
 import lucuma.odb.phase0.ImagingRow
+import lucuma.odb.phase0.ScorpioSpectroscopyRow
 import lucuma.odb.phase0.SpectroscopyRow
 import org.postgresql.core.BaseConnection
 
@@ -106,7 +107,8 @@ object Phase0Loader {
       new Phase0Loader[GmosSpectroscopyRow.GmosSouth, SpectroscopyRow](Instrument.GmosSouth, rdr.gmosSouthSpectroscopy, _.spec, Phase0Table.SpectroscopyGmosSouth.some),
       new Phase0Loader[GnirsSpectroscopyRow, SpectroscopyRow](Instrument.Gnirs, rdr.gnirsSpectroscopy, _.spec, Phase0Table.SpectroscopyGnirs.some),
       new Phase0Loader[SpectroscopyRow, SpectroscopyRow](Instrument.Igrins2, rdr.igrins2Spectroscopy, identity, none),
-      new Phase0Loader[SpectroscopyRow, SpectroscopyRow](Instrument.MaroonX, rdr.maroonXSpectroscopy, identity, none)
+      new Phase0Loader[SpectroscopyRow, SpectroscopyRow](Instrument.MaroonX, rdr.maroonXSpectroscopy, identity, none),
+      new Phase0Loader[ScorpioSpectroscopyRow, SpectroscopyRow](Instrument.Scorpio, rdr.scorpioSpectroscopy, _.spec, Phase0Table.SpectroscopyScorpio.some)
     ).traverse_(_.load(bc, ConfigModeVariant.Spectroscopy, is))
 
   def imagingLoadAll(bc: BaseConnection, fileName: String, is: IO[InputStream]): IO[Unit] =
@@ -118,6 +120,7 @@ object Phase0Loader {
       new Phase0Loader[GnirsImagingRow, ImagingRow](Instrument.Gnirs, rdr.gnirsImaging, _.img, Phase0Table.ImagingGnirs.some),
       new Phase0Loader[ImagingRow, ImagingRow](Instrument.Alopeke, rdr.alopekeImaging, identity, none),
       new Phase0Loader[ImagingRow, ImagingRow](Instrument.Zorro, rdr.zorroImaging, identity, none),
+      new Phase0Loader[ImagingRow, ImagingRow](Instrument.Scorpio, rdr.scorpioImaging, identity, none)
     ).traverse_(_.load(bc, ConfigModeVariant.Imaging, is))
 
 }

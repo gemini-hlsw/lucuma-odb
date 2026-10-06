@@ -15910,6 +15910,11 @@ type SpectroscopyConfigOption {
   """
   gnirs: SpectroscopyConfigOptionGnirs
 
+  """
+  For SCORPIO options, the SCORPIO configuration.  Null for other instruments.
+  """
+  scorpio: SpectroscopyConfigOptionScorpio
+
 }
 
 type SpectroscopyConfigOptionFlamingos2 {
@@ -15992,6 +15997,24 @@ enum GnirsPrism {
   MIRROR
   SXD
   LXD
+}
+
+"""
+SCORPIO exposes every channel at once, so a spectroscopy option is identified
+by its long slit alone.
+"""
+type SpectroscopyConfigOptionScorpio {
+  fpu: ScorpioFpu!
+}
+
+enum ScorpioFpu {
+  LONG_SLIT_0_36
+  LONG_SLIT_0_54
+  LONG_SLIT_0_72
+  LONG_SLIT_1_08
+  LONG_SLIT_1_44
+  LONG_SLIT_2_16
+  LONG_SLIT_4_32
 }
 
 enum GnirsCamera {
