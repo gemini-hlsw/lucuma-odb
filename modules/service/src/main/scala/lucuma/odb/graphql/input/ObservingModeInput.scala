@@ -198,6 +198,20 @@ object ObservingModeInput:
     def needsStaffAccess: Boolean =
       gnirsSpectroscopy.exists(_.needsStaffAccess)
 
+    /**
+     * True when the edit is a science `exposureTimeMode` on a mode that takes a telluric
+     * and nothing else: the one edit a telluric calibration accepts.
+     */
+    def isTelluricScienceExposureTimeModeOnly: Boolean =
+      val modes: List[Boolean] = List(
+        flamingos2LongSlit.map(_.isScienceExposureTimeModeOnly),
+        gnirsSpectroscopy.map(_.isScienceExposureTimeModeOnly),
+        igrins2LongSlit.map(_.isScienceExposureTimeModeOnly)
+      ).flatten
+      modes.sizeIs == 1 && modes.forall(identity) &&
+        copy(flamingos2LongSlit = None, gnirsSpectroscopy = None, igrins2LongSlit = None)
+          .productIterator.forall(_ == None)
+
     def observingModeType: Option[ObservingModeType] =
       exchange.flatMap(_.mode)
         .orElse(flamingos2Imaging.map(_.observingModeType))

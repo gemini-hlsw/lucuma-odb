@@ -43,11 +43,14 @@ object GnirsSpectroscopyInput:
    * ITC result.
    */
   private[input] def resolveWavelengths(
-    ws: List[GnirsCentralWavelengthConfigInput]
+    ws:        List[GnirsCentralWavelengthConfigInput],
+    allowNull: Boolean = false
   ): Result[NonEmptyList[GnirsCentralWavelengthConfigInput]] =
     if ws.sizeIs > MaxWavelengths then
       Matcher.validationFailure:
         s"At most $MaxWavelengths central wavelengths may be specified for GNIRS spectroscopy observations."
+    else if !allowNull && ws.exists(_.exposureTimeMode.isNull) then
+      Matcher.validationFailure(TelluricExposureTimeModeEdit.NullOnlyOnTelluric)
     else
       Result.fromOption(
         NonEmptyList.fromList(ws),
@@ -200,6 +203,10 @@ object GnirsSpectroscopyInput:
     def observingModeType: Option[ObservingModeType] = fpu.map(modeTypeFor)
     def updatesAcquisition: Boolean = acquisition.isDefined
 
+    def isScienceExposureTimeModeOnly: Boolean =
+      centralWavelengths.exists(_.exists(_.exposureTimeMode.isDefined)) &&
+        copy(centralWavelengths = None) == Edit.AllUndefined
+
     /**
      * True if the input modifies fields that only Staff (or higher) may set.
      * Setting `explicitFocusMotorSteps` to a value requires Staff; clearing it
@@ -224,6 +231,11 @@ object GnirsSpectroscopyInput:
                    telluricType.getOrElse(TelluricType.Hot))
 
   object Edit:
+    private val AllUndefined: Edit =
+      Edit(None, None, None, None, Nullable.Absent, Nullable.Absent, Nullable.Absent, Nullable.Absent,
+           Nullable.Absent, Nullable.Absent, Nullable.Absent, Nullable.Absent, Nullable.Absent, None,
+           None, None)
+
     val Binding: Matcher[Edit] =
       ObjectFieldsBinding.rmap:
         case List(
@@ -249,7 +261,7 @@ object GnirsSpectroscopyInput:
             (centralWavelengths, filter, slit, ifu, camera, grating, prism,
              decker, explGrating, explPrism,
              focus, readMode, wellDepth, acq, telluricType) =>
-              (centralWavelengths.traverse(resolveWavelengths),
+              (centralWavelengths.traverse(resolveWavelengths(_, allowNull = true)),
                resolveEdit(slit, ifu)
               ).parMapN: (ws, resolved) =>
                 val (fpu, explTelescopeSlit, telescopeIfu) = resolved

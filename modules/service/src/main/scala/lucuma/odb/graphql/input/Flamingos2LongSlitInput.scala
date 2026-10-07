@@ -88,7 +88,7 @@ object Flamingos2LongSlitInput:
           Flamingos2DisperserBinding("disperser", rDisperser),
           Flamingos2FilterBinding("filter", rFilter),
           Flamingos2FpuBinding("fpu", rFpu),
-          ExposureTimeModeInput.Binding.Option("exposureTimeMode", rExposureTimeMode),
+          ExposureTimeModeInput.Binding.Nullable("exposureTimeMode", rExposureTimeMode),
           Flamingos2ReadModeBinding.Option("explicitReadMode", rReadMode),
           Flamingos2ReadsBinding.Option("explicitReads", rReads),
           Flamingos2DeckerBinding.Option("explicitDecker", rDecker),
@@ -109,12 +109,14 @@ object Flamingos2LongSlitInput:
           rTelluricType,
           rAcquisition
         ).parTupled.flatMap { case (disperser, filter, fpu, exposureTimeMode, readMode, reads, decker, readoutMode, telescopeConfigs, telluricType, acquisition) =>
-          telescopeConfigs.traverse(Flamingos2SpectroscopyInput.validateTelescopeConfigs).map { validated =>
+          (TelluricExposureTimeModeEdit.forCreate(exposureTimeMode),
+           telescopeConfigs.traverse(Flamingos2SpectroscopyInput.validateTelescopeConfigs)
+          ).parMapN { (etm, validated) =>
             Create(
               disperser,
               filter,
               fpu,
-              exposureTimeMode,
+              etm,
               readMode,
               reads,
               decker,
@@ -131,7 +133,7 @@ object Flamingos2LongSlitInput:
     disperser: Option[Flamingos2Disperser],
     filter: Option[Flamingos2Filter],
     fpu: Option[Flamingos2Fpu],
-    exposureTimeMode: Option[ExposureTimeMode],
+    exposureTimeMode: Nullable[ExposureTimeMode],
     explicitReadMode: Nullable[Flamingos2ReadMode],
     explicitReads: Nullable[Flamingos2Reads],
     explicitDecker: Nullable[Flamingos2Decker],
@@ -148,6 +150,10 @@ object Flamingos2LongSlitInput:
       // Staff can edit the acquisition info for ongoing observations
       access <= Access.Pi ||
         copy(acquisition = None) =!= Edit.AllUndefined
+
+    def isScienceExposureTimeModeOnly: Boolean =
+      exposureTimeMode.isDefined &&
+        copy(exposureTimeMode = Nullable.Absent) === Edit.AllUndefined
 
     val observingModeType: ObservingModeType =
       ObservingModeType.Flamingos2LongSlit
@@ -173,7 +179,7 @@ object Flamingos2LongSlitInput:
         g,
         f,
         u,
-        exposureTimeMode,
+        exposureTimeMode.toOption,
         explicitReadMode.toOption,
         explicitReads.toOption,
         explicitDecker.toOption,
@@ -191,7 +197,7 @@ object Flamingos2LongSlitInput:
           Flamingos2DisperserBinding.Option("disperser", rDisperser),
           Flamingos2FilterBinding.Option("filter", rFilter),
           Flamingos2FpuBinding.Option("fpu", rFpu),
-          ExposureTimeModeInput.Binding.Option("exposureTimeMode", rExposureTimeMode),
+          ExposureTimeModeInput.Binding.Nullable("exposureTimeMode", rExposureTimeMode),
           Flamingos2ReadModeBinding.Nullable("explicitReadMode", rReadMode),
           Flamingos2ReadsBinding.Nullable("explicitReads", rReads),
           Flamingos2DeckerBinding.Nullable("explicitDecker", rDecker),
@@ -231,4 +237,4 @@ object Flamingos2LongSlitInput:
       }
 
     private val AllUndefined: Edit =
-      Edit(None, None, None, None, Nullable.Absent, Nullable.Absent, Nullable.Absent, Nullable.Absent, Nullable.Absent, None, None)
+      Edit(None, None, None, Nullable.Absent, Nullable.Absent, Nullable.Absent, Nullable.Absent, Nullable.Absent, Nullable.Absent, None, None)

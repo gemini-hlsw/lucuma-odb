@@ -80,7 +80,7 @@ class Flamingos2LongSlitInputSuite extends DisciplineSuite with ArbitraryInstanc
       disperser = None,
       filter = None,
       fpu = None,
-      exposureTimeMode = None,
+      exposureTimeMode = lucuma.odb.data.Nullable.Absent,
       explicitReadMode = lucuma.odb.data.Nullable.Null,
       explicitReads = lucuma.odb.data.Nullable.Null,
       explicitDecker = lucuma.odb.data.Nullable.Null,

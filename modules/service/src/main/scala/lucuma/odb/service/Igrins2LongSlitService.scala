@@ -44,7 +44,7 @@ trait Igrins2LongSlitService[F[_]]:
   def update(
     SET: Igrins2LongSlitInput.Edit,
     which: List[Observation.Id]
-  )(using Transaction[F]): F[Unit]
+  )(using Transaction[F]): F[Result[Unit]]
 
   def clone(originalId: Observation.Id, newId: Observation.Id): F[Unit]
 
@@ -123,18 +123,21 @@ object Igrins2LongSlitService:
       private def updateExposureTimeModes(
         input: Igrins2LongSlitInput.Edit,
         which: List[Observation.Id]
-      )(using Transaction[F]): F[Unit] =
-        input.exposureTimeMode.fold(().pure[F]): e =>
-          services.exposureTimeModeService.updateMany(which, ExposureTimeModeRole.Science, e)
+      )(using Transaction[F]): F[Result[Unit]] =
+        input.exposureTimeMode.fold(
+          TelluricScienceExposureTimeMode.revert(which),
+          Result.unit.pure[F],
+          e => services.exposureTimeModeService.updateMany(which, ExposureTimeModeRole.Science, e).as(Result.unit)
+        )
 
       override def update(
         SET: Igrins2LongSlitInput.Edit,
         which: List[Observation.Id]
-      )(using Transaction[F]): F[Unit] =
-        for
-          _ <- updateExposureTimeModes(SET, which)
-          _ <- Statements.updateIgrins2LongSlit(SET, which).fold(F.unit)(session.exec)
-        yield ()
+      )(using Transaction[F]): F[Result[Unit]] =
+        (for
+          _ <- ResultT(updateExposureTimeModes(SET, which))
+          _ <- ResultT.liftF(Statements.updateIgrins2LongSlit(SET, which).fold(F.unit)(session.exec))
+        yield ()).value
 
       def clone(originalId: Observation.Id, newId: Observation.Id): F[Unit] =
         session.exec(Statements.cloneIgrins2(originalId, newId))

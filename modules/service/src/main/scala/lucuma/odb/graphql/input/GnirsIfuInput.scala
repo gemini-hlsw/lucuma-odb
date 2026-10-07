@@ -47,7 +47,7 @@ object GnirsIfuInput:
           (centralWavelengths, filter, fpu, telescopeConfigs, camera, grating, prism,
            decker, explGrating, explPrism,
            focus, readMode, wellDepth, acq, telluricType) =>
-            (centralWavelengths.traverse(GnirsSpectroscopyInput.resolveWavelengths),
+            (centralWavelengths.traverse(GnirsSpectroscopyInput.resolveWavelengths(_, allowNull = true)),
              telescopeConfigs.traverse(resolveTelescopeConfigs)
             ).parMapN: (ws, tcs) =>
               GnirsSpectroscopyInput.Edit(

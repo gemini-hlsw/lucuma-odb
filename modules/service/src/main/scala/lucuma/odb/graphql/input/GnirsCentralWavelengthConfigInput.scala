@@ -8,6 +8,7 @@ import eu.timepit.refined.types.numeric.PosInt
 import grackle.Result
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
+import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.*
 
 /**
@@ -17,7 +18,7 @@ import lucuma.odb.graphql.binding.*
  */
 case class GnirsCentralWavelengthConfigInput(
   centralWavelength: Wavelength,
-  exposureTimeMode:  Option[ExposureTimeMode],
+  exposureTimeMode:  Nullable[ExposureTimeMode],
   coadds:            Option[PosInt]
 )
 
@@ -27,11 +28,11 @@ object GnirsCentralWavelengthConfigInput:
     ObjectFieldsBinding.rmap:
       case List(
         WavelengthInput.Binding("centralWavelength", rCentralWavelength),
-        ExposureTimeModeInput.Binding.Option("exposureTimeMode", rEtm),
+        ExposureTimeModeInput.Binding.Nullable("exposureTimeMode", rEtm),
         PosIntBinding.Option("coadds", rCoadds)
       ) =>
         (rCentralWavelength, rEtm, rCoadds).parMapN: (w, etm, coadds) =>
-          GnirsCentralWavelengthConfigInput(w, etm, GnirsCentralWavelengthConfigInput.coaddsForEtm(etm, coadds))
+          GnirsCentralWavelengthConfigInput(w, etm, coaddsForEtm(etm.toOption, coadds))
 
   /**
    * Signal-to-noise exposure time mode does not support coadds.  When the ETM is

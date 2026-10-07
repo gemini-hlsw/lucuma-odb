@@ -248,7 +248,7 @@ object ObservingModeServices:
         List(
           input.exchange.map(m => exchangeService.update(m, which).map(_.success)),
           input.flamingos2Imaging.map(m => flamingos2ImagingService.update(m, which)),
-          input.flamingos2LongSlit.map(m => flamingos2LongSlitService.update(m, which).map(_.success)),
+          input.flamingos2LongSlit.map(m => flamingos2LongSlitService.update(m, which)),
           input.flamingos2Mos.map(m => flamingos2MosService.update(m, which)),
           input.ghostIfu.map(m => ghostIfuService.update(m, which)),
           input.gmosNorthIfu.map(m => gmosIfuService.updateNorth(m, which)),
@@ -259,7 +259,7 @@ object ObservingModeServices:
           input.gmosSouthImaging.map(m => gmosImagingService.updateSouth(m, which)),
           input.gmosSouthLongSlit.map(m => gmosLongSlitService.updateSouth(m, which).map(_.success)),
           input.gmosSouthMos.map(m => gmosMosService.updateSouth(m, which)),
-          input.igrins2LongSlit.map(m => igrins2LongSlitService.update(m, which).map(_.success)),
+          input.igrins2LongSlit.map(m => igrins2LongSlitService.update(m, which)),
           input.gnirsImaging.map(m => gnirsImagingService.update(m, which)),
           input.gnirsSpectroscopy.map(m => gnirsSpectroscopyService.update(m, which)),
           input.visitor.map(m => visitorService.update(m, which).map(_.success))

@@ -155,6 +155,11 @@ object ObservationPropertiesInput {
     def needsStaffAccess: Boolean =
       observingMode.toOption.exists(_.needsStaffAccess)
 
+    /** True when the edit is exactly the one a telluric calibration accepts. */
+    def isTelluricScienceExposureTimeModeOnly: Boolean =
+      observingMode.toOption.exists(_.isTelluricScienceExposureTimeModeOnly) &&
+        copy(observingMode = Nullable.Absent) == Edit.Empty
+
   object Edit {
 
     val Empty: Edit =

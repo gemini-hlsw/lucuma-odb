@@ -74,6 +74,18 @@ sealed trait ExposureTimeModeService[F[_]]:
     isExplicit: Boolean = true
   )(using Transaction[F]): F[Unit]
 
+  /** Rewrites one row with a user-set mode and marks it explicit. */
+  def setExplicit(
+    eid:    ExposureTimeModeId,
+    update: ExposureTimeMode
+  )(using Transaction[F]): F[Unit]
+
+  /** `setDerived` for a single row. */
+  def setDerivedOne(
+    eid:                  ExposureTimeModeId,
+    defaultSignalToNoise: SignalToNoise
+  )(using Transaction[F]): F[Unit]
+
   /**
    * Rewrites the signal-to-noise of *derived* exposure time modes only, leaving explicit
    * ones untouched.  This is the interlock that keeps an automatic update -- the GNIRS
@@ -270,6 +282,18 @@ object ExposureTimeModeService:
           _ <- session.exec(Statements.updateWherePresent(oids, role, update, isExplicit))
           _ <- session.exec(Statements.insertWhereNotPresent(oids, role, update, isExplicit))
         yield ()
+
+      override def setExplicit(
+        eid:    ExposureTimeModeId,
+        update: ExposureTimeMode
+      )(using Transaction[F]): F[Unit] =
+        session.execute(Statements.SetExplicit)(eid, update).void
+
+      override def setDerivedOne(
+        eid:                  ExposureTimeModeId,
+        defaultSignalToNoise: SignalToNoise
+      )(using Transaction[F]): F[Unit] =
+        session.execute(Statements.SetDerivedOne)(defaultSignalToNoise, eid).void
 
       override def updateDerivedSignalToNoise(
         oids: List[Observation.Id],
@@ -538,6 +562,41 @@ object ExposureTimeModeService:
             etm.frameCount,
             id
           )
+
+    val SetExplicit: Command[(ExposureTimeModeId, ExposureTimeMode)] =
+      sql"""
+        UPDATE t_exposure_time_mode
+        SET c_exposure_time_mode = $exposure_time_mode_type,
+            c_signal_to_noise    = ${signal_to_noise.opt},
+            c_signal_to_noise_at = $wavelength_pm,
+            c_exposure_time      = ${time_span.opt},
+            c_exposure_count     = ${int4_pos.opt},
+            c_is_explicit        = true
+        WHERE
+            c_exposure_time_mode_id = $exposure_time_mode_id
+      """
+        .command
+        .contramap: (id, etm) =>
+          (
+            etm.modeType,
+            etm.signalToNoise,
+            etm.at,
+            etm.exposureTime,
+            etm.frameCount,
+            id
+          )
+
+    val SetDerivedOne: Command[(SignalToNoise, ExposureTimeModeId)] =
+      sql"""
+        UPDATE t_exposure_time_mode
+           SET c_is_explicit        = false,
+               c_exposure_time_mode = 'signal_to_noise',
+               c_signal_to_noise    = COALESCE(c_signal_to_noise, $signal_to_noise),
+               c_exposure_time      = NULL,
+               c_exposure_count     = NULL
+         WHERE c_exposure_time_mode_id = $exposure_time_mode_id
+           AND c_is_explicit
+      """.command
 
     def updateWherePresent(
       oids:       List[Observation.Id],

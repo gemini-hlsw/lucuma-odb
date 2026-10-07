@@ -244,7 +244,7 @@ object GnirsSpectroscopyService:
         ws: NonEmptyList[GnirsCentralWavelengthConfigInput]
       ): NonEmptyList[(WavelengthKey, Option[ExposureTimeMode])] =
         ws.zipWithIndex.map: (w, i) =>
-          (WavelengthKey(NonNegShort.unsafeFrom(i.toShort), w), w.exposureTimeMode)
+          (WavelengthKey(NonNegShort.unsafeFrom(i.toShort), w), w.exposureTimeMode.toOption)
 
       private def stripAcquisition[K, E](
         m: Map[Observation.Id, (E, NonEmptyList[(K, E)])]
@@ -360,16 +360,64 @@ object GnirsSpectroscopyService:
                 OdbError.InvalidArgument("'ifu.telescopeConfigs' is only valid with an IFU FPU.".some).asFailure
               else Result.unit
 
+      /**
+       * A telluric calibration's science exposure time modes are edited in place, one per
+       * current central wavelength row, so the rows keep their ids and a null entry can
+       * revert to the derived value.  The wavelengths and coadds are not editable here: the
+       * submitted list must match the telluric's current rows in order, and coadds follow
+       * the science on the next resync.
+       */
+      private def updateTelluricWavelengths(
+        ws:  NonEmptyList[GnirsCentralWavelengthConfigInput],
+        oid: Observation.Id
+      )(using Transaction[F]): ResultT[F, Unit] =
+        for
+          rows <- ResultT.liftF(session.execute(Statements.SelectCurrentWavelengthRows)(oid))
+          _    <- ResultT.fromResult:
+                    if rows.map(_._1) === ws.toList.map(_.centralWavelength) then Result.unit
+                    else OdbError.InvalidArgument(
+                      (s"The central wavelengths of telluric calibration $oid cannot be edited; " +
+                        "submit its current wavelengths in order.").some
+                    ).asFailure
+          _    <- ResultT.liftF:
+                    rows.zip(ws.toList).traverse_ : (row, w) =>
+                      val (_, eid) = row
+                      w.exposureTimeMode.fold(
+                        exposureTimeModeService
+                          .setDerivedOne(eid, TelluricScienceExposureTimeMode.DerivedSignalToNoise),
+                        ().pure[F],
+                        exposureTimeModeService.setExplicit(eid, _)
+                      )
+          _    <- ResultT.liftF(TelluricScienceExposureTimeMode.requeue(List(oid)))
+                    .whenA(ws.exists(_.exposureTimeMode.isNull))
+        yield ()
+
       override def update(
         SET:   GnirsSpectroscopyInput.Edit,
         which: List[Observation.Id]
       )(using Transaction[F]): F[Result[Unit]] =
-        NonEmptyList.fromList(which).fold(Result.unit.pure[F]): oids =>
+        NonEmptyList.fromList(which).fold(Result.unit.pure[F]): _ =>
           (for
-            _ <- ResultT(validateTelescopeConfigKind(SET, which))
-            _ <- ResultT.liftF(updateAcquisitionExposureTimeMode(SET, which))
-            _ <- updateWavelengths(SET, oids, which)
-            _ <- ResultT.liftF(Statements.updateGnirsSpectroscopy(SET, which).fold(F.unit)(session.exec))
+            tellurics <- ResultT.liftF(calibrationCalcService.telluricScience(which).map(_.keySet))
+            inPlace: List[Observation.Id] =
+                         if SET.isScienceExposureTimeModeOnly then which.filter(tellurics.contains)
+                         else Nil
+            others: List[Observation.Id] =
+                         which.filterNot(inPlace.contains)
+            reverts: Boolean =
+                         SET.centralWavelengths.exists(_.exists(_.exposureTimeMode.isNull))
+            _         <- ResultT.fromResult:
+                           if reverts && others.nonEmpty then TelluricScienceExposureTimeMode.NotATelluric.asFailure
+                           else Result.unit
+            _         <- (SET.centralWavelengths, NonEmptyList.fromList(inPlace)).tupled.traverse_ : (ws, oids) =>
+                           oids.traverse_(updateTelluricWavelengths(ws, _))
+            _         <- NonEmptyList.fromList(others).traverse_ : oids =>
+                           for
+                             _ <- ResultT(validateTelescopeConfigKind(SET, others))
+                             _ <- ResultT.liftF(updateAcquisitionExposureTimeMode(SET, others))
+                             _ <- updateWavelengths(SET, oids, others)
+                             _ <- ResultT.liftF(Statements.updateGnirsSpectroscopy(SET, others).fold(F.unit)(session.exec))
+                           yield ()
           yield ()).value
 
       override def clone(
@@ -814,6 +862,15 @@ object GnirsSpectroscopyService:
           )
 
       insertInto |+| values.intercalate(void", ")
+
+    val SelectCurrentWavelengthRows: Query[Observation.Id, (Wavelength, ExposureTimeModeId)] =
+      sql"""
+        SELECT c_central_wavelength, c_exposure_time_mode_id
+        FROM   t_gnirs_central_wavelength_config
+        WHERE  c_observation_id = $observation_id
+          AND  c_version = 'current'::e_observing_mode_row_version
+        ORDER BY c_index
+      """.query(wavelength_pm *: exposure_time_mode_id)
 
     /**
      * Copies the central wavelength rows to a cloned observation, remapping each

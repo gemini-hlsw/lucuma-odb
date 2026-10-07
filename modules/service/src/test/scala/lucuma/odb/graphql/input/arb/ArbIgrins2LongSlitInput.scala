@@ -47,7 +47,7 @@ trait ArbIgrins2LongSlitInput:
   given Arbitrary[Igrins2LongSlitInput.Edit] =
     Arbitrary:
       for
-        e   <- arbitrary[Option[ExposureTimeMode]]
+        e   <- arbitrary[Nullable[ExposureTimeMode]]
         svc <- arbitrary[Nullable[Igrins2LongSlitInput.Svc.Edit]]
         tc  <- arbitrary[Nullable[SlitTelescopeConfigs]]
         tt  <- arbitrary[Option[TelluricType]]
