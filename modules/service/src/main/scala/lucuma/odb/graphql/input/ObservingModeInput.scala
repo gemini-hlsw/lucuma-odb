@@ -203,14 +203,26 @@ object ObservingModeInput:
      * and nothing else: the one edit a telluric calibration accepts.
      */
     def isTelluricScienceExposureTimeModeOnly: Boolean =
-      val modes: List[Boolean] = List(
-        flamingos2LongSlit.map(_.isScienceExposureTimeModeOnly),
-        gnirsSpectroscopy.map(_.isScienceExposureTimeModeOnly),
-        igrins2LongSlit.map(_.isScienceExposureTimeModeOnly)
+      telluricScienceExposureTimeModeOnlyModes.nonEmpty
+
+    /**
+     * The observing mode types a telluric must have to accept this edit, or empty when the
+     * edit is not a science `exposureTimeMode` alone.  A telluric of another mode must not
+     * be admitted: the edit would replace its observing mode.
+     */
+    def telluricScienceExposureTimeModeOnlyModes: List[ObservingModeType] =
+      import ObservingModeType.*
+      val modes: List[List[ObservingModeType]] = List(
+        flamingos2LongSlit.filter(_.isScienceExposureTimeModeOnly).as(List(Flamingos2LongSlit)),
+        gnirsSpectroscopy.filter(_.isScienceExposureTimeModeOnly).as(List(GnirsLongSlit, GnirsIfu)),
+        igrins2LongSlit.filter(_.isScienceExposureTimeModeOnly).as(List(Igrins2LongSlit))
       ).flatten
-      modes.sizeIs == 1 && modes.forall(identity) &&
+      val others: Boolean =
         copy(flamingos2LongSlit = None, gnirsSpectroscopy = None, igrins2LongSlit = None)
           .productIterator.forall(_ == None)
+      modes match
+        case List(ms) if others => ms
+        case _                  => Nil
 
     def observingModeType: Option[ObservingModeType] =
       exchange.flatMap(_.mode)

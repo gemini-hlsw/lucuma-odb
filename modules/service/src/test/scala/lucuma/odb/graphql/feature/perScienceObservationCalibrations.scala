@@ -3591,6 +3591,26 @@ class perScienceObservationCalibrations
       assertEquals(updated, Nil)
       assertEquals(after, (Some(120), false))
 
+  test("telluric etm override: an ETM-only edit for another mode leaves the telluric alone"):
+    for
+      pid        <- createProgramAs(pi)
+      (_, tel)   <- createF2WithTelluric(pid)
+      updated    <- query(
+                      pi,
+                      s"""mutation {
+                        updateObservations(input: {
+                          SET: { observingMode: { igrins2LongSlit: { exposureTimeMode: ${snEtm(250)} } } }
+                          WHERE: { id: { EQ: "$tel" } }
+                        }) {
+                          observations { id }
+                        }
+                      }"""
+                    ).map(_.hcursor.downFields("updateObservations", "observations").require[List[ObsInfo]].map(_.id))
+      after      <- queryF2ScienceEtm(tel)
+    yield
+      assertEquals(updated, Nil)
+      assertEquals(after, (Some(120), false))
+
   test("telluric etm override: null on a science observation is rejected"):
     for
       pid <- createProgramAs(pi)
@@ -3705,6 +3725,31 @@ class perScienceObservationCalibrations
                     }""",
                     expected = {
                       case OdbError.InvalidArgument(Some(msg)) if msg.contains("cannot be edited") => ()
+                    }
+                  )
+    yield ()
+
+  test("telluric etm override: GNIRS rejects coadds on a telluric"):
+    for
+      pid      <- createProgramAs(pi)
+      (_, tel) <- createGnirsWithTelluric(pid)
+      _        <- expectOdbError(
+                    user  = pi,
+                    query = s"""mutation {
+                      updateObservations(input: {
+                        SET: { observingMode: { gnirsSpectroscopy: { centralWavelengths: [
+                          { centralWavelength: { nanometers: 1600 }
+                            exposureTimeMode: { timeAndCount: { time: { seconds: 30 } count: 2 at: { nanometers: 1600 } } }
+                            coadds: 4 }
+                          { centralWavelength: { nanometers: 1650 } }
+                        ] } } }
+                        WHERE: { id: { EQ: "$tel" } }
+                      }) {
+                        observations { id }
+                      }
+                    }""",
+                    expected = {
+                      case OdbError.InvalidArgument(Some(msg)) if msg.contains("coadds of telluric") => ()
                     }
                   )
     yield ()

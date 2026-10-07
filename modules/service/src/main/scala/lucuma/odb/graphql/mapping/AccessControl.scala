@@ -178,14 +178,17 @@ trait AccessControl[F[_]] extends Predicates[F] {
     includeDeleted:      Option[Boolean],
     WHERE:               Option[Predicate],
     includeCalibrations: Boolean,
-    includeTellurics:    Boolean = false
+    telluricModes:       List[ObservingModeType] = Nil
   )(using Services[F]): Result[AppliedFragment] =
     val calibrations: Predicate =
       if includeCalibrations then True
-      else if includeTellurics then
+      else if telluricModes.nonEmpty then
         Or(
           Predicates.observation.calibrationRole.isNull(true),
-          Predicates.observation.calibrationRole.eql(CalibrationRole.Telluric.some)
+          And(
+            Predicates.observation.calibrationRole.eql(CalibrationRole.Telluric.some),
+            Predicates.observation.observingModeType.in(telluricModes)
+          )
         )
       else Predicates.observation.calibrationRole.isNull(true)
 
@@ -209,10 +212,10 @@ trait AccessControl[F[_]] extends Predicates[F] {
     WHERE:               Option[Predicate],
     includeCalibrations: Boolean,
     allowedStates:       Set[ObservationWorkflowState],
-    includeTellurics:    Boolean = false
+    telluricModes:       List[ObservingModeType] = Nil
   )(using Services[F], NoTransaction[F]): F[Result[List[Observation.Id]]] =
     Services.asSuperUser:
-      writableOids(includeDeleted, WHERE, includeCalibrations, includeTellurics)
+      writableOids(includeDeleted, WHERE, includeCalibrations, telluricModes)
         .flatTraverse: which =>
           observationWorkflowService.filterState(which, allowedStates)
 
@@ -384,13 +387,13 @@ trait AccessControl[F[_]] extends Predicates[F] {
         else ObservationWorkflowState.fullSet         // always ok
 
       // A telluric calibration is otherwise read-only, but accepts an edit to its science
-      // exposure time mode alone.
+      // exposure time mode alone, and only from a SET for its own observing mode.
       selectForObservationUpdateImpl(
         input.includeDeleted,
         input.WHERE,
         includeCalibrations,
         allowedStates,
-        includeTellurics = input.SET.isTelluricScienceExposureTimeModeOnly
+        telluricModes = input.SET.telluricObservingModeTypes
       ).nestMap: oids =>
         Services.asSuperUser:
           AccessControl.unchecked(input.SET, oids, observation_id)

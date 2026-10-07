@@ -4,7 +4,9 @@
 package lucuma.odb.graphql
 package input
 
+import cats.Eq
 import cats.data.NonEmptyList
+import cats.syntax.eq.*
 import cats.syntax.parallel.*
 import cats.syntax.traverse.*
 import grackle.Result
@@ -205,7 +207,7 @@ object GnirsSpectroscopyInput:
 
     def isScienceExposureTimeModeOnly: Boolean =
       centralWavelengths.exists(_.exists(_.exposureTimeMode.isDefined)) &&
-        copy(centralWavelengths = None) == Edit.AllUndefined
+        copy(centralWavelengths = None) === Edit.AllUndefined
 
     /**
      * True if the input modifies fields that only Staff (or higher) may set.
@@ -231,6 +233,8 @@ object GnirsSpectroscopyInput:
                    telluricType.getOrElse(TelluricType.Hot))
 
   object Edit:
+    given Eq[Edit] = Eq.fromUniversalEquals
+
     private val AllUndefined: Edit =
       Edit(None, None, None, None, Nullable.Absent, Nullable.Absent, Nullable.Absent, Nullable.Absent,
            Nullable.Absent, Nullable.Absent, Nullable.Absent, Nullable.Absent, Nullable.Absent, None,

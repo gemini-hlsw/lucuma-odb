@@ -372,6 +372,18 @@ object GnirsSpectroscopyService:
         oid: Observation.Id
       )(using Transaction[F]): ResultT[F, Unit] =
         for
+          // The binding forces coadds to 1 under a signal-to-noise mode, so only a
+          // time-and-count entry can carry a user-set value.
+          _    <- ResultT.fromResult:
+                    val userCoadds = ws.exists: w =>
+                      w.coadds.isDefined && !w.exposureTimeMode.toOption.exists:
+                        case ExposureTimeMode.SignalToNoiseMode(_, _) => true
+                        case _                                        => false
+                    if userCoadds then
+                      OdbError.InvalidArgument(
+                        s"The coadds of telluric calibration $oid cannot be edited.".some
+                      ).asFailure
+                    else Result.unit
           rows <- ResultT.liftF(session.execute(Statements.SelectCurrentWavelengthRows)(oid))
           _    <- ResultT.fromResult:
                     if rows.map(_._1) === ws.toList.map(_.centralWavelength) then Result.unit
@@ -398,16 +410,20 @@ object GnirsSpectroscopyService:
       )(using Transaction[F]): F[Result[Unit]] =
         NonEmptyList.fromList(which).fold(Result.unit.pure[F]): _ =>
           (for
-            tellurics <- ResultT.liftF(calibrationCalcService.telluricScience(which).map(_.keySet))
-            inPlace: List[Observation.Id] =
-                         if SET.isScienceExposureTimeModeOnly then which.filter(tellurics.contains)
-                         else Nil
+            // Only an ETM-only edit admits tellurics, so no lookup is needed otherwise.
+            inPlace   <- ResultT.liftF:
+                           if SET.isScienceExposureTimeModeOnly then
+                             calibrationCalcService
+                               .telluricScience(which)
+                               .map(t => which.filter(t.contains))
+                           else Nil.pure[F]
             others: List[Observation.Id] =
                          which.filterNot(inPlace.contains)
             reverts: Boolean =
                          SET.centralWavelengths.exists(_.exists(_.exposureTimeMode.isNull))
             _         <- ResultT.fromResult:
-                           if reverts && others.nonEmpty then TelluricScienceExposureTimeMode.NotATelluric.asFailure
+                           if reverts && others.nonEmpty then
+                             TelluricScienceExposureTimeMode.notATelluric(others).asFailure
                            else Result.unit
             _         <- (SET.centralWavelengths, NonEmptyList.fromList(inPlace)).tupled.traverse_ : (ws, oids) =>
                            oids.traverse_(updateTelluricWavelengths(ws, _))

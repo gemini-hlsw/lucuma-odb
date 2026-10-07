@@ -142,14 +142,8 @@ object Flamingos2LongSlitService:
           etm.fold(().pure[F]): e =>
             services.exposureTimeModeService.updateMany(which, role, e)
 
-        val science: F[Result[Unit]] =
-          input.exposureTimeMode.fold(
-            TelluricScienceExposureTimeMode.revert(which),
-            Result.unit.pure[F],
-            e => services.exposureTimeModeService.updateMany(which, ExposureTimeModeRole.Science, e).as(Result.unit)
-          )
-
-        update(input.acquisition.flatMap(_.exposureTimeMode), ExposureTimeModeRole.Acquisition) *> science
+        update(input.acquisition.flatMap(_.exposureTimeMode), ExposureTimeModeRole.Acquisition) *>
+          TelluricScienceExposureTimeMode.updateScience(which, input.exposureTimeMode)
 
       override def update(
         SET: Flamingos2LongSlitInput.Edit,

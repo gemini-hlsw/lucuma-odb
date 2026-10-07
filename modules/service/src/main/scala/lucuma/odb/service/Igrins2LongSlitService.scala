@@ -16,7 +16,6 @@ import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.igrins2.SvcDefaultExposure
 import lucuma.core.model.sequence.igrins2.SvcDefaultTelescopeConfigs
 import lucuma.core.util.TimeSpan
-import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.format.telescopeConfigs.*
 import lucuma.odb.graphql.input.Igrins2LongSlitInput
 import lucuma.odb.sequence.igrins2.longslit.Config
@@ -124,11 +123,7 @@ object Igrins2LongSlitService:
         input: Igrins2LongSlitInput.Edit,
         which: List[Observation.Id]
       )(using Transaction[F]): F[Result[Unit]] =
-        input.exposureTimeMode.fold(
-          TelluricScienceExposureTimeMode.revert(which),
-          Result.unit.pure[F],
-          e => services.exposureTimeModeService.updateMany(which, ExposureTimeModeRole.Science, e).as(Result.unit)
-        )
+        TelluricScienceExposureTimeMode.updateScience(which, input.exposureTimeMode)
 
       override def update(
         SET: Igrins2LongSlitInput.Edit,

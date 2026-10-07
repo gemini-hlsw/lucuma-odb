@@ -4,6 +4,7 @@
 package lucuma.odb.graphql
 package input
 
+import cats.Eq
 import cats.syntax.order.*
 import cats.syntax.parallel.*
 import cats.syntax.traverse.*
@@ -111,7 +112,7 @@ object Igrins2LongSlitInput:
 
     def isScienceExposureTimeModeOnly: Boolean =
       exposureTimeMode.isDefined &&
-        copy(exposureTimeMode = Nullable.Absent) == Edit.AllUndefined
+        copy(exposureTimeMode = Nullable.Absent) === Edit.AllUndefined
 
     private val stored = explicitTelescopeConfigs.map(storedSlitTelescopeConfigs)
 
@@ -132,6 +133,7 @@ object Igrins2LongSlitInput:
       ))
 
   object Edit:
+    given Eq[Edit] = Eq.fromUniversalEquals
 
     private val AllUndefined: Edit =
       Edit(Nullable.Absent, Nullable.Absent, Nullable.Absent, None)
