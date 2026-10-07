@@ -147,7 +147,8 @@ object CalibrationCalcDaemon:
     pollPeriod:       FiniteDuration,
     batchSize:        Int,
     topic:            Topic[F, CalibrationCalcTopic.Element],
-    services:         Resource[F, Services[F]]
+    services:         Resource[F, Services[F]],
+    heartbeat:        F[Unit]
   ): Resource[F, Unit] =
     given Logger[F] = LF.getLoggerFromName("calibration-calc")
 
@@ -176,6 +177,7 @@ object CalibrationCalcDaemon:
             services.useTransactionally:
               Services.asSuperUser:
                 calibrationCalcService.load(batchSize)
+        .evalTap(_ => heartbeat)
         .map(groupByProgramAndWorkType)
         .flatMap(Stream.emits)
 

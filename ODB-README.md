@@ -256,6 +256,10 @@ ODB checks: `db` (`SELECT 1`) and `sso` (`GET <sso>/health/ready`) required; `it
 flip the status. HTTP probes pass only on 2xx. Implementation: `lucuma.otel.health` in
 `modules/otel`.
 
+Worker dynos (`obscalc`, `calibration`, `pdfsummary`) have no HTTP. Each records the gauge
+`lucuma.worker.last_iteration_epoch_seconds{service=...}` once per poll; alert in Grafana on
+`time() - value` and `absent()`.
+
 ## SQL Query Instrumentation
 
 The GraphQL `fetch` layer (grackle -> skunk) records timing and row-count attributes on every

@@ -35,6 +35,7 @@ import lucuma.odb.service.S3FileService
 import lucuma.odb.service.Services
 import lucuma.odb.service.UserService
 import lucuma.odb.util.OdbTelemetry
+import lucuma.otel.health.WorkerHeartbeat
 import org.http4s.Credentials
 import org.http4s.client.Client
 import org.http4s.headers.Authorization
@@ -151,10 +152,11 @@ object PMain extends MainParams:
         error"Failed to get service user" *>
           MonadThrow[F].raiseError(new RuntimeException("Failed to get service user"))
 
-  def server[F[_]: Async: Compression: Files: Processes: Parallel: Logger: LoggerFactory: Tracer: TracerProvider: MeterProvider: Console: Network: SecureRandom]: Resource[F, ExitCode] =
+  def server[F[_]: Async: Compression: Files: Processes: Parallel: Logger: LoggerFactory: Tracer: TracerProvider: Meter: MeterProvider: Console: Network: SecureRandom]: Resource[F, ExitCode] =
     for {
       c                <- Resource.eval(Config.fromCiris.load[F])
       _                <- Resource.eval(banner[F](c))
+      heartbeat        <- WorkerHeartbeat.resource[F]("pdf-summary")
       pool             <- databasePoolResource[F](c.database, c.database.maxPdfSummaryConnections)
       enums            <- Resource.eval(pool.use(Enums.load))
       user             <- Resource.eval(serviceUser[F](c))
@@ -189,7 +191,7 @@ object PMain extends MainParams:
       servicesResource  = pool.evalMap(services(user, c.email, c.commitHash, ptc, httpClient, itcClient, gaiaClient, horizonsClient, s3FileService, mapping))
       renderer          = PdfRenderer.subprocess[F](c.pdfSummary.python, c.itc.root, c.pdfSummary.renderTimeout, c.pdfSummary.keepTempFiles)
       _                <- Resource.eval(info"PDF summary job daemon starting")
-      _                <- PdfSummaryJobDaemon.run(c.obscalcPoll, pool, servicesResource, renderer, c.pdfSummary.keepTempFiles)
+      _                <- PdfSummaryJobDaemon.run(c.obscalcPoll, pool, servicesResource, renderer, heartbeat, c.pdfSummary.keepTempFiles)
     } yield ExitCode.Success
 
   def runF(using Logger[IO], LoggerFactory[IO]): IO[ExitCode] =

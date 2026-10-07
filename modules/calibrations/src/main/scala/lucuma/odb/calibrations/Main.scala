@@ -37,6 +37,7 @@ import lucuma.odb.service.TelluricTargetsDaemon
 import lucuma.odb.service.TelluricTargetsService
 import lucuma.odb.service.UserService
 import lucuma.odb.util.OdbTelemetry
+import lucuma.otel.health.WorkerHeartbeat
 import org.http4s.Credentials
 import org.http4s.client.Client
 import org.http4s.headers.Authorization
@@ -143,7 +144,8 @@ object CMain extends MainParams {
   def runCalibrationCalcDaemon[F[_]: {Async, LoggerFactory as LF, Tracer as T}](
     calcTopic:        Topic[F, CalibrationCalcTopic.Element],
     pollPeriod:       FiniteDuration,
-    services:         Resource[F, Services[F]]
+    services:         Resource[F, Services[F]],
+    heartbeat:        F[Unit]
   ): Resource[F, Unit] =
     // No connection limit to pass: `connectionsLimit` was only ever this
     // daemon's poll batch size, never a bound on any fan-out -- it recalculates
@@ -153,14 +155,16 @@ object CMain extends MainParams {
       pollPeriod       = pollPeriod,
       batchSize        = 10,
       topic            = calcTopic,
-      services         = services
+      services         = services,
+      heartbeat        = heartbeat
     )
 
   def runTelluricTargetsDaemon[F[_]: {Async, Parallel, Logger, LoggerFactory, Tracer}](
     connectionsLimit: Int,
     pollPeriod: FiniteDuration,
     telluricTopic: Topic[F, TelluricTargetTopic.Element],
-    services: Resource[F, Services[F]]
+    services: Resource[F, Services[F]],
+    heartbeat: F[Unit]
   ): Resource[F, Unit] =
     Resource.eval:
       info"Telluric Resolution Daemon starting" *>
@@ -169,7 +173,8 @@ object CMain extends MainParams {
           pollPeriod = pollPeriod,
           batchSize = 10,
           topic = telluricTopic,
-          services = services
+          services = services,
+          heartbeat = heartbeat
         )
 
   def services[F[_]: Async: Parallel: UUIDGen: Tracer: Logger: LoggerFactory](
@@ -213,10 +218,11 @@ object CMain extends MainParams {
    * Our main server, as a resource that starts up our server on acquire and shuts it all down
    * in cleanup, yielding an `ExitCode`. Users will `use` this resource and hold it forever.
    */
-  def server[F[_]: Async: Compression: Parallel: Logger: LoggerFactory: Tracer: TracerProvider: MeterProvider: Console: Network: SecureRandom]: Resource[F, ExitCode] =
+  def server[F[_]: Async: Compression: Parallel: Logger: LoggerFactory: Tracer: TracerProvider: Meter: MeterProvider: Console: Network: SecureRandom]: Resource[F, ExitCode] =
     for {
       c                  <- Resource.eval(Config.fromCiris.load[F])
       _                  <- Resource.eval(banner[F](c))
+      heartbeat          <- WorkerHeartbeat.resource[F]("calibrations")
       pool               <- databasePoolResource[F](c.database)
       enums              <- Resource.eval(pool.use(Enums.load))
       (ccT, trT)         <- topics(pool)
@@ -233,8 +239,8 @@ object CMain extends MainParams {
       hminCache          <- Resource.eval(pool.use(TelluricTargetsService.loadBrightnessCache))
       _                  <- Resource.eval(info"Loading ${hminCache.value.size} configurations for telluric brightness")
       servicesResource   = pool.evalMap(services(user, c.email, c.commitHash, ptc, httpClient, itcClient, gaiaClient, horizonsClient, telClient, hminCache))
-      _                  <- runCalibrationCalcDaemon(ccT, c.obscalcPoll, servicesResource)
-      _                  <- runTelluricTargetsDaemon(c.database.calibrationWorkers, c.obscalcPoll, trT, servicesResource)
+      _                  <- runCalibrationCalcDaemon(ccT, c.obscalcPoll, servicesResource, heartbeat)
+      _                  <- runTelluricTargetsDaemon(c.database.calibrationWorkers, c.obscalcPoll, trT, servicesResource, heartbeat)
     } yield ExitCode.Success
 
   /** Our logical entry point. */
