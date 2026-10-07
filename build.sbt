@@ -1088,7 +1088,9 @@ lazy val binding = project
       "org.typelevel" %% "grackle-core"       % grackleVersion,
       "org.typelevel" %% "grackle-sql-core"   % grackleVersion,
       "org.typelevel" %% "log4cats-core"      % log4catsVersion,
+      "edu.gemini"    %% "lucuma-core-testkit" % lucumaCoreVersion     % Test,
       "org.scalameta" %% "munit"              % munitVersion           % Test,
+      "org.scalameta" %% "munit-scalacheck"   % munitScalacheckVersion % Test,
       "org.typelevel" %% "munit-cats-effect"  % munitCatsEffectVersion % Test
     )
   )
