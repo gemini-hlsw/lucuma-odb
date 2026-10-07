@@ -266,6 +266,30 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat with que
     }
   }
 
+  test("[general] cannot create an observation in a group from another program"):
+    for
+      pid1 <- createProgramAs(pi)
+      pid2 <- createProgramAs(pi)
+      gid  <- createGroupAs(pi, pid2)
+      _    <- expectOdbError(
+                user = pi,
+                query = s"""
+                  mutation {
+                    createObservation(input: {
+                      programId: "$pid1"
+                      SET: { groupId: "$gid" }
+                    }) {
+                      observation { id }
+                    }
+                  }
+                """,
+                expected = {
+                  case OdbError.InvalidArgument(Some(s"Group $gid is not in program $pid1.")) => ()
+                }
+              )
+      es2  <- groupElementsAs(pi, pid2, Some(gid))
+    yield assertEquals(es2, Nil)
+
   test("[general] created observation should have specified subtitle (non-null)") {
     createProgramAs(pi).flatMap { pid =>
       query(pi,

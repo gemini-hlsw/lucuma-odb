@@ -12,6 +12,6 @@ ALOPEKE	3	u,g,r,i,z,EO466,EO562,EO716,EO832	no	speckle	n
 ZORRO	3	u,g,r,i,z,EO466,EO562,EO716,EO832,Halpha	no	speckle	s
 ALOPEKE	35	u,g,r,i,z,EO466,EO562,EO716,EO832	no	wide field	n
 ZORRO	35	u,g,r,i,z,EO466,EO562,EO716,EO832,Halpha	no	wide field	s
-SCORPIO	180	g,r,i,z,J,H,Ks	no		s
+SCORPIO	180	g,r,i,z	no		s
 Visitor @ GN	-	-	yes		n
 Visitor @ GS	-	-	no		s

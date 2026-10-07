@@ -433,6 +433,7 @@ object ObservationService {
             ).parTupled.void
 
           ResultT(guidingCheck.pure[F])
+            .flatMap(_ => SET.group.traverse_(gid => ResultT(groupService.checkGroupInProgram(pid, gid))))
             .flatMap(_ => ResultT(Services.asSuperUser(createObservationImpl(pid, SET, calibrationRole))))
             .flatMap: oid =>
               SET
@@ -642,6 +643,16 @@ object ObservationService {
                           s"Observations ${ids.map(_.show).mkString(", ")} cannot be moved out of their system group; move the group instead.".some
                         ).asFailure
 
+            // On a group change, the destination group must be in the same program.
+            val checkSameProgram: ResultT[F, Unit] =
+              SET.group.toOption.fold(ResultT.unit): dest =>
+                ResultT:
+                  val af = Statements.selectProgramsOf(which)
+                  session.execute(af.fragment.query(program_id))(af.argument).flatMap:
+                    case Nil        => Result.unit.pure[F]
+                    case pid :: Nil => groupService.checkGroupInProgram(pid, dest)
+                    case _          => OdbError.InvalidArgument("Cannot move observations from different programs into one group.".some).asFailureF
+
             // Runs after the mode update so the probe is checked against the new mode.
             val validateExplicitGuideProbe: ResultT[F, Unit] =
               ResultT:
@@ -726,6 +737,7 @@ object ObservationService {
             (for {
               _ <- validateAltairConfiguration
               _ <- forbidSystemGroupMove
+              _ <- checkSameProgram
 
               // Ahead of the update, unlike the ceiling check below it.  A CHECK
               // constraint backs this rule, and a constraint aborts the statement
@@ -1566,6 +1578,12 @@ object ObservationService {
         WHERE c_observation_id IN (
       """.apply(gid, index) |+| which |+| void")"
 
+    def selectProgramsOf(which: AppliedFragment): AppliedFragment =
+      void"""
+        SELECT DISTINCT c_program_id
+        FROM t_observation
+        WHERE c_observation_id IN (""" |+| which |+| void")"
+
     def selectObservationsInSystemGroup(which: AppliedFragment): AppliedFragment =
       void"""
         SELECT o.c_observation_id
@@ -1705,7 +1723,8 @@ object ObservationService {
           END AS c_error_message
         FROM t_atom a
         LEFT JOIN t_step s ON s.c_atom_id = a.c_atom_id
-        WHERE a.c_observation_id IN (""".apply(limit) |+| which |+| sql""")
+        WHERE a.c_sequence_type = 'science'
+          AND a.c_observation_id IN (""".apply(limit) |+| which |+| sql""")
         GROUP BY a.c_observation_id
         HAVING
           COUNT(DISTINCT a.c_atom_id) > 1 OR

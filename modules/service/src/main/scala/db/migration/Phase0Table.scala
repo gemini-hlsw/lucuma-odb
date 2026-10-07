@@ -20,12 +20,14 @@ import lucuma.odb.phase0.GmosSpectroscopyRow
 import lucuma.odb.phase0.GnirsImagingRow
 import lucuma.odb.phase0.GnirsSpectroscopyRow
 import lucuma.odb.phase0.ImagingRow
+import lucuma.odb.phase0.ScorpioSpectroscopyRow
 import lucuma.odb.phase0.SpectroscopyRow
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Flamingos2Codecs.*
 import lucuma.odb.util.GhostCodecs.*
 import lucuma.odb.util.GmosCodecs.*
 import lucuma.odb.util.GnirsCodecs.*
+import lucuma.odb.util.ScorpioCodecs.*
 import skunk.Encoder
 import skunk.codec.boolean.bool
 import skunk.codec.numeric.numeric
@@ -236,6 +238,26 @@ object Phase0Table {
         "c_fpu_ifu",
         "c_prism",
         "c_camera"
+      )
+
+  val SpectroscopyScorpio = new Phase0Table[ScorpioSpectroscopyRow]:
+    override def name: String =
+      s"${Spectroscopy.name}_scorpio"
+
+    override def encoder: Encoder[ScorpioSpectroscopyRow] =
+      (
+        instrument *:
+        scorpio_fpu
+      ).contramap[ScorpioSpectroscopyRow]: row =>
+        (
+          row.spec.instrument,
+          row.fpu
+        )
+
+    override def columns: List[String] =
+      List(
+        "c_instrument",
+        "c_fpu"
       )
 
   val SpectroscopyGhostIfu = new Phase0Table[GhostIfuRow]:

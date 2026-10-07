@@ -34,7 +34,8 @@ case class GeneratorParams(
   stepCount:        Long,
   isSplittable:     Boolean,
   altair:           Option[AltairConfiguration],
-  guideProbe:       Option[GuideProbe]
+  guideProbe:       Option[GuideProbe],
+  tellurics:        CalibrationGroupTellurics
 ):
 
   // The standard star is chosen to suit the observation time, so a real
@@ -64,7 +65,8 @@ object GeneratorParams:
         a.stepCount,
         a.isSplittable,
         a.altair,
-        a.guideProbe
+        a.guideProbe,
+        a.tellurics
       )
 
   given HashBytes[AltairConfiguration] with
@@ -76,6 +78,8 @@ object GeneratorParams:
         a.ndFilter.hashBytes
       )
 
+  // Tellurics are left out so that a telluric change keeps the cached digest
+  // and guide star; the generator adds the calibration estimate on read.
   given HashBytes[GeneratorParams] with
     def hashBytes(a: GeneratorParams): Array[Byte] =
       Array.concat(

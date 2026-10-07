@@ -34,7 +34,7 @@ val keySemaphoreVersion          = "0.3.0"
 val kittensVersion               = "3.5.0"
 val logbackVersion               = "1.6.5"
 val log4catsVersion              = "2.8.0"
-val lucumaCoreVersion            = "0.261.0"
+val lucumaCoreVersion            = "0.262.0"
 val lucumaGraphQLRoutesVersion   = "0.16.0"
 val lucumaRefinedVersion         = "0.1.4"
 val monocleVersion               = "3.3.0"
@@ -88,7 +88,7 @@ ThisBuild / libraryDependencySchemes ++= Seq(
 ThisBuild / libraryDependencySchemes +=
   "edu.gemini" %% "clue-model" % VersionScheme.Always
 
-ThisBuild / tlBaseVersion      := "0.100"
+ThisBuild / tlBaseVersion      := "0.101"
 ThisBuild / scalaVersion       := "3.9.0"
 ThisBuild / crossScalaVersions := Seq("3.9.0")
 ThisBuild / scalacOptions     ++= Seq("-Xmax-inlines", "50") // Hash derivation fails with default of 32
@@ -609,7 +609,7 @@ lazy val ssoBackendClient = project
 
 lazy val ssoService = project
   .in(file("modules/sso-service"))
-  .dependsOn(ssoBackendClient, binding, common)
+  .dependsOn(ssoBackendClient, binding, common, otel)
   .enablePlugins(NoPublishPlugin, LucumaDockerPlugin, JavaAppPackaging, BuildInfoPlugin)
   .settings(buildInfoSettings)
   .settings(
@@ -617,24 +617,22 @@ lazy val ssoService = project
     // Include internal (unpublished) project dependencies, like common, in the package
     projectDependencyArtifacts := (Compile / dependencyClasspathAsJars).value,
     libraryDependencies ++= Seq(
-      "org.typelevel"       %% "grackle-skunk"              % grackleVersion,
-      "org.tpolecat"        %% "skunk-core"                 % skunkVersion,
-      "org.tpolecat"        %% "skunk-circe"                % skunkVersion,
-      "org.flywaydb"         % "flyway-database-postgresql" % flywayVersion,
-      "org.postgresql"       % "postgresql"                 % postgresVersion,
-      "org.http4s"          %% "http4s-blaze-server"        % http4sBlazeVersion,
-      "org.http4s"          %% "http4s-ember-client"        % http4sVersion,
-      "org.http4s"          %% "http4s-circe"               % http4sVersion,
-      "org.http4s"          %% "http4s-dsl"                 % http4sVersion,
-      "is.cir"              %% "ciris"                      % cirisVersion,
-      "com.monovore"        %% "decline-effect"             % declineVersion,
-      "org.typelevel"       %% "log4cats-slf4j"             % log4catsVersion,
-      "ch.qos.logback"       % "logback-classic"            % logbackVersion,
-      "io.circe"            %% "circe-generic"              % circeVersion,
-      "org.tpolecat"        %% "natchez-honeycomb"          % natchezVersion,
-      "org.tpolecat"        %% "natchez-http4s"             % natchezHttp4sVersion,
-      "org.tpolecat"        %% "natchez-log"                % natchezVersion,
-      "edu.gemini"          %% "lucuma-graphql-routes"      % lucumaGraphQLRoutesVersion,
+      "org.typelevel"       %% "grackle-skunk"                         % grackleVersion,
+      "org.tpolecat"        %% "skunk-core"                            % skunkVersion,
+      "org.tpolecat"        %% "skunk-circe"                           % skunkVersion,
+      "org.flywaydb"         % "flyway-database-postgresql"            % flywayVersion,
+      "org.postgresql"       % "postgresql"                            % postgresVersion,
+      "org.http4s"          %% "http4s-blaze-server"                   % http4sBlazeVersion,
+      "org.http4s"          %% "http4s-ember-client"                   % http4sVersion,
+      "org.http4s"          %% "http4s-circe"                          % http4sVersion,
+      "org.http4s"          %% "http4s-dsl"                            % http4sVersion,
+      "is.cir"              %% "ciris"                                 % cirisVersion,
+      "com.monovore"        %% "decline-effect"                        % declineVersion,
+      "org.typelevel"       %% "log4cats-slf4j"                        % log4catsVersion,
+      "ch.qos.logback"       % "logback-classic"                       % logbackVersion,
+      "io.circe"            %% "circe-generic"                         % circeVersion,
+      "org.http4s"          %% "http4s-otel4s-middleware-trace-server" % http4sOtel4sVersion,
+      "edu.gemini"          %% "lucuma-graphql-routes"                 % lucumaGraphQLRoutesVersion,
 
       "io.circe"            %% "circe-literal"                   % circeVersion               % Test,
       "org.scalameta"       %% "munit"                           % munitVersion               % Test,
@@ -667,7 +665,7 @@ lazy val ssoBackendExample = project
       "org.http4s"   %% "http4s-ember-server" % http4sVersion,
       "org.slf4j"    %  "slf4j-simple"        % slf4jVersion,
       "org.tpolecat" %% "natchez-http4s"      % natchezHttp4sVersion,
-      "org.tpolecat" %% "natchez-honeycomb"   % natchezVersion,
+      "org.tpolecat" %% "natchez-log"         % natchezVersion,
     )
   )
 
@@ -1072,6 +1070,7 @@ lazy val otel = project
     },
     Compile / compile := (Compile / compile).dependsOn(checkOtelVersion).value,
     libraryDependencies ++= Seq(
+      "is.cir"                           %% "ciris"                                     % cirisVersion,
       "org.tpolecat"                     %% "natchez-core"                              % natchezVersion,
       "org.tpolecat"                     %% "natchez-noop"                              % natchezVersion,
       "org.typelevel"                    %% "otel4s-oteljava"                           % otel4sVersion,

@@ -67,7 +67,7 @@ import lucuma.odb.graphql.query.ObservingModeSetupOperations
 import lucuma.odb.graphql.subscription.SubscriptionUtils
 import lucuma.odb.json.time.transport.given
 import lucuma.odb.json.wavelength.decoder.given
-import lucuma.odb.logic.Generator
+import lucuma.odb.service.ObsExtract
 import lucuma.odb.service.Services
 import lucuma.odb.service.TelluricTargetsServiceSuiteSupport
 import lucuma.odb.smartgcal.data.Gnirs
@@ -1617,7 +1617,7 @@ class perScienceObservationCalibrations
                     _.flatMap(_.result).flatMap(_.digest)
     yield
       assertEquals(meta.flatMap(_.resolvedTargetId), None)
-      assertEquals(dig.map(_.fullTimeEstimate.sum), Generator.UnresolvedTelluricTime.some)
+      assertEquals(dig.map(_.fullTimeEstimate.sum), ObsExtract.TelluricPlaceholderTime.some)
       assertEquals(dig.map(_.science.steps.time), dig.map(_.science.timeEstimate), "the step digests must sum to the estimate")
 
   test("coordinate change triggers re-resolution with new hash"):
@@ -2108,6 +2108,37 @@ class perScienceObservationCalibrations
         ("initial", 1, 1650, 1, 100, 1700)
       )
       assertEquals(rows.map(_.sortBy(_._1)), expected.some)
+
+  // sc-10381: the telluric's S/N wavelength follows the science's even when the central
+  // wavelength itself does not move.
+  test("telluric sn wavelength follows the science sn wavelength at an unchanged central wavelength"):
+    for {
+      pid    <- createProgramAs(pi)
+      tid    <- createTargetWithProfileAs(pi, pid)
+      _      <- seedGnirsXdSmartGcal
+      oid    <- createGnirsXdObservationAs(pi, pid, tid, wavelengthsNm = List(1100))
+      _      <- runObscalcUpdate(pid, oid)
+      _      <- recalculateCalibrations(pid, when, oid)
+      telOpt <- selectTelluricObservationFor(oid)
+      before <- telOpt.traverse(gnirsWavelengthRows)
+      _      <- setGnirsCentralWavelengths(oid,
+                  """{ centralWavelength: { nanometers: 1100 }
+                       exposureTimeMode: { timeAndCount: { time: { seconds: 300.0 } count: 12 at: { nanometers: 2400 } } } }""")
+      _      <- runObscalcUpdate(pid, oid)
+      _      <- recalculateCalibrations(pid, when, oid)
+      after  <- telOpt.traverse(gnirsWavelengthRows)
+      _      <- setGnirsCentralWavelengths(oid,
+                  """{ centralWavelength: { nanometers: 1100 }
+                       exposureTimeMode: { signalToNoise: { value: 50 at: { nanometers: 2300 } } } }""")
+      _      <- runObscalcUpdate(pid, oid)
+      _      <- recalculateCalibrations(pid, when, oid)
+      sn     <- telOpt.traverse(gnirsWavelengthRows)
+    } yield
+      assertEquals(before.map(_.map(_._6).distinct), List(1100).some)
+      assertEquals(after.map(_.sortBy(_._1)),
+        List(("current", 0, 1100, 1, 232, 2400), ("initial", 0, 1100, 1, 232, 2400)).some)
+      assertEquals(sn.map(_.sortBy(_._1)),
+        List(("current", 0, 1100, 1, 100, 2300), ("initial", 0, 1100, 1, 100, 2300)).some)
 
   test("science configurations sharing a wavelength collapse to one telluric configuration"):
     for {

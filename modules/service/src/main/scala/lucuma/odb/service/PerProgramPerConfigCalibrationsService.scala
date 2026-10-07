@@ -26,7 +26,6 @@ import lucuma.odb.data.Existence
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.data.GroupTree
 import lucuma.odb.data.Nullable
-import lucuma.odb.graphql.input.CreateGroupInput
 import lucuma.odb.graphql.input.GmosLongSlitInput
 import lucuma.odb.graphql.input.GroupPropertiesInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
@@ -100,24 +99,26 @@ object PerProgramPerConfigCalibrationsService:
                 case Some(gid) => gid.some.pure[F]
                 case None      =>
                   groupService.createGroup(
-                      input = CreateGroupInput(
-                        programId = pid.some,
-                        proposalReference = none,
-                        programReference = none,
-                        SET = GroupPropertiesInput.Create(
-                          name = CalibrationsGroupName.some,
-                          description = CalibrationsGroupName.some,
-                          minimumRequired = none,
-                          ordered = false,
-                          minimumInterval = none,
-                          maximumInterval = none,
-                          sameNight = false,
-                          parentGroupId = none,
-                          parentGroupIndex = none,
-                          existence = Existence.Present
+                      input = Services.asSuperUser:
+                        AccessControl.unchecked(
+                          GroupService.NewGroup(
+                            SET = GroupPropertiesInput.Create(
+                              name = CalibrationsGroupName.some,
+                              description = CalibrationsGroupName.some,
+                              minimumRequired = none,
+                              ordered = false,
+                              minimumInterval = none,
+                              maximumInterval = none,
+                              sameNight = false,
+                              parentGroupId = none,
+                              parentGroupIndex = none,
+                              existence = Existence.Present
+                            ),
+                            initialContents = Nil
+                          ),
+                          pid,
+                          program_id
                         ),
-                        Nil
-                      ),
                     system = true,
                     calibrationRoles = List(CalibrationRole.Twilight, CalibrationRole.SpectroPhotometric)
                   ).map(_.toOption)

@@ -20,7 +20,7 @@ object TargetDataInput:
   val Binding: Matcher[TargetDataInput] =
     ObjectFieldsBinding.rmap:
       case List(
-            SourceProfileInput.Binding("sourceProfile", sourceProfile),
+            SourceProfileInput.CreateBinding("sourceProfile", sourceProfile),
             RadialVelocityInput.Binding("radialVelocity", radialVelocity)
           ) =>
         (sourceProfile, radialVelocity).parMapN((sp, rv) => TargetDataInput(sp, rv))

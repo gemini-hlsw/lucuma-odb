@@ -10,8 +10,10 @@ import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import grackle.Result
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.ExecutionState
 import lucuma.core.enums.ObservationWorkflowState
+import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.Site
 import lucuma.core.math.Angle
@@ -27,6 +29,9 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.TelluricType
+import lucuma.core.model.sequence.CalibrationDigest
+import lucuma.core.model.sequence.CalibrationEstimate
+import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.BlindOffsetType
@@ -41,6 +46,9 @@ import lucuma.odb.graphql.input.SpectroscopyScienceRequirementsInput
 import lucuma.odb.graphql.input.TargetEnvironmentInput
 import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.sequence.ObservingMode
+import lucuma.odb.sequence.ObservingMode.Syntax.*
+import lucuma.odb.sequence.data.CalibrationGroupTellurics
+import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.ItcInput
 import lucuma.odb.sequence.flamingos2.longslit.Config as Flamingos2Config
 import lucuma.odb.sequence.flamingos2.mos.Config as Flamingos2MosConfig
@@ -84,34 +92,98 @@ object ObsExtract:
       case c: GnirsSpectroscopyConfig => c.telluricType =!= TelluricType.NoTelluric
       case _                          => true
 
+  /** Wavelength from which infrared calibrations repeat hourly rather than every 90 minutes. 2.6 microns */
+  val LongWavelengthCutoff: Wavelength = Wavelength.unsafeFromIntPicometers(2_600_000)
+
+  val ShortWavelengthSetInterval: TimeSpan = 90.minTimeSpan
+
+  val LongWavelengthSetInterval: TimeSpan = 60.minTimeSpan
+
+  def calibrationSetInterval(wavelength: Wavelength): TimeSpan =
+    if wavelength < LongWavelengthCutoff then ShortWavelengthSetInterval else LongWavelengthSetInterval
+
   /** Modes whose science observations are accompanied by tellurics. */
-  def modeTakesTelluric(mode: ObservingMode): Boolean =
-    mode match
-      case _: Flamingos2Config | _: Flamingos2MosConfig | _: Igrins2Config | _: GnirsSpectroscopyConfig => true
-      case _                                                                                           => false
-
-  /** Roughly one calibration epoch per this much science time. */
-  // TODO: This is a temporary value. In the future this will depend on the obs wavelength.
-  val CalibrationEpochInterval: TimeSpan = 90.minTimeSpan
-
-  /** Calibration epochs over the lifetime of an observation: ceil(scienceTime / interval). */
-  // TODO: This is a temporary value. In the future this will depend on the obs wavelength and duration
-  def calibrationEpochs(scienceTime: TimeSpan): NonNegInt =
-    NonNegInt.unsafeFrom:
-      math.ceil(scienceTime.toMicroseconds.toDouble / CalibrationEpochInterval.toMicroseconds.toDouble).toInt
+  def modeTakesTelluric(modeType: ObservingModeType): Boolean =
+    modeType match
+      case ObservingModeType.Flamingos2LongSlit | ObservingModeType.Flamingos2Mos |
+           ObservingModeType.Igrins2LongSlit | ObservingModeType.GnirsLongSlit |
+           ObservingModeType.GnirsIfu => true
+      case _                          => false
 
   /**
-   * Calibration carried in the time estimate.  Zero for calibration
-   * observations and for modes that take no telluric; independent of the
-   * telluric type, which only decides whether each epoch costs a telluric.
+   * Duration of science to require a telluric.
+   * GNIRS follows its longest central wavelength; the other infrared modes
+   * never reach the cutoff and keep the 90-minute scienceSpan.
    */
-  def calibrationCount(
+  def telluricPerScience(mode: ObservingMode): Option[TimeSpan] =
+    mode match
+      case c: GnirsSpectroscopyConfig =>
+        calibrationSetInterval(c.wavelengths.map(_.centralWavelength).maximum).some
+      case _ if modeTakesTelluric(mode.modeType) =>
+        ShortWavelengthSetInterval.some
+      case _ =>
+        none
+
+  /** Calibration sets over the lifetime of an observation: ceil(scienceTime / scienceSpan). */
+  def calibrationSets(scienceSpan: TimeSpan, scienceTime: TimeSpan): NonNegInt =
+    NonNegInt.unsafeFrom:
+      math.ceil(scienceTime.toMicroseconds.toDouble / scienceSpan.toMicroseconds.toDouble).toInt
+
+  /** Placeholder charge for a telluric that has no sequence to estimate from. */
+  val TelluricPlaceholderTime: TimeSpan = 15.minTimeSpan
+
+  val TelluricPlaceholderCharge: CategorizedTime =
+    CategorizedTime.Zero.sumCharge(ChargeClass.Program, TelluricPlaceholderTime)
+
+  /**
+   * The calibration estimate for an observation with `scienceTime` left, as the
+   * generator and the stale-estimate refresh both work it out.  Zero once the
+   * observation is declared complete.
+   */
+  def calibrationEstimate(params: GeneratorParams, scienceTime: TimeSpan): CalibrationDigest =
+    if params.declaredState == Some(ExecutionState.DeclaredComplete) then CalibrationDigest.Zero
+    else calibrationEstimate(params.observingMode, params.calibrationRole, scienceTime, params.tellurics)
+
+  /**
+   * The unobserved tellurics already in the group and those still predicted,
+   * one calibration set per scienceSpan of science time, with their time.  All
+   * zero for calibration observations and modes without tellurics, or with a
+   * NoTelluric type.
+   */
+  def calibrationEstimate(
     mode:        ObservingMode,
     role:        Option[CalibrationRole],
-    scienceTime: TimeSpan
-  ): NonNegInt =
-    if role.isDefined || !modeTakesTelluric(mode) then NonNegInt.MinValue
-    else calibrationEpochs(scienceTime)
+    scienceTime: TimeSpan,
+    tellurics:   CalibrationGroupTellurics
+  ): CalibrationDigest =
+    if role.isDefined || !modeRequiresTelluric(mode) then CalibrationDigest.Zero
+    else
+      telluricPerScience(mode).fold(CalibrationDigest.Zero): scienceSpan =>
+        telluricEstimate(calibrationSets(scienceSpan, scienceTime), tellurics)
+
+  /**
+   * The science's telluric estimate, given the tellurics `count` predicted for
+   * its remaining science time.  Existing: the unobserved, undeclined tellurics
+   * in the group, each at its own total or the placeholder.  Expected: `count`
+   * less the unobserved tellurics, declined or not, each at the mean total of
+   * the undeclined tellurics or the placeholder.  Spent tellurics only feed
+   * that mean.
+   */
+  def telluricEstimate(count: NonNegInt, tellurics: CalibrationGroupTellurics): CalibrationDigest =
+    val existing = tellurics.existing
+    val pending  = math.max(0, count.value - tellurics.unobserved.size)
+    val unit     = tellurics.unitCost.getOrElse(TelluricPlaceholderCharge)
+
+    CalibrationDigest(
+      CalibrationEstimate(
+        NonNegInt.unsafeFrom(existing.size),
+        existing.map(_.total.getOrElse(TelluricPlaceholderCharge)).combineAll
+      ),
+      CalibrationEstimate(
+        NonNegInt.unsafeFrom(pending),
+        unit.combineN(pending)
+      )
+    )
 
   /** Tellurics materialised for one visit: one after, or one before and one after for a long visit. */
   def telluricsForVisit(visitTime: TimeSpan): NonNegInt =

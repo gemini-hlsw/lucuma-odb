@@ -221,6 +221,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F]:
       LeafMapping[ProposalStatus](ProposalStatusType),
       LeafMapping[SchedulingMode](SchedulingModeType),
       LeafMapping[ScienceBand](ScienceBandType),
+      LeafMapping[ScorpioFpu](ScorpioFpuType),
       LeafMapping[ScienceMode](ScienceModeType),
       LeafMapping[ScienceSubtype](ScienceSubtypeType),
       LeafMapping[SeeingTrend](SeeingTrendType),

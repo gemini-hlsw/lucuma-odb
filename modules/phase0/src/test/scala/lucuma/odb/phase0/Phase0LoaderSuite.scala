@@ -140,6 +140,40 @@ class Phase0LoaderSuite extends CatsEffectSuite:
       .map: rows =>
         assertEquals(rows.length, 229)
 
+  test("loadAll scorpio spectroscopy configurations"):
+    val rdr = FileReader[IO](fileName)
+    val inputStream = getClass.getResourceAsStream(fileName)
+    val stream =
+      fs2.io.readInputStream(
+        IO(inputStream),
+        chunkSize = 4096,
+        closeAfterUse = true
+      )
+
+    stream
+      .through(rdr.scorpioSpectroscopy)
+      .compile
+      .toList
+      .map: rows =>
+        assertEquals(rows.length, 7)
+
+  test("loadAll scorpio imaging configurations"):
+    val rdr = FileReader[IO](imgFileName)
+    val inputStream = getClass.getResourceAsStream(imgFileName)
+    val stream =
+      fs2.io.readInputStream(
+        IO(inputStream),
+        chunkSize = 4096,
+        closeAfterUse = true
+      )
+
+    stream
+      .through(rdr.scorpioImaging)
+      .compile
+      .toList
+      .map: rows =>
+        assertEquals(rows.map(_._1.filter), List("g,r,i,z"))
+
   test("loadAll gmosNorth imaging configurations"):
     val rdr = FileReader[IO](imgFileName)
     val inputStream = getClass.getResourceAsStream(imgFileName)

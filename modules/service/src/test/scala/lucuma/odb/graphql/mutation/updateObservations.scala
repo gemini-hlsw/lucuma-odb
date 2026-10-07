@@ -19,6 +19,7 @@ import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.syntax.timespan.*
+import lucuma.odb.data.OdbError
 import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.graphql.query.ExecutionQuerySetupOperations
 import lucuma.odb.service.ObservationService
@@ -3368,6 +3369,60 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
 
   def oidElementSet(os: Observation.Id*): Set[Either[Group.Id, Observation.Id]] =
     os.map(_.asRight[Group.Id]).toSet
+
+  test("grouping: can't move observations into a group in another program"):
+    for
+      pid1 <- createProgramAs(pi)
+      oid  <- createObservationInGroupAs(pi, pid1, None, None)
+      pid2 <- createProgramAs(pi)
+      gid  <- createGroupAs(pi, pid2)
+      _    <- expectOdbError(
+                user = pi,
+                query = s"""
+                  mutation {
+                    updateObservations(input: {
+                      SET: { groupId: "$gid" }
+                      WHERE: { id: { EQ: "$oid" } }
+                    }) {
+                      observations { id }
+                    }
+                  }
+                """,
+                expected = {
+                  case OdbError.InvalidArgument(Some(s"Group $gid is not in program $pid1.")) => ()
+                }
+              )
+      es1  <- groupElementsAs(pi, pid1, None)
+      es2  <- groupElementsAs(pi, pid2, Some(gid))
+    yield
+      assertEquals(es1, List(Right(oid)))
+      assertEquals(es2, Nil)
+
+  test("grouping: can't move observations from different programs into one group"):
+    for
+      pid1 <- createProgramAs(pi)
+      gid  <- createGroupAs(pi, pid1)
+      o1   <- createObservationInGroupAs(pi, pid1, None, None)
+      pid2 <- createProgramAs(pi)
+      o2   <- createObservationInGroupAs(pi, pid2, None, None)
+      _    <- expectOdbError(
+                user = pi,
+                query = s"""
+                  mutation {
+                    updateObservations(input: {
+                      SET: { groupId: "$gid" }
+                      WHERE: { id: { IN: ["$o1", "$o2"] } }
+                    }) {
+                      observations { id }
+                    }
+                  }
+                """,
+                expected = {
+                  case OdbError.InvalidArgument(Some("Cannot move observations from different programs into one group.")) => ()
+                }
+              )
+      es   <- groupElementsAs(pi, pid1, Some(gid))
+    yield assertEquals(es, Nil)
 
   test("grouping: move observations into a group (at end)") {
     for {

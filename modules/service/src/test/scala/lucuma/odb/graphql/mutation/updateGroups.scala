@@ -25,13 +25,51 @@ import skunk.syntax.all.*
 class updateGroups extends OdbSuite {
 
   val pi: User = TestUsers.Standard.pi(nextId, nextId)
+  val pi2: User = TestUsers.Standard.pi(nextId, nextId)
+  val guest: User = TestUsers.guest(nextId)
   val service  = TestUsers.service(6)
-  override lazy val validUsers: List[User] = List(pi, service)
+  override lazy val validUsers: List[User] = List(pi, pi2, guest, service)
 
   val inputIntervalError =
     "Argument 'input.SET' is invalid: Minimum interval must be less than or equal maximum interval."
   val odbIntervalError =
     "Minimum interval must be less than or equal maximum interval."
+
+  private def renameGroupAs(user: User, gid: Group.Id, name: String): IO[Json] =
+    query(
+      user = user,
+      query = s"""
+        mutation {
+          updateGroups(input: {
+            WHERE: { id: { EQ: "$gid" } }
+            SET: { name: "$name" }
+          }) {
+            groups { id }
+          }
+        }
+      """
+    )
+
+  private def groupNameAs(user: User, gid: Group.Id): IO[Option[String]] =
+    query(
+      user = user,
+      query = s"""
+        query {
+          group(groupId: "$gid") { name }
+        }
+      """
+    ).map(_.hcursor.downFields("group", "name").require[Option[String]])
+
+  List(("a pi", pi2), ("a guest", guest)).foreach: (who, user) =>
+    test(s"$who cannot update a group in another user's program"):
+      for
+        pid <- createProgramAs(pi)
+        gid <- createGroupAs(pi, pid, name = "mine".some)
+        res <- renameGroupAs(user, gid, "theirs")
+        nm  <- groupNameAs(pi, gid)
+      yield
+        assertEquals(res, json"""{ "updateGroups": { "groups": [] } }""")
+        assertEquals(nm, "mine".some)
 
   test("simple bulk update") {
     for {
@@ -138,6 +176,60 @@ class updateGroups extends OdbSuite {
 
   private def gidElementSet(gs: Group.Id*): Set[Either[Group.Id, Observation.Id]] =
     gs.map(_.asLeft[Observation.Id]).toSet
+
+  test("can't move groups into a group in another program"):
+    for
+      pid1 <- createProgramAs(pi)
+      g1   <- createGroupAs(pi, pid1)
+      pid2 <- createProgramAs(pi)
+      g2   <- createGroupAs(pi, pid2)
+      _    <- expectOdbError(
+                user = pi,
+                query = s"""
+                  mutation {
+                    updateGroups(input: {
+                      SET: { parentGroup: "$g2" }
+                      WHERE: { id: { EQ: "$g1" } }
+                    }) {
+                      groups { id }
+                    }
+                  }
+                """,
+                expected = {
+                  case OdbError.InvalidArgument(Some(s"Group $g2 is not in program $pid1.")) => ()
+                }
+              )
+      es1  <- groupElementsAs(pi, pid1, None)
+      es2  <- groupElementsAs(pi, pid2, Some(g2))
+    yield
+      assertEquals(es1, List(Left(g1)))
+      assertEquals(es2, Nil)
+
+  test("can't move groups from different programs into one group"):
+    for
+      pid1 <- createProgramAs(pi)
+      dest <- createGroupAs(pi, pid1)
+      g1   <- createGroupAs(pi, pid1)
+      pid2 <- createProgramAs(pi)
+      g2   <- createGroupAs(pi, pid2)
+      _    <- expectOdbError(
+                user = pi,
+                query = s"""
+                  mutation {
+                    updateGroups(input: {
+                      SET: { parentGroup: "$dest" }
+                      WHERE: { id: { IN: ["$g1", "$g2"] } }
+                    }) {
+                      groups { id }
+                    }
+                  }
+                """,
+                expected = {
+                  case OdbError.InvalidArgument(Some("Cannot move groups from different programs into one group.")) => ()
+                }
+              )
+      es   <- groupElementsAs(pi, pid1, Some(dest))
+    yield assertEquals(es, Nil)
 
   test("move groups into a group (at end)") {
     for {

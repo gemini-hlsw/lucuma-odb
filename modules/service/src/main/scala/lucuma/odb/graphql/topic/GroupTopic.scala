@@ -15,7 +15,6 @@ import lucuma.core.util.Gid
 import lucuma.odb.data.EditType
 import org.typelevel.log4cats.Logger
 import org.typelevel.otel4s.trace.Tracer
-import skunk.*
 import skunk.implicits.*
 
 object GroupTopic:
@@ -51,8 +50,8 @@ object GroupTopic:
     topic.create(sup)
 
   def feed[F[_]: Concurrent: Logger: Tracer](
-    s:         Session[F],
+    sessions:  OdbTopic.Sessions[F],
     maxQueued: Int,
     top:       Topic[F, Element]
   ): Stream[F, Unit] =
-    topic.feed(s, maxQueued, top)
+    topic.feed(sessions, maxQueued, top)

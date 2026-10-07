@@ -479,32 +479,8 @@ object Config:
     value.fold(ConfigValue.failed(ConfigError("Missing value"))): v =>
       ConfigValue.loaded(ConfigKey(key), v)
 
-  private val otelEnvironment: ConfigValue[Effect, String] =
-    envOrProp("ODB_ENVIRONMENT").default("local")
-
-  private val inHeroku: ConfigValue[Effect, Boolean] =
-    envOrProp("DYNO").option.map(_.isDefined)
-
   private val otelConfig: ConfigValue[Effect, Option[OtelConfig]] =
-    inHeroku.flatMap: inHeroku =>
-      if inHeroku then
-        (
-          envOrProp("ODB_OTEL_ENDPOINT"),
-          envOrProp("ODB_OTEL_KEY"),
-          otelEnvironment
-        ).parMapN: (endpoint, key, env) =>
-          OtelConfig(endpoint, key, env).some
-      else
-        (
-          envOrProp("ODB_OTEL_ENDPOINT").option,
-          envOrProp("ODB_OTEL_KEY").option,
-          otelEnvironment
-        ).parTupled.map:
-          case (Some(endpoint), Some(key), env)
-            if endpoint.trim.nonEmpty && key.trim.nonEmpty =>
-            OtelConfig(endpoint, key, env).some
-          case _ =>
-            None
+    OtelConfig.fromEnv("ODB_OTEL", envOrProp("ODB_ENVIRONMENT").default("local"))
 
   lazy val fromCiris: ConfigValue[Effect, Config] = (
     envOrProp("PORT").as[Int].as[Port], // passed by Heroku

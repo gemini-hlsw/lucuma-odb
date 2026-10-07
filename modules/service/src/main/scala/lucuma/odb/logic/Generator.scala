@@ -27,6 +27,7 @@ import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.AtomDigest
+import lucuma.core.model.sequence.CalibrationDigest
 import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.ExecutionConfig
 import lucuma.core.model.sequence.ExecutionDigest
@@ -142,9 +143,6 @@ object Generator:
   // a reasonable upper limit on the number of atoms in a sequence.
   val SequenceAtomLimit = 1000
 
-  // Placeholder charge for a telluric whose target is not yet resolved.
-  val UnresolvedTelluricTime: TimeSpan = 15.minTimeSpan
-
   // Placeholder charge for a spectrophotometric standard whose proposal has yet
   // to be accepted.  No sequence is produced for one, so there is nothing to
   // derive a real estimate from.  See GeneratorParams.isSpecPhotoProposal.
@@ -174,10 +172,13 @@ object Generator:
 
       object ExecutionDigestCache:
         def lookupOne(ctx: GeneratorContext)(using Transaction[F]): EitherT[F, OdbError, Option[ExecutionDigest]] =
-          EitherT.right(executionDigestService.selectOne(ctx.oid, ctx.hash))
+          EitherT.right(executionDigestService.selectOne(ctx.oid, ctx.hash).map(_.map(withCalibrations(ctx, _))))
 
         def lookupMany(contexts: List[GeneratorContext])(using Transaction[F]): F[Map[Observation.Id, ExecutionDigest]] =
-          executionDigestService.selectMany(contexts.map(c => (c.oid, c.hash)))
+          val byOid = contexts.map(c => c.oid -> c).toMap
+          executionDigestService
+            .selectMany(contexts.map(c => (c.oid, c.hash)))
+            .map(_.map((oid, d) => oid -> byOid.get(oid).fold(d)(withCalibrations(_, d))))
 
         def store(ctx: GeneratorContext, digest: ExecutionDigest)(using Transaction[F]): EitherT[F, OdbError, Unit] =
           EitherT.right(executionDigestService.insertOrUpdate(ctx.oid, ctx.hash, digest))
@@ -240,7 +241,7 @@ object Generator:
           SetupTime.Zero,
           NonNegInt.MinValue,
           NonNegInt.MinValue,
-          NonNegInt.MinValue,
+          CalibrationDigest.Zero,
           SequenceDigest.Zero,
           SequenceDigest.Zero.copy(
             observeClass   = ctx.params.calibrationRole.sciClass,
@@ -251,9 +252,24 @@ object Generator:
         )
 
       private def unresolvedTelluricDigest(ctx: GeneratorContext): ExecutionDigest =
-        flatDigest(ctx, UnresolvedTelluricTime)
+        flatDigest(ctx, ObsExtract.TelluricPlaceholderTime)
+
+      /**
+       * Adds the calibration estimate to a digest. It follows the group's tellurics, which the
+       * generator hash leaves out so that a telluric change keeps the science observation's cached
+       * digest and guide star, so it is worked out on every read rather than cached.
+       */
+      private def withCalibrations(ctx: GeneratorContext, d: ExecutionDigest): ExecutionDigest =
+        ExecutionDigest.calibrations.replace(
+          ObsExtract.calibrationEstimate(ctx.params, d.science.timeEstimate.sum)
+        )(d)
 
       private def calcDigestFromContext(
+        ctx: GeneratorContext
+      )(using Transaction[F]): EitherT[F, OdbError, ExecutionDigest] =
+        calcSequenceDigest(ctx).map(withCalibrations(ctx, _))
+
+      private def calcSequenceDigest(
         ctx: GeneratorContext
       )(using Transaction[F]): EitherT[F, OdbError, ExecutionDigest] =
 
@@ -280,8 +296,7 @@ object Generator:
                  else NonNegInt.unsafeFrom(1)
             // Recentering is needed whether or not the observation may be split.
             r  = estimator.estimateReacquisitionCount(s.timeEstimate.sum)
-            n  = ObsExtract.calibrationCount(ctx.params.observingMode, ctx.params.calibrationRole, s.timeEstimate.sum)
-          yield ExecutionDigest(estimator.estimateSetupTime, c, r, n, a, s)
+          yield ExecutionDigest(estimator.estimateSetupTime, c, r, CalibrationDigest.Zero, a, s)
 
         // Setting up GNIRS behind the Altair laser costs more than the nominal setup.
         def gnirsSetup(nominal: SetupTimeEstimateCalculator): SetupTimeEstimateCalculator =
@@ -302,7 +317,7 @@ object Generator:
               SetupTime.Zero,
               NonNegInt.MinValue,
               NonNegInt.MinValue,
-              NonNegInt.MinValue,
+              CalibrationDigest.Zero,
               SequenceDigest.Zero.copy(executionState = ExecutionState.DeclaredComplete),
               SequenceDigest.Zero.copy(executionState = ExecutionState.DeclaredComplete)
             )

@@ -9,6 +9,7 @@ import lucuma.odb.util.Flamingos2Codecs.*
 import lucuma.odb.util.GhostCodecs.*
 import lucuma.odb.util.GmosCodecs.*
 import lucuma.odb.util.GnirsCodecs.*
+import lucuma.odb.util.ScorpioCodecs.*
 import skunk.codec.boolean.bool
 
 trait SpectroscopyConfigOptionTable[F[_]] extends BaseMapping[F]:
@@ -81,3 +82,9 @@ trait SpectroscopyConfigOptionTable[F[_]] extends BaseMapping[F]:
     val FpuIfu     = col("c_fpu_ifu",    gnirs_fpu_ifu.opt)
     val Prism      = col("c_prism",      gnirs_prism)
     val Camera     = col("c_camera",     gnirs_camera)
+
+  object SpectroscopyConfigOptionScorpioTable extends TableDef("t_spectroscopy_config_option_scorpio"):
+    val Instrument = col("c_instrument", instrument)
+    val Index      = col("c_index",      int4_pos)
+
+    val Fpu        = col("c_fpu",        scorpio_fpu)
