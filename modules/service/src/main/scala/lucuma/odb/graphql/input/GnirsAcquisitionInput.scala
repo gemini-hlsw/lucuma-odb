@@ -4,12 +4,15 @@
 package lucuma.odb.graphql
 package input
 
+import cats.Eq
 import cats.data.NonEmptyList
+import cats.derived.*
 import cats.syntax.foldable.*
 import cats.syntax.option.*
 import cats.syntax.parallel.*
 import cats.syntax.traverse.*
 import cats.syntax.unorderedFoldable.*
+import eu.timepit.refined.cats.*
 import eu.timepit.refined.types.numeric.PosInt
 import grackle.Result
 import grackle.syntax.*
@@ -33,7 +36,7 @@ case class GnirsAcquisitionInput(
   coadds:                   Option[PosInt],
   skyOffset:                Option[Offset],
   explicitExposureTimeMode: Nullable[ExposureTimeMode]
-)
+) derives Eq
 
 object GnirsAcquisitionInput:
 

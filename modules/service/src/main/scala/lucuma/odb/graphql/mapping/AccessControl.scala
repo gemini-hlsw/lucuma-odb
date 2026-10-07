@@ -177,14 +177,27 @@ trait AccessControl[F[_]] extends Predicates[F] {
   def writableOids(
     includeDeleted:      Option[Boolean],
     WHERE:               Option[Predicate],
-    includeCalibrations: Boolean
+    includeCalibrations: Boolean,
+    admittedTelluricModes: List[ObservingModeType] = Nil
   )(using Services[F]): Result[AppliedFragment] =
+    val calibrations: Predicate =
+      if includeCalibrations then True
+      else if admittedTelluricModes.nonEmpty then
+        Or(
+          Predicates.observation.calibrationRole.isNull(true),
+          And(
+            Predicates.observation.calibrationRole.eql(CalibrationRole.Telluric.some),
+            Predicates.observation.observingModeType.in(admittedTelluricModes)
+          )
+        )
+      else Predicates.observation.calibrationRole.isNull(true)
+
     idSelectFromPredicate(
       ObservationType,
       and(List(
         Predicates.observation.program.isWritableBy(user),
         Predicates.observation.existence.includeDeleted(includeDeleted.getOrElse(false)),
-        if (includeCalibrations) True else Predicates.observation.calibrationRole.isNull(true),
+        calibrations,
         WHERE.getOrElse(True)
       ))
     )
@@ -198,10 +211,11 @@ trait AccessControl[F[_]] extends Predicates[F] {
     includeDeleted:      Option[Boolean],
     WHERE:               Option[Predicate],
     includeCalibrations: Boolean,
-    allowedStates:       Set[ObservationWorkflowState]
+    allowedStates:       Set[ObservationWorkflowState],
+    admittedTelluricModes: List[ObservingModeType] = Nil
   )(using Services[F], NoTransaction[F]): F[Result[List[Observation.Id]]] =
     Services.asSuperUser:
-      writableOids(includeDeleted, WHERE, includeCalibrations)
+      writableOids(includeDeleted, WHERE, includeCalibrations, admittedTelluricModes)
         .flatTraverse: which =>
           observationWorkflowService.filterState(which, allowedStates)
 
@@ -372,11 +386,14 @@ trait AccessControl[F[_]] extends Predicates[F] {
         then ObservationWorkflowState.allButComplete
         else ObservationWorkflowState.fullSet         // always ok
 
+      // A telluric calibration is otherwise read-only, but accepts an edit to its science
+      // exposure time mode alone, and only from a SET for its own observing mode.
       selectForObservationUpdateImpl(
         input.includeDeleted,
         input.WHERE,
         includeCalibrations,
-        allowedStates
+        allowedStates,
+        admittedTelluricModes = input.SET.admittedTelluricModes
       ).nestMap: oids =>
         Services.asSuperUser:
           AccessControl.unchecked(input.SET, oids, observation_id)

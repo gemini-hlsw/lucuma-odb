@@ -3,11 +3,14 @@
 
 package lucuma.odb.service
 
+import cats.data.NonEmptyList
 import cats.effect.Concurrent
+import cats.syntax.applicative.*
 import cats.syntax.eq.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import lucuma.core.model.Observation
+import lucuma.core.model.Program
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.PendingRecalc
 import lucuma.odb.service.Services.ServiceAccess
@@ -46,6 +49,20 @@ trait CalibrationCalcService[F[_]]:
    * Returns whether the row was parked.
    */
   def markRetry(oid: Observation.Id, error: String)(using ServiceAccess, Transaction[F]): F[Boolean]
+
+  /**
+   * The science observation (and program) behind each of the given observations that
+   * is a telluric calibration.  Observations that are not tellurics are left out.
+   */
+  def telluricScience(
+    oids: List[Observation.Id]
+  )(using Transaction[F]): F[Map[Observation.Id, (Observation.Id, Program.Id)]]
+
+  /** Queues a recalculation of `oid`'s calibrations, as a trigger would. */
+  def invalidate(
+    oid: Observation.Id,
+    pid: Program.Id
+  )(using Transaction[F]): F[Unit]
 
 object CalibrationCalcService:
 
@@ -86,7 +103,40 @@ object CalibrationCalcService:
       )(using ServiceAccess, Transaction[F]): F[Boolean] =
         session.unique(Statements.MarkRetry)((MaxFailures, error, oid))
 
+      override def telluricScience(
+        oids: List[Observation.Id]
+      )(using Transaction[F]): F[Map[Observation.Id, (Observation.Id, Program.Id)]] =
+        NonEmptyList.fromList(oids).fold(Map.empty.pure[F]): nel =>
+          val af = Statements.selectTelluricScience(nel)
+          session.prepareR(af.fragment.query(observation_id *: observation_id *: program_id)).use: pq =>
+            pq.stream(af.argument, 64).compile.toList.map:
+              _.map((t, s, p) => t -> (s, p)).toMap
+
+      override def invalidate(
+        oid: Observation.Id,
+        pid: Program.Id
+      )(using Transaction[F]): F[Unit] =
+        session.execute(Statements.Invalidate)(oid, pid).void
+
       object Statements:
+        // A telluric shares its calibration group with exactly one science observation.
+        def selectTelluricScience(oids: NonEmptyList[Observation.Id]): AppliedFragment =
+          sql"""
+            SELECT t.c_observation_id, s.c_observation_id, s.c_program_id
+            FROM   t_observation t
+            JOIN   t_observation s
+              ON   s.c_group_id = t.c_group_id
+             AND   s.c_calibration_role IS NULL
+             AND   s.c_existence = 'present'
+            WHERE  t.c_observation_id IN ${observation_id.list(oids.size).values}
+              AND  t.c_calibration_role = 'telluric'
+          """.apply(oids.toList)
+
+        val Invalidate: Command[(Observation.Id, Program.Id)] =
+          sql"""
+            CALL invalidate_calibration_calc($observation_id, $program_id, 'recalc')
+          """.command
+
         val pending: Codec[PendingRecalc] =
           (program_id *: observation_id *: core_timestamp *: calibration_work_type).to[PendingRecalc]
 

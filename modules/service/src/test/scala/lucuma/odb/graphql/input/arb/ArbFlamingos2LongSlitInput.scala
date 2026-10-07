@@ -54,7 +54,7 @@ trait ArbFlamingos2LongSlitInput:
         g  <- arbitrary[Option[Flamingos2Disperser]]
         f  <- arbitrary[Option[Flamingos2Filter]]
         u  <- arbitrary[Option[Flamingos2Fpu]]
-        e  <- arbitrary[Option[ExposureTimeMode]]
+        e  <- arbitrary[Nullable[ExposureTimeMode]]
         r  <- arbitrary[Nullable[Flamingos2ReadMode]]
         s  <- arbitrary[Nullable[Flamingos2Reads]]
         d  <- arbitrary[Nullable[Flamingos2Decker]]

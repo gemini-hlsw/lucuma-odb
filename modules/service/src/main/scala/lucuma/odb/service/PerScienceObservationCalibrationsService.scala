@@ -403,7 +403,7 @@ object PerScienceObservationCalibrationsService:
                 yield result
 
       // A telluric's S/N floor, also used when no science S/N can be derived.
-      private val MinTelluricSN = SignalToNoise.fromInt(100).get
+      private val MinTelluricSN = TelluricETMHelpers.DerivedSignalToNoise
 
       // A pinhole flat's exposure comes from SmartGcal, so its S/N doesn't really matter.
       private val DaytimePinholeSN = SignalToNoise.fromInt(100).get
@@ -427,6 +427,18 @@ object PerScienceObservationCalibrationsService:
             gnirs.derivedAcquisitionExposureTimeMode(none, at)
           case _                                                                  =>
             ExposureTimeMode.forAcquisition(at)
+
+      private def currentScienceEtmRows(
+        oid: Observation.Id
+      ): F[List[(ExposureTimeModeId, ExposureTimeMode, Option[Wavelength], Boolean)]] =
+        S.session
+          .prepareR(Statements.selectCurrentScienceExposureTimeModes)
+          .use(_.stream(oid, 8).compile.toList)
+
+      private def currentScienceEtms(
+        oid: Observation.Id
+      ): F[List[(ExposureTimeModeId, ExposureTimeMode, Option[Wavelength])]] =
+        currentScienceEtmRows(oid).map(_.map((eid, etm, w, _) => (eid, etm, w)))
 
       // After cloning we have the same etm as science, but we need a different one for tellurics
       // https://app.shortcut.com/lucuma/story/6968/generate-telluric-standard-sequence
@@ -479,11 +491,6 @@ object PerScienceObservationCalibrationsService:
             .updateMany(List(telluricOid), ExposureTimeModeRole.Acquisition, newEtm, isExplicit = false)
             .unlessA(current.contains(newEtm))
             .void
-
-        def currentScienceEtms(oid: Observation.Id): F[List[(ExposureTimeModeId, ExposureTimeMode, Option[Wavelength])]] =
-          S.session
-            .prepareR(Statements.selectCurrentScienceExposureTimeModes)
-            .use(_.stream(oid, 8).compile.toList)
 
         def scienceEtmsByIndex(oid: Observation.Id): F[List[(ExposureTimeModeId, ExposureTimeMode, Int, Option[Wavelength])]] =
           S.session
@@ -650,6 +657,25 @@ object PerScienceObservationCalibrationsService:
             case _ =>
               F.unit
 
+        // The user's overrides, keyed by central wavelength, read before the reclone deletes
+        // the rows and written back afterwards.  A change of observing mode drops them all.
+        def readOverrides(
+          sm: Option[ObservingModeType],
+          tm: Option[ObservingModeType]
+        ): F[List[(Option[Wavelength], ExposureTimeMode)]] =
+          if calibrationRole =!= CalibrationRole.Telluric || telluricModeFor(sm) =!= tm then
+            List.empty.pure[F]
+          else
+            currentScienceEtmRows(targetOid).map(_.collect { case (_, etm, w, true) => (w, etm) })
+
+        def reapplyOverrides(overrides: List[(Option[Wavelength], ExposureTimeMode)]): F[Unit] =
+          NonEmptyList.fromList(overrides).traverse_ : os =>
+            currentScienceEtms(targetOid).flatMap: rows =>
+              os.traverse_ : (key, etm) =>
+                rows
+                  .filter(_._3 === key)
+                  .traverse_((eid, _, _) => S.exposureTimeModeService.setExplicit(eid, etm))
+
         // A telluric observes each science wavelength once; a pinhole keeps the list as is.
         def collapseTelluricWavelengths(sm: Option[ObservingModeType]): F[Unit] =
           (sm, calibrationRole) match
@@ -659,17 +685,19 @@ object PerScienceObservationCalibrationsService:
               F.unit
 
         for {
-          modes    <- readObservingModes
-          (sm, tm) <- extractModes(modes)
-          _        <- syncObservationProperties
-          _        <- syncAltair
-          _        <- deleteOldTargetMode(tm)
-          _        <- deleteAllExposureTimeModes(sm)
-          _        <- updateTargetModeType(sm)
-          _        <- cloneSourceMode(sm)
-          _        <- resetTelluricConfig(sm)
-          _        <- collapseTelluricWavelengths(sm)
-          _        <- createTelluricExposureTimeMode(telluricModeFor(sm), pid, sourceOid, targetOid, calibrationRole)
+          modes     <- readObservingModes
+          (sm, tm)  <- extractModes(modes)
+          _         <- syncObservationProperties
+          _         <- syncAltair
+          overrides <- readOverrides(sm, tm)
+          _         <- deleteOldTargetMode(tm)
+          _         <- deleteAllExposureTimeModes(sm)
+          _         <- updateTargetModeType(sm)
+          _         <- cloneSourceMode(sm)
+          _         <- resetTelluricConfig(sm)
+          _         <- collapseTelluricWavelengths(sm)
+          _         <- createTelluricExposureTimeMode(telluricModeFor(sm), pid, sourceOid, targetOid, calibrationRole)
+          _         <- reapplyOverrides(overrides)
         } yield ()
 
       private def findObsCalibrationGroupForObservation(
@@ -790,7 +818,8 @@ object PerScienceObservationCalibrationsService:
         // The live ('current') science exposure time modes in configuration order, which is
         // the order of the ITC results.  GNIRS keeps an 'initial' list beside it (V1248);
         // other modes have a single row and no wavelength table.
-        val selectCurrentScienceExposureTimeModes: Query[Observation.Id, (ExposureTimeModeId, ExposureTimeMode, Option[Wavelength])] =
+        // Current science rows with their wavelength and whether a user set them.
+        val selectCurrentScienceExposureTimeModes: Query[Observation.Id, (ExposureTimeModeId, ExposureTimeMode, Option[Wavelength], Boolean)] =
           sql"""
             SELECT e.c_exposure_time_mode_id,
                    e.c_exposure_time_mode,
@@ -798,7 +827,8 @@ object PerScienceObservationCalibrationsService:
                    e.c_signal_to_noise,
                    e.c_exposure_time,
                    e.c_exposure_count,
-                   g.c_central_wavelength
+                   g.c_central_wavelength,
+                   e.c_is_explicit
             FROM   t_exposure_time_mode e
             LEFT JOIN t_gnirs_central_wavelength_config g
                    ON g.c_exposure_time_mode_id = e.c_exposure_time_mode_id
@@ -806,7 +836,9 @@ object PerScienceObservationCalibrationsService:
               AND  e.c_role = 'science'::e_exposure_time_mode_role
               AND  (g.c_version IS NULL OR g.c_version = 'current'::e_observing_mode_row_version)
             ORDER BY COALESCE(g.c_index, 0), e.c_exposure_time_mode_id
-          """.query(exposure_time_mode_id *: exposure_time_mode *: wavelength_pm.opt)
+          """.query(
+            exposure_time_mode_id *: exposure_time_mode *: wavelength_pm.opt *: skunk.codec.boolean.bool
+          )
 
         // Every science exposure time mode row, both versions, with its configuration's
         // index and wavelength.  The calibration's 'initial' rows are written too.

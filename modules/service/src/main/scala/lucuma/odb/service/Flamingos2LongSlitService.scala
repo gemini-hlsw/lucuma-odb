@@ -42,7 +42,7 @@ trait Flamingos2LongSlitService[F[_]]:
   def update(
     SET:   Flamingos2LongSlitInput.Edit,
     which: List[Observation.Id]
-  )(using Transaction[F]): F[Unit]
+  )(using Transaction[F]): F[Result[Unit]]
 
   def clone(originalId: Observation.Id, newId: Observation.Id): F[Unit]
 
@@ -136,25 +136,23 @@ object Flamingos2LongSlitService:
       private def updateExposureTimeModes(
         input: Flamingos2LongSlitInput.Edit,
         which: List[Observation.Id]
-      )(using Transaction[F]): F[Unit] =
+      )(using Transaction[F]): F[Result[Unit]] =
 
         def update(etm: Option[ExposureTimeMode], role: ExposureTimeModeRole): F[Unit] =
           etm.fold(().pure[F]): e =>
             services.exposureTimeModeService.updateMany(which, role, e)
 
-        for
-          _ <- update(input.acquisition.flatMap(_.exposureTimeMode), ExposureTimeModeRole.Acquisition)
-          _ <- update(input.exposureTimeMode, ExposureTimeModeRole.Science)
-        yield ()
+        update(input.acquisition.flatMap(_.exposureTimeMode), ExposureTimeModeRole.Acquisition) *>
+          TelluricETMHelpers.updateScience(which, input.exposureTimeMode)
 
       override def update(
         SET: Flamingos2LongSlitInput.Edit,
         which: List[Observation.Id]
-      )(using Transaction[F]): F[Unit] =
-        for
-          _ <- updateExposureTimeModes(SET, which)
-          _ <- Statements.updateF2LongSlit(SET, which).fold(F.unit)(session.exec)
-        yield ()
+      )(using Transaction[F]): F[Result[Unit]] =
+        (for
+          _ <- ResultT(updateExposureTimeModes(SET, which))
+          _ <- ResultT.liftF(Statements.updateF2LongSlit(SET, which).fold(F.unit)(session.exec))
+        yield ()).value
 
       def clone(originalId: Observation.Id, newId: Observation.Id): F[Unit] =
         session.exec(Statements.cloneF2(originalId, newId))

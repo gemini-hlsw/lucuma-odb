@@ -74,6 +74,18 @@ sealed trait ExposureTimeModeService[F[_]]:
     isExplicit: Boolean = true
   )(using Transaction[F]): F[Unit]
 
+  /** Rewrites one row with a user-set mode and marks it explicit. */
+  def setExplicit(
+    eid:    ExposureTimeModeId,
+    update: ExposureTimeMode
+  )(using Transaction[F]): F[Unit]
+
+  /** `setDerived` for a single row. */
+  def setDerivedOne(
+    eid:                  ExposureTimeModeId,
+    defaultSignalToNoise: SignalToNoise
+  )(using Transaction[F]): F[Unit]
+
   /**
    * Rewrites the signal-to-noise of *derived* exposure time modes only, leaving explicit
    * ones untouched.  This is the interlock that keeps an automatic update -- the GNIRS
@@ -270,6 +282,18 @@ object ExposureTimeModeService:
           _ <- session.exec(Statements.updateWherePresent(oids, role, update, isExplicit))
           _ <- session.exec(Statements.insertWhereNotPresent(oids, role, update, isExplicit))
         yield ()
+
+      override def setExplicit(
+        eid:    ExposureTimeModeId,
+        update: ExposureTimeMode
+      )(using Transaction[F]): F[Unit] =
+        session.exec(Statements.setExplicit(eid, update))
+
+      override def setDerivedOne(
+        eid:                  ExposureTimeModeId,
+        defaultSignalToNoise: SignalToNoise
+      )(using Transaction[F]): F[Unit] =
+        session.exec(Statements.setDerivedOne(eid, defaultSignalToNoise))
 
       override def updateDerivedSignalToNoise(
         oids: List[Observation.Id],
@@ -539,11 +563,19 @@ object ExposureTimeModeService:
             id
           )
 
-    def updateWherePresent(
-      oids:       List[Observation.Id],
-      role:       ExposureTimeModeRole,
+    private def whereRowsOf(oids: List[Observation.Id], role: ExposureTimeModeRole): AppliedFragment =
+      sql"""
+        c_observation_id IN ${observation_id.list(oids.length).values}
+        AND c_role = $exposure_time_mode_role
+      """.apply(oids, role)
+
+    private def whereRow(eid: ExposureTimeModeId): AppliedFragment =
+      sql"c_exposure_time_mode_id = $exposure_time_mode_id".apply(eid)
+
+    private def updateWhere(
       update:     ExposureTimeMode,
-      isExplicit: Boolean
+      isExplicit: Boolean,
+      where:      AppliedFragment
     ): AppliedFragment =
       sql"""
         UPDATE t_exposure_time_mode
@@ -553,18 +585,26 @@ object ExposureTimeModeService:
             c_exposure_time      = ${time_span.opt},
             c_exposure_count     = ${int4_pos.opt},
             c_is_explicit        = $bool
-        WHERE c_observation_id IN ${observation_id.list(oids.length).values}
-          AND c_role = $exposure_time_mode_role
+        WHERE
       """.apply(
         update.modeType,
         update.signalToNoise,
         update.at,
         update.exposureTime,
         update.frameCount,
-        isExplicit,
-        oids,
-        role
-      )
+        isExplicit
+      ) |+| where
+
+    def updateWherePresent(
+      oids:       List[Observation.Id],
+      role:       ExposureTimeModeRole,
+      update:     ExposureTimeMode,
+      isExplicit: Boolean
+    ): AppliedFragment =
+      updateWhere(update, isExplicit, whereRowsOf(oids, role))
+
+    def setExplicit(eid: ExposureTimeModeId, update: ExposureTimeMode): AppliedFragment =
+      updateWhere(update, true, whereRow(eid))
 
     def updateDerivedSignalToNoise(
       oids: List[Observation.Id],
@@ -585,10 +625,9 @@ object ExposureTimeModeService:
     // converted and picks up the supplied default; a signal-to-noise row keeps its value
     // as a prior until the next ITC pass rewrites it, which avoids a visible jump.  The
     // wavelength is left alone in both cases.
-    def setDerived(
-      oids:                 List[Observation.Id],
-      role:                 ExposureTimeModeRole,
-      defaultSignalToNoise: SignalToNoise
+    private def setDerivedWhere(
+      defaultSignalToNoise: SignalToNoise,
+      where:                AppliedFragment
     ): AppliedFragment =
       sql"""
         UPDATE t_exposure_time_mode
@@ -597,10 +636,21 @@ object ExposureTimeModeService:
                c_signal_to_noise    = COALESCE(c_signal_to_noise, $signal_to_noise),
                c_exposure_time      = NULL,
                c_exposure_count     = NULL
-         WHERE c_observation_id IN ${observation_id.list(oids.length).values}
-           AND c_role = $exposure_time_mode_role
-           AND c_is_explicit
-      """.apply(defaultSignalToNoise, oids, role)
+         WHERE c_is_explicit AND
+      """.apply(defaultSignalToNoise) |+| where
+
+    def setDerived(
+      oids:                 List[Observation.Id],
+      role:                 ExposureTimeModeRole,
+      defaultSignalToNoise: SignalToNoise
+    ): AppliedFragment =
+      setDerivedWhere(defaultSignalToNoise, whereRowsOf(oids, role))
+
+    def setDerivedOne(
+      eid:                  ExposureTimeModeId,
+      defaultSignalToNoise: SignalToNoise
+    ): AppliedFragment =
+      setDerivedWhere(defaultSignalToNoise, whereRow(eid))
 
     def insertWhereNotPresent(
       oids:       List[Observation.Id],

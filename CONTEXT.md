@@ -134,6 +134,10 @@ _Avoid_: telluric standard (names the target star, not the observation).
 A telluric a PI has explicitly declined, held inactive so it will not be observed even when its science observation is active. Reversible — reinstating the telluric resumes its science observation's lifecycle. Distinct from a Telluric Type of NoTelluric, which is declarative and prevents generation up front: the type governs whether tellurics exist, the decline governs whether an existing one is observed. The two are uncoupled — setting NoTelluric deletes tellurics (unless they have visits or execution), taking any decline state with them; restoring a real type never reinstates a declined telluric.
 _Avoid_: disabled telluric, skipped telluric, deleted telluric, opted-out telluric.
 
+**Telluric Exposure Time Mode Override**:
+A science exposure time mode a user has set on a telluric by hand, replacing the one derived from its science observation (twice the science signal-to-noise). It holds per central wavelength, survives every resync from the science, and ignores later science changes until the user clears it, at which point the derived value returns at once. It goes away with the wavelength it was set on if the science stops observing there, and with the telluric itself when the unobserved set is rebuilt (see Spent Telluric); a retarget keeps it. Distinct from a Declined Telluric, which governs whether the telluric is observed, not how deeply.
+_Avoid_: custom telluric S/N, pinned ETM, explicit telluric mode, manual telluric.
+
 **Calibration Set**:
 The night-time calibrations one interval of science is expected to consume: a telluric (unless the Telluric Type is `NoTelluric`) and, depending on the instrument, a GCAL Set (flats and arcs) as well. An estimating unit, not a scheduling one — sets do not line up with visits (a visit can hold more or less than a set), so the Calibration Count and the setup count disagree by design.
 _Avoid_: calibration epoch (an epoch is a reference instant, as in coordinate epochs), visit (a scheduling unit), telluric interval.

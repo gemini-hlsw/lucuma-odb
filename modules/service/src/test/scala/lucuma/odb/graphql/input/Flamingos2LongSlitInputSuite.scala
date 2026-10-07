@@ -36,7 +36,8 @@ class Flamingos2LongSlitInputSuite extends DisciplineSuite with ArbitraryInstanc
       val edit = e.copy(disperser = Some(grating), fpu = Some(fpu), filter = Some(filter))
       val createResult = edit.toCreate
 
-      assert(createResult.toEither.isRight, "Should succeed when all required fields are present")
+      // A null exposure time mode only clears a telluric override; a create rejects it.
+      assertEquals(createResult.toEither.isRight, !e.exposureTimeMode.isNull, "Should succeed when all required fields are present")
 
   test("Flamingos2LongSlitInput.Edit toCreate should fail when required fields are missing"):
     forAll: (edit: Flamingos2LongSlitInput.Edit) =>
@@ -80,7 +81,7 @@ class Flamingos2LongSlitInputSuite extends DisciplineSuite with ArbitraryInstanc
       disperser = None,
       filter = None,
       fpu = None,
-      exposureTimeMode = None,
+      exposureTimeMode = lucuma.odb.data.Nullable.Absent,
       explicitReadMode = lucuma.odb.data.Nullable.Null,
       explicitReads = lucuma.odb.data.Nullable.Null,
       explicitDecker = lucuma.odb.data.Nullable.Null,

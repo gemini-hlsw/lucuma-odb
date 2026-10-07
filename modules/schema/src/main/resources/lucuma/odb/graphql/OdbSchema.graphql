@@ -10958,7 +10958,10 @@ input Flamingos2LongSlitInput {
 
   """
   Exposure time mode for the science sequence.  If not specified, the exposure
-  time mode of the observation's science requirements are used.
+  time mode of the observation's science requirements are used.  On a telluric
+  calibration a value overrides the mode derived from the science observation
+  and survives recalculation; null clears the override.  Null is only valid on
+  a telluric.
   """
   exposureTimeMode: ExposureTimeModeInput
 
@@ -11841,8 +11844,11 @@ Edit or create IGRINS-2 Long Slit configuration
 input Igrins2LongSlitInput {
 
   """
-  The exposureTimeMode field may be unset by assigning a null value, or ignored
-  by skipping it altogether
+  Exposure time mode for the science sequence.  If not specified, the exposure
+  time mode of the observation's science requirements are used.  On a telluric
+  calibration a value overrides the mode derived from the science observation
+  and survives recalculation; null clears the override.  Null is only valid on
+  a telluric.
   """
   exposureTimeMode: ExposureTimeModeInput
 
@@ -12170,8 +12176,11 @@ input GnirsCentralWavelengthConfigInput {
   centralWavelength: WavelengthInput!
 
   """
-  Exposure time mode for this central wavelength.
-  If not specified, it is taken from the observation's requirements.
+  Exposure time mode for this central wavelength.  If not specified, it is
+  taken from the observation's requirements.  On a telluric calibration a value
+  overrides the mode derived from the science observation and survives
+  recalculation; null clears the override.  Null is only valid on a telluric,
+  whose wavelength list must then match its current configuration in order.
   """
   exposureTimeMode: ExposureTimeModeInput
 

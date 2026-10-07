@@ -4,6 +4,7 @@
 package lucuma.odb.graphql
 package input
 
+import cats.Eq
 import cats.syntax.order.*
 import cats.syntax.parallel.*
 import cats.syntax.traverse.*
@@ -89,18 +90,18 @@ object Igrins2LongSlitInput:
     val Binding: Matcher[Create] =
       ObjectFieldsBinding.rmap {
         case List(
-          ExposureTimeModeInput.Binding.Option("exposureTimeMode", rETM),
+          ExposureTimeModeInput.Binding.Nullable("exposureTimeMode", rETM),
           Svc.Create.Binding.Option("svc", rSvc),
           SlitTelescopeConfigsInput.Binding.Option("explicitTelescopeConfigs", rTelescopeConfigs),
           TelluricTypeBinding.Option("telluricType", rTelluricType)
         ) =>
-          (rETM, rSvc, rTelescopeConfigs, rTelluricType).parMapN { (etm, svc, telescopeConfigs, telluricType) =>
+          (rETM.flatMap(TelluricExposureTimeModeEdit.forCreate), rSvc, rTelescopeConfigs, rTelluricType).parMapN { (etm, svc, telescopeConfigs, telluricType) =>
             Create(etm, svc, telescopeConfigs, telluricType.getOrElse(TelluricType.Hot))
           }
       }
 
   case class Edit(
-    exposureTimeMode: Option[ExposureTimeMode],
+    exposureTimeMode: Nullable[ExposureTimeMode],
     svc:              Nullable[Svc.Edit],
     explicitTelescopeConfigs: Nullable[SlitTelescopeConfigs],
     telluricType: Option[TelluricType]
@@ -109,6 +110,10 @@ object Igrins2LongSlitInput:
     val observingModeType: ObservingModeType =
       ObservingModeType.Igrins2LongSlit
 
+    def isScienceExposureTimeModeOnly: Boolean =
+      exposureTimeMode.isDefined &&
+        copy(exposureTimeMode = Nullable.Absent) === Edit.AllUndefined
+
     private val stored = explicitTelescopeConfigs.map(storedSlitTelescopeConfigs)
 
     val explicitSlitOffsetMode = stored.map(_.slitOffsetMode)
@@ -116,23 +121,28 @@ object Igrins2LongSlitInput:
     val formattedTelescopeConfigs = stored.map(_.telescopeConfigs)
 
     val toCreate: Result[Create] =
-      Result(Create(
-        exposureTimeMode,
-        svc.toOption.map: s =>
-          Svc.Create(
-            s.explicitExposure.toOption,
-            s.explicitTelescopeConfigs.toOption
-          ),
-        explicitTelescopeConfigs.toOption,
-        telluricType.getOrElse(TelluricType.Hot)
-      ))
+      TelluricExposureTimeModeEdit.forCreate(exposureTimeMode).map: etm =>
+        Create(
+          etm,
+          svc.toOption.map: s =>
+            Svc.Create(
+              s.explicitExposure.toOption,
+              s.explicitTelescopeConfigs.toOption
+            ),
+          explicitTelescopeConfigs.toOption,
+          telluricType.getOrElse(TelluricType.Hot)
+        )
 
   object Edit:
+    given Eq[Edit] = Eq.fromUniversalEquals
+
+    private val AllUndefined: Edit =
+      Edit(Nullable.Absent, Nullable.Absent, Nullable.Absent, None)
 
     val Binding: Matcher[Edit] =
       ObjectFieldsBinding.rmap {
         case List(
-          ExposureTimeModeInput.Binding.Option("exposureTimeMode", rETM),
+          ExposureTimeModeInput.Binding.Nullable("exposureTimeMode", rETM),
           Svc.Edit.Binding.Nullable("svc", rSvc),
           SlitTelescopeConfigsInput.Binding.Nullable("explicitTelescopeConfigs", rTelescopeConfigs),
           TelluricTypeBinding.Option("telluricType", rTelluricType)

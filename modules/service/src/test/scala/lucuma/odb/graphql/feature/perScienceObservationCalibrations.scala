@@ -3484,3 +3484,388 @@ class perScienceObservationCalibrations
       assert(before.resolvedTargetId.isDefined, "the initial resolution must find a target")
       assertEquals(after.state, CalculationState.Ready)
       assertEquals(after.resolvedTargetId, before.resolvedTargetId)
+
+  // ---------------------------------------------------------------------------
+  // Telluric science exposure time mode override
+  // ---------------------------------------------------------------------------
+
+  private def setTelluricScienceEtm(oid: Observation.Id, etm: String, extra: String = ""): IO[List[Observation.Id]] =
+    query(
+      pi,
+      s"""mutation {
+        updateObservations(input: {
+          SET: { observingMode: { flamingos2LongSlit: { exposureTimeMode: $etm $extra } } }
+          WHERE: { id: { EQ: "$oid" } }
+        }) {
+          observations { id }
+        }
+      }"""
+    ).map(_.hcursor.downFields("updateObservations", "observations").require[List[ObsInfo]].map(_.id))
+
+  private def snEtm(value: Int, atNm: Int = 500): String =
+    s"{ signalToNoise: { value: $value at: { nanometers: $atNm } } }"
+
+  // (effective S/N, explicit flag) of a Flamingos 2 long slit science exposure time mode.
+  private def queryF2ScienceEtm(oid: Observation.Id): IO[(Option[Int], Boolean)] =
+    val sn = query(
+      serviceUser,
+      s"""query {
+            observation(observationId: "$oid") {
+              observingMode { flamingos2LongSlit { exposureTimeMode { signalToNoise { value } } } }
+            }
+          }"""
+    ).map: c =>
+      c.hcursor
+        .downFields("observation", "observingMode", "flamingos2LongSlit", "exposureTimeMode", "signalToNoise", "value")
+        .as[BigDecimal].toOption.map(_.toInt)
+    (sn, scienceEtmIsExplicit(oid)).tupled
+
+  private def createF2WithTelluric(pid: Program.Id): IO[(Observation.Id, Observation.Id)] =
+    for
+      tid <- createTargetWithProfileAs(pi, pid)
+      oid <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _   <- setScienceRequirements(oid, DefaultSnAt, 60.0)
+      _   <- runObscalcUpdate(pid, oid)
+      _   <- recalculateCalibrations(pid, when, oid)
+      tel <- selectTelluricObservationFor(oid)
+    yield (oid, tel.get)
+
+  private def calibrationCalcState(oid: Observation.Id): IO[Option[String]] =
+    import skunk.codec.all.text
+    withSession: s =>
+      s.option(
+        sql"""SELECT c_state::text
+                FROM t_calibration_calc
+               WHERE c_observation_id = $observation_id""".query(text)
+      )(oid)
+
+  test("telluric etm override: a PI sets it, it is explicit, and it survives a resync"):
+    for
+      pid        <- createProgramAs(pi)
+      (oid, tel) <- createF2WithTelluric(pid)
+      before     <- queryF2ScienceEtm(tel)
+      updated    <- setTelluricScienceEtm(tel, snEtm(250))
+      after      <- queryF2ScienceEtm(tel)
+      // A deeper science changes the derived value, but the override holds.
+      _          <- setScienceRequirements(oid, DefaultSnAt, 80.0)
+      _          <- runObscalcUpdate(pid, oid)
+      _          <- recalculateCalibrations(pid, when, oid)
+      resynced   <- queryF2ScienceEtm(tel)
+    yield
+      assertEquals(before, (Some(120), false))
+      assertEquals(updated, List(tel))
+      assertEquals(after, (Some(250), true))
+      assertEquals(resynced, (Some(250), true))
+
+  test("telluric etm override: null queues the recalculation and restores the derived value"):
+    for
+      pid        <- createProgramAs(pi)
+      (oid, tel) <- createF2WithTelluric(pid)
+      _          <- setTelluricScienceEtm(tel, snEtm(250))
+      _          <- setTelluricScienceEtm(tel, "null")
+      cleared    <- queryF2ScienceEtm(tel)
+      queued     <- calibrationCalcState(oid)
+      // Run the queued recalculation as the daemon would.
+      _          <- recalculateCalibrations(pid, when, oid)
+      after      <- queryF2ScienceEtm(tel)
+    yield
+      assertEquals(cleared._2, false)
+      assertEquals(queued, Some("pending"))
+      assertEquals(after, (Some(120), false))
+
+  test("telluric etm override: a time and count mode is accepted"):
+    for
+      pid        <- createProgramAs(pi)
+      (_, tel)   <- createF2WithTelluric(pid)
+      _          <- setTelluricScienceEtm(tel, "{ timeAndCount: { time: { seconds: 30 } count: 4 at: { nanometers: 500 } } }")
+      etm        <- queryF2ScienceEtm(tel)
+    yield assertEquals(etm, (None, true))
+
+  test("telluric etm override: an edit touching anything else leaves the telluric alone"):
+    for
+      pid        <- createProgramAs(pi)
+      (_, tel)   <- createF2WithTelluric(pid)
+      updated    <- setTelluricScienceEtm(tel, snEtm(250), extra = "explicitReadMode: FAINT")
+      after      <- queryF2ScienceEtm(tel)
+    yield
+      assertEquals(updated, Nil)
+      assertEquals(after, (Some(120), false))
+
+  test("telluric etm override: an ETM-only edit for another mode leaves the telluric alone"):
+    for
+      pid        <- createProgramAs(pi)
+      (_, tel)   <- createF2WithTelluric(pid)
+      updated    <- query(
+                      pi,
+                      s"""mutation {
+                        updateObservations(input: {
+                          SET: { observingMode: { igrins2LongSlit: { exposureTimeMode: ${snEtm(250)} } } }
+                          WHERE: { id: { EQ: "$tel" } }
+                        }) {
+                          observations { id }
+                        }
+                      }"""
+                    ).map(_.hcursor.downFields("updateObservations", "observations").require[List[ObsInfo]].map(_.id))
+      after      <- queryF2ScienceEtm(tel)
+    yield
+      assertEquals(updated, Nil)
+      assertEquals(after, (Some(120), false))
+
+  test("telluric etm override: null on a science observation is rejected"):
+    for
+      pid <- createProgramAs(pi)
+      tid <- createTargetWithProfileAs(pi, pid)
+      oid <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _   <- expectOdbError(
+               user  = pi,
+               query = s"""mutation {
+                 updateObservations(input: {
+                   SET: { observingMode: { flamingos2LongSlit: { exposureTimeMode: null } } }
+                   WHERE: { id: { EQ: "$oid" } }
+                 }) {
+                   observations { id }
+                 }
+               }""",
+               expected = {
+                 case OdbError.InvalidArgument(Some(msg)) if msg.contains("only valid when editing a telluric") => ()
+               }
+             )
+    yield ()
+
+  test("telluric etm override: null is rejected when an update creates the mode"):
+    for
+      pid <- createProgramAs(pi)
+      tid <- createTargetWithProfileAs(pi, pid)
+      oid <- createObservationWithNoModeAs(pi, pid, tid)
+      _   <- expectOdbError(
+               user  = pi,
+               query = s"""mutation {
+                 updateObservations(input: {
+                   SET: { observingMode: { flamingos2LongSlit: {
+                     disperser: R1200_JH filter: JH fpu: LONG_SLIT_1 exposureTimeMode: null
+                   } } }
+                   WHERE: { id: { EQ: "$oid" } }
+                 }) {
+                   observations { id }
+                 }
+               }""",
+               expected = {
+                 case OdbError.InvalidArgument(Some(msg)) if msg.contains("only valid when editing a telluric") => ()
+               }
+             )
+    yield ()
+
+  test("telluric etm override: GNIRS null is rejected on create"):
+    for
+      pid <- createProgramAs(pi)
+      tid <- createTargetWithProfileAs(pi, pid)
+      _   <- expectOdbError(
+               user  = pi,
+               query = s"""mutation {
+                 createObservation(input: {
+                   programId: "$pid"
+                   SET: {
+                     targetEnvironment: { asterism: ["$tid"] }
+                     observingMode: { gnirsLongSlit: {
+                       filter: ORDER3 fpu: LONG_SLIT_0_30 camera: SHORT_BLUE grating: D32 prism: SXD
+                       centralWavelengths: [{ centralWavelength: { nanometers: 1600 } exposureTimeMode: null }]
+                     } }
+                   }
+                 }) {
+                   observation { id }
+                 }
+               }""",
+               expected = {
+                 case OdbError.InvalidArgument(Some(msg)) if msg.contains("only valid when editing a telluric") => ()
+               }
+             )
+    yield ()
+
+  // (wavelength nm, S/N, explicit) per current row.
+  private def gnirsCurrentRows(oid: Observation.Id): IO[List[(Int, Int, Boolean)]] =
+    import skunk.codec.all.{bool, int4}
+    withSession: s =>
+      s.execute(
+        sql"""SELECT (g.c_central_wavelength / 1000)::int4,
+                     e.c_signal_to_noise,
+                     e.c_is_explicit
+                FROM t_gnirs_central_wavelength_config g
+                JOIN t_exposure_time_mode e ON e.c_exposure_time_mode_id = g.c_exposure_time_mode_id
+               WHERE g.c_observation_id = $observation_id
+                 AND g.c_version = 'current'
+               ORDER BY g.c_index"""
+          .query(int4 *: lucuma.odb.util.Codecs.signal_to_noise *: bool)
+      )(oid).map(_.map((w, sn, x) => (w, sn.toBigDecimal.toInt, x)))
+
+  private def createGnirsWithTelluric(pid: Program.Id): IO[(Observation.Id, Observation.Id)] =
+    for
+      tid <- createTargetWithProfileAs(pi, pid)
+      _   <- seedGnirsXdSmartGcal
+      oid <- createGnirsXdObservationAs(pi, pid, tid, wavelengthsNm = List(1600, 1650))
+      _   <- runObscalcUpdate(pid, oid)
+      _   <- recalculateCalibrations(pid, when, oid)
+      tel <- selectTelluricObservationFor(oid)
+    yield (oid, tel.get)
+
+  test("telluric etm override: GNIRS overrides one wavelength row and keeps the rest derived"):
+    for
+      pid        <- createProgramAs(pi)
+      (oid, tel) <- createGnirsWithTelluric(pid)
+      before     <- gnirsCurrentRows(tel)
+      _          <- setGnirsCentralWavelengths(tel,
+                      """{ centralWavelength: { nanometers: 1600 } }
+                         { centralWavelength: { nanometers: 1650 }
+                           exposureTimeMode: { signalToNoise: { value: 300 at: { nanometers: 1650 } } } }""")
+      set        <- gnirsCurrentRows(tel)
+      _          <- recalculateCalibrations(pid, when, oid)
+      kept       <- gnirsCurrentRows(tel)
+      // The science drops the overridden wavelength: the override goes with it.
+      _          <- setGnirsCentralWavelengths(oid,
+                      """{ centralWavelength: { nanometers: 1600 }
+                           exposureTimeMode: { timeAndCount: { time: { seconds: 30.0 } count: 3 at: { nanometers: 1600 } } } }
+                         { centralWavelength: { nanometers: 1700 }
+                           exposureTimeMode: { timeAndCount: { time: { seconds: 30.0 } count: 3 at: { nanometers: 1700 } } } }""")
+      _          <- runObscalcUpdate(pid, oid)
+      _          <- recalculateCalibrations(pid, when, oid)
+      moved      <- gnirsCurrentRows(tel)
+    yield
+      // Only the first leg has a measured S/N; the second starts at the derived floor.
+      assertEquals(before, List((1600, 232, false), (1650, 100, false)))
+      assertEquals(set,    List((1600, 232, false), (1650, 300, true)))
+      assertEquals(kept,   List((1600, 232, false), (1650, 300, true)))
+      assertEquals(moved,  List((1600, 232, false), (1700, 232, false)))
+
+  test("telluric etm override: GNIRS sets one row and reverts another in one edit"):
+    for
+      pid        <- createProgramAs(pi)
+      (oid, tel) <- createGnirsWithTelluric(pid)
+      _          <- setGnirsCentralWavelengths(tel,
+                      """{ centralWavelength: { nanometers: 1600 }
+                           exposureTimeMode: { signalToNoise: { value: 400 at: { nanometers: 1600 } } } }
+                         { centralWavelength: { nanometers: 1650 }
+                           exposureTimeMode: { signalToNoise: { value: 300 at: { nanometers: 1650 } } } }""")
+      _          <- setGnirsCentralWavelengths(tel,
+                      """{ centralWavelength: { nanometers: 1600 } exposureTimeMode: null }
+                         { centralWavelength: { nanometers: 1650 }
+                           exposureTimeMode: { signalToNoise: { value: 350 at: { nanometers: 1650 } } } }""")
+      rows       <- gnirsCurrentRows(tel)
+      state      <- calibrationCalcState(oid)
+    yield
+      assertEquals(rows, List((1600, 400, false), (1650, 350, true)))
+      assertEquals(state, Some("pending"))
+
+  test("telluric etm override: GNIRS rejects a wavelength list that differs from the telluric's"):
+    for
+      pid      <- createProgramAs(pi)
+      (_, tel) <- createGnirsWithTelluric(pid)
+      _        <- expectOdbError(
+                    user  = pi,
+                    query = s"""mutation {
+                      updateObservations(input: {
+                        SET: { observingMode: { gnirsSpectroscopy: { centralWavelengths: [
+                          { centralWavelength: { nanometers: 1650 }
+                            exposureTimeMode: { signalToNoise: { value: 300 at: { nanometers: 1650 } } } }
+                          { centralWavelength: { nanometers: 1600 } }
+                        ] } } }
+                        WHERE: { id: { EQ: "$tel" } }
+                      }) {
+                        observations { id }
+                      }
+                    }""",
+                    expected = {
+                      case OdbError.InvalidArgument(Some(msg)) if msg.contains("cannot be edited") => ()
+                    }
+                  )
+    yield ()
+
+  test("telluric etm override: GNIRS rejects coadds on a telluric"):
+    for
+      pid      <- createProgramAs(pi)
+      (_, tel) <- createGnirsWithTelluric(pid)
+      _        <- expectOdbError(
+                    user  = pi,
+                    query = s"""mutation {
+                      updateObservations(input: {
+                        SET: { observingMode: { gnirsSpectroscopy: { centralWavelengths: [
+                          { centralWavelength: { nanometers: 1600 }
+                            exposureTimeMode: { timeAndCount: { time: { seconds: 30 } count: 2 at: { nanometers: 1600 } } }
+                            coadds: 4 }
+                          { centralWavelength: { nanometers: 1650 } }
+                        ] } } }
+                        WHERE: { id: { EQ: "$tel" } }
+                      }) {
+                        observations { id }
+                      }
+                    }""",
+                    expected = {
+                      case OdbError.InvalidArgument(Some(msg)) if msg.contains("coadds of telluric") => ()
+                    }
+                  )
+    yield ()
+
+  test("telluric etm override: GNIRS null on a science observation is rejected"):
+    for
+      pid      <- createProgramAs(pi)
+      (oid, _) <- createGnirsWithTelluric(pid)
+      _        <- expectOdbError(
+                    user  = pi,
+                    query = s"""mutation {
+                      updateObservations(input: {
+                        SET: { observingMode: { gnirsSpectroscopy: { centralWavelengths: [
+                          { centralWavelength: { nanometers: 1600 } exposureTimeMode: null }
+                          { centralWavelength: { nanometers: 1650 } }
+                        ] } } }
+                        WHERE: { id: { EQ: "$oid" } }
+                      }) {
+                        observations { id }
+                      }
+                    }""",
+                    expected = {
+                      case OdbError.InvalidArgument(Some(msg)) if msg.contains("only valid when editing a telluric") => ()
+                    }
+                  )
+    yield ()
+
+  test("telluric etm override: a change of observing mode drops it"):
+    for
+      pid        <- createProgramAs(pi)
+      (oid, tel) <- createF2WithTelluric(pid)
+      _          <- setTelluricScienceEtm(tel, snEtm(250))
+      _          <- query(
+                      pi,
+                      s"""mutation {
+                        updateObservations(input: {
+                          SET: { observingMode: { igrins2LongSlit: {
+                            exposureTimeMode: { signalToNoise: { value: 60 at: { nanometers: 1500 } } }
+                          } } }
+                          WHERE: { id: { EQ: "$oid" } }
+                        }) {
+                          observations { id }
+                        }
+                      }"""
+                    )
+      _          <- runObscalcUpdate(pid, oid)
+      _          <- recalculateCalibrations(pid, when, oid)
+      telAfter   <- selectTelluricObservationFor(oid)
+      explicit   <- telAfter.traverse(scienceEtmIsExplicit)
+    yield
+      assertEquals(telAfter, Some(tel))
+      assertEquals(explicit, Some(false))
+
+  test("telluric etm override: a rebuilt telluric set starts derived"):
+    for
+      pid        <- createProgramAs(pi)
+      (oid, tel) <- createF2WithTelluric(pid)
+      _          <- setTelluricScienceEtm(tel, snEtm(250))
+      // Crossing the multi-telluric threshold replaces the unobserved set.
+      _          <- setExposureTime(oid, 120)
+      _          <- runObscalcUpdate(pid, oid)
+      _          <- recalculateCalibrations(pid, when, oid)
+      obs        <- queryObservation(oid)
+      group      <- queryObservationsInGroup(obs.groupId.get)
+      tellurics   = group.filter(_.calibrationRole.contains(CalibrationRole.Telluric)).map(_.id)
+      explicit   <- tellurics.traverse(scienceEtmIsExplicit)
+    yield
+      assertEquals(tellurics.size, 2)
+      assert(!tellurics.contains(tel))
+      assertEquals(explicit, List(false, false))

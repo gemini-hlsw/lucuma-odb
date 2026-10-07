@@ -5,6 +5,7 @@ package lucuma.odb.graphql
 
 package input
 
+import cats.Eq
 import cats.data.NonEmptyList
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegShort
@@ -12,6 +13,7 @@ import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
 import grackle.syntax.*
 import lucuma.core.enums.ObservationPriority
+import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ScienceBand
 import lucuma.core.model.Attachment
 import lucuma.core.model.Group
@@ -155,7 +157,17 @@ object ObservationPropertiesInput {
     def needsStaffAccess: Boolean =
       observingMode.toOption.exists(_.needsStaffAccess)
 
+    /**
+     * The observing mode types of the tellurics this edit may touch: a science
+     * `exposureTimeMode` alone is the one edit a telluric calibration accepts.
+     */
+    def admittedTelluricModes: List[ObservingModeType] =
+      if copy(observingMode = Nullable.Absent) === Edit.Empty then
+        observingMode.toOption.toList.flatMap(_.admittedTelluricModes)
+      else Nil
+
   object Edit {
+    given Eq[Edit] = Eq.fromUniversalEquals
 
     val Empty: Edit =
       Edit(
