@@ -43,8 +43,6 @@ val munitCatsEffectVersion       = "2.2.1"   // check test output if you attempt
 val munitDisciplineVersion       = "2.0.0"   // check test output if you attempt to update this
 val munitScalacheckVersion       = "1.3.0"   // check test output if you attempt to update this
 val scalacheckEffectMunitVersion = "2.1.0"
-val natchezHttp4sVersion         = "0.6.2"
-val natchezVersion               = "0.3.10"
 val openTelemetryVersion         = "1.64.0" // must match otel4s-oteljava, see .scala-steward.conf
 val openTelemetryInstrVersion    = "2.26.1-alpha"
 val otel4sVersion                = "1.1.0"
@@ -602,7 +600,7 @@ lazy val ssoBackendClient = project
       "org.http4s"           %% "http4s-core"        % http4sVersion,
       "org.http4s"           %% "http4s-client"      % http4sVersion,
       "org.http4s"           %% "http4s-dsl"         % http4sVersion,
-      "org.tpolecat"         %% "natchez-core"       % natchezVersion,
+      "org.typelevel"        %% "otel4s-core-trace"  % otel4sVersion,
       "org.typelevel"        %% "log4cats-core"      % log4catsVersion
     )
   )
@@ -664,8 +662,6 @@ lazy val ssoBackendExample = project
       "org.http4s"   %% "http4s-ember-client" % http4sVersion,
       "org.http4s"   %% "http4s-ember-server" % http4sVersion,
       "org.slf4j"    %  "slf4j-simple"        % slf4jVersion,
-      "org.tpolecat" %% "natchez-http4s"      % natchezHttp4sVersion,
-      "org.tpolecat" %% "natchez-log"         % natchezVersion,
     )
   )
 
@@ -843,7 +839,6 @@ lazy val itcClient = crossProject(JVMPlatform, JSPlatform)
       "edu.gemini"    %%% "clue-http4s"       % clueVersion,
       "edu.gemini"    %%% "clue-core"         % clueVersion,
       "io.circe"      %%% "circe-generic"     % circeVersion,
-      "org.tpolecat"  %%% "natchez-http4s"    % natchezHttp4sVersion,
       "org.typelevel" %%% "spire"             % spireVersion,
       "org.typelevel" %%% "spire-extras"      % spireVersion,
       "org.typelevel" %%% "kittens"           % kittensVersion,
@@ -1071,8 +1066,6 @@ lazy val otel = project
     Compile / compile := (Compile / compile).dependsOn(checkOtelVersion).value,
     libraryDependencies ++= Seq(
       "is.cir"                           %% "ciris"                                     % cirisVersion,
-      "org.tpolecat"                     %% "natchez-core"                              % natchezVersion,
-      "org.tpolecat"                     %% "natchez-noop"                              % natchezVersion,
       "org.typelevel"                    %% "otel4s-oteljava"                           % otel4sVersion,
       "org.typelevel"                    %% "otel4s-instrumentation-metrics"            % otel4sVersion,
       "io.opentelemetry"                  % "opentelemetry-exporter-otlp"               % openTelemetryVersion,
@@ -1158,7 +1151,6 @@ lazy val service = project
       "org.http4s"                       %% "http4s-otel4s-middleware-trace-server"      % http4sOtel4sVersion,
       "org.http4s"                       %% "http4s-otel4s-middleware-trace-client"      % http4sOtel4sVersion,
       "org.http4s"                       %% "http4s-otel4s-middleware-metrics"           % http4sOtel4sVersion,
-      "org.tpolecat"                     %% "natchez-noop"                               % natchezVersion,
       "org.tpolecat"                     %% "skunk-core"                                 % skunkVersion,
       "org.tpolecat"                     %% "skunk-circe"                                % skunkVersion,
       "com.lihaoyi"                      %% "pprint"                                     % pprintVersion,

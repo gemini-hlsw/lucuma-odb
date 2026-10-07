@@ -24,7 +24,6 @@ import lucuma.sso.service.config.*
 import lucuma.sso.service.database.Database
 import lucuma.sso.service.graphql.GraphQLRoutes
 import lucuma.sso.service.orcid.OrcidService
-import natchez.Trace
 import org.flywaydb.core.Flyway
 import org.flywaydb.core.api.output.MigrateResult
 import org.http4s.*
@@ -181,14 +180,14 @@ object FMain extends AnsiColor {
     OtelSetup.resource(ServiceName, BuildInfo.gitHeadCommit.getOrElse("unknown"), config.otel)
 
   /** A resource that yields an OrcidService. */
-  def orcidServiceResource[F[_]: Async: Trace: Network](config: OrcidConfig, env: Environment) =
+  def orcidServiceResource[F[_]: Async: Tracer: Network](config: OrcidConfig, env: Environment) =
     EmberClientBuilder.default[F].build
       .map(LoggingMiddleware.client[F](revealSensitiveHeaders = env == Environment.Local))
       .map: client =>
         OrcidService(config.orcidHost, config.clientId, config.clientSecret, client)
 
   /** A resource that yields our HttpRoutes, wrapped in accessory middleware. */
-  def routesResource[F[_]: Async: Trace: Tracer: TracerProvider: Logger: Network: Console](config: Config): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
+  def routesResource[F[_]: Async: Tracer: TracerProvider: Logger: Network: Console](config: Config): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
     for {
       pool        <- databasePoolResource[F](config.database)
       orcid       <- orcidServiceResource(config.orcid, config.environment)
@@ -289,7 +288,6 @@ object FMain extends AnsiColor {
       _                        <- Applicative[Resource[IO, *]].whenA(reset.isRequested)(Resource.eval(resetDatabase[IO](c.database)))
       _                        <- Applicative[Resource[IO, *]].unlessA(skipMigration.isRequested)(Resource.eval(migrateDatabase[IO](c.database)))
       ot                       <- otelResource[IO](c)
-      given Trace[IO]          = ot.trace
       given Tracer[IO]         = ot.tracer
       given TracerProvider[IO] = ot.tracerProvider
       ap                       <- routesResource[IO](c).map(_.map(_.orNotFound))
@@ -307,7 +305,7 @@ object FMain extends AnsiColor {
   def standaloneDatabase[F[_]: Temporal: Network: Console](
     config: DatabaseConfig
   ): Resource[F, Database[F]] = {
-    import Trace.Implicits.noop
+    import Tracer.Implicits.noop
     databasePoolResource(config).flatten.map(Database.fromSession(_))
   }
 

@@ -22,19 +22,18 @@ server.
 
 ```
   SSOClient
-    └─ NatchezMiddleware.client  // Adds tracing to outgoing requests, given `Trace[F]`.
-         └─ Client               // Ember client
+    └─ Client  // Ember client; wrap it in the http4s otel4s client middleware to trace API key exchange.
 ```
 
-The `HttpRoutes` has two layers of tracing.
+The `HttpRoutes` adds the user to the current span.
 
 ```
   HttpRoutes
-    └─ NatchezMiddleware.server  // Continues incoming traces, adds url, etc., to request root trace.
-         └─ SSOMiddleware        // Adds current user to the request root trace.
-              └─ HttpRoutes      // Our original routes without middleware.
+    └─ SSOMiddleware   // Adds current user to the current span, given an otel4s `Tracer[F]`.
+         └─ HttpRoutes // Our original routes without middleware.
 ```
 
-If you have no `Trace[F]` available then the tracing middlewares can be removed and it will all still
-work, but without any visibility. _This is why tracing isn't integrated more deeply_: we apps to be
-able to use `SSOClient` even if tracing is unavailable.
+This example uses a no-op `Tracer[F]`, so spans are dropped. A real service provides one from
+OpenTelemetry (see the `otel` module) and wraps the routes in the http4s otel4s server middleware,
+as `lucuma-sso` and the ODB do. _This is why tracing isn't integrated more deeply_: we want apps to
+be able to use `SSOClient` even if tracing is unavailable.

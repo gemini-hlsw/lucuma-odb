@@ -37,7 +37,6 @@ import lucuma.odb.service.TelluricTargetsDaemon
 import lucuma.odb.service.TelluricTargetsService
 import lucuma.odb.service.UserService
 import lucuma.odb.util.OdbTelemetry
-import natchez.Trace
 import org.http4s.Credentials
 import org.http4s.client.Client
 import org.http4s.headers.Authorization
@@ -124,7 +123,7 @@ object CMain extends MainParams {
       )
       .pooled(max = config.maxCalibrationConnections)
 
-  def serviceUser[F[_]: Async: Trace: Network: Logger](c: Config): F[Option[User]] =
+  def serviceUser[F[_]: Async: Network: Logger: TracerProvider](c: Config): F[Option[User]] =
     c.ssoClient.use: sso =>
       sso.get(Authorization(Credentials.Token(CIString("Bearer"), c.serviceJwt)))
 
@@ -214,7 +213,7 @@ object CMain extends MainParams {
    * Our main server, as a resource that starts up our server on acquire and shuts it all down
    * in cleanup, yielding an `ExitCode`. Users will `use` this resource and hold it forever.
    */
-  def server[F[_]: Async: Compression: Parallel: Logger: LoggerFactory: Trace: Tracer: TracerProvider: MeterProvider: Console: Network: SecureRandom]: Resource[F, ExitCode] =
+  def server[F[_]: Async: Compression: Parallel: Logger: LoggerFactory: Tracer: TracerProvider: MeterProvider: Console: Network: SecureRandom]: Resource[F, ExitCode] =
     for {
       c                  <- Resource.eval(Config.fromCiris.load[F])
       _                  <- Resource.eval(banner[F](c))
@@ -244,7 +243,6 @@ object CMain extends MainParams {
       c                        <- Resource.eval(Config.fromCiris.load[IO])
       otel                     <- OdbTelemetry.otel(ServiceName, c)
       given Tracer[IO]         = otel.tracer
-      given Trace[IO]          = otel.trace
       given Meter[IO]          = otel.meter
       given TracerProvider[IO] = otel.tracerProvider
       given MeterProvider[IO]  = otel.meterProvider

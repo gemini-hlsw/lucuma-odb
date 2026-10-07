@@ -13,7 +13,8 @@ import lucuma.sso.client.ApiKey
 import lucuma.sso.service.*
 import lucuma.sso.service.orcid.OrcidAccess
 import lucuma.sso.service.orcid.OrcidPerson
-import natchez.Trace
+import org.typelevel.otel4s.Attribute
+import org.typelevel.otel4s.trace.Tracer
 import skunk.*
 import skunk.codec.all.*
 import skunk.data.Completion
@@ -92,30 +93,30 @@ object Database extends Codecs {
 
   val SsoServiceUserName = "Lucuma SSO"
 
-  def fromSession[F[_]: Concurrent: Trace](s: Session[F]): Database[F] =
+  def fromSession[F[_]: {Concurrent, Tracer as T}](s: Session[F]): Database[F] =
     new Database[F] {
 
       def canonicalizeServiceUser(serviceName: String): F[ServiceUser] =
-        Trace[F].span("canonicalizeServiceUser") {
+        T.span("canonicalizeServiceUser").surround {
           s.prepareR(CanonicalizeServiceUser).use(_.unique(serviceName))
         }
 
       def getSsoServiceUser: F[ServiceUser] =
-        Trace[F].span("getSsoServiceUser") {
+        T.span("getSsoServiceUser").surround {
           canonicalizeServiceUser(SsoServiceUserName)
         }
 
       def createApiKey(roleId: StandardRole.Id): F[ApiKey] =
-        Trace[F].span("createApiKey") {
+        T.span("createApiKey").surround {
           s.prepareR(CreateApiKey).use(_.unique(roleId))
         }
 
       def deleteApiKey(keyId: PosLong, userId: Option[User.Id]): F[Boolean] =
-        Trace[F].span("deleteApiKey") {
-          Trace[F].put("keyId" -> keyId.toString) *> {
+        T.span("deleteApiKey").surround {
+          T.currentSpanOrNoop.flatMap(_.addAttribute(Attribute("keyId", keyId.toString))) *> {
             userId match {
               case Some(u) =>
-                Trace[F].put("userId" -> Gid[User.Id].fromString.reverseGet(u)) *>
+                T.currentSpanOrNoop.flatMap(_.addAttribute(Attribute("userId", Gid[User.Id].fromString.reverseGet(u)))) *>
                 s.prepareR(DeleteApiKeyForUser).use(_.execute(keyId, u))
               case None =>
                 s.prepareR(DeleteApiKey).use(_.execute(keyId))
@@ -127,40 +128,40 @@ object Database extends Codecs {
         }
 
       def createGuestUser: F[GuestUser] =
-        Trace[F].span("createGuestUser") {
+        T.span("createGuestUser").surround {
           s.unique(InsertGuestUser)
         }
 
       def createGuestUserSessionToken(guestUser: GuestUser): F[SessionToken] =
-        Trace[F].span("createGuestUserSessionToken") {
+        T.span("createGuestUserSessionToken").surround {
           s.prepareR(InsertGuestUserSessionToken).use(_.unique(guestUser.id))
         }
 
       def createGuestUserAndSessionToken: F[(GuestUser, SessionToken)] =
-        Trace[F].span("createGuestUserAndSessionToken") {
+        T.span("createGuestUserAndSessionToken").surround {
           s.transaction.use { _ =>
             createGuestUser.mproduct(createGuestUserSessionToken) // 🔥
           }
         }
 
       def createStandardUserSessionToken(roleId: StandardRole.Id): F[SessionToken] =
-        Trace[F].span("createStandardUserSessionToken") {
+        T.span("createStandardUserSessionToken").surround {
           s.prepareR(InsertStandardUserSessionToken).use(_.unique(roleId))
         }
 
       def findGuestUserFromToken(token: SessionToken): F[Option[GuestUser]] =
-        Trace[F].span("findGuestUserFromToken") {
+        T.span("findGuestUserFromToken").surround {
           s.prepareR(SelectGuestUserForSessionToken).use(_.option(token))
         }
 
       def getGuestUserFromToken(token: SessionToken): F[GuestUser] =
-        Trace[F].span("getGuestUserFromToken") {
+        T.span("getGuestUserFromToken").surround {
           findGuestUserFromToken(token)
             .flatMap(_.toRight(new RuntimeException(s"No guest user for session token: ${token.value}")).liftTo[F])
         }
 
       def findUserFromToken(token: SessionToken): F[Option[User]] =
-        Trace[F].span("findUserFromToken") {
+        T.span("findUserFromToken").surround {
           s.transaction.use { _ =>
             OptionT(findStandardUserFromToken(token).widen[Option[User]])
               .orElse(OptionT(findGuestUserFromToken(token).widen[Option[User]]))
@@ -169,7 +170,7 @@ object Database extends Codecs {
         }
 
       def getUserFromToken(token: SessionToken): F[User] =
-        Trace[F].span("getUserFromToken") {
+        T.span("getUserFromToken").surround {
           findUserFromToken(token)
             .flatMap(_.toRight(new RuntimeException(s"Invalid session token: ${token.value}")).liftTo[F])
         }
@@ -180,7 +181,7 @@ object Database extends Codecs {
         gid:       User.Id,
         role:      RoleRequest
       ) : F[(Option[User.Id], SessionToken)] =
-        Trace[F].span("promoteGuestUser") {
+        T.span("promoteGuestUser").surround {
           s.transaction.use { _ =>
 
             // Try to update the user profile.
@@ -208,14 +209,14 @@ object Database extends Codecs {
         }
 
       def deleteAllSessionTokensForUser(uid: User.Id): F[Unit] =
-        Trace[F].span("deleteAllSessionTokensForUser") {
+        T.span("deleteAllSessionTokensForUser").surround {
           s.prepareR(sql"DELETE FROM lucuma_session WHERE user_id = $user_id".command)
             .use(_.execute(uid))
             .void
         }
 
       def deleteAllSessionTokensForRole(id: StandardRole.Id): F[Unit] =
-        Trace[F].span("deleteAllSessionTokensForRole") {
+        T.span("deleteAllSessionTokensForRole").surround {
           s.prepareR(sql"DELETE FROM lucuma_session WHERE role_id = $role_id".command)
             .use(_.execute(id))
             .void
@@ -223,7 +224,7 @@ object Database extends Codecs {
 
       def deleteRole(id: StandardRole.Id): F[Unit] =
         deleteAllSessionTokensForRole(id) >>
-        Trace[F].span("deleteAllSessionTokensForRole") {
+        T.span("deleteAllSessionTokensForRole").surround {
           s.prepareR(sql"DELETE FROM lucuma_role WHERE role_id = $role_id AND role_type <> 'pi'".command)
             .use(_.execute(id))
             .void
@@ -234,7 +235,7 @@ object Database extends Codecs {
         person:    OrcidPerson,
         role:      RoleRequest
       ) : F[SessionToken] =
-        Trace[F].span("canonicalizeUser") {
+        T.span("canonicalizeUser").surround {
           s.transaction.use { _ =>
 
             // See if we can update the ORCID profile. If we can then it means it already exists.
@@ -264,15 +265,15 @@ object Database extends Codecs {
 
       def canonicalizeRole(id: User.Id, role: RoleRequest): F[StandardRole.Id] =
         s.transaction.use(_ => canonicalizeRoleImpl(id, role))
-        
+
       private def canonicalizeRoleImpl(userId: User.Id, role: RoleRequest): F[StandardRole.Id] =
-        Trace[F].span("canonicalizeRoleImpl") {
+        T.span("canonicalizeRoleImpl").surround {
           // we assume we're in a transction … would be nice if we could put this in the type
           OptionT(findRole(userId, role)).getOrElseF(addRole(userId, role))
         }
 
       def findRole(userId: User.Id, role: RoleRequest): F[Option[StandardRole.Id]] =
-        Trace[F].span("findRole") {
+        T.span("findRole").surround {
 
           // Query depends on whether there's a partner or not.
           val af: AppliedFragment =
@@ -294,7 +295,7 @@ object Database extends Codecs {
 
       def deleteUser(id: User.Id): F[Boolean] =
         deleteAllSessionTokensForUser(id) >>
-        Trace[F].span("deleteUser") {
+        T.span("deleteUser").surround {
           s.prepareR(DeleteUser).use { pq =>
             pq.execute(id).map {
               case Delete(c) => c > 0
@@ -307,7 +308,7 @@ object Database extends Codecs {
 
       // Update the specified ORCID profile and yield the associated `StandardUser`, if any.
       def updateProfile(access: OrcidAccess, person: OrcidPerson): F[Option[User.Id]] =
-        Trace[F].span("updateProfile"):
+        T.span("updateProfile").surround:
           s.prepareR(UpdateProfile).use(_.option(access, person))
 
       def promoteGuest(
@@ -316,7 +317,7 @@ object Database extends Codecs {
         gid:       User.Id,
         role:      RoleRequest
       ): F[StandardRole.Id] =
-        Trace[F].span("promoteGuest") {
+        T.span("promoteGuest").surround {
           s.prepareR(PromoteGuest).use { pq =>
             for {
               userId <- pq.unique(gid, access, person)
@@ -330,7 +331,7 @@ object Database extends Codecs {
         person:    OrcidPerson,
         role:      RoleRequest
       ): F[StandardRole.Id] =
-        Trace[F].span("createStandardUser") {
+        T.span("createStandardUser").surround {
           s.prepareR(InsertStandardUser).use { pq =>
             for {
               userId <- pq.unique(access, person)
@@ -340,12 +341,12 @@ object Database extends Codecs {
         }
 
       def addRole(user: User.Id, role: RoleRequest): F[StandardRole.Id] =
-        Trace[F].span("addRole") {
+        T.span("addRole").surround {
           s.prepareR(InsertRole).use(_.unique(user, role))
         }
 
       def getStandardUserFromToken(token: SessionToken): F[StandardUser] =
-        Trace[F].span("getStandardUserFromToken") {
+        T.span("getStandardUserFromToken").surround {
           findStandardUserFromToken(token).flatMap {
             case None => Concurrent[F].raiseError(new RuntimeException(s"No such standard user with session token: ${token.value}"))
             case Some(u) => u.pure[F]
@@ -355,7 +356,7 @@ object Database extends Codecs {
       def findStandardUserFromToken(
         token: SessionToken
       ): F[Option[StandardUser]] =
-        Trace[F].span("findStandardUserFromToken") {
+        T.span("findStandardUserFromToken").surround {
           s.prepareR(SelectStandardUserByToken).use { pq =>
             pq.stream(token, 64).compile.toList flatMap {
               case Nil => none[StandardUser].pure[F]
@@ -373,7 +374,7 @@ object Database extends Codecs {
       def findStandardUserFromApiKey(
         apiKey: ApiKey
       ): F[Option[StandardUser]] =
-        Trace[F].span("findStandardUserFromApiKey") {
+        T.span("findStandardUserFromApiKey").surround {
           s.prepareR(SelectStandardUserByApiKey).use { pq =>
             pq.stream(apiKey, 64).compile.toList flatMap {
               case Nil => none[StandardUser].pure[F]

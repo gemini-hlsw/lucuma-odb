@@ -12,7 +12,6 @@ import lucuma.itc.tests.EmissionLineMockItc
 import lucuma.itc.tests.MockItc
 import munit.CatsEffectSuite
 import munit.catseffect.IOFixture
-import natchez.Trace
 import org.http4s.*
 import org.http4s.client.middleware.ResponseLogger
 import org.http4s.ember.server.EmberServerBuilder
@@ -29,7 +28,6 @@ trait ClientSuite extends CatsEffectSuite:
 
   given Logger[IO] = Slf4jLogger.getLoggerFromClass(getClass)
   given Tracer[IO] = Tracer.noop
-  given Trace[IO]  = Trace.Implicits.noop
 
   private def httpApp(backend: Itc[IO]): Resource[IO, WebSocketBuilder2[IO] => HttpApp[IO]] =
     Resource.eval(lucuma.itc.tests.app(backend))

@@ -38,7 +38,6 @@ import lucuma.odb.service.S3FileService
 import lucuma.odb.service.UserService
 import lucuma.odb.util.OdbTelemetry
 import lucuma.sso.client.SsoClient
-import natchez.Trace
 import org.flywaydb.core.Flyway
 import org.flywaydb.core.api.output.MigrateResult
 import org.http4s.*
@@ -202,7 +201,7 @@ object FMain extends MainParams {
       .resource
 
   /** A resource that yields our HttpRoutes, wrapped in accessory middleware. */
-  def routesResource[F[_]: Compression: Async: Parallel: Trace: Tracer: TracerProvider: MeterProvider: Logger: LoggerFactory: Network: Console: SecureRandom](
+  def routesResource[F[_]: Compression: Async: Parallel: Tracer: TracerProvider: MeterProvider: Logger: LoggerFactory: Network: Console: SecureRandom](
     config: Config
   ): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
     routesResource(
@@ -352,7 +351,6 @@ object FMain extends MainParams {
       _  <- Resource.eval(runStartupDiagnostics(c.database, true))
       ot <- OdbTelemetry.otel(ServiceName, c)
       given Tracer[F]         = ot.tracer
-      given Trace[F]          = ot.trace
       given Meter[F]          = ot.meter
       given TracerProvider[F] = ot.tracerProvider
       given MeterProvider[F]  = ot.meterProvider

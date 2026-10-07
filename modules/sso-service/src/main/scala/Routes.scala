@@ -13,11 +13,11 @@ import lucuma.sso.client.SsoMiddleware.traceUser
 import lucuma.sso.service.database.Database
 import lucuma.sso.service.database.RoleRequest
 import lucuma.sso.service.orcid.OrcidService
-import natchez.Trace
 import org.http4s.*
 import org.http4s.dsl.Http4sDsl
 import org.http4s.headers.Location
 import org.typelevel.log4cats.Logger
+import org.typelevel.otel4s.trace.Tracer
 
 import scala.concurrent.duration.*
 
@@ -29,7 +29,7 @@ object Routes {
     }
 
   // This is the main event. Here are the routes we're serving.
-  def apply[F[_]: Async: Logger: Trace](
+  def apply[F[_]: Async: Logger: Tracer](
     dbPool:    Resource[F, Database[F]],
     odb:       OdbClient[F],
     orcid:     OrcidService[F],

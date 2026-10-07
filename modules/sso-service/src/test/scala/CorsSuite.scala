@@ -5,10 +5,10 @@ package lucuma.sso.service
 
 import cats.effect.*
 import lucuma.common.middleware.CorsMiddleware
-import natchez.Trace.Implicits.noop
 import org.http4s.*
 import org.http4s.implicits.*
 import org.typelevel.ci.CIString
+import org.typelevel.otel4s.trace.Tracer.Implicits.noop
 
 class CorsSuite extends SsoSuite {
 

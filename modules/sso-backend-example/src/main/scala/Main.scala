@@ -5,19 +5,12 @@ package lucuma.sso.example
 
 import cats.*
 import cats.effect.*
-import cats.effect.std.SecureRandom
-import cats.effect.std.UUIDGen
 import com.comcast.ip4s.Host
 import com.comcast.ip4s.Port
 import fs2.io.net.Network
 import lucuma.core.model.User
 import lucuma.sso.client.SsoClient
 import lucuma.sso.client.SsoMiddleware
-import natchez.EntryPoint
-import natchez.Trace
-import natchez.http4s.NatchezMiddleware
-import natchez.http4s.implicits.*
-import natchez.log.Log
 import org.http4s.*
 import org.http4s.dsl.Http4sDsl
 import org.http4s.ember.server.EmberServerBuilder
@@ -27,6 +20,7 @@ import org.http4s.server.middleware.CORS
 import org.http4s.server.middleware.ErrorAction
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
+import org.typelevel.otel4s.trace.Tracer
 
 import scala.annotation.unused
 import scala.concurrent.duration.*
@@ -38,6 +32,8 @@ object Main extends IOApp {
 
   implicit val logger: Logger[IO] =
     Slf4jLogger.getLoggerFromName("lucuma-sso")
+
+  given Tracer[IO] = Tracer.Implicits.noop
 
   // A normal server.
   def serverResource[F[_]: Async: Network](
@@ -65,19 +61,12 @@ object Main extends IOApp {
   }
 
   // Our routes, with middleware
-  def wrappedRoutes[F[_]: Async: Trace: Network: Logger](
+  def wrappedRoutes[F[_]: Async: Tracer: Network: Logger](
     cfg: Config
   ): Resource[F, HttpRoutes[F]] =
     cfg.ssoClient[F].map { ssoClient =>
       val userClient = ssoClient.map(_.user) // we only want part of the UserInfo
-      NatchezMiddleware.server(SsoMiddleware(userClient)(routes[F](userClient)))
-    }
-
-  // Traces go to the log; swap this for a real exporter in a production service.
-  def entryPoint[F[_]: Sync: Logger]: Resource[F, EntryPoint[F]] =
-    Resource.eval(SecureRandom.javaSecuritySecureRandom[F]).map { sr =>
-      given UUIDGen[F] = UUIDGen.fromSecureRandom(using Sync[F], sr)
-      Log.entryPoint[F]("backend-example")
+      SsoMiddleware(userClient)(routes[F](userClient))
     }
 
   def log[F[_]: Async](@unused r: Request[F], t: Throwable): F[Unit] =
@@ -95,8 +84,7 @@ object Main extends IOApp {
     cfg: Config
   ): Resource[IO, Server] =
     for {
-      ep      <- entryPoint[IO]
-      routes  <- ep.liftR(wrappedRoutes(cfg))
+      routes  <- wrappedRoutes[IO](cfg)
       httpApp  = ErrorAction.httpRoutes(cors(routes, "lucuma.xyz"), log[IO]).orNotFound
       server  <- serverResource(cfg.port, httpApp)
     } yield server

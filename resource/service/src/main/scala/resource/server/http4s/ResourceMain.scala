@@ -18,7 +18,6 @@ import lucuma.core.model.User
 import lucuma.graphql.routes.GraphQLService
 import lucuma.otel.OtelSetup
 import lucuma.sso.client.SsoClient
-import natchez.Trace
 import org.flywaydb.core.Flyway
 import org.http4s.*
 import org.http4s.client.Client
@@ -54,7 +53,6 @@ object ResourceMain extends IOApp.Simple {
                                   BuildInfo.gitHeadCommit.getOrElse("000000"),
                                   conf.otel
                                 )
-      given Trace[F]          = otel.trace
       given Tracer[F]         = otel.tracer
       given Meter[F]          = otel.meter
       given TracerProvider[F] = otel.tracerProvider

@@ -7,7 +7,7 @@ This file covers the ODB subsystem. The ITC subsystem has its own guide at `itc/
 | sbt project id | Path | Role |
 |---|---|---|
 | `schema` | `modules/schema` | Cross (JVM+JS) — GraphQL schema, JSON codecs, domain types |
-| `otel` | `modules/otel` | OpenTelemetry/natchez wiring |
+| `otel` | `modules/otel` | OpenTelemetry wiring |
 | `binding` | `modules/binding` | Grackle input binding helpers (JVM) |
 | `sequence` | `modules/sequence` | Sequence model — observing mode logic, step generation |
 | `smartgcal` | `modules/smartgcal` | SmartGCal calibration lookup |
