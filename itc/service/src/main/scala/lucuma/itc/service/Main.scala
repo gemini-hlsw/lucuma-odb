@@ -31,7 +31,6 @@ import lucuma.itc.legacy.ItcImpl
 import lucuma.itc.legacy.LocalItc
 import lucuma.itc.service.config.*
 import lucuma.otel.OtelSetup
-import natchez.Trace
 import org.http4s.*
 import org.http4s.ember.server.EmberServerBuilder
 import org.http4s.headers.`Cache-Control`
@@ -221,7 +220,6 @@ object Main extends IOApp with ItcCacheOrRemote {
     for
       _                       <- Resource.eval(banner[IO](cfg))
       otel                    <- OtelSetup.resource(ServiceName, version.value, cfg.otel)
-      given Trace[IO]          = otel.trace
       given Tracer[IO]         = otel.tracer
       given Meter[IO]          = otel.meter
       given TracerProvider[IO] = otel.tracerProvider

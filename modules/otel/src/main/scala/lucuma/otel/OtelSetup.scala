@@ -7,7 +7,6 @@ import cats.effect.*
 import cats.effect.unsafe.IORuntime
 import cats.syntax.all.*
 import io.opentelemetry.instrumentation.runtimetelemetry.RuntimeTelemetry
-import natchez.Trace
 import org.typelevel.otel4s.context.LocalProvider
 import org.typelevel.otel4s.instrumentation.ce.IORuntimeMetrics
 import org.typelevel.otel4s.metrics.Meter
@@ -20,7 +19,6 @@ import org.typelevel.otel4s.trace.TracerProvider
 import scala.jdk.CollectionConverters.*
 
 case class OtelServices[F[_]](
-  trace:          Trace[F],
   meter:          Meter[F],
   tracer:         Tracer[F],
   meterProvider:  MeterProvider[F],
@@ -60,7 +58,6 @@ object OtelSetup:
         .evalMap: otel =>
           (otel.tracerProvider.get(serviceName), otel.meterProvider.get(serviceName)).mapN: (tracer, meter) =>
             OtelServices(
-              trace = Otel4sTrace.fromTracer(tracer),
               tracer = tracer,
               meter = meter,
               meterProvider = otel.meterProvider,
@@ -68,7 +65,6 @@ object OtelSetup:
             )
       case None =>
         Resource.pure(OtelServices(
-          trace = Trace.Implicits.noop,
           tracer = Tracer.noop,
           meter = Meter.noop,
           meterProvider = MeterProvider.noop,

@@ -12,7 +12,6 @@ import lucuma.graphql.routes.GraphQLService
 import lucuma.graphql.routes.Routes as LucumaGraphQLRoutes
 import lucuma.sso.client.SsoClient
 import lucuma.sso.service.graphql.mapping.SsoMapping
-import natchez.Trace
 import org.http4s.*
 import org.http4s.server.websocket.WebSocketBuilder2
 import org.typelevel.log4cats.Logger
@@ -22,7 +21,7 @@ import skunk.Session
 object GraphQLRoutes {
 
   /** The GraphQL service of SSO, which serves every request. */
-  def service[F[_]: Async: Trace: Tracer: Logger](pool: Resource[F, Session[F]]): Resource[F, GraphQLService[F]] =
+  def service[F[_]: Async: Tracer: Logger](pool: Resource[F, Session[F]]): Resource[F, GraphQLService[F]] =
     for {
       schema   <- Resource.eval(SsoMapping.loadSchema[F])
       channels <- SsoMapping.Channels(pool)

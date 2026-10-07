@@ -39,8 +39,8 @@ import lucuma.sso.service.database.RoleRequest
 import lucuma.sso.service.database.RoleType
 import lucuma.sso.service.graphql.input.WhereUser
 import lucuma.sso.service.graphql.predicate.Predicates
-import natchez.Trace
 import org.typelevel.log4cats.Logger
+import org.typelevel.otel4s.trace.Tracer
 
 object SsoMapping {
 
@@ -60,7 +60,7 @@ object SsoMapping {
   def loadSchema[F[_]: ApplicativeThrow: Logger]: F[Schema] =
     SchemaStitcher.load("Sso.graphql")
 
-  def apply[F[_]: Async: Trace](
+  def apply[F[_]: Async: Tracer](
     channels: Channels[F],
     pool:     Resource[F, Session[F]],
     monitor:  SkunkMonitor[F],

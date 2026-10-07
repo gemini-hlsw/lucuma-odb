@@ -36,8 +36,6 @@ import lucuma.sso.client.SsoClient
 import lucuma.sso.client.SsoJwtReader
 import lucuma.sso.client.util.GpgPublicKeyReader
 import lucuma.sso.client.util.JwtDecoder
-import natchez.Trace
-import natchez.http4s.NatchezMiddleware
 import org.http4s.Uri
 import org.http4s.client.Client
 import org.http4s.client.middleware.GZip
@@ -128,13 +126,13 @@ case class Config(
     otelHttpClient[F].map(GoaClient.build[F](_))
 
   // SSO Client resource (has to be a resource because it owns an HTTP client).
-  def ssoClient[F[_]: Async: Trace: Network: Logger]: Resource[F, SsoClient[F, User]] =
-    httpClientResource[F].evalMap: httpClient =>
+  def ssoClient[F[_]: Async: Network: Logger: TracerProvider]: Resource[F, SsoClient[F, User]] =
+    otelHttpClient[F].evalMap: httpClient =>
       SsoClient.initial(
         serviceJwt = serviceJwt,
         ssoRoot    = sso.root,
         jwtReader  = jwtReader[F],
-        httpClient = NatchezMiddleware.client(httpClient), // Note!
+        httpClient = httpClient,
       ) .map(_.map(_.user))
 
 

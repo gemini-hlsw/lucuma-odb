@@ -14,28 +14,21 @@ object AngleInput {
 
   def getMicroarcseconds(d: Long)  = Angle.microarcseconds.reverseGet(d)
   def getMicroseconds(d: Long)     = HourAngle.fromMicroseconds(d)
-  def getMilliarcseconds(d: Int)   = Angle.milliarcseconds.reverseGet(d)
-  def getMilliseconds(d: Int)      = HourAngle.milliseconds.reverseGet(d)
-  def getArcSeconds(d: Double)     = Angle.fromDoubleArcseconds(d)
-  def getSeconds(d: Int)           = HourAngle.seconds.reverseGet(d)
-  def getArcMinutes(d: Int)        = Angle.arcminutes.reverseGet(d)
-  def getMinutes(d: Int)           = HourAngle.minutes.reverseGet(d)
-  def getDegrees(d: Double)        = Angle.fromDoubleDegrees(d)
-  def getHours(d: Double)          = HourAngle.fromDoubleHours(d)
+
   def getDMS(s: String)            = Angle.fromStringDMS.getOption(s).toRight(s"Invalid DMS angle: $s")
   def getHMS(s: String)            = HourAngle.fromStringHMS.getOption(s).toRight(s"Invalid HMS angle: $s")
 
-  // N.B. many of these truncate precision because there aren't decimal/double constructors. Need to go back and fix.
-  val Microarcseconds = LongBinding.map(getMicroarcseconds)
-  val Microseconds    = BigDecimalBinding.map(_.toLong).map(getMicroseconds)
-  val Milliarcseconds = BigDecimalBinding.map(_.toInt).map(getMilliarcseconds)
-  val Milliseconds    = BigDecimalBinding.map(_.toInt).map(getMilliseconds)
-  val ArcSeconds      = BigDecimalBinding.map(_.toDouble).map(getArcSeconds)
-  val Seconds         = BigDecimalBinding.map(_.toInt).map(getSeconds)
-  val ArcMinutes      = BigDecimalBinding.map(_.toInt).map(getArcMinutes)
-  val Minutes         = BigDecimalBinding.map(_.toInt).map(getMinutes)
-  val Degrees         = BigDecimalBinding.map(_.toDouble).map(getDegrees)
-  val Hours           = BigDecimalBinding.map(_.toDouble).map(getHours)
+  // Decimal values are rounded to the nearest whole µas (arc units) or µs (time units).
+  val Microarcseconds = AngleBinding.Microarcseconds
+  val Microseconds    = HourAngleBinding.DecimalMicroseconds
+  val Milliarcseconds = AngleBinding.Milliarcseconds
+  val Milliseconds    = HourAngleBinding.Milliseconds
+  val ArcSeconds      = AngleBinding.Arcseconds
+  val Seconds         = HourAngleBinding.Seconds
+  val ArcMinutes      = AngleBinding.Arcminutes
+  val Minutes         = HourAngleBinding.Minutes
+  val Degrees         = AngleBinding.Degrees
+  val Hours           = HourAngleBinding.Hours
   val DMS             = StringBinding.emap(getDMS)
   val HMS             = StringBinding.emap(getHMS)
 
@@ -74,4 +67,3 @@ object AngleInput {
         }
     }
 }
-

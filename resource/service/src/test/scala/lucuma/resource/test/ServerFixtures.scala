@@ -11,7 +11,6 @@ import com.dimafeng.testcontainers.PostgreSQLContainer
 import com.dimafeng.testcontainers.munit.TestContainerForAll
 import lucuma.resource.ResourceBaseSuite
 import munit.catseffect.IOFixture
-import natchez.Trace
 import org.http4s.*
 import org.http4s.ember.server.EmberServerBuilder
 import org.http4s.server.Server
@@ -62,7 +61,6 @@ object ResourceTestDb:
 
 trait ServerFixtures extends munit.CatsEffectSuite with ResourceBaseSuite with TestContainerForAll:
 
-  given Trace[IO]          = Trace.Implicits.noop
   given TracerProvider[IO] = TracerProvider.noop
   given Tracer[IO]         = Tracer.Implicits.noop
   given MeterProvider[IO]  = MeterProvider.noop

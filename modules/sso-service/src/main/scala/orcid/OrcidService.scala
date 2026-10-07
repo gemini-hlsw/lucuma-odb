@@ -5,7 +5,6 @@ package lucuma.sso.service.orcid
 
 import cats.effect.Concurrent
 import cats.implicits.*
-import natchez.Trace
 import orcid.lucuma.sso.service.orcid.OrcidException
 import org.http4s.*
 import org.http4s.Uri.Authority
@@ -16,6 +15,8 @@ import org.http4s.client.Client
 import org.http4s.client.dsl.Http4sClientDsl
 import org.http4s.headers.Accept
 import org.http4s.headers.Authorization
+import org.typelevel.otel4s.Attribute
+import org.typelevel.otel4s.trace.Tracer
 
 trait OrcidService[F[_]] {
 
@@ -50,7 +51,7 @@ trait OrcidService[F[_]] {
 
 object OrcidService {
 
-  def apply[F[_]: Concurrent: Trace](
+  def apply[F[_]: {Concurrent, Tracer as T}](
     orcidHost:         Host,
     orcidClientId:     String,
     orcidClientSecret: String,
@@ -85,7 +86,7 @@ object OrcidService {
           )).pure[F]
 
       def getAccessToken(redirect: Uri, authenticationCode: String): F[OrcidAccess] =
-        Trace[F].span("getAccessToken") {
+        T.span("getAccessToken").surround {
           httpClient.expectOr(
             Method.POST(
               UrlForm(
@@ -102,8 +103,8 @@ object OrcidService {
         }
 
       def getPerson(access: OrcidAccess): F[OrcidPerson] =
-        Trace[F].span("getPerson") {
-          Trace[F].put("orcidId" -> access.orcidId.value) *>
+        T.span("getPerson").surround {
+          T.currentSpanOrNoop.flatMap(_.addAttribute(Attribute("orcidId", access.orcidId.value))) *>
           httpClient.expectOr[OrcidPerson](
             Method.GET(
               Uri.unsafeFromString(s"https://pub.$orcidHost/v3.0/${access.orcidId.value}/person"), // safe, heh-heh
