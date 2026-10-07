@@ -563,13 +563,13 @@ object ExposureTimeModeService:
             id
           )
 
-    private def rowsOf(oids: List[Observation.Id], role: ExposureTimeModeRole): AppliedFragment =
+    private def whereRowsOf(oids: List[Observation.Id], role: ExposureTimeModeRole): AppliedFragment =
       sql"""
         c_observation_id IN ${observation_id.list(oids.length).values}
         AND c_role = $exposure_time_mode_role
       """.apply(oids, role)
 
-    private def rowWithId(eid: ExposureTimeModeId): AppliedFragment =
+    private def whereRow(eid: ExposureTimeModeId): AppliedFragment =
       sql"c_exposure_time_mode_id = $exposure_time_mode_id".apply(eid)
 
     private def updateWhere(
@@ -601,10 +601,10 @@ object ExposureTimeModeService:
       update:     ExposureTimeMode,
       isExplicit: Boolean
     ): AppliedFragment =
-      updateWhere(update, isExplicit, rowsOf(oids, role))
+      updateWhere(update, isExplicit, whereRowsOf(oids, role))
 
     def setExplicit(eid: ExposureTimeModeId, update: ExposureTimeMode): AppliedFragment =
-      updateWhere(update, true, rowWithId(eid))
+      updateWhere(update, true, whereRow(eid))
 
     def updateDerivedSignalToNoise(
       oids: List[Observation.Id],
@@ -644,13 +644,13 @@ object ExposureTimeModeService:
       role:                 ExposureTimeModeRole,
       defaultSignalToNoise: SignalToNoise
     ): AppliedFragment =
-      setDerivedWhere(defaultSignalToNoise, rowsOf(oids, role))
+      setDerivedWhere(defaultSignalToNoise, whereRowsOf(oids, role))
 
     def setDerivedOne(
       eid:                  ExposureTimeModeId,
       defaultSignalToNoise: SignalToNoise
     ): AppliedFragment =
-      setDerivedWhere(defaultSignalToNoise, rowWithId(eid))
+      setDerivedWhere(defaultSignalToNoise, whereRow(eid))
 
     def insertWhereNotPresent(
       oids:       List[Observation.Id],

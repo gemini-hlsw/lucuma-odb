@@ -19,11 +19,10 @@ import lucuma.odb.service.Services.Syntax.*
 import skunk.Transaction
 
 /**
- * A telluric calibration's science exposure time mode is derived from its science
- * observation unless a user overrides it.  Clearing the override marks the row derived
- * again and queues the science observation's calibrations, whose resync rewrites it.
+ * Helpers shared by the observing mode services for a user's override of a telluric
+ * calibration's science exposure time mode.
  */
-object TelluricScienceExposureTimeMode:
+object TelluricETMHelpers:
 
   /** The S/N a derived telluric row falls back to until the resync rewrites it. */
   val DerivedSignalToNoise: SignalToNoise =
@@ -36,7 +35,7 @@ object TelluricScienceExposureTimeMode:
     )
 
   /** Queues a recalculation of the science observation behind each telluric. */
-  def requeue[F[_]: {Concurrent, Services}](
+  def requeueScienceCalc[F[_]: {Concurrent, Services}](
     tellurics: List[Observation.Id]
   )(using Transaction[F]): F[Unit] =
     calibrationCalcService.telluricScience(tellurics).flatMap(requeueScience)
@@ -55,13 +54,13 @@ object TelluricScienceExposureTimeMode:
     etm:   Nullable[ExposureTimeMode]
   )(using Transaction[F]): F[Result[Unit]] =
     etm.fold(
-      revert(which),
+      revertToDerived(which),
       Result.unit.pure[F],
       e => exposureTimeModeService.updateMany(which, ExposureTimeModeRole.Science, e).as(Result.unit)
     )
 
   /** Reverts every science row of the given observations, which must all be tellurics. */
-  def revert[F[_]: {Concurrent, Services}](
+  def revertToDerived[F[_]: {Concurrent, Services}](
     which: List[Observation.Id]
   )(using Transaction[F]): F[Result[Unit]] =
     calibrationCalcService.telluricScience(which).flatMap: tellurics =>

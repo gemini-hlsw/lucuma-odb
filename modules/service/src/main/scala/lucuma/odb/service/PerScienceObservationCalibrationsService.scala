@@ -403,7 +403,7 @@ object PerScienceObservationCalibrationsService:
                 yield result
 
       // A telluric's S/N floor, also used when no science S/N can be derived.
-      private val MinTelluricSN = TelluricScienceExposureTimeMode.DerivedSignalToNoise
+      private val MinTelluricSN = TelluricETMHelpers.DerivedSignalToNoise
 
       // A pinhole flat's exposure comes from SmartGcal, so its S/N doesn't really matter.
       private val DaytimePinholeSN = SignalToNoise.fromInt(100).get

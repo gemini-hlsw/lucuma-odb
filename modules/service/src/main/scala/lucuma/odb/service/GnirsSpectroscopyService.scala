@@ -363,9 +363,7 @@ object GnirsSpectroscopyService:
       /**
        * A telluric calibration's science exposure time modes are edited in place, one per
        * current central wavelength row, so the rows keep their ids and a null entry can
-       * revert to the derived value.  The wavelengths and coadds are not editable here: the
-       * submitted list must match the telluric's current rows in order, and coadds follow
-       * the science on the next resync.
+       * revert to the derived value.
        */
       private def updateTelluricWavelengths(
         ws:  NonEmptyList[GnirsCentralWavelengthConfigInput],
@@ -396,11 +394,11 @@ object GnirsSpectroscopyService:
                       val (_, eid) = row
                       w.exposureTimeMode.fold(
                         exposureTimeModeService
-                          .setDerivedOne(eid, TelluricScienceExposureTimeMode.DerivedSignalToNoise),
+                          .setDerivedOne(eid, TelluricETMHelpers.DerivedSignalToNoise),
                         ().pure[F],
                         exposureTimeModeService.setExplicit(eid, _)
                       )
-          _    <- ResultT.liftF(TelluricScienceExposureTimeMode.requeue(List(oid)))
+          _    <- ResultT.liftF(TelluricETMHelpers.requeueScienceCalc(List(oid)))
                     .whenA(ws.exists(_.exposureTimeMode.isNull))
         yield ()
 
@@ -423,7 +421,7 @@ object GnirsSpectroscopyService:
                          SET.centralWavelengths.exists(_.exists(_.exposureTimeMode.isNull))
             _         <- ResultT.fromResult:
                            if reverts && others.nonEmpty then
-                             TelluricScienceExposureTimeMode.notATelluric(others).asFailure
+                             TelluricETMHelpers.notATelluric(others).asFailure
                            else Result.unit
             _         <- (SET.centralWavelengths, NonEmptyList.fromList(inPlace)).tupled.traverse_ : (ws, oids) =>
                            oids.traverse_(updateTelluricWavelengths(ws, _))

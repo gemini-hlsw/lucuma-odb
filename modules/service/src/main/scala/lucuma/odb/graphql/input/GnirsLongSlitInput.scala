@@ -44,7 +44,7 @@ object GnirsLongSlitInput:
           (centralWavelengths, filter, fpu, telescopeConfigs, camera, grating, prism,
            decker, explGrating, explPrism,
            focus, readMode, wellDepth, acq, telluricType) =>
-            centralWavelengths.traverse(GnirsSpectroscopyInput.resolveWavelengths(_, allowNull = true)).map: ws =>
+            centralWavelengths.traverse(GnirsSpectroscopyInput.resolveWavelengths(_, allowNullEtm = true)).map: ws =>
               GnirsSpectroscopyInput.Edit(
                 ws, filter, fpu.map(GnirsFpu.Spectroscopy.Slit(_)), camera, grating, prism,
                 decker, explGrating, explPrism,

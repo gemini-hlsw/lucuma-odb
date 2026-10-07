@@ -3,7 +3,10 @@
 
 package lucuma.odb.graphql.input
 
+import cats.Eq
+import cats.derived.*
 import cats.syntax.parallel.*
+import eu.timepit.refined.cats.*
 import eu.timepit.refined.types.numeric.PosInt
 import grackle.Result
 import lucuma.core.math.Wavelength
@@ -20,7 +23,7 @@ case class GnirsCentralWavelengthConfigInput(
   centralWavelength: Wavelength,
   exposureTimeMode:  Nullable[ExposureTimeMode],
   coadds:            Option[PosInt]
-)
+) derives Eq
 
 object GnirsCentralWavelengthConfigInput:
 

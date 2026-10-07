@@ -6,6 +6,7 @@ package input
 
 import cats.Eq
 import cats.data.NonEmptyList
+import cats.derived.*
 import cats.syntax.eq.*
 import cats.syntax.parallel.*
 import cats.syntax.traverse.*
@@ -46,12 +47,12 @@ object GnirsSpectroscopyInput:
    */
   private[input] def resolveWavelengths(
     ws:        List[GnirsCentralWavelengthConfigInput],
-    allowNull: Boolean = false
+    allowNullEtm: Boolean = false
   ): Result[NonEmptyList[GnirsCentralWavelengthConfigInput]] =
     if ws.sizeIs > MaxWavelengths then
       Matcher.validationFailure:
         s"At most $MaxWavelengths central wavelengths may be specified for GNIRS spectroscopy observations."
-    else if !allowNull && ws.exists(_.exposureTimeMode.isNull) then
+    else if !allowNullEtm && ws.exists(_.exposureTimeMode.isNull) then
       Matcher.validationFailure(TelluricExposureTimeModeEdit.NullOnlyOnTelluric)
     else
       Result.fromOption(
@@ -201,7 +202,7 @@ object GnirsSpectroscopyInput:
     telescopeConfigsIfu:          Option[NonEmptyList[TelescopeConfig]], // Option: set or skip (no clear; IFU always has a value)
     acquisition:               Option[AcquisitionInput],
     telluricType:              Option[TelluricType]            // Option: set or skip; cannot be unset
-  ):
+  ) derives Eq:
     def observingModeType: Option[ObservingModeType] = fpu.map(modeTypeFor)
     def updatesAcquisition: Boolean = acquisition.isDefined
 
@@ -233,8 +234,6 @@ object GnirsSpectroscopyInput:
                    telluricType.getOrElse(TelluricType.Hot))
 
   object Edit:
-    given Eq[Edit] = Eq.fromUniversalEquals
-
     private val AllUndefined: Edit =
       Edit(None, None, None, None, Nullable.Absent, Nullable.Absent, Nullable.Absent, Nullable.Absent,
            Nullable.Absent, Nullable.Absent, Nullable.Absent, Nullable.Absent, Nullable.Absent, None,
@@ -265,7 +264,7 @@ object GnirsSpectroscopyInput:
             (centralWavelengths, filter, slit, ifu, camera, grating, prism,
              decker, explGrating, explPrism,
              focus, readMode, wellDepth, acq, telluricType) =>
-              (centralWavelengths.traverse(resolveWavelengths(_, allowNull = true)),
+              (centralWavelengths.traverse(resolveWavelengths(_, allowNullEtm = true)),
                resolveEdit(slit, ifu)
               ).parMapN: (ws, resolved) =>
                 val (fpu, explTelescopeSlit, telescopeIfu) = resolved

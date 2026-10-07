@@ -161,9 +161,9 @@ object ObservationPropertiesInput {
      * The observing mode types of the tellurics this edit may touch: a science
      * `exposureTimeMode` alone is the one edit a telluric calibration accepts.
      */
-    def telluricObservingModeTypes: List[ObservingModeType] =
+    def admittedTelluricModes: List[ObservingModeType] =
       if copy(observingMode = Nullable.Absent) === Edit.Empty then
-        observingMode.toOption.toList.flatMap(_.telluricScienceExposureTimeModeOnlyModes)
+        observingMode.toOption.toList.flatMap(_.admittedTelluricModes)
       else Nil
 
   object Edit {

@@ -123,7 +123,7 @@ object Igrins2LongSlitService:
         input: Igrins2LongSlitInput.Edit,
         which: List[Observation.Id]
       )(using Transaction[F]): F[Result[Unit]] =
-        TelluricScienceExposureTimeMode.updateScience(which, input.exposureTimeMode)
+        TelluricETMHelpers.updateScience(which, input.exposureTimeMode)
 
       override def update(
         SET: Igrins2LongSlitInput.Edit,

@@ -178,16 +178,16 @@ trait AccessControl[F[_]] extends Predicates[F] {
     includeDeleted:      Option[Boolean],
     WHERE:               Option[Predicate],
     includeCalibrations: Boolean,
-    telluricModes:       List[ObservingModeType] = Nil
+    admittedTelluricModes: List[ObservingModeType] = Nil
   )(using Services[F]): Result[AppliedFragment] =
     val calibrations: Predicate =
       if includeCalibrations then True
-      else if telluricModes.nonEmpty then
+      else if admittedTelluricModes.nonEmpty then
         Or(
           Predicates.observation.calibrationRole.isNull(true),
           And(
             Predicates.observation.calibrationRole.eql(CalibrationRole.Telluric.some),
-            Predicates.observation.observingModeType.in(telluricModes)
+            Predicates.observation.observingModeType.in(admittedTelluricModes)
           )
         )
       else Predicates.observation.calibrationRole.isNull(true)
@@ -212,10 +212,10 @@ trait AccessControl[F[_]] extends Predicates[F] {
     WHERE:               Option[Predicate],
     includeCalibrations: Boolean,
     allowedStates:       Set[ObservationWorkflowState],
-    telluricModes:       List[ObservingModeType] = Nil
+    admittedTelluricModes: List[ObservingModeType] = Nil
   )(using Services[F], NoTransaction[F]): F[Result[List[Observation.Id]]] =
     Services.asSuperUser:
-      writableOids(includeDeleted, WHERE, includeCalibrations, telluricModes)
+      writableOids(includeDeleted, WHERE, includeCalibrations, admittedTelluricModes)
         .flatTraverse: which =>
           observationWorkflowService.filterState(which, allowedStates)
 
@@ -393,7 +393,7 @@ trait AccessControl[F[_]] extends Predicates[F] {
         input.WHERE,
         includeCalibrations,
         allowedStates,
-        telluricModes = input.SET.telluricObservingModeTypes
+        admittedTelluricModes = input.SET.admittedTelluricModes
       ).nestMap: oids =>
         Services.asSuperUser:
           AccessControl.unchecked(input.SET, oids, observation_id)

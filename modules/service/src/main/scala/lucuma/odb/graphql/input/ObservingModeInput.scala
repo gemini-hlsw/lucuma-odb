@@ -199,18 +199,11 @@ object ObservingModeInput:
       gnirsSpectroscopy.exists(_.needsStaffAccess)
 
     /**
-     * True when the edit is a science `exposureTimeMode` on a mode that takes a telluric
-     * and nothing else: the one edit a telluric calibration accepts.
-     */
-    def isTelluricScienceExposureTimeModeOnly: Boolean =
-      telluricScienceExposureTimeModeOnlyModes.nonEmpty
-
-    /**
      * The observing mode types a telluric must have to accept this edit, or empty when the
      * edit is not a science `exposureTimeMode` alone.  A telluric of another mode must not
      * be admitted: the edit would replace its observing mode.
      */
-    def telluricScienceExposureTimeModeOnlyModes: List[ObservingModeType] =
+    def admittedTelluricModes: List[ObservingModeType] =
       import ObservingModeType.*
       val modes: List[List[ObservingModeType]] = List(
         flamingos2LongSlit.filter(_.isScienceExposureTimeModeOnly).as(List(Flamingos2LongSlit)),

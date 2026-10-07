@@ -143,7 +143,7 @@ object Flamingos2LongSlitService:
             services.exposureTimeModeService.updateMany(which, role, e)
 
         update(input.acquisition.flatMap(_.exposureTimeMode), ExposureTimeModeRole.Acquisition) *>
-          TelluricScienceExposureTimeMode.updateScience(which, input.exposureTimeMode)
+          TelluricETMHelpers.updateScience(which, input.exposureTimeMode)
 
       override def update(
         SET: Flamingos2LongSlitInput.Edit,
