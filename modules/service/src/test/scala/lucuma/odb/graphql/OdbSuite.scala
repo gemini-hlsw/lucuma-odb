@@ -491,6 +491,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       CommitHash.Zero,
       goaUsers,
       ssoClient.pure[Resource[IO, *]],
+      uri"https://sso.unused",
       true,
       List("unused"),
       s3ClientOpsResource,

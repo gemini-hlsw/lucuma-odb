@@ -242,6 +242,16 @@ the version should instead be *derived*: import the opentelemetry BOM that otel4
 depends on, drop `openTelemetryVersion` and the version off each `io.opentelemetry` line,
 and delete `project/OtelCheck.scala` along with the `updates.pin` entry.
 
+## Health Endpoints
+
+All HTTP services (ODB, SSO, ITC) serve `GET /health` (liveness, always `200`) and
+`GET /health/ready` (readiness, `503` when a required check fails). Both are unauthenticated
+and bypass the middleware, so polling leaves no traces or logs. Checks time out after 2s and
+readiness is cached for 10s.
+
+ODB checks: `db` and `sso` required, `itc` and `s3` info (reported, never flip the
+status). Implementation: `lucuma.otel.health.HealthRoutes` in `modules/otel`.
+
 ## SQL Query Instrumentation
 
 The GraphQL `fetch` layer (grackle -> skunk) records timing and row-count attributes on every

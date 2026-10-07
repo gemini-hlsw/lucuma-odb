@@ -20,6 +20,8 @@ import lucuma.core.model.StandardUser
 import lucuma.core.util.Gid
 import lucuma.otel.OtelServices
 import lucuma.otel.OtelSetup
+import lucuma.otel.health.HealthCheck
+import lucuma.otel.health.HealthRoutes
 import lucuma.sso.service.config.*
 import lucuma.sso.service.database.Database
 import lucuma.sso.service.graphql.GraphQLRoutes
@@ -29,6 +31,7 @@ import org.flywaydb.core.api.output.MigrateResult
 import org.http4s.*
 import org.http4s.Uri.Scheme
 import org.http4s.blaze.server.BlazeServerBuilder
+import org.http4s.client.Client
 import org.http4s.ember.client.EmberClientBuilder
 import org.http4s.implicits.*
 import org.http4s.server.*
@@ -187,7 +190,7 @@ object FMain extends AnsiColor {
         OrcidService(config.orcidHost, config.clientId, config.clientSecret, client)
 
   /** A resource that yields our HttpRoutes, wrapped in accessory middleware. */
-  def routesResource[F[_]: Async: Tracer: TracerProvider: Logger: Network: Console](config: Config): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
+  def routesResource[F[_]: Async: Parallel: Tracer: TracerProvider: Logger: Network: Console](config: Config): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
     for {
       pool        <- databasePoolResource[F](config.database)
       orcid       <- orcidServiceResource(config.orcid, config.environment)
@@ -196,7 +199,11 @@ object FMain extends AnsiColor {
       serviceUser <- Resource.eval(dbPool.use(_.getSsoServiceUser))
       service     <- GraphQLRoutes.service(pool)
       middleware  <- Resource.eval(ServerMiddleware[F](config))
-    } yield wsb => middleware {
+      health      <- Resource.eval(HealthRoutes[F](
+                       BuildInfo.gitHeadCommit.getOrElse("unknown"),
+                       healthChecks(pool, httpClient, config.orcid)
+                     ))
+    } yield wsb => health <+> middleware {
       val localClient = LocalSsoClient(config.ssoJwtReader, dbPool).collect { case su: StandardUser => su }
       val odb = OdbClient[F](httpClient, config.ssoJwtWriter, config.odbRootUri, serviceUser)
       Routes[F](
@@ -211,6 +218,20 @@ object FMain extends AnsiColor {
       ) <+>
       GraphQLRoutes(localClient, service, wsb)
     }
+
+  /** Postgres is required to serve; ORCID only blocks new logins. */
+  def healthChecks[F[_]: Concurrent](
+    pool:       Resource[F, Session[F]],
+    httpClient: Client[F],
+    orcid:      OrcidConfig
+  ): List[HealthCheck[F]] =
+    import skunk.codec.numeric.int4
+    import skunk.implicits.*
+    val orcidUri = Uri(Some(Scheme.https), Some(Uri.Authority(host = orcid.orcidHost)))
+    List(
+      HealthCheck.required("db", pool.use(_.unique(sql"SELECT 1".query(int4))).void),
+      HealthCheck.info("orcid", HealthCheck.reachable(httpClient, orcidUri))
+    )
 
   /** A startup action that prints a banner. */
   def banner[F[_]: Applicative: Logger](config: Config): F[Unit] = {
