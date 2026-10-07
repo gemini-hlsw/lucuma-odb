@@ -11,7 +11,6 @@ import lucuma.itc.tests.FailingMockItc
 import lucuma.itc.tests.MockImagingItc
 import lucuma.itc.tests.MockItc
 import lucuma.itc.tests.WavelengthAtOutOfRangeMockItc
-import natchez.Trace
 import org.http4s.*
 import org.http4s.circe.*
 import org.http4s.syntax.all.*
@@ -22,7 +21,6 @@ import org.typelevel.otel4s.trace.Tracer
 trait GraphQLSuiteBase extends munit.CatsEffectSuite:
   given Logger[IO] = Slf4jLogger.getLogger[IO]
   given Tracer[IO] = Tracer.noop
-  given Trace[IO]  = Trace.Implicits.noop
 
   def itcService: Itc[IO]
 

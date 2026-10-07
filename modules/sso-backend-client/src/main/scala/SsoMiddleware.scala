@@ -8,8 +8,9 @@ import cats.data.OptionT
 import cats.effect.MonadCancelThrow
 import cats.syntax.all.*
 import lucuma.core.model.User
-import natchez.Trace
 import org.http4s.HttpRoutes
+import org.typelevel.otel4s.Attribute
+import org.typelevel.otel4s.trace.Tracer
 
 /**
  * A middleware that adds the following Lucuma-standard fields to the current span:
@@ -22,18 +23,20 @@ object SsoMiddleware {
 
   // The SSO service itself can't use this middleware but it does need to log the user, so we're
   // exposing it to the `sso` package.
-  private[sso] def traceUser[F[_]: Trace](u: User, prefix: String = "lucuma"): F[Unit] =
-    Trace[F].put(
-      s"$prefix.user"      -> u.displayName,
-      s"$prefix.user.id"   -> u.id.toString,
-      s"$prefix.user.role" -> u.role.name,
+  private[sso] def traceUser[F[_]: MonadCancelThrow: Tracer](u: User, prefix: String = "lucuma"): F[Unit] =
+    Tracer[F].currentSpanOrNoop.flatMap(
+      _.addAttributes(
+        Attribute(s"$prefix.user", u.displayName),
+        Attribute(s"$prefix.user.id", u.id.toString),
+        Attribute(s"$prefix.user.role", u.role.name),
+      )
     )
 
-  def apply[F[_]: MonadCancelThrow: Trace](ssoClient: SsoClient[F, User])(routes: HttpRoutes[F]): HttpRoutes[F] =
+  def apply[F[_]: MonadCancelThrow: Tracer](ssoClient: SsoClient[F, User])(routes: HttpRoutes[F]): HttpRoutes[F] =
     Kleisli { req =>
       for {
         ou  <- OptionT.liftF(ssoClient.find(req))
-        _   <- ou.traverse(traceUser[OptionT[F, *]](_))
+        _   <- OptionT.liftF(ou.traverse_(traceUser[F](_)))
         res <- routes.run(req)
       } yield res
     }

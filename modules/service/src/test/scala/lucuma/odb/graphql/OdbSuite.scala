@@ -93,7 +93,6 @@ import munit.AnyFixture
 import munit.CatsEffectSuite
 import munit.Location
 import munit.diff.console.AnsiColors
-import natchez.Trace
 import org.http4s.Uri
 import org.http4s.blaze.server.BlazeServerBuilder
 import org.http4s.circe.jsonEncoderOf
@@ -560,9 +559,6 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
         sts  <- mon.take
       } yield (json, sts)
 
-  protected def trace: Resource[IO, Trace[IO]] =
-    Resource.pure(Trace.Implicits.noop)
-
   protected def tracerProvider: Resource[IO, TracerProvider[IO]] =
     Resource.pure(TracerProvider.noop)
 
@@ -571,7 +567,6 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
 
   protected def server: Resource[IO, Server] =
     for {
-      given Trace[IO]          <- trace
       given TracerProvider[IO] <- tracerProvider
       given Tracer[IO]         <- tracerProvider.evalMap(_.get("test-tracer"))
       given MeterProvider[IO]  <- meterProvider

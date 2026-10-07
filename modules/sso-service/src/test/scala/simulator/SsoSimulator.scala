@@ -26,7 +26,6 @@ import lucuma.sso.service.graphql.GraphQLRoutes
 import lucuma.sso.service.orcid.OrcidService
 import munit.Suite
 import munit.diff.console.AnsiColors
-import natchez.Trace.Implicits.noop
 import org.http4s.HttpRoutes
 import org.http4s.Uri
 import org.http4s.client.Client

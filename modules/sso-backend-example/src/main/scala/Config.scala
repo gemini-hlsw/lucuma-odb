@@ -13,8 +13,6 @@ import lucuma.sso.client.SsoClient.UserInfo
 import lucuma.sso.client.SsoJwtReader
 import lucuma.sso.client.util.GpgPublicKeyReader
 import lucuma.sso.client.util.JwtDecoder
-import natchez.Trace
-import natchez.http4s.NatchezMiddleware
 import org.http4s.Uri
 import org.http4s.client.Client
 import org.http4s.ember.client.EmberClientBuilder
@@ -40,13 +38,13 @@ case class Config(
     EmberClientBuilder.default[F].build
 
   // SSO Client resource (has to be a resource because it owns an HTTP client).
-  def ssoClient[F[_]: Async: Trace: Network: Logger]: Resource[F, SsoClient[F, UserInfo]] =
+  def ssoClient[F[_]: Async: Network: Logger]: Resource[F, SsoClient[F, UserInfo]] =
     httpClientResource[F].evalMap { httpClient =>
       SsoClient.initial(
         serviceJwt = serviceJwt,
         ssoRoot    = ssoRoot,
         jwtReader  = jwtReader[F],
-        httpClient = NatchezMiddleware.client(httpClient), // Note!
+        httpClient = httpClient,
       )
     }
 
