@@ -37,6 +37,8 @@ import lucuma.odb.service.ItcService
 import lucuma.odb.service.S3FileService
 import lucuma.odb.service.UserService
 import lucuma.odb.util.OdbTelemetry
+import lucuma.otel.health.HealthCheck
+import lucuma.otel.health.HealthRoutes
 import lucuma.sso.client.SsoClient
 import org.flywaydb.core.Flyway
 import org.flywaydb.core.api.output.MigrateResult
@@ -54,6 +56,7 @@ import org.typelevel.otel4s.metrics.MeterProvider
 import org.typelevel.otel4s.trace.Tracer
 import org.typelevel.otel4s.trace.TracerProvider
 import skunk.{Command as _, *}
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Request
 import software.amazon.awssdk.services.s3.presigner.S3Presigner
 
 import scala.concurrent.duration.*
@@ -214,6 +217,8 @@ object FMain extends MainParams {
       config.commitHash,
       config.goaUsers,
       config.ssoClient,
+      config.sso.root,
+      config.itc.root,
       config.corsOverHttps,
       config.domain,
       S3FileService.s3AsyncClientOpsResource(config.aws),
@@ -235,6 +240,8 @@ object FMain extends MainParams {
     commitHash:           CommitHash,
     goaUsers:             Set[User.Id],
     ssoClientResource:    Resource[F, SsoClient[F, User]],
+    ssoRoot:              Uri,
+    itcRoot:              Uri,
     corsOverHttps:        Boolean,
     domain:               List[String],
     s3OpsResource:        Resource[F, S3AsyncClientOp[F]],
@@ -263,13 +270,43 @@ object FMain extends MainParams {
       s3Presigner       <- s3PresignerResource
       s3FileService      = S3FileService.fromS3ConfigAndClient(awsConfig, s3ClientOps, s3Presigner)
       webhookService    <- pool.map(EmailWebhookService.fromSession(_))
+      healthRoutes      <- Resource.eval(HealthRoutes[F](
+                             commitHash.format,
+                             healthChecks(singleSession(databaseConfig), httpClient, ssoRoot, itcRoot, s3ClientOps, awsConfig)
+                           ))
     } yield { wsb =>
       val attachmentRoutes   = AttachmentRoutes.apply[F](pool, s3FileService, ssoClient, awsConfig.fileUploadMaxMb, emailConfig, commitHash, ptc, httpClient, itcClient, gaiaClient, horizonsClient)
       val schedulerRoutes    = SchedulerRoutes.apply[F](pool, ssoClient, emailConfig, commitHash, ptc, httpClient, itcClient, gaiaClient, horizonsClient)
       val emailWebhookRoutes = EmailWebhookRoutes(webhookService, emailConfig)
       val chownRoutes        = ChownRoutes(pool, s3FileService, ssoClient, emailConfig, commitHash, ptc, httpClient, itcClient, gaiaClient, horizonsClient)
-      middleware(graphQLRoutes(wsb) <+> attachmentRoutes <+> GraphQLRoutes.dummyMetadata <+> emailWebhookRoutes <+> schedulerRoutes <+> chownRoutes)
+      healthRoutes <+> middleware(graphQLRoutes(wsb) <+> attachmentRoutes <+> GraphQLRoutes.dummyMetadata <+> emailWebhookRoutes <+> schedulerRoutes <+> chownRoutes)
     }
+
+  /**
+   * Postgres and SSO are required to serve; ITC and S3 only degrade features. Probes use the
+   * plain HTTP client and a session of their own so polling leaves no traces and a saturated
+   * pool is not reported as Postgres being down.
+   */
+  def healthChecks[F[_]: Concurrent](
+    session:    Resource[F, Session[F]],
+    httpClient: Client[F],
+    ssoRoot:    Uri,
+    itcRoot:    Uri,
+    s3:         S3AsyncClientOp[F],
+    awsConfig:  Config.Aws
+  ): List[HealthCheck[F]] =
+    // Cloudcube scopes permissions to the cube prefix, so list within it rather than HEAD the bucket.
+    val s3Probe = ListObjectsV2Request.builder
+      .bucket(awsConfig.bucketName.value.value)
+      .prefix(awsConfig.basePath.value)
+      .maxKeys(1)
+      .build
+    List(
+      HealthCheck.required("db", HealthCheck.postgres(session)),
+      HealthCheck.required("sso", HealthCheck.reachable(httpClient, ssoRoot / "health" / "ready")),
+      HealthCheck.info("itc", HealthCheck.reachable(httpClient, itcRoot / "health")),
+      HealthCheck.info("s3", s3.listObjectsV2(s3Probe).void)
+    )
 
   /** A startup action that runs database migrations using Flyway. */
   def migrateDatabase[F[_]: Sync](config: Config.Database): F[MigrateResult] =

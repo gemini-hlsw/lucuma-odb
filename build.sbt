@@ -1071,6 +1071,13 @@ lazy val otel = project
       "io.opentelemetry"                  % "opentelemetry-exporter-otlp"               % openTelemetryVersion,
       "io.opentelemetry.instrumentation"  % "opentelemetry-runtime-telemetry"           % openTelemetryInstrVersion,
       "org.typelevel"                    %% "log4cats-core"                             % log4catsVersion,
+      "org.http4s"                       %% "http4s-circe"                              % http4sVersion,
+      "org.http4s"                       %% "http4s-client"                             % http4sVersion,
+      "org.http4s"                       %% "http4s-dsl"                                % http4sVersion,
+      "org.tpolecat"                     %% "skunk-core"                                % skunkVersion,
+      "io.circe"                         %% "circe-core"                                % circeVersion,
+      "org.typelevel"                    %% "log4cats-noop"                             % log4catsVersion % Test,
+      "org.typelevel"                    %% "munit-cats-effect"                         % munitCatsEffectVersion % Test
     )
   )
 
