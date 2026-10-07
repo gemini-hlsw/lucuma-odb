@@ -201,7 +201,7 @@ object FMain extends AnsiColor {
       middleware  <- Resource.eval(ServerMiddleware[F](config))
       health      <- Resource.eval(HealthRoutes[F](
                        BuildInfo.gitHeadCommit.getOrElse("unknown"),
-                       healthChecks(pool, httpClient, config.orcid)
+                       healthChecks(singleSession(config.database), httpClient, config.orcid)
                      ))
     } yield wsb => health <+> middleware {
       val localClient = LocalSsoClient(config.ssoJwtReader, dbPool).collect { case su: StandardUser => su }
@@ -219,17 +219,15 @@ object FMain extends AnsiColor {
       GraphQLRoutes(localClient, service, wsb)
     }
 
-  /** Postgres is required to serve; ORCID only blocks new logins. */
+  /** Postgres is required to serve; ORCID only blocks new logins. The session is untraced and not pooled. */
   def healthChecks[F[_]: Concurrent](
-    pool:       Resource[F, Session[F]],
+    session:    Resource[F, Session[F]],
     httpClient: Client[F],
     orcid:      OrcidConfig
   ): List[HealthCheck[F]] =
-    import skunk.codec.numeric.int4
-    import skunk.implicits.*
     val orcidUri = Uri(Some(Scheme.https), Some(Uri.Authority(host = orcid.orcidHost)))
     List(
-      HealthCheck.required("db", pool.use(_.unique(sql"SELECT 1".query(int4))).void),
+      HealthCheck.required("db", HealthCheck.postgres(session)),
       HealthCheck.info("orcid", HealthCheck.reachable(httpClient, orcidUri))
     )
 

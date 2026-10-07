@@ -246,11 +246,15 @@ and delete `project/OtelCheck.scala` along with the `updates.pin` entry.
 
 All HTTP services (ODB, SSO, ITC) serve `GET /health` (liveness, always `200`) and
 `GET /health/ready` (readiness, `503` when a required check fails). Both are unauthenticated
-and bypass the middleware, so polling leaves no traces or logs. Checks time out after 2s and
-readiness is cached for 10s.
+and bypass the middleware. Probes use a plain HTTP client and an untraced single-connection
+session, so polling leaves no traces, logs or HTTP metrics. Checks time out after 2s, failures
+are logged at warn, and the readiness result is cached for 10s with concurrent misses sharing
+one computation.
 
-ODB checks: `db` and `sso` required, `itc` and `s3` info (reported, never flip the
-status). Implementation: `lucuma.otel.health.HealthRoutes` in `modules/otel`.
+ODB checks: `db` (`SELECT 1`) and `sso` (`GET <sso>/health/ready`) required; `itc`
+(`GET <itc>/health`) and `s3` (list one key under the Cloudcube prefix) info, reported but never
+flip the status. HTTP probes pass only on 2xx. Implementation: `lucuma.otel.health` in
+`modules/otel`.
 
 ## SQL Query Instrumentation
 

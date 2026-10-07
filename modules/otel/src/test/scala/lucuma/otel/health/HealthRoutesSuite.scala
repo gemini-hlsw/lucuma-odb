@@ -15,10 +15,14 @@ import org.http4s.Status
 import org.http4s.Uri
 import org.http4s.circe.*
 import org.http4s.implicits.*
+import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.noop.NoOpLogger
 
 import scala.concurrent.duration.*
 
 class HealthRoutesSuite extends CatsEffectSuite:
+
+  private given Logger[IO] = NoOpLogger[IO]
 
   private val config: HealthRoutes.Config =
     HealthRoutes.Config(checkTimeout = 100.millis, cacheTtl = 200.millis)
@@ -71,6 +75,13 @@ class HealthRoutesSuite extends CatsEffectSuite:
     get(uri"/health/ready", checks).map: (st, json) =>
       assertEquals(st, Status.ServiceUnavailable)
       assertEquals(check(json, "db"), "fail".some)
+
+  test("concurrent misses share one computation"):
+    Ref[IO].of(0).flatMap: counter =>
+      val checks = List(HealthCheck.required[IO]("db", IO.sleep(50.millis) *> counter.update(_ + 1)))
+      routes(checks).flatMap: r =>
+        val hit = r.orNotFound.run(Request[IO](Method.GET, uri"/health/ready")).flatMap(_.as[Json]).void
+        List.fill(5)(hit).parSequence_ *> counter.get.map(assertEquals(_, 1))
 
   test("readiness result is cached for the configured ttl"):
     Ref[IO].of(0).flatMap: counter =>

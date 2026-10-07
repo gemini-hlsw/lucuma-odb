@@ -5,6 +5,7 @@ package lucuma.otel.health
 
 import cats.Parallel
 import cats.effect.Async
+import cats.effect.Deferred
 import cats.effect.Ref
 import cats.effect.syntax.all.*
 import cats.syntax.all.*
@@ -14,6 +15,7 @@ import org.http4s.Response
 import org.http4s.Status
 import org.http4s.circe.*
 import org.http4s.dsl.Http4sDsl
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration.*
 
@@ -42,12 +44,12 @@ object HealthRoutes:
 
   private final case class Readiness(status: Status, body: Json)
 
-  def apply[F[_]: Async: Parallel](
+  def apply[F[_]: Async: Parallel: Logger](
     commit: String,
     checks: List[HealthCheck[F]],
     config: Config = Config()
   ): F[HttpRoutes[F]] =
-    Ref[F].of(Option.empty[(FiniteDuration, Readiness)]).map: cache =>
+    Ref[F].of(Option.empty[(FiniteDuration, Deferred[F, Readiness])]).map: cache =>
       val dsl = Http4sDsl[F]
       import dsl.*
 
@@ -61,7 +63,8 @@ object HealthRoutes:
         c.run
           .timeout(config.checkTimeout)
           .as(Outcome.Ok)
-          .handleError(_ => Outcome.Fail)
+          .handleErrorWith: e =>
+            Logger[F].warn(e)(s"health check '${c.name}' failed").as(Outcome.Fail)
           .tupleLeft(c)
 
       val computeReadiness: F[Readiness] =
@@ -75,12 +78,15 @@ object HealthRoutes:
             base(status).deepMerge(Json.obj("checks" -> detail))
           ).pure[F]
 
+      // Single flight: the first miss installs a Deferred and computes, later callers wait on it.
       val readiness: F[Readiness] =
         Async[F].monotonic.flatMap: now =>
-          cache.get.flatMap:
-            case Some((at, r)) if now - at < config.cacheTtl => r.pure[F]
-            case _                                           =>
-              computeReadiness.flatTap(r => cache.set((now, r).some))
+          Deferred[F, Readiness].flatMap: fresh =>
+            cache.modify:
+              case current @ Some((at, d)) if now - at < config.cacheTtl => (current, d.get)
+              case _                                                     =>
+                ((now, fresh).some, computeReadiness.flatTap(fresh.complete).onError(_ => cache.set(None)))
+            .flatten
 
       HttpRoutes.of[F]:
         case GET -> Root / "health"           =>
