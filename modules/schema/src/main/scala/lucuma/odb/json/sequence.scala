@@ -20,6 +20,8 @@ import lucuma.core.enums.ObserveClass
 import lucuma.core.math.Offset
 import lucuma.core.math.Wavelength
 import lucuma.core.model.sequence.Atom
+import lucuma.core.model.sequence.CalibrationDigest
+import lucuma.core.model.sequence.CalibrationEstimate
 import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.ExecutionConfig
@@ -157,18 +159,48 @@ trait SequenceCodec {
         "executionState"   -> a.executionState.asJson
       )
 
+  given Decoder[CalibrationEstimate] =
+    Decoder.instance: c =>
+      for
+        n <- c.downField("count").as[NonNegInt]
+        t <- c.downField("time").as[CategorizedTime]
+      yield CalibrationEstimate(n, t)
+
+  given (using Encoder[TimeSpan]): Encoder[CalibrationEstimate] =
+    Encoder.instance: (a: CalibrationEstimate) =>
+      Json.obj(
+        "count" -> a.count.asJson,
+        "time"  -> a.time.asJson
+      )
+
+  // `count` is derived from the two estimates, so it is written but not read.
+  given Decoder[CalibrationDigest] =
+    Decoder.instance: c =>
+      for
+        i <- c.downField("existing").as[CalibrationEstimate]
+        p <- c.downField("expected").as[CalibrationEstimate]
+      yield CalibrationDigest(i, p)
+
+  given (using Encoder[TimeSpan]): Encoder[CalibrationDigest] =
+    Encoder.instance: (a: CalibrationDigest) =>
+      Json.obj(
+        "count"    -> a.count.asJson,
+        "existing" -> a.existing.asJson,
+        "expected" -> a.expected.asJson
+      )
+
   given Decoder[ExecutionDigest] =
     Decoder.instance { c =>
       // `ExecutionDigest` has six canonical fields: `setup`, `setupCount`,
-      // `reacquisitionCount`, `calibrationCount`, `acquisition` and `science`.  Everything else the encoder emits --
+      // `reacquisitionCount`, `calibrations`, `acquisition` and `science`.  Everything else the encoder emits --
       // `fullTimeEstimate` and the entire `estimate` object (`estimate.science`,
       // `estimate.total`) -- is a derived, output-only projection with no place
       // to live in the model, so it is intentionally ignored here and recomputed
       // from the fields below.
       //
-      // `reacquisitionCount` and `calibrationCount` appear only under
-      // `estimate` and are absent from payloads that predate them, so a missing
-      // value reads as 0.
+      // `reacquisitionCount` and `calibrations` appear only under `estimate`
+      // and are absent from payloads that predate them, so a missing value
+      // reads as zero.
       //
       // `setup` and `setupCount` appear twice in the encoded form: under the
       // (current) `estimate` object and as deprecated top-level fields.  Read
@@ -184,7 +216,7 @@ trait SequenceCodec {
         t <- read[SetupTime]("setup")
         n <- read[NonNegInt]("setupCount")
         r <- est.downField("reacquisitionCount").as[Option[NonNegInt]].map(_.getOrElse(NonNegInt.MinValue))
-        k <- est.downField("calibrationCount").as[Option[NonNegInt]].map(_.getOrElse(NonNegInt.MinValue))
+        k <- est.downField("calibrations").as[Option[CalibrationDigest]].map(_.getOrElse(CalibrationDigest.Zero))
         a <- c.downField("acquisition").as[SequenceDigest]
         s <- c.downField("science").as[SequenceDigest]
       } yield ExecutionDigest(t, n, r, k, a, s)
@@ -197,7 +229,8 @@ trait SequenceCodec {
           "setup"              -> a.setup.asJson,
           "setupCount"         -> a.setupCount.asJson,
           "reacquisitionCount" -> a.reacquisitionCount.asJson,
-          "calibrationCount"   -> a.calibrationCount.asJson,
+          "calibrations"       -> a.calibrations.asJson,
+          "calibrationCount"   -> a.calibrations.count.asJson, // deprecated, use calibrations.count
           "science"            -> a.science.timeEstimate.asJson,
           "total"              -> a.fullTimeEstimate.asJson
         ),

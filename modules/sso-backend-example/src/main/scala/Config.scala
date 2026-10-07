@@ -27,8 +27,6 @@ case class Config(
   ssoRoot:      Uri,       // Root URI for the SSO server we're using.
   ssoPublicKey: PublicKey, // We need to verify user JWTs, which requires the SSO server's public key.
   serviceJwt:   String,    // Only service users can exchange API keys, so we need a service user JWT.
-  hcWriteKey:   String,    // Honeycomb API key
-  hcDataset:    String,    // Honeycomb dataset
 ) {
 
   // People send us their JWTs. We need to be able to extract them from the request, decode them,
@@ -78,8 +76,6 @@ object Config {
     envOrProp("EXAMPLE_SSO_ROOT").as[Uri],
     envOrProp("EXAMPLE_SSO_PUBLIC_KEY").as[PublicKey],
     envOrProp("EXAMPLE_SERVICE_JWT"),
-    envOrProp("EXAMPLE_HONEYCOMB_WRITE_KEY"),
-    envOrProp("EXAMPLE_HONEYCOMB_DATASET"),
   ).parMapN(Config.apply)
 
 }

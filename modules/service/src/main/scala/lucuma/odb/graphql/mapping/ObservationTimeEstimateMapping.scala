@@ -4,6 +4,8 @@
 package lucuma.odb.graphql
 package mapping
 
+import eu.timepit.refined.types.numeric.NonNegInt
+import io.circe.refined.given
 import lucuma.odb.graphql.table.ObservationView
 
 trait ObservationTimeEstimateMapping[F[_]] extends ObservationView[F]:
@@ -14,12 +16,36 @@ trait ObservationTimeEstimateMapping[F[_]] extends ObservationView[F]:
     List(
       ObjectMapping(ExecutionType / "originalEstimate")(
         SqlField("id", OriginalEstimate.SyntheticId, key = true, hidden = true),
+        SqlField("existingCount", OriginalEstimate.ExistCalCount, hidden = true),
+        SqlField("expectedCount", OriginalEstimate.ExpCalCount, hidden = true),
         SqlObject("setup"),
         SqlField("setupCount", OriginalEstimate.SetupCount),
         SqlField("reacquisitionCount", OriginalEstimate.ReacquisitionCount),
-        SqlField("calibrationCount", OriginalEstimate.CalibrationCount),
+        SqlObject("calibrations"),
+        calibrationCount("calibrationCount"),
         SqlObject("science"),
         SqlObject("total")
+      ),
+
+      ObjectMapping(ExecutionType / "originalEstimate" / "calibrations")(
+        SqlField("id", OriginalEstimate.SyntheticId, key = true, hidden = true),
+        SqlField("existingCount", OriginalEstimate.ExistCalCount, hidden = true),
+        SqlField("expectedCount", OriginalEstimate.ExpCalCount, hidden = true),
+        calibrationCount("count"),
+        SqlObject("existing"),
+        SqlObject("expected")
+      ),
+
+      ObjectMapping(ExecutionType / "originalEstimate" / "calibrations" / "existing")(
+        SqlField("id", OriginalEstimate.SyntheticId, key = true, hidden = true),
+        SqlField("count", OriginalEstimate.ExistCalCount),
+        SqlObject("time")
+      ),
+
+      ObjectMapping(ExecutionType / "originalEstimate" / "calibrations" / "expected")(
+        SqlField("id", OriginalEstimate.SyntheticId, key = true, hidden = true),
+        SqlField("count", OriginalEstimate.ExpCalCount),
+        SqlObject("time")
       ),
 
       ObjectMapping(ExecutionType / "originalEstimate" / "setup")(
@@ -40,5 +66,20 @@ trait ObservationTimeEstimateMapping[F[_]] extends ObservationView[F]:
       // predicated index; their fields are then resolved from the digest JSON
       // as normal.
       ObjectMapping(ExecutionType / "digest" / "value" / "estimate")(),
-      ObjectMapping(ExecutionType / "digest" / "value" / "estimate" / "setup")()
+      ObjectMapping(ExecutionType / "digest" / "value" / "estimate" / "setup")(),
+      ObjectMapping(ExecutionType / "digest" / "value" / "estimate" / "calibrations")(),
+      ObjectMapping(ExecutionType / "digest" / "value" / "estimate" / "calibrations" / "existing")(),
+      ObjectMapping(ExecutionType / "digest" / "value" / "estimate" / "calibrations" / "expected")()
+    )
+
+  // The count is not stored: it is the existing plus the expected calibrations.
+  private def calibrationCount(name: String): CursorField[NonNegInt] =
+    CursorField(
+      name,
+      cursor =>
+        for
+          i <- cursor.fieldAs[NonNegInt]("existingCount")
+          p <- cursor.fieldAs[NonNegInt]("expectedCount")
+        yield NonNegInt.unsafeFrom(i.value + p.value),
+      List("existingCount", "expectedCount")
     )

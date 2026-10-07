@@ -17,6 +17,16 @@ SSO requires the following configuration in staging/production.
 | `LUCUMA_SSO_ENVIRONMENT` | Constant value `staging` (will go away) |
 | `LUCUMA_SSO_HOSTNAME` | External hostname for this service. |
 
+##### OpenTelemetry (OTLP)
+
+Traces are exported via OTLP. Both variables are required on Heroku; elsewhere tracing is a
+silent no-op unless both are set. See the ODB README for collector and Grafana Cloud details.
+
+| Variable | Value |
+|----------|-------|
+| `LUCUMA_SSO_OTEL_ENDPOINT` | OTLP HTTP endpoint (e.g. `http://collector.example.com:4318`) |
+| `LUCUMA_SSO_OTEL_KEY` | Value for the `Authorization` header (e.g. `Basic dXNlcjpwYXNz`) |
+
 ##### GPG Information
 
 SSO signs JWTs with a private key. Client applications verify JWTs with a public key.

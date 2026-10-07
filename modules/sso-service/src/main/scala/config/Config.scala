@@ -7,6 +7,7 @@ import cats.effect.*
 import cats.syntax.all.*
 import ciris.*
 import com.comcast.ip4s.Port
+import lucuma.otel.OtelConfig
 import lucuma.sso.client.SsoJwtReader
 import lucuma.sso.client.util.JwtDecoder
 import lucuma.sso.service.SsoJwtWriter
@@ -33,7 +34,7 @@ final case class Config(
   scheme:       Uri.Scheme,
   hostname:     String,
   heroku:       Option[HerokuConfig],
-  honeycomb:    Option[HoneycombConfig],
+  otel:         Option[OtelConfig],
   odbHostName:  String,
 ) {
 
@@ -72,7 +73,7 @@ final case class Config(
 
 object Config {
 
-  def local(orcid: OrcidConfig, honeycomb: Option[HoneycombConfig]): Config = {
+  def local(orcid: OrcidConfig, otel: Option[OtelConfig]): Config = {
 
     // Generate a random key pair. This basically means nobody is going to be able to validate keys
     // issued here because they have no way to get the public key. It may end up being better to use
@@ -94,11 +95,14 @@ object Config {
       Uri.Scheme.http,
       "local.lucuma.xyz",
       None,
-      honeycomb,
+      otel,
       "local.lucuma.xyz"
     )
 
   }
+
+  private def otelConfig(env: Environment): ConfigValue[Effect, Option[OtelConfig]] =
+    OtelConfig.fromEnv("LUCUMA_SSO_OTEL", ConfigValue.default(env.toString.toLowerCase))
 
   def config: ConfigValue[Effect, Config] =
     envOrProp("LUCUMA_SSO_ENVIRONMENT")
@@ -107,7 +111,7 @@ object Config {
       .flatMap {
 
         case Local =>
-          (OrcidConfig.config(Local), HoneycombConfig.config.option).parMapN(local)
+          (OrcidConfig.config(Local), otelConfig(Local)).parMapN(local)
 
         case envi => (
           envOrProp("PORT").as[Int].as[Port],
@@ -119,12 +123,12 @@ object Config {
           envOrProp("LUCUMA_SSO_COOKIE_DOMAIN"),
           envOrProp("LUCUMA_SSO_HOSTNAME"),
           HerokuConfig.config.option,
-          HoneycombConfig.config.option,
+          otelConfig(envi),
           envOrProp("LUCUMA_ODB_HOSTNAME"),
-        ).parTupled.flatMap { case (port, dbc, orc, pkey, text, pass, domain, host, heroku, honeycomb, odb) =>
+        ).parTupled.flatMap { case (port, dbc, orc, pkey, text, pass, domain, host, heroku, otel, odb) =>
           for {
             skey <- default(text).as[PrivateKey](using privateKey(pass))
-          } yield Config(envi, dbc, orc, pkey, skey, port, domain, Uri.Scheme.https, host, heroku, honeycomb, odb)
+          } yield Config(envi, dbc, orc, pkey, skey, port, domain, Uri.Scheme.https, host, heroku, otel, odb)
         }
 
       }

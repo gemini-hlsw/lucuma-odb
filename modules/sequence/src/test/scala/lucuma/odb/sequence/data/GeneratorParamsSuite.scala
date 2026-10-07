@@ -35,3 +35,13 @@ class GeneratorParamsSuite extends ScalaCheckSuite:
       assertNotEquals(withNgs, hash(params.copy(altair = ngs.copy(cassRotator = CassRotator.Fixed).some)))
       assertNotEquals(withNgs, hash(params.copy(altair = ngs.copy(ndFilter = AltairNdFilter.In).some)))
     }
+
+  property("the group's tellurics leave the hash alone"):
+    forAll { (params: GeneratorParams) =>
+      // A telluric change must keep the science observation's cached digest and guide star.
+      val telluric = CalibrationGroupTelluric(unobserved = true, declined = false, total = none)
+      assertEquals(
+        hash(params.copy(tellurics = CalibrationGroupTellurics(List(telluric)))),
+        hash(params.copy(tellurics = CalibrationGroupTellurics.Empty))
+      )
+    }

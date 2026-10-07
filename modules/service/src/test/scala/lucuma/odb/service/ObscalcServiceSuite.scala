@@ -18,6 +18,7 @@ import lucuma.core.model.ObservationValidation
 import lucuma.core.model.ObservationWorkflow
 import lucuma.core.model.Program
 import lucuma.core.model.Visit
+import lucuma.core.model.sequence.CalibrationDigest
 import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.core.model.sequence.SequenceDigest
@@ -208,7 +209,7 @@ class ObscalcServiceSuite extends ObscalcServiceSuiteSupport:
           ),
           NonNegInt.unsafeFrom(2),
           NonNegInt.MinValue,
-          NonNegInt.MinValue,
+          CalibrationDigest.Zero,
           SequenceDigest(
             ObserveClass.Acquisition,
             CategorizedTime(ChargeClass.Program -> TimeSpan.unsafeFromMicroseconds(617162500L)),

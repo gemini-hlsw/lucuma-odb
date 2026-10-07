@@ -6,12 +6,15 @@ package data
 package arb
 
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.DeclaredExecutionState
 import lucuma.core.enums.DeclaredExecutionState.given
 import lucuma.core.enums.ExecutionState
 import lucuma.core.enums.GuideProbe
 import lucuma.core.enums.ProposalStatus
 import lucuma.core.enums.ScienceBand
+import lucuma.core.model.sequence.CategorizedTime
+import lucuma.core.util.TimeSpan
 import lucuma.core.util.arb.ArbEnumerated
 import lucuma.itc.client.ImagingParameters
 import lucuma.itc.client.InstrumentMode
@@ -29,6 +32,21 @@ trait ArbGeneratorParams:
   import ArbGmosLongSlitConfig.given
   import ArbInstrumentMode.given
   import ArbItcInput.given
+
+  private val genTelluric: Gen[CalibrationGroupTelluric] =
+    for
+      u <- arbitrary[Boolean]
+      d <- arbitrary[Boolean]
+      t <- Gen.option(Gen.choose(0L, 3_600_000_000L).map(us =>
+             CategorizedTime(ChargeClass.Program -> TimeSpan.unsafeFromMicroseconds(us))
+           ))
+    yield CalibrationGroupTelluric(u, d, t)
+
+  private val genTellurics: Gen[CalibrationGroupTellurics] =
+    for
+      n  <- Gen.choose(0, 4)
+      ts <- Gen.listOfN(n, genTelluric)
+    yield CalibrationGroupTellurics(ts)
 
   private val genAltair: Gen[Option[AltairConfiguration]] =
     Gen.option(arbitrary[AltairConfiguration])
@@ -55,7 +73,8 @@ trait ArbGeneratorParams:
       sp  <- arbitrary[Boolean]
       alt <- genAltair
       gp  <- arbitrary[Option[GuideProbe]]
-    yield GeneratorParams(ItcInputDerivation.Ready(itc), bnd, cfg, rol, pst, tgt, dc, es, sc, sp, alt, gp)
+      tel <- genTellurics
+    yield GeneratorParams(ItcInputDerivation.Ready(itc), bnd, cfg, rol, pst, tgt, dc, es, sc, sp, alt, gp, tel)
 
   val genGmosSouthLongSlit: Gen[GeneratorParams] =
     for
@@ -72,7 +91,8 @@ trait ArbGeneratorParams:
       sp  <- arbitrary[Boolean]
       alt <- genAltair
       gp  <- arbitrary[Option[GuideProbe]]
-    yield GeneratorParams(ItcInputDerivation.Ready(itc), bnd, cfg, rol, pst, tgt, dc, es, sc, sp, alt, gp)
+      tel <- genTellurics
+    yield GeneratorParams(ItcInputDerivation.Ready(itc), bnd, cfg, rol, pst, tgt, dc, es, sc, sp, alt, gp, tel)
 
   given Arbitrary[GeneratorParams] =
     Arbitrary:
