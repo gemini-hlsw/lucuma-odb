@@ -20,6 +20,9 @@ You can then open the playground to work with the API by pointing your browser t
 
 http://localhost:6060/playground.html
 
+`GET /health` and `GET /health/ready` are unauthenticated. Readiness never answers `503`;
+`redis` is reported when `REDISCLOUD_URL` is set. Body format is in the ODB README.
+
 ## Env
 
 The app needs an environment variable, `REDISCLOUD_URL`, which points to the

@@ -27,6 +27,11 @@ silent no-op unless both are set. See the ODB README for collector and Grafana C
 | `LUCUMA_SSO_OTEL_ENDPOINT` | OTLP HTTP endpoint (e.g. `http://collector.example.com:4318`) |
 | `LUCUMA_SSO_OTEL_KEY` | Value for the `Authorization` header (e.g. `Basic dXNlcjpwYXNz`) |
 
+##### Health
+
+`GET /health` and `GET /health/ready` are unauthenticated; readiness is `503` when `db` fails,
+`orcid` is informational. Body format is in the ODB README.
+
 ##### GPG Information
 
 SSO signs JWTs with a private key. Client applications verify JWTs with a public key.
