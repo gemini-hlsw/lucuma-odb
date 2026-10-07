@@ -225,7 +225,7 @@ object GnirsSpectroscopyInput:
         c  <- required(camera, "camera")
         g  <- required(grating.toOption, "grating")
         p  <- required(prism.toOption, "prism")
-        ws <- required(centralWavelengths, "centralWavelengths")
+        ws <- required(centralWavelengths, "centralWavelengths").flatMap(ws => resolveWavelengths(ws.toList))
       yield Create(ws, f, u, c, g, p,
                    explicitDecker.toOption,
                    explicitGrating.toOption, explicitPrism.toOption,

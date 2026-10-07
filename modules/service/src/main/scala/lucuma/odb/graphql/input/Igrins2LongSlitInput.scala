@@ -121,16 +121,17 @@ object Igrins2LongSlitInput:
     val formattedTelescopeConfigs = stored.map(_.telescopeConfigs)
 
     val toCreate: Result[Create] =
-      Result(Create(
-        exposureTimeMode.toOption,
-        svc.toOption.map: s =>
-          Svc.Create(
-            s.explicitExposure.toOption,
-            s.explicitTelescopeConfigs.toOption
-          ),
-        explicitTelescopeConfigs.toOption,
-        telluricType.getOrElse(TelluricType.Hot)
-      ))
+      TelluricExposureTimeModeEdit.forCreate(exposureTimeMode).map: etm =>
+        Create(
+          etm,
+          svc.toOption.map: s =>
+            Svc.Create(
+              s.explicitExposure.toOption,
+              s.explicitTelescopeConfigs.toOption
+            ),
+          explicitTelescopeConfigs.toOption,
+          telluricType.getOrElse(TelluricType.Hot)
+        )
 
   object Edit:
     given Eq[Edit] = Eq.fromUniversalEquals

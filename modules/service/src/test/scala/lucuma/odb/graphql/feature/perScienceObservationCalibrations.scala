@@ -3632,6 +3632,55 @@ class perScienceObservationCalibrations
              )
     yield ()
 
+  test("telluric etm override: null is rejected when an update creates the mode"):
+    for
+      pid <- createProgramAs(pi)
+      tid <- createTargetWithProfileAs(pi, pid)
+      oid <- createObservationWithNoModeAs(pi, pid, tid)
+      _   <- expectOdbError(
+               user  = pi,
+               query = s"""mutation {
+                 updateObservations(input: {
+                   SET: { observingMode: { flamingos2LongSlit: {
+                     disperser: R1200_JH filter: JH fpu: LONG_SLIT_1 exposureTimeMode: null
+                   } } }
+                   WHERE: { id: { EQ: "$oid" } }
+                 }) {
+                   observations { id }
+                 }
+               }""",
+               expected = {
+                 case OdbError.InvalidArgument(Some(msg)) if msg.contains("only valid when editing a telluric") => ()
+               }
+             )
+    yield ()
+
+  test("telluric etm override: GNIRS null is rejected on create"):
+    for
+      pid <- createProgramAs(pi)
+      tid <- createTargetWithProfileAs(pi, pid)
+      _   <- expectOdbError(
+               user  = pi,
+               query = s"""mutation {
+                 createObservation(input: {
+                   programId: "$pid"
+                   SET: {
+                     targetEnvironment: { asterism: ["$tid"] }
+                     observingMode: { gnirsLongSlit: {
+                       filter: ORDER3 fpu: LONG_SLIT_0_30 camera: SHORT_BLUE grating: D32 prism: SXD
+                       centralWavelengths: [{ centralWavelength: { nanometers: 1600 } exposureTimeMode: null }]
+                     } }
+                   }
+                 }) {
+                   observation { id }
+                 }
+               }""",
+               expected = {
+                 case OdbError.InvalidArgument(Some(msg)) if msg.contains("only valid when editing a telluric") => ()
+               }
+             )
+    yield ()
+
   // (wavelength nm, S/N, explicit) per current row.
   private def gnirsCurrentRows(oid: Observation.Id): IO[List[(Int, Int, Boolean)]] =
     import skunk.codec.all.{bool, int4}

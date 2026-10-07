@@ -175,11 +175,12 @@ object Flamingos2LongSlitInput:
         g <- required(disperser, "disperser")
         f <- required(filter, "filter")
         u <- required(fpu, "fpu")
+        e <- TelluricExposureTimeModeEdit.forCreate(exposureTimeMode)
       yield Create(
         g,
         f,
         u,
-        exposureTimeMode.toOption,
+        e,
         explicitReadMode.toOption,
         explicitReads.toOption,
         explicitDecker.toOption,
