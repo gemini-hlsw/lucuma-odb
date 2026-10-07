@@ -31,6 +31,8 @@ import lucuma.itc.legacy.ItcImpl
 import lucuma.itc.legacy.LocalItc
 import lucuma.itc.service.config.*
 import lucuma.otel.OtelSetup
+import lucuma.otel.health.HealthCheck
+import lucuma.otel.health.HealthRoutes
 import org.http4s.*
 import org.http4s.ember.server.EmberServerBuilder
 import org.http4s.headers.`Cache-Control`
@@ -130,17 +132,18 @@ object Main extends IOApp with ItcCacheOrRemote {
       .withHttpWebSocketApp(app)
       .build
 
+  // Redis is optional, so the readiness check for it is only present when it is configured.
   private def createCache[F[_]: Async: Tracer: Logger](
     redisUrl: Option[Uri]
-  ): Resource[F, BinaryEffectfulCache[F]] =
+  ): Resource[F, (BinaryEffectfulCache[F], List[HealthCheck[F]])] =
     redisUrl match
       case Some(url) =>
         for
           redis <- Redis[F].simple(url.toString, RedisCodec.gzip(RedisCodec.Bytes))
           cache <- Resource.eval(RedisEffectfulCache[F](redis))
-        yield cache
+        yield (cache, List(HealthCheck.informational("redis", redis.ping.void)))
       case None      =>
-        Resource.eval(NoOpBinaryCache[F])
+        Resource.eval(NoOpBinaryCache[F]).map((_, Nil))
 
   private val redactor: UriRedactor = new UriRedactor:
     def redactPath(path: Uri.Path) = path
@@ -167,7 +170,11 @@ object Main extends IOApp with ItcCacheOrRemote {
         Itc.limitConcurrency(cfg.maxConcurrentCalculations, calcSemaphore)(
           ItcImpl.build(FLocalItc[F](localItc))
         )
-      cache                      <- createCache[F](cfg.redisUrl)
+      (cache, healthChecks)      <- createCache[F](cfg.redisUrl)
+      health                     <- Resource.eval(HealthRoutes[F](
+                                      BuildInfo.gitHeadCommit.getOrElse("unknown"),
+                                      healthChecks
+                                    ))
       _                          <- Resource.eval(checkVersionToPurge[F](cache))
       customSedResolver          <- CustomSedOdbAttachmentResolver[F](cfg.odbBaseUrl, cfg.odbServiceToken)
       given CustomSed.Resolver[F] = CustomSedCachedResolver(customSedResolver, cache, CustomSedTTL)
@@ -176,7 +183,7 @@ object Main extends IOApp with ItcCacheOrRemote {
       otelMiddleware             <- Resource.eval(OtelServerMiddleware.builder[F](spanDataProvider).build)
       metricsOps                 <- Resource.eval(OtelMetrics.serverMetricsOps[F]())
     yield wsb =>
-      otelMiddleware.asHttpRoutesMiddleware:
+      health <+> otelMiddleware.asHttpRoutesMiddleware:
         GZip:
           corsPolicy:
             cacheMiddleware:
