@@ -169,32 +169,33 @@ trait ObservationMapping[F[_]]
     def applicable(ks: List[(Program.Id, Observation.Id)])(using Services[F], Transaction[F]): F[Result[Map[(Program.Id, Observation.Id), List[ConfigurationRequest.Id]]]] =
       configurationService.selectRequests(ks).map(_.map(_.view.mapValues(_.map(_.id)).toMap))
 
-    // Fetches the requests `rids` through SQL with the selection of the effect `query`, returning
-    // the result list cursor along with its elements keyed by id.
-    def fetch(query: Query, env: Env, rids: List[ConfigurationRequest.Id]): F[Result[(Cursor, Map[ConfigurationRequest.Id, Cursor])]] =
-      Query.extractChild(query).toResultOrError("Configuration requests query has the wrong shape").flatTraverse: child =>
-        val q = Select("configurationRequests", None, Select("matches", None, Filter(Predicates.configurationRequest.id.in(rids), child)))
-        sqlCursor(q, env).map: res =>
-          for
-            root    <- res
-            matches <- root.field("configurationRequests", None).flatMap(_.field("matches", None))
-            elems   <- matches.asList
-            byId    <- elems.traverse(c => c.fieldAs[ConfigurationRequest.Id]("id").tupleRight(c))
-          yield (matches, byId.toMap)
+    // Fetches the requests `rids` through SQL with the selection `child`, returning the result list
+    // cursor along with its elements keyed by id.
+    def fetch(child: Query, env: Env, rids: List[ConfigurationRequest.Id]): F[Result[(Cursor, Map[ConfigurationRequest.Id, Cursor])]] =
+      val q = Select("configurationRequests", None, Select("matches", None, Filter(Predicates.configurationRequest.id.in(rids), child)))
+      sqlCursor(q, env).map: res =>
+        for
+          root    <- res
+          matches <- root.field("configurationRequests", None).flatMap(_.field("matches", None))
+          elems   <- matches.asList
+          byId    <- elems.traverse(c => c.fieldAs[ConfigurationRequest.Id]("id").tupleRight(c))
+        yield (matches, byId.toMap)
 
-    // One SQL query per distinct selection (in practice, one per alias) for the union of the ids
-    // its observations need, split back out into one list per observation.
+    // One SQL query per distinct child selection for the union of the ids its observations need,
+    // split back out into one list per observation. Grackle runs that child selection against the
+    // cursors we return, so aliases of this field that select the same fields share one query.
     def cursors(ridLists: List[List[ConfigurationRequest.Id]]): F[Result[List[Cursor]]] =
       pairs
         .zip(ridLists)
         .zipWithIndex
-        .groupBy { case (((query, _), _), _) => query }
+        .groupBy { case (((query, _), _), _) => Query.extractChild(query) }
         .toList
-        .traverse: (query, group) =>
+        .traverse: (child, group) =>
           val rids = group.flatMap(_._1._2).distinct
           val fetched: F[Result[Option[(Cursor, Map[ConfigurationRequest.Id, Cursor])]]] =
-            if rids.isEmpty then Option.empty.success.pure[F]
-            else fetch(query, group.head._1._1._2.fullEnv, rids).map(_.map(_.some))
+            child.toResultOrError("Configuration requests query has the wrong shape").flatTraverse: c =>
+              if rids.isEmpty then Option.empty.success.pure[F]
+              else fetch(c, group.head._1._1._2.fullEnv, rids).map(_.map(_.some))
           fetched.map: res =>
             res.flatMap: f =>
               group.traverse:

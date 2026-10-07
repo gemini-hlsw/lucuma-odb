@@ -504,6 +504,7 @@ class observation_configurationRequests
                         id
                         a: configurationRequests { id applicableObservations }
                         b: configurationRequests { feedback }
+                        c: configurationRequests { id applicableObservations }
                       }
                     }
                   }
@@ -515,17 +516,20 @@ class observation_configurationRequests
                         {
                           "id" : $oid1,
                           "a"  : [ { "id" : $rid1, "applicableObservations" : [ $oid1 ] } ],
-                          "b"  : [ { "feedback" : null } ]
+                          "b"  : [ { "feedback" : null } ],
+                          "c"  : [ { "id" : $rid1, "applicableObservations" : [ $oid1 ] } ]
                         },
                         {
                           "id" : $oid2,
                           "a"  : [ { "id" : $rid2, "applicableObservations" : [ $oid2 ] } ],
-                          "b"  : [ { "feedback" : "Second" } ]
+                          "b"  : [ { "feedback" : "Second" } ],
+                          "c"  : [ { "id" : $rid2, "applicableObservations" : [ $oid2 ] } ]
                         },
                         {
                           "id" : $oid3,
                           "a"  : [],
-                          "b"  : []
+                          "b"  : [],
+                          "c"  : []
                         }
                       ]
                     }
