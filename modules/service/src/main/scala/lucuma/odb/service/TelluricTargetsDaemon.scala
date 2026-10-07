@@ -38,7 +38,8 @@ object TelluricTargetsDaemon:
     pollPeriod:       FiniteDuration,
     batchSize:        Int,
     topic:            Topic[F, TelluricTargetTopic.Element],
-    services:         Resource[F, Services[F]]
+    services:         Resource[F, Services[F]],
+    heartbeat:        F[Unit]
   ): F[Unit] =
     given Logger[F] = LF.getLoggerFromName("telluric-targets")
 
@@ -70,6 +71,7 @@ object TelluricTargetsDaemon:
             services.useTransactionally:
               Services.asSuperUser:
                 telluricTargetsService.load(batchSize)
+        .evalTap(_ => heartbeat)
         .flatMap(Stream.emits)
 
     val mainStream: Stream[F, Unit] =

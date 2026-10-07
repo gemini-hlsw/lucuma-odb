@@ -40,6 +40,7 @@ import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.service.UserService
 import lucuma.odb.util.OdbTelemetry
+import lucuma.otel.health.WorkerHeartbeat
 import org.http4s.Credentials
 import org.http4s.client.Client
 import org.http4s.headers.Authorization
@@ -151,7 +152,8 @@ object CalcMain extends MainParams:
     connectionsLimit: Int,
     pollPeriod:       FiniteDuration,
     topic:            Topic[F, ObscalcTopic.Element],
-    services:         Resource[F, Services[F]]
+    services:         Resource[F, Services[F]],
+    heartbeat:        F[Unit]
   ): Resource[F, F[Outcome[F, Throwable, Unit]]] =
 
     // Stream of pending calc produced by watching for updates to t_obscalc.
@@ -187,6 +189,7 @@ object CalcMain extends MainParams:
             services.useTransactionally:
               requireServiceAccessOrThrow:
                 obscalcService.load(1024)
+        .evalTap(_ => heartbeat)
         .flatMap(Stream.emits)
 
     // Combine the eventStream and the pollStream (after startup), process each
@@ -276,10 +279,11 @@ object CalcMain extends MainParams:
    * Our main server, as a resource that starts up our server on acquire and shuts it all down
    * in cleanup, yielding an `ExitCode`. Users will `use` this resource and hold it forever.
    */
-  def server[F[_]: Async: Compression: Parallel: Logger: LoggerFactory: Tracer: TracerProvider: MeterProvider: Console: Network: SecureRandom]: Resource[F, F[Outcome[F, Throwable, Unit]]] =
+  def server[F[_]: Async: Compression: Parallel: Logger: LoggerFactory: Tracer: TracerProvider: Meter: MeterProvider: Console: Network: SecureRandom]: Resource[F, F[Outcome[F, Throwable, Unit]]] =
     for
       c          <- Resource.eval(Config.fromCiris.load[F])
       _          <- Resource.eval(banner[F](c))
+      heartbeat  <- WorkerHeartbeat.resource[F]("obscalc")
       pool       <- databasePoolResource[F](c.database)
       enums      <- Resource.eval(pool.use(Enums.load))
       http       <- c.httpClientResource
@@ -323,7 +327,9 @@ object CalcMain extends MainParams:
                           itc,
                           gaiaClient,
                           horizonsClient,
-                      )))
+                      )),
+                      heartbeat
+                    )
     yield o
 
   /** Our logical entry point. */
