@@ -252,8 +252,8 @@ are logged at warn, and the readiness result is cached for 10s with concurrent m
 one computation.
 
 ODB checks: `db` (`SELECT 1`) and `sso` (`GET <sso>/health/ready`) required; `itc`
-(`GET <itc>/health`) and `s3` (list one key under the Cloudcube prefix) info, reported but never
-flip the status. HTTP probes pass only on 2xx. Implementation: `lucuma.otel.health` in
+(`GET <itc>/health`) info, reported but never flips the status. S3 is not probed, Cloudcube
+grants no `s3:ListBucket`. HTTP probes pass only on 2xx. Implementation: `lucuma.otel.health` in
 `modules/otel`.
 
 Worker dynos (`obscalc`, `calibration`, `pdfsummary`) have no HTTP. Each records the gauge

@@ -56,7 +56,6 @@ import org.typelevel.otel4s.metrics.MeterProvider
 import org.typelevel.otel4s.trace.Tracer
 import org.typelevel.otel4s.trace.TracerProvider
 import skunk.{Command as _, *}
-import software.amazon.awssdk.services.s3.model.ListObjectsV2Request
 import software.amazon.awssdk.services.s3.presigner.S3Presigner
 
 import scala.concurrent.duration.*
@@ -272,7 +271,7 @@ object FMain extends MainParams {
       webhookService    <- pool.map(EmailWebhookService.fromSession(_))
       healthRoutes      <- Resource.eval(HealthRoutes[F](
                              commitHash.format,
-                             healthChecks(singleSession(databaseConfig), httpClient, ssoRoot, itcRoot, s3ClientOps, awsConfig)
+                             healthChecks(singleSession(databaseConfig), httpClient, ssoRoot, itcRoot)
                            ))
     } yield { wsb =>
       val attachmentRoutes   = AttachmentRoutes.apply[F](pool, s3FileService, ssoClient, awsConfig.fileUploadMaxMb, emailConfig, commitHash, ptc, httpClient, itcClient, gaiaClient, horizonsClient)
@@ -283,29 +282,24 @@ object FMain extends MainParams {
     }
 
   /**
-   * Postgres and SSO are required to serve; ITC and S3 only degrade features. Probes use the
-   * plain HTTP client and a session of their own so polling leaves no traces and a saturated
-   * pool is not reported as Postgres being down.
+   * Postgres and SSO are required to serve; ITC only degrades features. Probes use the plain
+   * HTTP client and a session of their own so polling leaves no traces and a saturated pool is
+   * not reported as Postgres being down. S3 is not probed: Cloudcube grants no s3:ListBucket,
+   * so no read-only request can tell "down" from "forbidden".
    */
   def healthChecks[F[_]: Concurrent](
     session:    Resource[F, Session[F]],
     httpClient: Client[F],
     ssoRoot:    Uri,
-    itcRoot:    Uri,
-    s3:         S3AsyncClientOp[F],
-    awsConfig:  Config.Aws
+    itcRoot:    Uri
   ): List[HealthCheck[F]] =
-    // Cloudcube scopes permissions to the cube prefix, so list within it rather than HEAD the bucket.
-    val s3Probe = ListObjectsV2Request.builder
-      .bucket(awsConfig.bucketName.value.value)
-      .prefix(awsConfig.basePath.value)
-      .maxKeys(1)
-      .build
+    // Roots may carry a GraphQL path (e.g. .../itc); health lives at the server root.
+    def healthOf(root: Uri, path: String*): Uri =
+      root.withPath(path.foldLeft(Uri.Path.Root)(_ / _))
     List(
       HealthCheck.required("db", HealthCheck.postgres(session)),
-      HealthCheck.required("sso", HealthCheck.reachable(httpClient, ssoRoot / "health" / "ready")),
-      HealthCheck.info("itc", HealthCheck.reachable(httpClient, itcRoot / "health")),
-      HealthCheck.info("s3", s3.listObjectsV2(s3Probe).void)
+      HealthCheck.required("sso", HealthCheck.reachable(httpClient, healthOf(ssoRoot, "health", "ready"))),
+      HealthCheck.info("itc", HealthCheck.reachable(httpClient, healthOf(itcRoot, "health")))
     )
 
   /** A startup action that runs database migrations using Flyway. */
