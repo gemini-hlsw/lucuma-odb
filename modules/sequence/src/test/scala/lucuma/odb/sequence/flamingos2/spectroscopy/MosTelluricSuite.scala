@@ -150,4 +150,4 @@ class MosTelluricSuite extends FunSuite:
     val atoms = generate(cfg = config(defaultTelluricTelescopeConfigs(Flamingos2TelluricOffsetPreset.Telluric).telescopeConfigs
 , none)).science.toList
 
-    assertEquals(titles(atoms).distinct, List("ABBA Cycle", "Nighttime Calibrations"))
+    assertEquals(titles(atoms).distinct, List("Nighttime Calibrations", "ABBA Cycle"))
