@@ -435,6 +435,9 @@ object ObservationValidationInfo {
           c_program_id IN ($enc)
       """.query(program_id *: science_band)
 
+    // The obscalc invalidation trigger on t_cfp (V1342) fires only when one of
+    // the t_cfp columns read here changes.  If you read another column, add it
+    // to that trigger's WHEN clause in a new migration.
     def CfpInfos[A <: NonEmptyList[CallForProposals.Id]](enc: Encoder[A]): Query[A, (CfpInfo, Option[Instrument])] =
       sql"""
         SELECT

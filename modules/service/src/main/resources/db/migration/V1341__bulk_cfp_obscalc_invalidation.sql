@@ -18,20 +18,25 @@ CREATE OR REPLACE PROCEDURE invalidate_obscalc_many(
 )
   LANGUAGE plpgsql AS $$
 BEGIN
+  -- Both the insert and the lock below take row locks in observation id order,
+  -- so that concurrent bulk invalidations cannot deadlock one another.
   INSERT INTO t_obscalc (c_program_id, c_observation_id)
   SELECT c_program_id, c_observation_id
     FROM t_observation
    WHERE c_observation_id = ANY(observation_ids)
+   ORDER BY c_observation_id
   ON CONFLICT ON CONSTRAINT t_obscalc_pkey DO NOTHING;
 
-  -- Lock in a consistent order so that concurrent bulk invalidations cannot
-  -- deadlock one another.
   PERFORM 1
      FROM t_obscalc
     WHERE c_observation_id = ANY(observation_ids)
     ORDER BY c_observation_id
       FOR UPDATE;
 
+  -- A single edit can invalidate the same observations more than once in a
+  -- transaction (e.g., deleting and inserting CfP instruments), so skip rows
+  -- that this transaction has already invalidated.  now() is the transaction
+  -- start time.
   UPDATE t_obscalc
      SET c_last_invalidation = now(),
          c_failure_count     = 0,
@@ -41,7 +46,11 @@ BEGIN
                                    THEN c_obscalc_state
                                  ELSE 'pending' :: e_calculation_state
                                END
-   WHERE c_observation_id = ANY(observation_ids);
+   WHERE c_observation_id = ANY(observation_ids)
+     AND NOT (
+       c_last_invalidation = now() AND
+       c_obscalc_state IN ('pending' :: e_calculation_state, 'calculating' :: e_calculation_state)
+     );
 END;
 $$;
 

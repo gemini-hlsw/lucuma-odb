@@ -1362,11 +1362,47 @@ class updateCallsForProposals extends OdbSuite {
       assertEquals(s, CalculationState.Calculating)
       assert(after.toInstant.isAfter(before.toInstant))
 
-  test("instruments - adding and removing at once stores exactly the requested list"):
+  test("instruments - adding and removing at once stores exactly the requested list and invalidates obscalc"):
     for
-      (cid, _) <- callWithObservation
-      _        <- assertIO(setInstruments(cid, "GMOS_SOUTH", "GHOST").map(_.sorted), List("GHOST", "GMOS_SOUTH"))
-      _        <- assertIO(setInstruments(cid, "GHOST", "FLAMINGOS2").map(_.sorted), List("FLAMINGOS2", "GHOST"))
+      (cid, oid) <- callWithObservation
+      _          <- assertIO(setInstruments(cid, "GMOS_SOUTH", "GHOST").map(_.sorted), List("GHOST", "GMOS_SOUTH"))
+      _          <- setObscalcState(oid, CalculationState.Ready)
+      _          <- assertIO(setInstruments(cid, "GHOST", "FLAMINGOS2").map(_.sorted), List("FLAMINGOS2", "GHOST"))
+      _          <- assertIOBoolean(obscalcRow(oid).map(_._1 === CalculationState.Pending))
+    yield ()
+
+  test("instruments - editing several calls invalidates only those whose list changed"):
+    for
+      (cidA, oidA) <- callWithObservation
+      (cidB, oidB) <- callWithObservation
+      _            <- setInstruments(cidB, "GMOS_SOUTH")
+      _            <- setObscalcState(oidA, CalculationState.Ready)
+      _            <- setObscalcState(oidB, CalculationState.Ready)
+      _            <- expect(
+                        staff,
+                        s"""
+                          mutation {
+                            updateCallsForProposals(input: {
+                              SET: { gemini: { instruments: [GMOS_NORTH] } },
+                              WHERE: { id: { IN: ["$cidA", "$cidB"] } }
+                            }) {
+                              callsForProposals { gemini { instruments } }
+                            }
+                          }
+                        """,
+                        json"""
+                          {
+                            "updateCallsForProposals": {
+                              "callsForProposals": [
+                                { "gemini": { "instruments": ["GMOS_NORTH"] } },
+                                { "gemini": { "instruments": ["GMOS_NORTH"] } }
+                              ]
+                            }
+                          }
+                        """.asRight
+                      )
+      _            <- assertIOBoolean(obscalcRow(oidA).map(_._1 === CalculationState.Ready))
+      _            <- assertIOBoolean(obscalcRow(oidB).map(_._1 === CalculationState.Pending))
     yield ()
 
   test("a title edit does not invalidate obscalc"):
@@ -1392,4 +1428,29 @@ class updateCallsForProposals extends OdbSuite {
       _          <- updateCall(cid, "gemini: { coordinateLimits: { north: { raStart: { hms: \"00:00:00\" } } } }")
       _          <- assertIOBoolean(obscalcRow(oid).map(_._1 === CalculationState.Pending))
     yield ()
+
+  test("instruments and partners - no matching calls"):
+    expect(
+      staff,
+      s"""
+        mutation {
+          updateCallsForProposals(input: {
+            SET: {
+              partners: [{ geminiPartner: US }]
+              gemini: { instruments: [GMOS_SOUTH] }
+            },
+            WHERE: { id: { EQ: "c-ffff" } }
+          }) {
+            callsForProposals { id }
+          }
+        }
+      """,
+      json"""
+        {
+          "updateCallsForProposals": {
+            "callsForProposals": []
+          }
+        }
+      """.asRight
+    )
 }

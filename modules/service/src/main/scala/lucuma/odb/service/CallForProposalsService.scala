@@ -286,12 +286,17 @@ object CallForProposalsService:
               case Some(Edit.ObservatoryCallProperties.Gemini(g)) => g.exchangePartners
               case _                                              => Nullable.Absent
 
+          // The per-call tables are keyed by the matched ids, and their
+          // statements can't be built from an empty id list.
+          def forMatched(cids: List[CallForProposals.Id])(update: => F[Result[Unit]]): ResultT[F, Unit] =
+            ResultT(if cids.isEmpty then Result.unit.pure[F] else update)
+
           (for
             _    <- ResultT(checkObservatory(SET, which))
             cids <- ResultT(updateCfpTable(SET, which))
-            _    <- ResultT(updatePartners(cids, SET.partners))
-            _    <- ResultT(updateGeminiInstruments(cids, geminiInstruments))
-            _    <- ResultT(updateExchangePartners(cids, exchangePartners))
+            _    <- forMatched(cids)(updatePartners(cids, SET.partners))
+            _    <- forMatched(cids)(updateGeminiInstruments(cids, geminiInstruments))
+            _    <- forMatched(cids)(updateExchangePartners(cids, exchangePartners))
           yield cids).value
 
   object Statements:
@@ -486,7 +491,7 @@ object CallForProposalsService:
           c_cfp_id,
           c_instrument
         ) VALUES ${(cfp_id *: instrument).values.list(cids.length * instruments.length)}
-        ON CONFLICT DO NOTHING
+        ON CONFLICT (c_cfp_id, c_instrument) DO NOTHING
       """.command
          .contramap:
            case (cids, instruments) => cids.flatMap(instruments.tupleLeft(_))
