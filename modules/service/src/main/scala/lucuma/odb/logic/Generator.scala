@@ -45,13 +45,13 @@ import lucuma.odb.data.ItcAcquisition
 import lucuma.odb.data.Md5Hash
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.ObservingMode.Syntax.*
-import lucuma.odb.sequence.syntax.sequencedigest.*
 import lucuma.odb.sequence.SetupTimeEstimateCalculator
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.ItcInput
 import lucuma.odb.sequence.data.StreamingExecutionConfig
 import lucuma.odb.sequence.exchange.Config as ExchangeConfig
 import lucuma.odb.sequence.sciClass
+import lucuma.odb.sequence.syntax.sequencedigest.*
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.sequence.visitor.Config as VisitorConfig
 import lucuma.odb.sequence.visitor.VisitorExecutionDigestCalculator
