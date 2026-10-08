@@ -45,6 +45,7 @@ import lucuma.odb.graphql.input.ScienceRequirementsInput
 import lucuma.odb.graphql.input.SpectroscopyScienceRequirementsInput
 import lucuma.odb.graphql.input.TargetEnvironmentInput
 import lucuma.odb.graphql.mapping.AccessControl
+import lucuma.odb.sequence.InfraredCalibration
 import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.sequence.ObservingMode.Syntax.*
 import lucuma.odb.sequence.data.CalibrationGroupTellurics
@@ -92,15 +93,7 @@ object ObsExtract:
       case c: GnirsSpectroscopyConfig => c.telluricType =!= TelluricType.NoTelluric
       case _                          => true
 
-  /** Wavelength from which infrared calibrations repeat hourly rather than every 90 minutes. 2.6 microns */
-  val LongWavelengthCutoff: Wavelength = Wavelength.unsafeFromIntPicometers(2_600_000)
-
-  val ShortWavelengthSetInterval: TimeSpan = 90.minTimeSpan
-
-  val LongWavelengthSetInterval: TimeSpan = 60.minTimeSpan
-
-  def calibrationSetInterval(wavelength: Wavelength): TimeSpan =
-    if wavelength < LongWavelengthCutoff then ShortWavelengthSetInterval else LongWavelengthSetInterval
+  export InfraredCalibration.{LongWavelengthCutoff, ShortWavelengthSetInterval, LongWavelengthSetInterval, calibrationSetInterval}
 
   /** Modes whose science observations are accompanied by tellurics. */
   def modeTakesTelluric(modeType: ObservingModeType): Boolean =
