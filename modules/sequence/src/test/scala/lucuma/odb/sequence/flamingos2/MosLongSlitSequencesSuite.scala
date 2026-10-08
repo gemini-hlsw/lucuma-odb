@@ -6,7 +6,6 @@ package lucuma.odb.sequence.flamingos2
 import cats.Eval
 import cats.data.NonEmptyList
 import cats.syntax.either.*
-import cats.syntax.eq.*
 import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.PosInt
 import fs2.Pure
@@ -53,9 +52,10 @@ import java.util.UUID
 
 /**
  * Flamingos 2 MOS and long slit generate the same science sequence apart from the
- * aperture, but calibrate on their own cadences: 90 minutes for long slit, 2 hours
- * for MOS.  The per-step aperture is covered by the executionSciFlamingos2Mos
- * GraphQL suite; the cadence boundary is only reachable here.
+ * aperture, and share the 90 minute calibration period.  Both open with flats and
+ * arcs and, once the science runs past the period, close with them too.  Nothing
+ * is placed in between, however long the science runs.  The per-step aperture is
+ * covered by the executionSciFlamingos2Mos GraphQL suite.
  */
 class MosLongSlitSequencesSuite extends FunSuite:
 
@@ -131,21 +131,19 @@ class MosLongSlitSequencesSuite extends FunSuite:
       ): StepEstimate =
         StepEstimate.fromMax(List(ConfigChangeEstimate("test", "test", next.value.exposure)), Nil)
 
-  private val CycleEstimate: TimeSpan = ExposureTime *| 4
-
-  private def itc(cycles: Int): Either[OdbError, IntegrationTime] =
-    IntegrationTime(ExposureTime, PosInt.unsafeFrom(cycles * 4)).asRight
+  private def itc(cycles: Int, exposure: TimeSpan): Either[OdbError, IntegrationTime] =
+    IntegrationTime(exposure, PosInt.unsafeFrom(cycles * 4)).asRight
 
   private def science(
     gen: Eval[Either[OdbError, StreamingExecutionConfig[Pure, Flamingos2StaticConfig, Flamingos2DynamicConfig]]]
   ): List[Atom[Flamingos2DynamicConfig]] =
     gen.value.fold(e => fail(s"could not generate: $e"), _.science.toList)
 
-  private def generateLongSlit(cycles: Int): List[Atom[Flamingos2DynamicConfig]] =
-    science(longslit.LongSlit.instantiate[Eval](Oid, estimator, Namespace, expander, longSlit, itc(cycles), itc(cycles), none))
+  private def generateLongSlit(cycles: Int, exposure: TimeSpan = ExposureTime): List[Atom[Flamingos2DynamicConfig]] =
+    science(longslit.LongSlit.instantiate[Eval](Oid, estimator, Namespace, expander, longSlit, itc(cycles, exposure), itc(cycles, exposure), none))
 
-  private def generateMos(cycles: Int): List[Atom[Flamingos2DynamicConfig]] =
-    science(mos.Mos.instantiate[Eval](Oid, estimator, Namespace, expander, mosConfig, itc(cycles), none))
+  private def generateMos(cycles: Int, exposure: TimeSpan = ExposureTime): List[Atom[Flamingos2DynamicConfig]] =
+    science(mos.Mos.instantiate[Eval](Oid, estimator, Namespace, expander, mosConfig, itc(cycles, exposure), none))
 
   // The aperture and the decker that follows from it are what the two modes differ in.
   private def normalized(a: Atom[Flamingos2DynamicConfig]): Atom[Flamingos2DynamicConfig] =
@@ -164,27 +162,22 @@ class MosLongSlitSequencesSuite extends FunSuite:
     assert(ls.nonEmpty, "expected a non-empty long slit sequence")
     assertEquals(ms.map(normalized), ls.map(normalized))
 
-  test("100 minutes of science: long slit calibrates mid-block, MOS does not"):
-    // 5 cycles at 20 minutes each, past the 90 minute cadence but short of 2 hours.
-    val cycles = 5
-    assert(CycleEstimate *| cycles === 100.minuteTimeSpan)
+  test("60 minutes of science: an opening set only"):
+    val expected = "Nighttime Calibrations" :: List.fill(3)("ABBA Cycle")
+    assertEquals(titles(generateLongSlit(3)), expected)
+    assertEquals(titles(generateMos(3)), expected)
 
-    assertEquals(
-      titles(generateLongSlit(cycles)),
-      List("ABBA Cycle", "ABBA Cycle", "ABBA Cycle", "Nighttime Calibrations", "ABBA Cycle", "ABBA Cycle", "Nighttime Calibrations")
-    )
+  test("past the period the sequence closes with calibrations too, and never more than that"):
+    // 5 cycles = 100 minutes, 10 = 200 minutes.  Both bracket the science, and
+    // nothing is placed in between however long it runs.
+    List(5, 10).foreach: cycles =>
+      val expected =
+        ("Nighttime Calibrations" :: List.fill(cycles)("ABBA Cycle")) :+ "Nighttime Calibrations"
+      assertEquals(titles(generateLongSlit(cycles)), expected, s"long slit, $cycles cycles")
+      assertEquals(titles(generateMos(cycles)), expected, s"MOS, $cycles cycles")
 
-    assertEquals(
-      titles(generateMos(cycles)),
-      List("ABBA Cycle", "ABBA Cycle", "ABBA Cycle", "ABBA Cycle", "ABBA Cycle", "Nighttime Calibrations")
-    )
-
-  test("past 2 hours of science, MOS calibrates mid-block too"):
-    // 7 cycles = 140 minutes, past the MOS cadence.
-    val cycles = 7
-    assert(CycleEstimate *| cycles === 140.minuteTimeSpan)
-
-    assertEquals(
-      titles(generateMos(cycles)),
-      List("ABBA Cycle", "ABBA Cycle", "ABBA Cycle", "ABBA Cycle", "Nighttime Calibrations", "ABBA Cycle", "ABBA Cycle", "ABBA Cycle", "Nighttime Calibrations")
-    )
+  test("exactly the period of science: an opening set only"):
+    // 6 cycles of 4 x 225 seconds = 90 minutes, not strictly past the period.
+    val expected = "Nighttime Calibrations" :: List.fill(6)("ABBA Cycle")
+    assertEquals(titles(generateLongSlit(6, 225.secTimeSpan)), expected)
+    assertEquals(titles(generateMos(6, 225.secTimeSpan)), expected)

@@ -12,7 +12,6 @@ import lucuma.core.enums.CalibrationRole
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig as F2Dynamic
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig as F2Static
-import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
 import lucuma.odb.data.OdbError
@@ -34,11 +33,12 @@ import java.util.UUID
 object Mos:
 
   /**
-   * Maximum time that may pass between "Nighttime Calibrations" atoms.  MOS
-   * calibrates every 2 hours where long slit calibrates every 90 minutes.
+   * Science time past which the sequence closes with a "Nighttime
+   * Calibrations" atom.  MOS shares the long slit interval; Flamingos 2 never reaches the
+   * long wavelength cutoff, so the short wavelength interval always applies.
    */
   val MaxSciencePeriod: TimeSpan =
-    2.hourTimeSpan
+    InfraredCalibration.ShortWavelengthSetInterval
 
   def instantiate[F[_]: Monad](
     observationId:  Observation.Id,

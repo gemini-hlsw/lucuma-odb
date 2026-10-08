@@ -14,7 +14,6 @@ import cats.syntax.option.*
 import cats.syntax.order.*
 import eu.timepit.refined.*
 import eu.timepit.refined.types.numeric.NonNegInt
-import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Pure
 import fs2.Stream
@@ -31,8 +30,6 @@ import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig as F2
 import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
 import lucuma.core.optics.syntax.lens.*
-import lucuma.core.refined.numeric.NonZeroInt
-import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.itc.IntegrationTime
@@ -49,9 +46,11 @@ import java.util.UUID
  * Flamingos 2 spectroscopy science sequence generation, shared by the long slit
  * and MOS modes.
  *
- * The two modes differ only in the aperture their steps carry and in how often
- * a "Nighttime Calibrations" atom must be inserted; the latter is the
- * `maxSciencePeriod` parameter threaded through this object.
+ * The sequence opens with a "Nighttime Calibrations" atom and, when the science
+ * runs longer than `maxSciencePeriod`, closes with one too.  No further sets
+ * appear: the observer takes those.
+ * The two modes differ only in the aperture their steps carry and in the period,
+ * which is the `maxSciencePeriod` parameter threaded through this object.
  */
 object Science:
 
@@ -64,15 +63,6 @@ object Science:
    * The name of the nighttime cal atoms.
    */
   val NighttimeCalTitle: NonEmptyString = NonEmptyString.unsafeFrom("Nighttime Calibrations")
-
-  /**
-   * A visit shouldn't take more than this, since we need to break to do a
-   * telluric.
-   */
-  val MaxVisitLength: TimeSpan =
-    3.hourTimeSpan
-
-  private val Two: NonZeroInt = NonZeroInt.unsafeFrom(2)
 
   extension (start: Timestamp)
     def timeUntil(end: Timestamp): TimeSpan =
@@ -199,76 +189,24 @@ object Science:
     steps:            StepDefinition,
     cycleEstimate:    TimeSpan,
     maxSciencePeriod: TimeSpan,
-    estimate:         (NonEmptyList[ProtoStep[F2]], StepTimeEstimateCalculator.Last[F2]) => TimeSpan,
     builder:          AtomBuilder[F2],
     goalCycles:       NonNegInt
   ) extends SequenceGenerator[F2]:
 
-    // Computes the atoms remaining in a 3 hour science blocklimited to `maxCycles`
-    // at most.
-    private def atomsInBlock(maxCycles: NonNegInt): (Int, List[ProtoAtom[ProtoStep[F2]]]) =
-
-      // How many full ABBA cycles would fit in the given time span?
-      def cyclesIn(timeSpan: TimeSpan): Int =
-        (timeSpan.toMicroseconds / cycleEstimate.toMicroseconds).toInt
-
-      // Roughly, how many more cycles can we fit in the remaining time?
-      val cycles: Int = cyclesIn(MaxVisitLength) min maxCycles.value
-
-      // Remaining science time in this visit. If it reaches the cadence we need
-      // to insert a flat roughly after science-time / 2.
-      val scienceTime: TimeSpan = cycleEstimate *| cycles
-
-      val abbaAtom: ProtoAtom[ProtoStep[F2]] = ProtoAtom(AbbaCycleTitle.some, steps.abbaCycle)
-      val gcalAtom: ProtoAtom[ProtoStep[F2]] = ProtoAtom(NighttimeCalTitle.some, steps.cals)
-
-      cycles ->
-        Option
-          .when(scienceTime >= maxSciencePeriod)(scienceTime /| Two)
-          .fold(
-            // The science time is not long enough to warrant a mid-science cal in this block.
-            List.fill(cycles)(abbaAtom) ++ Option.when(cycles > 0)(gcalAtom).toList
-          ): timeUntilMidScienceCals =>
-
-            // How many more full cycles can we do before the mid-science cal time?
-            val fullPreCalCycles: Int        = cyclesIn(timeUntilMidScienceCals)
-            val leftOverPreCalTime: TimeSpan = timeUntilMidScienceCals -| (cycleEstimate *| fullPreCalCycles)
-
-            // If the nominal cal time falls in the middle of an ABBA cycle, make it so
-            // the break to do calibrations falls closest to an ABBA cycle boundary.
-            val extraPreCalCycle: Int =
-              if leftOverPreCalTime >= (cycleEstimate /| Two) then 1 min cycles else 0
-
-            // How many new ABBA cycles before and after the mid-science cals
-            val preCalCycles:  Int = fullPreCalCycles + extraPreCalCycle
-            val postCalCycles: Int = cycles - preCalCycles
-
-            List.fill(preCalCycles)(abbaAtom).appended(gcalAtom) ++
-            List.fill(postCalCycles)(abbaAtom)                   ++
-            Option.when(postCalCycles > 0)(gcalAtom).toList
-
     override def generate: Stream[Pure, Atom[F2]] =
 
-      // Add future blocks until we've completed all the cycles.
-      val future =
-        Stream
-          .unfold(0): c =>
-            PosInt.from(goalCycles.value - c).toOption.map: remainingCycles =>
-              val (cycles, atoms) = atomsInBlock(NonNegInt.unsafeFrom(remainingCycles.value))
+      val gcalAtom: ProtoAtom[ProtoStep[F2]] = ProtoAtom(NighttimeCalTitle.some, steps.cals)
 
-              // Sanity check....
-              assert(cycles > 0, "No progress made generating future F2 spectroscopy sequence!")
+      // Flats and arcs open the sequence and, when the science runs past the
+      // calibration period, close it as well.  Nothing is placed in between.
+      val protoAtoms: List[ProtoAtom[ProtoStep[F2]]] =
+        if goalCycles.value === 0 then Nil
+        else
+          val science     = List.fill(goalCycles.value)(ProtoAtom(AbbaCycleTitle.some, steps.abbaCycle))
+          val scienceTime = cycleEstimate *| goalCycles.value
+          (gcalAtom :: science) ++ Option.when(scienceTime > maxSciencePeriod)(gcalAtom).toList
 
-              (atoms, c + cycles)
-          .flatMap(Stream.emits)
-
-      // Convert the proto atoms into real atoms with ids and estimates.
-      future
-        .mapAccumulate((0, 0, StepTimeEstimateCalculator.Last.empty[F2])) { case ((a, s, calcState), protoAtom) =>
-          val (csʹ, atom) = builder.build(protoAtom.description, a, s, protoAtom.steps).run(calcState).value
-          ((a + 1, 0, csʹ), atom)
-        }
-        .map(_._2)
+      builder.buildStream(Stream.emits(protoAtoms))
 
   end Generator
 
@@ -278,7 +216,7 @@ object Science:
 
   /**
    * @param modeName         observing mode name, for error messages
-   * @param maxSciencePeriod cadence of the "Nighttime Calibrations" atoms
+   * @param maxSciencePeriod science time past which the sequence also closes with a "Nighttime Calibrations" atom
    */
   def instantiate[F[_]: Monad](
     observationId:    Observation.Id,
@@ -311,7 +249,6 @@ object Science:
       s,
       e,
       maxSciencePeriod,
-      (nel, calcState) => estimator.estimateTotalNel(static, nel).runA(calcState).value,
       AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Science),
       c
     ): SequenceGenerator[F2]

@@ -186,16 +186,16 @@ class executionSciFlamingos2Mos extends ExecutionTestSupportForFlamingos2:
         ).asRight
     )
 
-  test("sparse field: an ABBA cycle through the custom mask, then nighttime cals"):
+  test("sparse field: nighttime cals, then an ABBA cycle through the custom mask"):
     val abba = List(tc(1.2, Enabled), tc(-1.2, Enabled), tc(-1.2, Enabled), tc(1.2, Enabled))
     setupWith(SparseFieldMode).flatMap: oid =>
-      expectScience(oid, scienceAtom(abba*), List(gcalAtom(abba.last)))
+      expectScience(oid, gcalAtom(abba.last), List(scienceAtom(abba*)))
 
   test("crowded field: guiding is off on the sky offsets, and the mask is still on every step"):
     val cycle = List(tc(0, Enabled), tc(300, Disabled), tc(320, Disabled), tc(0, Enabled))
     setupWith(CrowdedFieldMode).flatMap: oid =>
       // Only 2 of the 4 steps are guided, so 2 cycles are needed for the ITC's 4 exposures.
-      expectScience(oid, scienceAtom(cycle*), List(scienceAtom(cycle*), gcalAtom(cycle.last)))
+      expectScience(oid, gcalAtom(cycle.last), List(scienceAtom(cycle*), scienceAtom(cycle*)))
 
   test("acquisition: mask out at q=0 and q=10, breakpoint, then the through-mask pair"):
     setupWith(SparseFieldMode).flatMap: oid =>
