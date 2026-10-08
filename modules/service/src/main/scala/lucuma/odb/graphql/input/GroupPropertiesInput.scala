@@ -9,6 +9,7 @@ import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
+import grackle.syntax.*
 import lucuma.core.model.Group
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.Existence
@@ -82,14 +83,15 @@ object GroupPropertiesInput {
         NonNegShortBinding.Option("parentGroupIndex", rParentGroupIndex),
         ExistenceBinding.Option("existence", rExistence),
       ) =>
-        (rName, rDescription, rMinimumRequired, rOrdered, rMinimumInterval, rMaximumInterval, rSameNight, rParentGroup, rParentGroupIndex, rExistence).parTupled.flatMap {
+        val rMinimumRequiredʹ = rMinimumRequired.flatMap: m =>
+          if m.exists(_.value < 1) then Result.failure(MinimumRequiredTooSmall)
+          else m.success
+        (rName, rDescription, rMinimumRequiredʹ, rOrdered, rMinimumInterval, rMaximumInterval, rSameNight, rParentGroup, rParentGroupIndex, rExistence).parFlatMapN {
           (name, description, minimumRequired, ordered, minimumInterval, maximumInterval, sameNight, parentGroup, parentGroupIndex, existence) =>
             (minimumInterval, maximumInterval) match
-              case (Some(min), Some(max)) if max < min => Matcher.validationFailure("Minimum interval must be less than or equal maximum interval.")
+              case (Some(min), Some(max)) if max < min => Result.failure("Minimum interval must be less than or equal maximum interval.")
               case _ if sameNight.contains(true) && maximumInterval.isDefined =>
-                Matcher.validationFailure("Same night and maximum interval are mutually exclusive.")
-              case _ if minimumRequired.exists(_.value < 1) =>
-                Matcher.validationFailure(MinimumRequiredTooSmall)
+                Result.failure("Same night and maximum interval are mutually exclusive.")
               case _ =>
                 Result(Create(
                   name,
@@ -120,14 +122,15 @@ object GroupPropertiesInput {
         NonNegShortBinding.NonNullable("parentGroupIndex", rParentGroupIndex),
         ExistenceBinding.Option("existence", rExistence),
       ) =>
-        (rName, rDescription, rMinimumRequired, rOrdered, rMinimumInterval, rMaximumInterval, rSameNight, rParentGroup, rParentGroupIndex, rExistence).parTupled.flatMap {
+        val rMinimumRequiredʹ = rMinimumRequired.flatMap: m =>
+          if m.toOption.exists(_.value < 1) then Result.failure(MinimumRequiredTooSmall)
+          else m.success
+        (rName, rDescription, rMinimumRequiredʹ, rOrdered, rMinimumInterval, rMaximumInterval, rSameNight, rParentGroup, rParentGroupIndex, rExistence).parTupled.flatMap {
           (name, description, minimumRequired, ordered, minimumInterval, maximumInterval, sameNight, parentGroup, parentGroupIndex, existence) =>
             (minimumInterval.toOption, maximumInterval.toOption) match // Scala can't typecheck it if we match Nullable.NonNull for some reason :-\
-              case (Some(min), Some(max)) if max < min => Matcher.validationFailure("Minimum interval must be less than or equal maximum interval.")
+              case (Some(min), Some(max)) if max < min => Result.failure("Minimum interval must be less than or equal maximum interval.")
               case _ if sameNight.contains(true) && maximumInterval.toOption.isDefined =>
-                Matcher.validationFailure("Same night and maximum interval are mutually exclusive.")
-              case _ if minimumRequired.toOption.exists(_.value < 1) =>
-                Matcher.validationFailure(MinimumRequiredTooSmall)
+                Result.failure("Same night and maximum interval are mutually exclusive.")
               case _ =>
                 Result(Edit(
                   name,

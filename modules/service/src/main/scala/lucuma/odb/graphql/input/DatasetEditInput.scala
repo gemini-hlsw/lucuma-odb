@@ -4,7 +4,7 @@
 package lucuma.odb.graphql
 package input
 
-import cats.syntax.apply.*
+import cats.syntax.parallel.*
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.sequence.Dataset
@@ -25,4 +25,4 @@ object DatasetEditInput:
       ObservationIdBinding.Option("observationId", rObservationId),
       ProgramIdBinding.Option("programId", rProgramId),
       BooleanBinding.Option("isWritten", rIsWritten)
-    ) => (rDatasetId, rObservationId, rProgramId, rIsWritten).mapN(apply)
+    ) => (rDatasetId, rObservationId, rProgramId, rIsWritten).parMapN(apply)

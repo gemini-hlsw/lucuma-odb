@@ -207,11 +207,12 @@ object GmosIfuInput extends AcquisitionFilterCheck:
         ObservingModeType.GmosNorthIfu
 
       val toCreate: Result[Create.North] =
-        for
-          g <- required(Site.GN, grating, "grating")
-          u <- required(Site.GN, fpu, "fpu")
-          c <- common.toCreate(Site.GN)
-        yield Create.North(g, filter.toOption, u, acquisition, c)
+        (
+          required(Site.GN, grating, "grating"),
+          required(Site.GN, fpu, "fpu"),
+          common.toCreate(Site.GN)
+        ).parMapN:
+          Create.North(_, filter.toOption, _, acquisition, _)
 
     object North:
 
@@ -232,11 +233,12 @@ object GmosIfuInput extends AcquisitionFilterCheck:
         ObservingModeType.GmosSouthIfu
 
       val toCreate: Result[Create.South] =
-        for
-          g <- required(Site.GS, grating, "grating")
-          u <- required(Site.GS, fpu, "fpu")
-          c <- common.toCreate(Site.GS)
-        yield Create.South(g, filter.toOption, u, acquisition, c)
+        (
+          required(Site.GS, grating, "grating"),
+          required(Site.GS, fpu, "fpu"),
+          common.toCreate(Site.GS)
+        ).parMapN:
+          Create.South(_, filter.toOption, _, acquisition, _)
 
     object South:
 
@@ -285,7 +287,7 @@ object GmosIfuInput extends AcquisitionFilterCheck:
           rWavelengthDithers,
           rTelescopeConfigs.flatMap(_.traverse: cs =>
             NonEmptyList.fromList(cs).fold(
-              Matcher.validationFailure("'explicitTelescopeConfigs' must not be empty")
+              Result.failure("'explicitTelescopeConfigs' must not be empty")
             )(Result(_))
           )
         ).parMapN(Edit.Common.apply)
@@ -331,9 +333,8 @@ object GmosIfuInput extends AcquisitionFilterCheck:
           rWavelengthDithers,
           rTelescopeConfigs.flatMap(_.traverse: cs =>
             NonEmptyList.fromList(cs).fold(
-              Matcher.validationFailure("'explicitTelescopeConfigs' must not be empty")
+              Result.failure("'explicitTelescopeConfigs' must not be empty")
             )(Result(_))
           )
         ).parMapN(Edit.Common.apply)
       ).parTupled
-

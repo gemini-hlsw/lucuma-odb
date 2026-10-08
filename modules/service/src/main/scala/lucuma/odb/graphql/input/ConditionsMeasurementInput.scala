@@ -40,10 +40,10 @@ object ConditionsMeasurementInput {
               case (None, None) | (Some(_), Some(_)) =>
                 Result(ConditionsMeasurementInput(source, seeing, extinction, wavelength, azimuth, elevation))
               case _ =>
-                Matcher.validationFailure("Azimuth and elevation must both be defined, or must both be empty.")                  
+                Result.failure("Azimuth and elevation must both be defined, or must both be empty.")                  
             }
           else
-            Matcher.validationFailure("At least one of seeing, wavelength, extinction, azimuth, and elevation must be defined.")                  
+            Result.failure("At least one of seeing, wavelength, extinction, azimuth, and elevation must be defined.")                  
         }
     }
 

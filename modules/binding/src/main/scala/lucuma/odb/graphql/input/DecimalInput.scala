@@ -27,12 +27,11 @@ import lucuma.odb.graphql.binding.*
         BigDecimalBinding("value", rValue),
         EnumBinding("units", rEnum)
       ) =>
-        (rValue, rEnum).parTupled.flatMap {
-          case (value, label) =>
-            handler.lift((value, label)) match {
-              case Some(r) => r
-              case None    => Matcher.validationFailure(s"Unexpected ${name}Units value: $label")
-            }
+        (rValue, rEnum).parFlatMapN {
+          (value, label) =>
+            handler.applyOrElse(
+              (value, label),
+              _ => Result.failure(s"Unexpected ${name}Units value: $label"))
       }
     }
 

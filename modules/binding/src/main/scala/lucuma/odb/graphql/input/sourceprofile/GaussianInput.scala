@@ -21,7 +21,7 @@ object GaussianInput {
       ) =>
         (rFwhm, rSpectralDefinition).parTupled.flatMap {
           case (Some(fwhm), Some(spectralDefinition)) => Result(SourceProfile.Gaussian(fwhm, spectralDefinition))
-          case _ => Matcher.validationFailure("Both fwhm and spectralDefinition must be provided on creation")
+          case _ => Result.failure("Both fwhm and spectralDefinition must be provided on creation")
         }
     }
 

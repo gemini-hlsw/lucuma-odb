@@ -3,6 +3,7 @@
 
 package lucuma.odb.graphql.input
 
+import grackle.Result
 import grackle.Value
 import lucuma.core.math.Angle
 import lucuma.core.math.Declination
@@ -17,10 +18,10 @@ import org.scalacheck.Prop.forAll
 
 class AngleInputSuite extends ScalaCheckSuite {
 
-  private def µas(m: Matcher[? <: Angle], v: Value): Either[String, Long] =
+  private def µas(m: Matcher[? <: Angle], v: Value): Result[Long] =
     m.validate(v).map(_.toMicroarcseconds)
 
-  private def µas(m: Matcher[? <: Angle], v: Double): Either[String, Long] =
+  private def µas(m: Matcher[? <: Angle], v: Double): Result[Long] =
     µas(m, Value.FloatValue(v))
 
   // A decimal output value, sent back either as an exact string or as a JSON number.
@@ -39,25 +40,25 @@ class AngleInputSuite extends ScalaCheckSuite {
     ("hours",           AngleInput.Hours,           1.5,   81_000_000_000L)
   ).foreach { case (name, matcher, value, expected) =>
     test(s"$name keep decimals") {
-      assertEquals(µas(matcher, value), Right(expected))
+      assertEquals(µas(matcher, value), Result(expected))
     }
   }
 
   test("sub-unit fractions are rounded to the nearest unit") {
-    assertEquals(µas(AngleInput.Milliarcseconds, 0.0014), Right(1L))
-    assertEquals(µas(AngleInput.Milliarcseconds, 0.0019), Right(2L))
-    assertEquals(µas(AngleInput.Milliseconds, 0.0019), Right(30L))
+    assertEquals(µas(AngleInput.Milliarcseconds, 0.0014), Result(1L))
+    assertEquals(µas(AngleInput.Milliarcseconds, 0.0019), Result(2L))
+    assertEquals(µas(AngleInput.Milliseconds, 0.0019), Result(30L))
   }
 
   test("negative values wrap around") {
-    assertEquals(µas(AngleInput.Milliarcseconds, -1.5), Right(Angle.µasPer360 - 1_500L))
-    assertEquals(µas(AngleInput.Milliarcseconds, -0.0019), Right(Angle.µasPer360 - 2L))
+    assertEquals(µas(AngleInput.Milliarcseconds, -1.5), Result(Angle.µasPer360 - 1_500L))
+    assertEquals(µas(AngleInput.Milliarcseconds, -0.0019), Result(Angle.µasPer360 - 2L))
   }
 
   test("values beyond the Long range wrap around the circle") {
-    assertEquals(µas(AngleInput.Hours, Value.StringValue("3000000000")), Right(0L))
-    assertEquals(µas(AngleInput.Hours, Value.StringValue("3000000001.5")), Right(Angle.µasPer180 / 8))
-    assertEquals(µas(AngleInput.Degrees, Value.StringValue("36000000000000000000.5")), Right(Angle.µasPer180 / 360))
+    assertEquals(µas(AngleInput.Hours, Value.StringValue("3000000000")), Result(0L))
+    assertEquals(µas(AngleInput.Hours, Value.StringValue("3000000001.5")), Result(Angle.µasPer180 / 8))
+    assertEquals(µas(AngleInput.Degrees, Value.StringValue("36000000000000000000.5")), Result(Angle.µasPer180 / 360))
   }
 
   // Output formulas are the ones in AngleMapping (service module).
@@ -73,7 +74,7 @@ class AngleInputSuite extends ScalaCheckSuite {
     property(s"AngleInput $name output round-trips") {
       forAll { (a: Angle) =>
         inputs(arcOutput(a, µasPerUnit)).foreach { v =>
-          assertEquals(µas(matcher, v), Right(a.toMicroarcseconds), v)
+          assertEquals(µas(matcher, v), Result(a.toMicroarcseconds), v)
         }
       }
     }
@@ -89,7 +90,7 @@ class AngleInputSuite extends ScalaCheckSuite {
     property(s"AngleInput $name output round-trips") {
       forAll { (h: HourAngle) =>
         inputs(arcOutput(h, µsPerUnit * 15L)).foreach { v =>
-          assertEquals(µas(matcher, v), Right(h.toMicroarcseconds), v)
+          assertEquals(µas(matcher, v), Result(h.toMicroarcseconds), v)
         }
       }
     }
@@ -100,16 +101,16 @@ class AngleInputSuite extends ScalaCheckSuite {
   private def oneOf(names: List[String], field: (String, Value)): Value =
     Value.ObjectValue(names.map(n => n -> (if n == field._1 then field._2 else Value.AbsentValue)))
 
-  private def ra(field: (String, Value)): Either[String, RightAscension] =
+  private def ra(field: (String, Value)): Result[RightAscension] =
     RightAscensionInput.Binding.validate(oneOf(List("microseconds", "degrees", "hours", "hms"), field))
 
-  private def dec(field: (String, Value)): Either[String, Declination] =
+  private def dec(field: (String, Value)): Result[Declination] =
     DeclinationInput.Binding.validate(oneOf(List("microarcseconds", "degrees", "dms"), field))
 
   property("RightAscensionInput hours output round-trips") {
     forAll { (r: RightAscension) =>
       inputs(BigDecimal(r.toHourAngle.toDoubleHours)).foreach { v =>
-        assertEquals(ra("hours" -> v), Right(r), v)
+        assertEquals(ra("hours" -> v), Result(r), v)
       }
     }
   }
@@ -117,7 +118,7 @@ class AngleInputSuite extends ScalaCheckSuite {
   property("RightAscensionInput degrees output round-trips") {
     forAll { (r: RightAscension) =>
       inputs(BigDecimal(r.toAngle.toDoubleDegrees)).foreach { v =>
-        assertEquals(ra("degrees" -> v), Right(r), v)
+        assertEquals(ra("degrees" -> v), Result(r), v)
       }
     }
   }
@@ -125,7 +126,7 @@ class AngleInputSuite extends ScalaCheckSuite {
   property("DeclinationInput degrees output round-trips") {
     forAll { (d: Declination) =>
       inputs(BigDecimal(d.toAngle.toDoubleDegrees)).foreach { v =>
-        assertEquals(dec("degrees" -> v), Right(d), v)
+        assertEquals(dec("degrees" -> v), Result(d), v)
       }
     }
   }

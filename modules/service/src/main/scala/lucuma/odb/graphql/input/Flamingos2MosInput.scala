@@ -130,23 +130,24 @@ object Flamingos2MosInput:
       )
 
     val toCreate: Result[Create] =
-      for
-        d <- required(disperser, "disperser")
-        f <- required(filter, "filter")
-        m <- required(customMask, "customMask")
-      yield Create(
-        d,
-        f,
-        m,
-        common.exposureTimeMode,
-        common.explicitReadMode.toOption,
-        common.explicitReads.toOption,
-        common.explicitDecker.toOption,
-        common.explicitReadoutMode.toOption,
-        common.explicitTelescopeConfigs.toOption,
-        common.telluricType.getOrElse(TelluricType.Hot),
-        common.acquisition
-      )
+      (
+        required(disperser, "disperser"),
+        required(filter, "filter"),
+        required(customMask, "customMask")
+      ).parMapN:
+        Create(
+          _,
+          _,
+          _,
+          common.exposureTimeMode,
+          common.explicitReadMode.toOption,
+          common.explicitReads.toOption,
+          common.explicitDecker.toOption,
+          common.explicitReadoutMode.toOption,
+          common.explicitTelescopeConfigs.toOption,
+          common.telluricType.getOrElse(TelluricType.Hot),
+          common.acquisition
+        )
 
   object Edit:
 

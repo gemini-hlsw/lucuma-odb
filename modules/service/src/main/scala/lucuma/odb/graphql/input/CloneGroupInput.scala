@@ -22,7 +22,7 @@ object CloneGroupInput {
         GroupIdBinding("groupId", rGroupId),
         GroupPropertiesInput.EditBinding.Option("SET", rSET),
       ) =>
-        (rGroupId, rSET).mapN(CloneGroupInput.apply)
+        (rGroupId, rSET).parMapN(CloneGroupInput.apply)
     }
 
 }

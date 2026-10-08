@@ -24,4 +24,4 @@ object RefreshArchiveDuplicationInput:
         ObservationIdBinding.Option("observationId", rObservationId),
         ObservationReferenceBinding.Option("observationReference", rObservationRef)
       ) =>
-        (rObservationId, rObservationRef).mapN(RefreshArchiveDuplicationInput.apply)
+        (rObservationId, rObservationRef).parMapN(RefreshArchiveDuplicationInput.apply)

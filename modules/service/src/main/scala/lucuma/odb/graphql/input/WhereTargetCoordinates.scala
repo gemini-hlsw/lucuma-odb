@@ -30,13 +30,13 @@ object WhereTargetCoordinates:
     allowCone: Boolean
   ): Matcher[Predicate] =
     if !allowCone then
-      _ => Left(s"`targetCoordinates` is only supported when querying $queryName.")
+      _ => Result.failure(s"`targetCoordinates` is only supported when querying $queryName.")
     else
       ObjectFieldsBinding.rmap:
         case List(
           CoordinatesInput.Create.Binding("center", rCenter),
           AngleInput.Binding("distance", rDistance)
-        ) => (rCenter, rDistance).parTupled.flatMap: (c, d) =>
+        ) => (rCenter, rDistance).parFlatMapN: (c, d) =>
           Cone.from(c, d) match
             case Some(cone) => Result(ConeFilter.ConePredicate(idPath, cone, entity))
-            case None       => Matcher.validationFailure("The `distance` must be an angle between 0° and 180°.")
+            case None       => Result.failure("The `distance` must be an angle between 0° and 180°.")

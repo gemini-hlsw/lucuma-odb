@@ -30,7 +30,7 @@ object ConfigurationRequestPropertiesInput {
           NonEmptyStringBinding.Option("justification", rJust),
           NonEmptyStringBinding.Option("feedback", rFeedback)
         ) =>
-          (rStatus, rJust, rFeedback).tupled.flatMap:
+          (rStatus, rJust, rFeedback).parFlatMapN:
             case (None, just, None) => Result(Create(just))
             case (Some(_), _, _)    =>
               OdbError.InvalidArgument(Some("Status may not be specified on creation")).asFailure

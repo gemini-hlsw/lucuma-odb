@@ -40,16 +40,13 @@ object AddEventBatchEntryInput:
         AddSlewEventInput.Binding.Option("slew", rSlew),
         AddStepEventInput.Binding.Option("step", rStep)
       ) =>
-        (rDataset, rSequence, rSlew, rStep).parTupled.flatMap: (d, sq, sl, st) =>
-          val chosen =
-            d.map(Dataset(_)).toList   ++
-            sq.map(Sequence(_)).toList ++
-            sl.map(Slew(_)).toList     ++
-            st.map(Step(_)).toList
-          chosen match
-            case one :: Nil => requireComplete(one)
-            case Nil        => Result.failure("An AddEventBatchEntryInput must set exactly one event; none were set.")
-            case _          => Result.failure("An AddEventBatchEntryInput must set exactly one event; more than one was set.")
+        (rDataset, rSequence, rSlew, rStep).parFlatMapN: (d, sq, sl, st) =>
+          oneOrFail(
+            d.map(Dataset(_))   -> "dataset",
+            sq.map(Sequence(_)) -> "sequence",
+            sl.map(Slew(_))     -> "slew",
+            st.map(Step(_))     -> "step"
+          ).flatMap(requireComplete)
 
   // A batched event, unlike a singular one, must carry both its own client time
   // (its recorded time would otherwise collapse onto the batch transaction's) and

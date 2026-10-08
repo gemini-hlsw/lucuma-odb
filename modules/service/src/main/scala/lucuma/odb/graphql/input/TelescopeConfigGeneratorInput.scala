@@ -113,10 +113,10 @@ object TelescopeConfigGeneratorInput:
         RandomBinding.Option("random", rRandom),
         SpiralBinding.Option("spiral", rSpiral),
         UniformBinding.Option("uniform", rUniform)
-      ) => (rEnumerated, rRandom, rSpiral, rUniform).parTupled.flatMap:
-        case (None,    None,    None,    None   ) => NoGeneratorInput.success
-        case (Some(e), None,    None,    None   ) => e.success
-        case (None,    Some(r), None,    None   ) => r.success
-        case (None,    None,    Some(s), None   ) => s.success
-        case (None,    None,    None,    Some(u)) => u.success
-        case _                                    => Matcher.validationFailure("At most one offset generator may be specified.")
+      ) => (rEnumerated, rRandom, rSpiral, rUniform).parTupled.flatMap: (e, r, s, u) =>
+        atMostOne(
+          e -> "enumerated",
+          r -> "random",
+          s -> "spiral",
+          u -> "uniform"
+        ).map(_.getOrElse(NoGeneratorInput))

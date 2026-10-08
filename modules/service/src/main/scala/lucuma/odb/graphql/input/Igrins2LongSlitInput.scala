@@ -36,7 +36,7 @@ object Igrins2LongSlitInput:
       */
     private def validateExposure(ts: TimeSpan): Result[TimeSpan] =
       if ts >= SvcMinExposureTime && ts <= MaxExposureTime then Result(ts)
-      else Matcher.validationFailure(
+      else Result.failure(
         s"SVC exposure time must be between ${secondsLabel(SvcMinExposureTime)} s and ${secondsLabel(MaxExposureTime)} s."
       )
 

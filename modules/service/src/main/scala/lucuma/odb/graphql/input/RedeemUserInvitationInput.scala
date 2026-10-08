@@ -18,5 +18,5 @@ object RedeemUserInvitationInput:
       case List(
         UserInvitationInput.Binding("key", rKey),
         BooleanBinding("accept", rAccept)
-      ) => (rKey, rAccept).mapN(RedeemUserInvitationInput.apply)
+      ) => (rKey, rAccept).parMapN(RedeemUserInvitationInput.apply)
     }

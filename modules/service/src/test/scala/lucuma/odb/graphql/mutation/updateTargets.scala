@@ -132,6 +132,39 @@ class updateTargets extends OdbSuite {
     }
   }
 
+  test("update with two invalid fields gives two errors") {
+    createProgramAs(pi).flatMap { pid =>
+      createTargetAs(pi, pid).flatMap { tid =>
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              updateTargets(input: {
+                SET: {
+                  name: null
+                  sidereal: {
+                    epoch: "not-an-epoch"
+                  }
+                }
+                WHERE: {
+                  id: { EQ: "$tid"}
+                }
+              }) {
+                targets {
+                  id
+                }
+              }
+            }
+          """,
+          expected = Left(List(
+            "Argument 'input.SET.name' is invalid: cannot be null",
+            "Argument 'input.SET.sidereal.epoch' is invalid: Invalid epoch: not-an-epoch"
+          ))
+        )
+      }
+    }
+  }
+
   test("update calibration targets is allowed directly with the id by staff") {
     for {
       pid  <- withServices(service) { s =>
@@ -1662,6 +1695,41 @@ class updateTargets extends OdbSuite {
               }
             """,
             expected = Left(List("Not a gaussian source.  To change profile type, please provide a full definition."))
+          )
+        }
+      }
+    }
+  }
+
+  test("update to an invalid gaussian fwhm gives exactly one error") {
+    createProgramAs(pi).flatMap { pid =>
+      createAllTargetTypesAs(pi, pid).flatMap { tids =>
+        tids.traverse { tid =>
+          expect(
+            user = pi,
+            query = s"""
+              mutation {
+                updateTargets(input: {
+                  SET: {
+                    sourceProfile: {
+                      gaussian: {
+                        fwhm: {
+                          dms: "garbage"
+                        }
+                      }
+                    }
+                  }
+                  WHERE: {
+                    id: { EQ: "$tid"}
+                  }
+                }) {
+                  targets {
+                    id
+                  }
+                }
+              }
+            """,
+            expected = Left(List("Argument 'input.SET.sourceProfile.gaussian.fwhm.dms' is invalid: Invalid DMS angle: garbage"))
           )
         }
       }

@@ -344,7 +344,10 @@ class createObservation_GmosImaging extends OdbSuite:
               }
             }
           }
-        """, List("Argument 'input.SET.observingMode.gmosNorthImaging.variant' is invalid: Input is not optional").asLeft)
+        """, List(
+          "Argument 'input.SET.observingMode.gmosNorthImaging.variant' is invalid: Input is not optional",
+          "Argument 'input.SET.observingMode.gmosNorthImaging' is invalid: At least one filter must be specified for GMOS imaging observations."
+        ).asLeft)
 
   test("cannot create GMOS South with empty filters"):
     createProgramAs(pi).flatMap: pid =>

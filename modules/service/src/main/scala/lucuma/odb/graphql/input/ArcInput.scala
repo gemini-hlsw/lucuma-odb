@@ -28,8 +28,8 @@ object ArcInput:
           case (ArcType.Empty, None, None) => Result(Arc.Empty())
           case (ArcType.Full, None, None) => Result(Arc.Full())
           case (ArcType.Partial, Some(s), Some(e)) => Result(Arc.Partial(s, e))
-          case (ArcType.Full | ArcType.Empty, _, _) => Matcher.validationFailure(s"Full and empty arcs must not specify start or end.")
-          case (ArcType.Partial, _, _) => Matcher.validationFailure(s"Partial arcs must specify both start and end.")
+          case (ArcType.Full | ArcType.Empty, _, _) => Result.failure(s"Full and empty arcs must not specify start or end.")
+          case (ArcType.Partial, _, _) => Result.failure(s"Partial arcs must specify both start and end.")
 
 object RightAscensionArcInput:
   val Binding: Matcher[Arc[RightAscension]] =

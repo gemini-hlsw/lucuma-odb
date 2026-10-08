@@ -22,12 +22,13 @@ object RadialVelocityInput {
         val rCentimetersPerSecondʹ = OptionT(rCentimetersPerSecond).map(BigDecimal(_)).semiflatMap(resultFromCentimetersPerSecond).value
         val rMetersPerSecondʹ      = OptionT(rMetersPerSecond).semiflatMap(resultFromMetersPerSecond).value
         val rKilometersPerSecondʹ  = OptionT(rKilometersPerSecond).semiflatMap(resultFromKilometersPerSecond).value
-        (rCentimetersPerSecondʹ, rMetersPerSecondʹ, rKilometersPerSecondʹ).parTupled.flatMap {
-          case (centimetersPerSecond, metersPerSecond, kilometersPerSecond) =>
-            List(centimetersPerSecond, metersPerSecond, kilometersPerSecond).flatten match {
-              case List(r) => Result(r)
-              case other   => Matcher.validationFailure(s"Expected exactly one RadialVelocity representation; found ${other.length}.")
-            }
+        (rCentimetersPerSecondʹ, rMetersPerSecondʹ, rKilometersPerSecondʹ).parFlatMapN {
+          (centimetersPerSecond, metersPerSecond, kilometersPerSecond) =>
+            oneOrFail(
+              centimetersPerSecond -> "centimetersPerSecond",
+              metersPerSecond      -> "metersPerSecond",
+              kilometersPerSecond  -> "kilometersPerSecond"
+            )
         }
     }
 

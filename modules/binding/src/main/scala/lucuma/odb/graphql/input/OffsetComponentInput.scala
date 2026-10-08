@@ -5,7 +5,6 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.all.*
-import grackle.Result
 import lucuma.core.math.Angle
 import lucuma.core.math.Offset.Component
 import lucuma.core.math.Offset.P
@@ -16,7 +15,6 @@ import monocle.Iso
 object OffsetComponentInput {
 
   private def componentBinding[A](
-    name: String,
     componentIso: Iso[Component[A], Angle]
   ): Matcher[Component[A]] =
     ObjectFieldsBinding.rmap {
@@ -25,18 +23,19 @@ object OffsetComponentInput {
         AngleBinding.Milliarcseconds.Option("milliarcseconds", rMilliarcseconds),
         AngleBinding.Arcseconds.Option("arcseconds", rArcseconds)
       ) => (rMicroarcseconds, rMilliarcseconds, rArcseconds).parTupled.flatMap {
-        case (microarcseconds, milliarcseconds, arcseconds) =>
-          List(microarcseconds, milliarcseconds, arcseconds).flatten match {
-            case List(a) => Result(componentIso.reverseGet(a))
-            case as      => Matcher.validationFailure(s"Expected exactly one offset in $name; found ${as.length}.")
-          }
+        (microarcseconds, milliarcseconds, arcseconds) =>
+          oneOrFail(
+            microarcseconds -> "microarcseconds",
+            milliarcseconds -> "milliarcseconds",
+            arcseconds      -> "arcseconds"
+          ).map(componentIso.reverseGet)
       }
     }
 
   val BindingP: Matcher[P] =
-    componentBinding("p", P.angle)
+    componentBinding(P.angle)
 
   val BindingQ: Matcher[Q] =
-    componentBinding("q", Q.angle)
+    componentBinding(Q.angle)
 
 }

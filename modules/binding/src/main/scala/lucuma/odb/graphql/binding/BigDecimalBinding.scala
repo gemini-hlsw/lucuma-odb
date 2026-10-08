@@ -3,18 +3,19 @@
 
 package lucuma.odb.graphql.binding
 
-import cats.syntax.all.*
+import grackle.Result
 import grackle.Value
+import grackle.syntax.*
 
 import scala.util.control.NonFatal
 
 val BigDecimalBinding: Matcher[BigDecimal] = {
-  case Value.IntValue(v)    => BigDecimal(v).asRight
-  case Value.FloatValue(v)  => BigDecimal(v).asRight
+  case Value.IntValue(v)    => BigDecimal(v).success
+  case Value.FloatValue(v)  => BigDecimal(v).success
   case Value.StringValue(v) =>
-    try BigDecimal(v).asRight
-    catch { case NonFatal(e) => s"Invalid BigDecimal: $v: ${e.getMessage}".asLeft }
-  case Value.NullValue      => s"cannot be null".asLeft
-  case Value.AbsentValue    => s"cannot be absent".asLeft
-  case other                => s"Expected BigDecimal, got $other".asLeft
+    try BigDecimal(v).success
+    catch { case NonFatal(e) => Result.failure(s"Invalid BigDecimal: $v: ${e.getMessage}") }
+  case Value.NullValue      => Result.failure(s"cannot be null")
+  case Value.AbsentValue    => Result.failure(s"cannot be absent")
+  case other                => Result.failure(s"Expected BigDecimal, got $other")
 }

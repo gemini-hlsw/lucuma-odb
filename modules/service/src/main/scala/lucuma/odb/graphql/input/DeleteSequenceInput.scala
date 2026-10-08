@@ -24,4 +24,4 @@ object DeleteSequenceInput:
         ObservationIdBinding.Option("observationId", rObservationId),
         ObservationReferenceBinding.Option("observationReference", rObservationRef)
       ) =>
-        (rObservationId, rObservationRef).mapN(DeleteSequenceInput.apply)
+        (rObservationId, rObservationRef).parMapN(DeleteSequenceInput.apply)

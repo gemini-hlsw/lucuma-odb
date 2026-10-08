@@ -36,7 +36,7 @@ object RegionInput:
         RightAscensionArcInput.Binding.NonNullable("rightAscensionArc", rRA),
         DeclinationArcInput.Binding.NonNullable("declinationArc", rDec)
       ) =>
-        (rRA, rDec).mapN: (ra, dec) =>
+        (rRA, rDec).parMapN: (ra, dec) =>
           Create(ra.getOrElse(Default.raArc), dec.getOrElse(Default.decArc))
 
   val EditBinding: Matcher[Edit] =
@@ -44,4 +44,4 @@ object RegionInput:
       case List(
         RightAscensionArcInput.Binding.NonNullable("rightAscensionArc", rRA),
         DeclinationArcInput.Binding.NonNullable("declinationArc", rDec)
-      ) => (rRA, rDec).mapN(Edit.apply)
+      ) => (rRA, rDec).parMapN(Edit.apply)

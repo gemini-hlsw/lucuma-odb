@@ -34,9 +34,9 @@ object SetAllocationsInput:
         AllocationInput.Binding.List("allocations", rAllocations)
       ) =>
         val rValidAllocations = rAllocations.flatMap: allocations =>
-          Matcher
-            .validationFailure("Each category + band combination may only appear once.")
+          Result
+            .failure("Each category + band combination may only appear once.")
             .unlessA(allocations.map(a => (a.category, a.scienceBand)).toSet.size === allocations.size)
             .as(allocations)
-        (rPid, rProp, rProg, rValidAllocations).mapN(apply)
+        (rPid, rProp, rProg, rValidAllocations).parMapN(apply)
     }

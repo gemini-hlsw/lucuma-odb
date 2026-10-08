@@ -35,7 +35,7 @@ object EmissionLineInput {
       ) =>
         (rWavelength, rLineWidth, rLineFlux).parTupled.flatMap {
           case (wavelength, Some(lineWidth), Some(lineFlux)) => Result((wavelength, EmissionLine(lineWidth, lineFlux)))
-          case _ => Matcher.validationFailure("All fields are required on creation.")
+          case _ => Result.failure("All fields are required on creation.")
         }
     }
 

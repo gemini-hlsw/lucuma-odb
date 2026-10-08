@@ -27,7 +27,7 @@ object WhereString {
         NonEmptyStringBinding.Option("NLIKE", rNlike),
         BooleanBinding.Option("MATCH_CASE", rMatchCase)
       ) =>
-        (rEq, rNeq, rIn, rNin, rLike, rNlike, rMatchCase).mapN {
+        (rEq, rNeq, rIn, rNin, rLike, rNlike, rMatchCase).parMapN {
           (eq, neq, in, nin, like, nlike, matchCase) =>
           and(List(
             eq.map(a => Eql(path, Const(a))),

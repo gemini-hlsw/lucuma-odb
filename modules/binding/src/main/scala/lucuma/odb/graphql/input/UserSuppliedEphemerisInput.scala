@@ -19,7 +19,7 @@ object UserSuppliedEphemerisInput:
         UserSuppliedEphemerisElementInput.Binding.List("gn", rNorth),
         UserSuppliedEphemerisElementInput.Binding.List("gs", rSouth),
       ) =>
-        (rNorth, rSouth).mapN: (gn, gs) =>
+        (rNorth, rSouth).parMapN: (gn, gs) =>
           PerSite.unfold:
             case Site.GN => gn
             case Site.GS => gs

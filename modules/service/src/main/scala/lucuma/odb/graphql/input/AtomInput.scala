@@ -5,6 +5,7 @@ package lucuma.odb.graphql.input
 
 import cats.data.NonEmptyList
 import cats.syntax.parallel.*
+import grackle.Result
 import grackle.syntax.*
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.model.sequence.ghost.GhostDynamicConfig
@@ -25,11 +26,11 @@ object AtomInput:
       case List(
         NonEmptyStringBinding.Option("description", rDescription),
         stepBinding.List("steps", rSteps)
-      ) => (rDescription, rSteps).parFlatMapN: (description, steps) =>
-        NonEmptyList
-          .fromList(steps)
-          .fold(Matcher.validationFailure("At least one step is required in an atom.")): nel =>
-            ProtoAtom(description, nel).success
+      ) => 
+        (
+          rDescription, 
+          rSteps.flatMap(NonEmptyList.fromList(_).toResult("At least one step is required in an atom."))
+        ).parMapN(ProtoAtom.apply)
 
   val Flamingos2Binding: Matcher[ProtoAtom[ProtoStep[Flamingos2DynamicConfig]]] =
     binding(StepInput.Flamingos2Binding)

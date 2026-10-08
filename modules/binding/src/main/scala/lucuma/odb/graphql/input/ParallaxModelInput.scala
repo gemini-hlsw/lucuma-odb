@@ -6,7 +6,6 @@ package input
 
 import cats.data.OptionT
 import cats.syntax.all.*
-import grackle.Result
 import lucuma.core.math.Parallax
 import lucuma.odb.graphql.binding.*
 
@@ -20,12 +19,11 @@ object ParallaxModelInput {
       ) =>
         val rMicroarcsecondsʹ = OptionT(rMicroarcseconds).map(Parallax.microarcseconds.reverseGet).value
         val rMilliarcsecondsʹ = OptionT(rMilliarcseconds).map(Parallax.milliarcseconds.reverseGet).value
-        (rMicroarcsecondsʹ, rMilliarcsecondsʹ).parTupled.flatMap {
-          case (microarcseconds, milliarcseconds) =>
-            List(microarcseconds, milliarcseconds).flatten match {
-              case List(p) => Result(p)
-              case other   => Matcher.validationFailure(s"Expected exactly one parallax representation; found ${other.length}.")
-            }
+        (rMicroarcsecondsʹ, rMilliarcsecondsʹ).parTupled.flatMap { (microarcseconds, milliarcseconds) =>
+          oneOrFail(
+            microarcseconds -> "microarcseconds",
+            milliarcseconds -> "milliarcseconds"
+          )
         }
     }
 

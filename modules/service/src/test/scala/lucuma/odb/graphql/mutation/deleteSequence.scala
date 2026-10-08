@@ -138,6 +138,27 @@ class deleteSequence extends query.ExecutionTestSupportForGmos with ReplaceGmosN
       _ <- expectAtomCount(o, 0)
     yield o
 
+  test("invalid observationId and observationReference give two errors"):
+    expect(
+      pi,
+      """
+        mutation {
+          deleteSequence(input: {
+            observationId: "not-an-id"
+            observationReference: "not-a-ref"
+          }) {
+            observation {
+              id
+            }
+          }
+        }
+      """,
+      List(
+        "Argument 'input.observationId' is invalid: 'not-an-id' is not a valid observation id",
+        "Argument 'input.observationReference' is invalid: 'not-a-ref' cannot be parsed as a valid ObservationReference."
+      ).asLeft
+    )
+
   test("delete unmaterialized sequence is a no-op"):
     for 
       oid <- setup

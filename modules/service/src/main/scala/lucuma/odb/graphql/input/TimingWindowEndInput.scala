@@ -18,7 +18,6 @@ case class TimingWindowEndInput(
 
 object TimingWindowEndInput:
   object messages:
-    val OnlyOneDefinition: String = "Only one of atUtc or after may be specified."
     val RepeatOnlyWhenAfter: String = "repeat can only be specified when after is specified."
     val RepeatPeriodGreaterThanAfter: String = "repeat.period must be greater than after."
 
@@ -28,11 +27,12 @@ object TimingWindowEndInput:
         TimestampBinding.Option("atUtc", rAt),
         TimeSpanInput.Binding.Option("after", rAfter),
         TimingWindowRepeatInput.Binding.Option("repeat", rRepeat)
-      ) => (rAt, rAfter, rRepeat).parMapN(TimingWindowEndInput(_, _, _)).flatMap {
-        case TimingWindowEndInput(Some(_), Some(_), _) => Matcher.validationFailure(messages.OnlyOneDefinition)
-        case TimingWindowEndInput(_, None, Some(_))    => Matcher.validationFailure(messages.RepeatOnlyWhenAfter)
+      ) => (rAt, rAfter, rRepeat).parMapN(TimingWindowEndInput(_, _, _)).flatTap { e =>
+        atMostOne(e.atUtc.void -> "atUtc", e.after.void -> "after")
+      }.flatMap {
+        case TimingWindowEndInput(_, None, Some(_))    => Result.failure(messages.RepeatOnlyWhenAfter)
         case TimingWindowEndInput(_, Some(duration), Some(TimingWindowRepeatInput(period, _)))
-          if period <= duration                        => Matcher.validationFailure(messages.RepeatPeriodGreaterThanAfter)
+          if period <= duration                        => Result.failure(messages.RepeatPeriodGreaterThanAfter)
         case other                                     => Result(other)
       }
     }

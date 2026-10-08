@@ -200,7 +200,7 @@ object GmosLongSlitInput extends AcquisitionFilterCheck:
               acquisition
             ))
           case _ =>
-            Matcher.validationFailure("grating, fpu, and centralWavelength are required when creating the GMOS North Long Slit observing mode.")
+            Result.failure("grating, fpu, and centralWavelength are required when creating the GMOS North Long Slit observing mode.")
 
     final case class South(
       grating:     GmosSouthGrating,
@@ -249,7 +249,7 @@ object GmosLongSlitInput extends AcquisitionFilterCheck:
               acquisition
             ))
           case _ =>
-            Matcher.validationFailure("grating, fpu, and centralWavelength are required when creating the GMOS South Long Slit observing mode.")
+            Result.failure("grating, fpu, and centralWavelength are required when creating the GMOS South Long Slit observing mode.")
 
 
   object Edit:
@@ -320,11 +320,12 @@ object GmosLongSlitInput extends AcquisitionFilterCheck:
         ObservingModeType.GmosNorthLongSlit
 
       val toCreate: Result[Create.North] =
-        for
-          g <- required(Site.GN, grating, "grating")
-          u <- required(Site.GN, fpu, "fpu")
-          c <- common.toCreate(Site.GN)
-        yield Create.North(g, filter.toOption, u, c, acquisition)
+        (
+          required(Site.GN, grating, "grating"),
+          required(Site.GN, fpu, "fpu"),
+          common.toCreate(Site.GN)
+        ).parMapN:
+          Create.North(_, filter.toOption, _, _, acquisition)
 
     object North:
 
@@ -385,11 +386,12 @@ object GmosLongSlitInput extends AcquisitionFilterCheck:
         ObservingModeType.GmosSouthLongSlit
 
       val toCreate: Result[Create.South] =
-        for
-          g <- required(Site.GS, grating, "grating")
-          u <- required(Site.GS, fpu, "fpu")
-          c <- common.toCreate(Site.GS)
-        yield Create.South(g, filter.toOption, u, c, acquisition)
+        (
+          required(Site.GS, grating, "grating"),
+          required(Site.GS, fpu, "fpu"),
+          common.toCreate(Site.GS)
+        ).parMapN:
+          Create.South(_, filter.toOption, _, _, acquisition)
 
     object South:
 

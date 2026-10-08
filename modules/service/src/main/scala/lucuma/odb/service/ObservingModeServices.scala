@@ -21,6 +21,7 @@ import lucuma.odb.data.ExposureTimeModeId
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
+import lucuma.odb.graphql.binding.Matcher.asValidation
 import lucuma.odb.graphql.input.ObservingModeInput
 import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.service.Services.SuperUserAccess
@@ -273,7 +274,8 @@ object ObservingModeServices:
         etm:   Option[ExposureTimeMode],
         which: List[Observation.Id]
       )(using Transaction[F], SuperUserAccess): F[Result[Unit]] =
-        input.toCreate.flatTraverse(c => create(c, etm, which))
+        // `toCreate` runs outside of any binding, so its problems are not tagged yet.
+        input.toCreate.asValidation.flatTraverse(c => create(c, etm, which))
 
       override def clone(
         mode:    ObservingModeType,

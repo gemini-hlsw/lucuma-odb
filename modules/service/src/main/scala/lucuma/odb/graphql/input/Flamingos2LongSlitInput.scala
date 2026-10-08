@@ -171,24 +171,25 @@ object Flamingos2LongSlitInput:
       )
 
     val toCreate: Result[Create] =
-      for
-        g <- required(disperser, "disperser")
-        f <- required(filter, "filter")
-        u <- required(fpu, "fpu")
-        e <- TelluricExposureTimeModeEdit.forCreate(exposureTimeMode)
-      yield Create(
-        g,
-        f,
-        u,
-        e,
-        explicitReadMode.toOption,
-        explicitReads.toOption,
-        explicitDecker.toOption,
-        explicitReadoutMode.toOption,
-        explicitTelescopeConfigs.toOption,
-        telluricType.getOrElse(TelluricType.Hot),
-        acquisition
-      )
+      (
+        required(disperser, "disperser"),
+        required(filter, "filter"),
+        required(fpu, "fpu"),
+        TelluricExposureTimeModeEdit.forCreate(exposureTimeMode)
+      ).parMapN:
+        Create(
+          _,
+          _,
+          _,
+          _,
+          explicitReadMode.toOption,
+          explicitReads.toOption,
+          explicitDecker.toOption,
+          explicitReadoutMode.toOption,
+          explicitTelescopeConfigs.toOption,
+          telluricType.getOrElse(TelluricType.Hot),
+          acquisition
+        )
 
   object Edit:
 

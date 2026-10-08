@@ -11,6 +11,7 @@ import cats.syntax.eq.*
 import cats.syntax.parallel.*
 import cats.syntax.traverse.*
 import grackle.Result
+import grackle.syntax.*
 import lucuma.core.enums.GnirsCamera
 import lucuma.core.enums.GnirsDecker
 import lucuma.core.enums.GnirsFilter
@@ -73,15 +74,13 @@ object GnirsSpectroscopyInput:
     slit: Option[GnirsSpectroscopyLongSlitInput.Value],
     ifu:  Option[GnirsSpectroscopyIfuInput.Value]
   ): Result[(GnirsFpu.Spectroscopy, Option[SlitTelescopeConfigs], Option[NonEmptyList[TelescopeConfig]])] =
-    (slit, ifu) match
-      case (Some(s), None) =>
-        Result.fromOption(s.fpu, Matcher.validationProblem("'slit.fpu' is required."))
+    oneOrFail(slit.map(Left(_)) -> "slit", ifu.map(Right(_)) -> "ifu").flatMap:
+      case Left(s)  =>
+        s.fpu.toResult("'slit.fpu' is required.")
           .map(f => (GnirsFpu.Spectroscopy.Slit(f), s.explicitTelescopeConfigs.toOption, None))
-      case (None, Some(i)) =>
-        Result.fromOption(i.fpu, Matcher.validationProblem("'ifu.fpu' is required."))
+      case Right(i) =>
+        i.fpu.toResult("'ifu.fpu' is required.")
           .map(f => (GnirsFpu.Spectroscopy.Ifu(f), None, i.telescopeConfigs))
-      case (None, None)    => Matcher.validationFailure("Exactly one of 'slit' or 'ifu' must be provided.")
-      case _               => Matcher.validationFailure("Only one of 'slit' or 'ifu' may be provided.")
 
   // On edit, at most one of slit / ifu may be present. A missing telescopeConfigs (IFU) or
   // absent explicitTelescopeConfigs (slit) is left unedited.
@@ -89,11 +88,10 @@ object GnirsSpectroscopyInput:
     slit: Option[GnirsSpectroscopyLongSlitInput.Value],
     ifu:  Option[GnirsSpectroscopyIfuInput.Value]
   ): Result[(Option[GnirsFpu.Spectroscopy], Nullable[SlitTelescopeConfigs], Option[NonEmptyList[TelescopeConfig]])] =
-    (slit, ifu) match
-      case (None, None)    => Result((None, Nullable.Absent, None))
-      case (Some(s), None) => Result((s.fpu.map(GnirsFpu.Spectroscopy.Slit(_)), s.explicitTelescopeConfigs, None))
-      case (None, Some(i)) => Result((i.fpu.map(GnirsFpu.Spectroscopy.Ifu(_)), Nullable.Absent, i.telescopeConfigs))
-      case _               => Matcher.validationFailure("Only one of 'slit' or 'ifu' may be provided.")
+    atMostOne(slit.map(Left(_)) -> "slit", ifu.map(Right(_)) -> "ifu").map:
+      case None           => (None, Nullable.Absent, None)
+      case Some(Left(s))  => (s.fpu.map(GnirsFpu.Spectroscopy.Slit(_)), s.explicitTelescopeConfigs, None)
+      case Some(Right(i)) => (i.fpu.map(GnirsFpu.Spectroscopy.Ifu(_)), Nullable.Absent, i.telescopeConfigs)
 
   // GnirsSpectroscopyLongSlitInput: fpu (required on create) + a clearable explicit telescope-config override.
   object GnirsSpectroscopyLongSlitInput:
@@ -116,12 +114,10 @@ object GnirsSpectroscopyInput:
           GnirsFpuIfuBinding.Option("fpu", rFpu),
           TelescopeConfigInput.Binding.List.Option("telescopeConfigs", rTcList)
         ) =>
-          (rFpu, rTcList).parTupled.flatMap: (fpu, tcList) =>
-            tcList.traverse: cs =>
-              NonEmptyList.fromList(cs).fold(
-                Matcher.validationFailure("'telescopeConfigs' must not be empty")
-              )(Result(_))
-            .map(Value(fpu, _))
+          (
+            rFpu,
+            rTcList.flatMap(_.traverse(NonEmptyList.fromList(_).toResult("'telescopeConfigs' must not be empty")))
+          ).parMapN(Value.apply)
 
   // The acquisition customization input is shared with the other GNIRS modes.
   type AcquisitionInput = GnirsAcquisitionInput
@@ -219,19 +215,20 @@ object GnirsSpectroscopyInput:
     def toCreate: Result[Create] =
       def required[A](oa: Option[A], name: String): Result[A] =
         Result.fromOption(oa, Matcher.validationProblem(s"A $name is required to create a GNIRS spectroscopy observing mode."))
-      for
-        f  <- required(filter, "filter")
-        u  <- required(fpu, "fpu")
-        c  <- required(camera, "camera")
-        g  <- required(grating.toOption, "grating")
-        p  <- required(prism.toOption, "prism")
-        ws <- required(centralWavelengths, "centralWavelengths").flatMap(ws => resolveWavelengths(ws.toList))
-      yield Create(ws, f, u, c, g, p,
-                   explicitDecker.toOption,
-                   explicitGrating.toOption, explicitPrism.toOption,
-                   explicitFocusMotorSteps.toOption, explicitReadMode.toOption, explicitWellDepth.toOption,
-                   explicitTelescopeConfigsSlit.toOption, telescopeConfigsIfu, acquisition,
-                   telluricType.getOrElse(TelluricType.Hot))
+      (
+        required(centralWavelengths, "centralWavelengths").flatMap(ws => resolveWavelengths(ws.toList)),
+        required(filter, "filter"),
+        required(fpu, "fpu"),
+        required(camera, "camera"),
+        required(grating.toOption, "grating"),
+        required(prism.toOption, "prism"),
+      ).parMapN:
+        Create(_, _, _, _, _, _,
+               explicitDecker.toOption,
+               explicitGrating.toOption, explicitPrism.toOption,
+               explicitFocusMotorSteps.toOption, explicitReadMode.toOption, explicitWellDepth.toOption,
+               explicitTelescopeConfigsSlit.toOption, telescopeConfigsIfu, acquisition,
+               telluricType.getOrElse(TelluricType.Hot))
 
   object Edit:
     private val AllUndefined: Edit =

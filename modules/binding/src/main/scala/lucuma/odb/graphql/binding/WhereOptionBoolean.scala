@@ -16,7 +16,7 @@ object WhereOptionBoolean {
       case List(
         BooleanBinding.Option("IS_NULL", rIsNull),
         binding.Option("EQ", rEq)
-      ) => (rIsNull, rEq).mapN {
+      ) => (rIsNull, rEq).parMapN {
         (isNull, eq) =>
           and(List(
             isNull.map(IsNull(path, _)),

@@ -24,4 +24,4 @@ object ResetAcquisitionInput:
         ObservationIdBinding.Option("observationId", rObservationId),
         ObservationReferenceBinding.Option("observationReference", rObservationRef)
       ) =>
-        (rObservationId, rObservationRef).mapN(ResetAcquisitionInput.apply)
+        (rObservationId, rObservationRef).parMapN(ResetAcquisitionInput.apply)
