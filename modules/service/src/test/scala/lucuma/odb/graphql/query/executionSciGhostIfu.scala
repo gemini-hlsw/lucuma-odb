@@ -301,13 +301,16 @@ class executionSciGhostIfu extends ExecutionTestSupportForGhost:
       }
     """
 
-  def singleTargetResult(t: Target.Id): Json =
+  def singleTargetResult(
+    t:              Target.Id,
+    resolutionMode: GhostResolutionMode = GhostResolutionMode.Standard
+  ): Json =
     json"""
       {
         "executionConfig": {
           "ghost": {
             "static": {
-              "resolutionMode": "STANDARD",
+              "resolutionMode": ${resolutionMode.asJson},
               "ifuMapping": {
                 "mappingType": "SINGLE_TARGET",
                 "singleTarget": {
@@ -769,7 +772,7 @@ class executionSciGhostIfu extends ExecutionTestSupportForGhost:
           )
     yield ()
 
-  test("IFU Mapping FAIL - opportunity"):
+  test("IFU Mapping Opportunity - standard resolution"):
     for
       p <- createProgram
       t <- createOpportunityTargetAs(pi, p)
@@ -777,8 +780,130 @@ class executionSciGhostIfu extends ExecutionTestSupportForGhost:
       _ <- expect(
             pi,
             staticConfigQuery(o),
-            List("Could not compute GHOST IFU mapping: A GHOST IFU mapping can only be determined after the science target is identified.").asLeft
+            singleTargetResult(t).asRight
           )
+    yield ()
+
+  test("IFU Mapping Opportunity - high resolution, no sky"):
+    for
+      p <- createProgram
+      t <- createOpportunityTargetAs(pi, p)
+      o <- createObservationWithModeAs(pi, p, List(t), mode(resolutionMode = GhostResolutionMode.High))
+      _ <- expect(
+            pi,
+            staticConfigQuery(o),
+            singleTargetResult(t, GhostResolutionMode.High).asRight
+          )
+    yield ()
+
+  test("IFU Mapping Opportunity - sky"):
+    val sky = TargetCoordinates.get.shift(HourAngle.fromMicroseconds(-10000000L), Angle.Angle0)
+    for
+      p <- createProgram
+      t <- createOpportunityTargetAs(pi, p)
+      o <- createObservationWithModeAs(pi, p, List(t), mode(skyPosition = sky.some))
+      _ <- expect(
+            pi,
+            staticConfigQuery(o),
+            targetPlusSkyResult(t).asRight
+          )
+    yield ()
+
+  test("IFU Mapping Opportunity - generation"):
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createOpportunityTargetAs(pi, p)
+        o <- createObservationWithModeAs(pi, p, List(t), standardResolutionNoSky)
+      yield o
+
+    setup.flatMap: oid =>
+      expect(
+        user     = pi,
+        query    = scienceQuery(oid),
+        expected = expected.asRight
+      )
+
+  private def queryFullTimeEstimate(o: Observation.Id): IO[BigDecimal] =
+    query(
+      user  = pi,
+      query = s"""
+        query {
+          observation(observationId: "$o") {
+            execution {
+              digest {
+                value {
+                  fullTimeEstimate { total { seconds } }
+                }
+              }
+            }
+          }
+        }
+      """
+    ).map: json =>
+      json.hcursor
+        .downFields("observation", "execution", "digest", "value", "fullTimeEstimate", "total", "seconds")
+        .require[BigDecimal]
+
+  // The IFU mapping assumed for an opportunity target does not change the
+  // time estimate, so it matches the one for an identified target.
+  test("IFU Mapping Opportunity - time estimate"):
+    for
+      p  <- createProgram
+      ts <- createTargetWithProfileAs(pi, p)
+      os <- createObservationWithModeAs(pi, p, List(ts), standardResolutionNoSky)
+      to <- createOpportunityTargetAs(pi, p)
+      oo <- createObservationWithModeAs(pi, p, List(to), standardResolutionNoSky)
+      _  <- runObscalcUpdate(p, os)
+      _  <- runObscalcUpdate(p, oo)
+      es <- queryFullTimeEstimate(os)
+      eo <- queryFullTimeEstimate(oo)
+    yield assertEquals(eo, es)
+
+  test("IFU Mapping Opportunity - no validation error"):
+    for
+      p <- createProgram
+      t <- createOpportunityTargetAs(pi, p)
+      o <- createObservationWithModeAs(pi, p, List(t), mode(resolutionMode = GhostResolutionMode.High))
+      _ <- runObscalcUpdate(p, o)
+      m <- query(
+             user  = pi,
+             query = s"""
+               query {
+                 observation(observationId: "$o") {
+                   workflow {
+                     value {
+                       validationErrors { messages }
+                     }
+                   }
+                 }
+               }
+             """
+           ).map: json =>
+             json.hcursor
+               .downFields("observation", "workflow", "value", "validationErrors")
+               .require[List[Json]]
+               .flatMap(_.hcursor.downField("messages").require[List[String]])
+    yield assert(!m.exists(_.contains("IFU")), s"Unexpected IFU mapping error: $m")
+
+  // Once the actual target replaces the placeholder, the usual rules apply.
+  test("IFU Mapping FAIL - opportunity replaced, high resolution, no sky"):
+    for
+      p  <- createProgram
+      to <- createOpportunityTargetAs(pi, p)
+      ts <- createTargetWithProfileAs(pi, p)
+      o  <- createObservationWithModeAs(pi, p, List(to), mode(resolutionMode = GhostResolutionMode.High))
+      _  <- expect(
+              pi,
+              staticConfigQuery(o),
+              singleTargetResult(to, GhostResolutionMode.High).asRight
+            )
+      _  <- updateAsterisms(pi, List(o), List(ts), List(to), List(o -> List(ts)))
+      _  <- expect(
+              pi,
+              staticConfigQuery(o),
+              List("Could not compute GHOST IFU mapping: GHOST High Resolution mode requires a sky position.").asLeft
+            )
     yield ()
 
   test("IFU Mapping FAIL - high resolution, no sky"):
