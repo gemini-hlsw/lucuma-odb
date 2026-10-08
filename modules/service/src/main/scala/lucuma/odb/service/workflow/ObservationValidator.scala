@@ -79,11 +79,13 @@ object ObservationValidator:
       OtherConfigErrorValidator                |+|
       ConditionsProbabilityValidator
 
+    // Checks downstream of the ITC.  The exposure times checked come from the
+    // sequence, which is generated from the ITC result.
     val scienceValidator2: ObservationValidator =
       ItcValidator(itcFor)                     |+|
       AcquisitionValidator(itcFor)             |+|
       TotalSignalToNoiseValidator(itcFor)      |+|
-      GnirsSpectroscopyValidator.exposure(itcFor)
+      ExposureTimeValidator
 
     // And our validation results
 

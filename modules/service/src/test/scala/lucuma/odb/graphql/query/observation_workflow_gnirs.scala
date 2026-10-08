@@ -9,11 +9,12 @@ import cats.syntax.all.*
 import io.circe.syntax.*
 import lucuma.core.enums.GnirsDecker
 import lucuma.core.enums.GnirsFilter
-import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.ObservationValidationCode
+import lucuma.core.enums.SequenceType
 import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
-import lucuma.core.syntax.timespan.*
+import lucuma.core.model.sequence.exposure.ExposureTimeViolation
+import lucuma.odb.service.workflow.validator.ExposureTimeValidator
 import lucuma.odb.service.workflow.validator.GnirsSpectroscopyValidator
 
 class observation_workflow_gnirs extends ExecutionTestSupportForGnirs:
@@ -113,7 +114,9 @@ class observation_workflow_gnirs extends ExecutionTestSupportForGnirs:
       _   <- runObscalcUpdate(pid, oid)
       vs  <- validations(oid)
     yield vs.filter: (code, _) =>
-      code === ObservationValidationCode.ConfigurationError || code === ObservationValidationCode.ConfigurationWarning
+      code === ObservationValidationCode.ConfigurationError   ||
+      code === ObservationValidationCode.ConfigurationWarning ||
+      code === ObservationValidationCode.ExposureTimeWarning
 
   private def expectConfigurationValidations(mode: String, expected: (ObservationValidationCode, List[String])*): IO[Unit] =
     configurationValidations(mode).map(assertEquals(_, expected.toList))
@@ -123,6 +126,29 @@ class observation_workflow_gnirs extends ExecutionTestSupportForGnirs:
 
   private def warning(msgs: String*): (ObservationValidationCode, List[String]) =
     (ObservationValidationCode.ConfigurationWarning, msgs.toList)
+
+  private def exposureWarning(msgs: String*): (ObservationValidationCode, List[String]) =
+    (ObservationValidationCode.ExposureTimeWarning, msgs.toList)
+
+  // Read mode exposure limits are reported per sequence by the
+  // ExposureTimeValidator rather than per wavelength by the GNIRS validator.
+  private val veryBrightUnusuallyLong: String =
+    ExposureTimeValidator.message(
+      SequenceType.Science,
+      ExposureTimeViolation(
+        ExposureTimeViolation.Severity.Warning,
+        "Exposure times above 1 s are not recommended for GNIRS very bright read mode where a lower read noise mode is normally used."
+      )
+    )
+
+  private val veryFaintTooShort: String =
+    ExposureTimeValidator.message(
+      SequenceType.Science,
+      ExposureTimeViolation(
+        ExposureTimeViolation.Severity.Error,
+        "Exposure times for GNIRS very faint read mode must be at least 18 s."
+      )
+    )
 
   private def nm(n: Int): Wavelength =
     Wavelength.fromIntNanometers(n).get
@@ -201,19 +227,19 @@ class observation_workflow_gnirs extends ExecutionTestSupportForGnirs:
   test("explicit read mode with an exposure below its minimum is an error"):
     expectConfigurationValidations(
       gnirsLongSlit(seconds = 5, explicitReadMode = "VERY_FAINT".some),
-      error(GnirsSpectroscopyValidator.exposureTooShort(GnirsReadMode.VeryFaint, nm(2200)))
+      error(veryFaintTooShort)
     )
 
   test("explicit read mode with an unusually long exposure is a warning"):
     expectConfigurationValidations(
       gnirsLongSlit(explicitReadMode = "VERY_BRIGHT".some),
-      warning(GnirsSpectroscopyValidator.exposureUnusuallyLong(GnirsReadMode.VeryBright, 1.secTimeSpan, nm(2200)))
+      exposureWarning(veryBrightUnusuallyLong)
     )
 
   test("a configuration warning does not hide an exposure error"):
     expectConfigurationValidations(
       gnirsLongSlit(filter = "ORDER4", seconds = 5, explicitReadMode = "VERY_FAINT".some),
-      error(GnirsSpectroscopyValidator.exposureTooShort(GnirsReadMode.VeryFaint, nm(2200))),
+      error(veryFaintTooShort),
       warning(GnirsSpectroscopyValidator.filterMismatch(GnirsFilter.Order4, nm(2200)))
     )
 

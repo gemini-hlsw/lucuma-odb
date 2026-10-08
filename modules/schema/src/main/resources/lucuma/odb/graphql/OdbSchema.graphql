@@ -17849,6 +17849,13 @@ enum ObservationValidationCode {
   """
   CFP_WARNING
 
+  """
+  An exposure time is outside the recommended range for its instrument
+  configuration.  Exposure times that cannot be taken at all are reported as
+  CONFIGURATION_ERROR instead.
+  """
+  EXPOSURE_TIME_WARNING
+
 }
 
 """
@@ -19480,6 +19487,39 @@ type SequenceDigest {
   the science sequence.
   """
   executionState: ExecutionState!
+
+  """
+  The instrument's exposure rules that steps of the sequence violate, errors
+  first.  Errors are exposures that cannot be taken; warnings are those merely
+  outside the recommended range, and are reported for science steps alone.
+  """
+  exposureTimeViolations: [ExposureTimeViolation!]!
+}
+
+"""
+Whether an exposure time violation means the exposure cannot be taken, or is
+merely outside the recommended range.
+"""
+enum ExposureTimeViolationSeverity {
+  "The exposure cannot be taken."
+  ERROR
+
+  "The exposure is outside the recommended range."
+  WARNING
+}
+
+"""
+An exposure rule that steps of a sequence violate.
+"""
+type ExposureTimeViolation {
+  "Whether the violation is an error or a warning."
+  severity: ExposureTimeViolationSeverity!
+
+  """
+  The rule violated, as a sentence, e.g. "Exposure times for GMOS North must be
+  at least 1 s."
+  """
+  description: String!
 }
 
 """

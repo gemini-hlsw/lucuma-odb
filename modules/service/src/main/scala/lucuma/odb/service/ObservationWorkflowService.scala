@@ -20,6 +20,7 @@ import lucuma.core.model.ObservationWorkflow
 import lucuma.core.model.Program
 import lucuma.core.model.StandardRole.*
 import lucuma.core.model.Target
+import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.core.util.CalculationState
 import lucuma.odb.data.Itc
 import lucuma.odb.data.ObservationValidationMap
@@ -66,9 +67,9 @@ sealed trait ObservationWorkflowService[F[_]] {
    * `Transaction`.
    */
   def getCalculatedWorkflow(
-    oid:  Observation.Id,
-    itc:  Option[Itc],
-    exec: Option[CoreExecutionState]
+    oid:    Observation.Id,
+    itc:    Option[Itc],
+    digest: Option[ExecutionDigest]
   )(using Transaction[F]): F[Result[ObservationWorkflow]]
 
   def setWorkflowState(
@@ -277,8 +278,25 @@ object ObservationWorkflowService {
         oids: List[Observation.Id]
       )(using NoTransaction[F], SuperUserAccess): F[Result[Map[Observation.Id, (ObservationWorkflow, Option[ObservingModeType], Option[CalibrationRole])]]] =
 
+        // The execution digests of science observations (the only ones whose
+        // exposure time violations are checked), as obscalc last stored them.
+        // Nothing is generated here, so until obscalc catches up with an edit
+        // the violations are those of the previous inputs; obscalc's workflow,
+        // calculated from a fresh digest, is the guarantee.  An observation
+        // that can no longer be generated is skipped: whatever digest it has is
+        // out of date, and the generator error already explains why.
+        def addExecutionDigests(
+          infos: Map[Observation.Id, ObservationValidationInfo]
+        )(using Transaction[F]): F[Map[Observation.Id, ObservationValidationInfo]] =
+          val science =
+            infos.values.toList.filter: i =>
+              i.calibrationRole.isEmpty && i.tpe.hasProposal && i.generatorParams.exists(_.isRight)
+          obscalcService.selectManyExecutionDigest(science.map(_.oid)).map: stored =>
+            infos.map: (oid, info) =>
+              oid -> info.copy(executionDigest = stored.get(oid).flatMap(_.value.toOption))
+
         // Data obtained from the database, requiring a transaction.
-        val select: F[Result[(
+        def select: F[Result[(
           Map[Observation.Id, ObservationValidationInfo],
           Map[Observation.Id, ObservationValidationMap],
           Map[Observation.Id, Itc]
@@ -286,8 +304,9 @@ object ObservationWorkflowService {
           services.transactionally:
             (
               for
-                infos  <- ResultT.liftF(ObservationValidationInfo.fetch(oids))         // Map[Observation.Id, ObsDefinition]
-                itcRes <- ResultT.liftF(lookupCachedItcResults(infos))      // Map[Observation.Id, ItcService.AsterismResults]
+                infos0 <- ResultT.liftF(ObservationValidationInfo.fetch(oids))         // Map[Observation.Id, ObsDefinition]
+                itcRes <- ResultT.liftF(lookupCachedItcResults(infos0))     // Map[Observation.Id, ItcService.AsterismResults]
+                infos  <- ResultT.liftF(addExecutionDigests(infos0))
                 errs   <- ObservationValidator.validate(infos, itcRes.get)          // Map[Observation.Id, ObservationValidationMap]
               yield (infos, errs, itcRes)
             ).value
@@ -360,12 +379,13 @@ object ObservationWorkflowService {
               case None     => OdbError.InvalidObservation(oid, Some(s"Could not compute workflow for $oid.")).asFailure
 
       override def getCalculatedWorkflow(
-        oid:  Observation.Id,
-        itc:  Option[Itc],
-        exec0: Option[CoreExecutionState]
+        oid:    Observation.Id,
+        itc:    Option[Itc],
+        digest: Option[ExecutionDigest]
       )(using Transaction[F]): F[Result[ObservationWorkflow]] =
+        val exec0 = digest.map(_.science.executionState)
         (for
-          infos <- ResultT.liftF(ObservationValidationInfo.fetch(List(oid)))
+          infos <- ResultT.liftF(ObservationValidationInfo.fetch(List(oid))).map(_.view.mapValues(_.copy(executionDigest = digest)).toMap)
           errs  <- ObservationValidator.validate(infos, _ => itc)
           exec = exec0.filter:
             case a: DeclaredExecutionState => true // always ok

@@ -37,6 +37,7 @@ import lucuma.core.model.sequence.SequenceDigest
 import lucuma.core.model.sequence.SetupTime
 import lucuma.core.model.sequence.StepDigest
 import lucuma.core.model.sequence.StepDigests
+import lucuma.core.model.sequence.exposure.PendingExposureRules
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.Itc
@@ -50,6 +51,7 @@ import lucuma.odb.sequence.data.ItcInput
 import lucuma.odb.sequence.data.StreamingExecutionConfig
 import lucuma.odb.sequence.exchange.Config as ExchangeConfig
 import lucuma.odb.sequence.sciClass
+import lucuma.odb.sequence.syntax.sequencedigest.*
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.sequence.visitor.Config as VisitorConfig
 import lucuma.odb.sequence.visitor.VisitorExecutionDigestCalculator
@@ -273,7 +275,10 @@ object Generator:
         ctx: GeneratorContext
       )(using Transaction[F]): EitherT[F, OdbError, ExecutionDigest] =
 
-        def digest[S, D](
+        // Exposure times are checked in the same pass over the steps.
+        val exposure = PendingExposureRules.Context(ctx.constraints)
+
+        def digest[S, D: PendingExposureRules](
           stream:    StreamingExecutionConfig[F, S, D],
           estimator: SetupTimeEstimateCalculator
         ): EitherT[F, OdbError, ExecutionDigest] =
@@ -283,7 +288,7 @@ object Generator:
               eDigest.flatMap: digest =>
                 Either.cond(
                   digest.atomCount.value < SequenceAtomLimit,
-                  digest.add(atom).copy(executionState = ctx.params.executionState),
+                  digest.add(atom, exposure).copy(executionState = ctx.params.executionState),
                   GeneratorError.sequenceTooLong(ctx.oid)
                 )
             }.compile.onlyOrError

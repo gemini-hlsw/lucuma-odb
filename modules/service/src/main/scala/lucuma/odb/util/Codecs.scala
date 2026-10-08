@@ -48,6 +48,7 @@ import lucuma.core.model.sequence.StepDigest
 import lucuma.core.model.sequence.StepDigests
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.TimeChargeCorrection
+import lucuma.core.model.sequence.exposure.ExposureTimeViolation
 import lucuma.core.optics.Format
 import lucuma.core.util.CalculationState
 import lucuma.core.util.DateInterval
@@ -452,6 +453,12 @@ trait Codecs extends CoreCodecs {
       _.as[List[ObservationValidation]].leftMap(f => s"Could not decode ObservationValidation array: ${f.message}.")
     )(_.asJson)
 
+  val _exposure_time_violation: Codec[SortedSet[ExposureTimeViolation]] =
+    import lucuma.odb.json.sequence.given
+    jsonb.eimap(
+      _.as[List[ExposureTimeViolation]].bimap(f => s"Could not decode ExposureTimeViolation array: ${f.message}.", SortedSet.from)
+    )(_.toList.asJson)
+
   val calculation_state: Codec[CalculationState] =
     enumerated(Type("e_calculation_state"))
 
@@ -705,10 +712,10 @@ trait Codecs extends CoreCodecs {
     (step_digest *: step_digest *: step_digest *: step_digest *: step_digest).to[StepDigests]
 
   lazy val sequence_digest: Codec[SequenceDigest] =
-    (obs_class *: categorized_time *: _offset_array.opt *: _guide_state.opt *: int4_nonneg *: int4_nonneg *: step_digests *: execution_state).imap {
-      case (oClass, pTime, offsets, guideStates, aCount, gcalSets, steps, execState) =>
+    (obs_class *: categorized_time *: _offset_array.opt *: _guide_state.opt *: int4_nonneg *: int4_nonneg *: step_digests *: execution_state *: _exposure_time_violation).imap {
+      case (oClass, pTime, offsets, guideStates, aCount, gcalSets, steps, execState, violations) =>
         val config = offsets.getOrElse(Nil).zip(guideStates.getOrElse(Nil)).map(TelescopeConfig.apply.tupled)
-        SequenceDigest(oClass, pTime, SortedSet.from(config), aCount, gcalSets, steps, execState)
+        SequenceDigest(oClass, pTime, SortedSet.from(config), aCount, gcalSets, steps, execState, violations)
     } { sd =>
       // Don't inline to get a consistent sort
       val telescopeConfigs = sd.telescopeConfigs.toList
@@ -720,7 +727,8 @@ trait Codecs extends CoreCodecs {
         sd.atomCount,
         sd.gcalSets,
         sd.steps,
-        sd.executionState
+        sd.executionState,
+        sd.exposureTimeViolations
       )
     }
 

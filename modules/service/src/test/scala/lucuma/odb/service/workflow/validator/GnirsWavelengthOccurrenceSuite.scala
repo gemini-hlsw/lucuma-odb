@@ -5,9 +5,7 @@ package lucuma.odb.service.workflow
 package validator
 
 import lucuma.core.enums.GnirsFilter
-import lucuma.core.enums.GnirsReadMode
 import lucuma.core.math.Wavelength
-import lucuma.core.syntax.timespan.*
 import lucuma.odb.sequence.gnirs.wavelengthOccurrences
 import munit.FunSuite
 
@@ -58,7 +56,7 @@ class GnirsWavelengthOccurrenceSuite extends FunSuite:
       List("1000.000 nm #1", "2200.000 nm", "1000.000 nm #2")
     )
 
-  // The configuration and exposure checks name wavelengths in µm.
+  // The configuration checks name wavelengths in µm.
   test("configuration check messages are unchanged when the wavelength occurs once"):
     assertEquals(
       GnirsSpectroscopyValidator.filterMismatch(GnirsFilter.Order4, ws(2200).head),
@@ -69,16 +67,4 @@ class GnirsWavelengthOccurrenceSuite extends FunSuite:
     assertEquals(
       GnirsSpectroscopyValidator.filterMismatch(GnirsFilter.Order4, ws(2200).head, Some(2)),
       "Filter H does not cover the central wavelength 2.200 µm #2."
-    )
-
-  test("exposure check messages carry the ordinal when the wavelength repeats"):
-    assert(
-      GnirsSpectroscopyValidator
-        .exposureTooShort(GnirsReadMode.VeryFaint, ws(2200).head, Some(1))
-        .endsWith("(at 2.200 µm #1).")
-    )
-    assert(
-      GnirsSpectroscopyValidator
-        .exposureUnusuallyLong(GnirsReadMode.VeryBright, 1.secTimeSpan, ws(2200).head, Some(2))
-        .endsWith("(at 2.200 µm #2).")
     )

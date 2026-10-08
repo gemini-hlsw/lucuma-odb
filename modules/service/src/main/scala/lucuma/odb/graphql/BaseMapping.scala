@@ -160,6 +160,7 @@ trait BaseMapping[F[_]]
   lazy val ExecutionStateType                      = schema.ref("ExecutionState")
   lazy val ExistenceType                           = schema.ref("Existence")
   lazy val ExposureTimeModeType                    = schema.ref("ExposureTimeMode")
+  lazy val ExposureTimeViolationSeverityType       = schema.ref("ExposureTimeViolationSeverity")
   lazy val ExtinctionType                          = schema.ref("Extinction")
   lazy val FastTurnaroundType                      = schema.ref("FastTurnaround")
   lazy val FieldLensType                           = schema.ref("FieldLens")
