@@ -23,3 +23,7 @@ object InfraredCalibration:
 
   def calibrationSetInterval(wavelength: Wavelength): TimeSpan =
     if wavelength < LongWavelengthCutoff then ShortWavelengthSetInterval else LongWavelengthSetInterval
+
+  /** Calibration sets that `scienceTime` needs: one per started interval, at least one. */
+  def setCount(interval: TimeSpan, scienceTime: TimeSpan): Int =
+    math.ceil(scienceTime.toMicroseconds.toDouble / interval.toMicroseconds.toDouble).toInt max 1

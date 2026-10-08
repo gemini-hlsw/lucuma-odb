@@ -50,7 +50,7 @@ import java.util.UUID
 
 /**
  * GNIRS runs each central wavelength as one segment closed by its own flats
- * and arcs.  A science cycle must be shorter than its wavelength's calibration
+ * and arcs, one set per started calibration set interval of its science.  A science cycle must be shorter than its wavelength's calibration
  * set interval: 90 minutes below 2.6 μm, an hour from it.
  */
 class ScienceCadenceSuite extends FunSuite:
@@ -121,13 +121,14 @@ class ScienceCadenceSuite extends FunSuite:
   private val Sci = "Science Cycle"
   private val Cal = "Nighttime Calibrations"
 
-  test("a single closing set of calibrations, however long the science runs"):
-    // 9 cycles = 180 minutes, 12 = 240.  Both get one set, at the end.
-    List(9, 12).foreach: cycles =>
-      assertEquals(titles(cycles, NearInfrared), List.fill(cycles)(Sci) :+ Cal, s"$cycles cycles")
+  test("near infrared: one closing set per started 90 minutes of science"):
+    // 20 minute cycles: 4 = 80 minutes, 9 = 180, 10 = 200.
+    List(4 -> 1, 9 -> 2, 10 -> 3).foreach: (cycles, sets) =>
+      assertEquals(titles(cycles, NearInfrared), List.fill(cycles)(Sci) ++ List.fill(sets)(Cal), s"$cycles cycles")
 
-  test("thermal infrared calibrates the same way"):
-    assertEquals(titles(7, ThermalInfrared), List.fill(7)(Sci) :+ Cal)
+  test("thermal infrared: one closing set per started hour, exactly an hour takes one"):
+    List(3 -> 1, 4 -> 2, 7 -> 3).foreach: (cycles, sets) =>
+      assertEquals(titles(cycles, ThermalInfrared), List.fill(cycles)(Sci) ++ List.fill(sets)(Cal), s"$cycles cycles")
 
   test("thermal infrared: a cycle longer than an hour is rejected"):
     val long = Science
@@ -153,11 +154,12 @@ class ScienceCadenceSuite extends FunSuite:
     assert(gen.isRight, s"expected per wavelength limits, got $gen")
 
   test("mixed wavelengths: each runs contiguously and closes with its own calibrations"):
+    // 80 minutes at each: one set at 2200 nm, two at 3500 nm.
     val Sci2200 = s"$Sci (2200 nm)"
     val Cal2200 = s"$Cal (2200 nm)"
     val Sci3500 = s"$Sci (3500 nm)"
     val Cal3500 = s"$Cal (3500 nm)"
     assertEquals(
       titles(4, NearInfrared, ThermalInfrared),
-      List.fill(4)(Sci2200) ++ List(Cal2200) ++ List.fill(4)(Sci3500) ++ List(Cal3500)
+      List.fill(4)(Sci2200) ++ List(Cal2200) ++ List.fill(4)(Sci3500) ++ List(Cal3500, Cal3500)
     )
