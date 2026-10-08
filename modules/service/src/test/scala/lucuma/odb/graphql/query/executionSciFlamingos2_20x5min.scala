@@ -47,8 +47,7 @@ class executionSciFlamingos2_20x5min extends ExecutionTestSupportForFlamingos2:
                     abba,
                     abba,
                     abba,
-                    abba,
-                    flamingos2ExpectedGcals((0, 10))
+                    abba
                   ).asJson,
                   "hasMore" -> false.asJson
                 )

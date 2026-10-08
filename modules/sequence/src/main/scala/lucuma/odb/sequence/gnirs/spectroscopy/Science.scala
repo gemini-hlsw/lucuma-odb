@@ -189,25 +189,22 @@ object Science:
 
   /**
    * One central wavelength's contribution to the science sequence: its steps
-   * (science plus, unless this is a telluric, its own flat and/or arc), the
-   * estimated duration of a single science cycle at that wavelength, and the
+   * (science plus, unless this is a telluric, its own flat and/or arc) and the
    * number of cycles needed to reach the requested signal-to-noise there.
    */
   case class WavelengthBlock(
-    steps:         StepDefinition,
-    cycleEstimate: TimeSpan,
-    goalCycles:    NonNegInt,
-    titleSuffix:   Option[String]
+    steps:       StepDefinition,
+    goalCycles:  NonNegInt,
+    titleSuffix: Option[String]
   )
 
   /**
    * Generates the science sequence across every central wavelength.
    *
    * Each wavelength runs as one contiguous segment, in configuration order,
-   * closed by its own "Nighttime Calibrations" atoms since the flats and arcs are
-   * looked up by wavelength: one per calibration set interval of its science.
-   * Nothing is placed in the middle of a segment.  Telluric sequences carry no
-   * calibrations.
+   * closed by a single "Nighttime Calibrations" atom of its own, since the flats
+   * and arcs are looked up by wavelength, however long the segment runs: the
+   * observer takes any further sets.  Telluric sequences carry no calibrations.
    */
   case class Generator(
     blocks:  NonEmptyVector[WavelengthBlock],
@@ -219,12 +216,9 @@ object Science:
         ProtoAtom(atomTitle(ScienceCycleTitle, b.titleSuffix).some, b.steps.scienceSteps)
       )
       val closing =
-        if b.goalCycles.value === 0 then Nil
-        else b.steps.cals.toList.flatMap: cals =>
-          val interval = CalibrationSetInterval.forWavelength(b.steps.wavelength.centralWavelength)
-          val sets     = CalibrationSetInterval.setCount(interval, b.cycleEstimate *| b.goalCycles.value)
-          List.fill(sets)(ProtoAtom(atomTitle(NighttimeCalTitle, b.titleSuffix).some, cals))
-      science ++ closing
+        if b.goalCycles.value === 0 then None
+        else b.steps.cals.map(cals => ProtoAtom(atomTitle(NighttimeCalTitle, b.titleSuffix).some, cals))
+      science ++ closing.toList
 
     // Atom ids come from the atom's index within a single builder, so every
     // segment must feed the same `buildStream`.
@@ -398,11 +392,11 @@ object Science:
 
     // A science cycle must be shorter than the calibration set interval of its
     // own wavelength; the error names the offending one.
-    def cycleEstimate(steps: StepDefinition): EitherT[F, OdbError, TimeSpan] =
+    def checkCycle(steps: StepDefinition): EitherT[F, OdbError, Unit] =
       val estimate = StepTimeEstimateCalculator.runEmpty(estimator.estimateTotalNel(static, steps.scienceSteps))
       val interval = CalibrationSetInterval.forWavelength(steps.wavelength.centralWavelength)
       EitherT.fromEither:
-        Either.cond(estimate < interval, estimate, exposureTimeTooLong(observationId, steps.wavelength, estimate, interval))
+        Either.cond(estimate < interval, (), exposureTimeTooLong(observationId, steps.wavelength, estimate, interval))
 
     val gen = for
       ts <- pairs
@@ -410,9 +404,9 @@ object Science:
       bs <- ds.zip(ts).zip(titleSuffixes(config.wavelengths, config.wavelengths.length > 1)).traverse: (dwt, suffix) =>
               val (d, wt) = dwt
               for
-                e <- cycleEstimate(d)
+                _ <- checkCycle(d)
                 c <- EitherT.fromEither(d.cycleCount(wt._2).leftMap(m => definitionError(observationId, m)))
-              yield WavelengthBlock(d, e, c, suffix)
+              yield WavelengthBlock(d, c, suffix)
     yield Generator(
       bs.toNev,
       AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Science)

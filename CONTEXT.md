@@ -193,10 +193,10 @@ An atom that contains at least one GCAL step, counted per sequence as `gcalSets`
 _Avoid_: calibration set (calibrations also means telluric observations), flat/arc pair (a set may hold only one).
 
 **Opening Set**:
-The GCAL Set a Flamingos-2 science sequence starts with, before any science. Always present.
+The single GCAL Set a Flamingos-2 science sequence starts with, before any science, and is its only one, however long the science runs. Any further sets the observation needs are taken by the observer.
 
 **Closing Set**:
-The GCAL Set that ends a run of science. Flamingos-2 adds one only when its planned science time is strictly longer than the Calibration Set Interval. GNIRS ends each central wavelength's science, which runs as one contiguous segment, with one Closing Set per Calibration Set Interval of that science (rounded up, at least one), each its own atom, and has no other sets. No set is ever placed in the middle of the science; on Flamingos-2 any further sets the observation needs are taken by the observer. The decision uses the planned science time, not the time left, so the Closing Set does not disappear partway through execution.
+The single GCAL Set that ends each central wavelength's science on GNIRS, which runs as one contiguous segment, however long the segment runs. GNIRS has no other sets; any further sets are taken by the observer.
 _Avoid_: end cal, trailing flat.
 
 **Science Steps**:

@@ -46,10 +46,10 @@ import java.util.UUID
  * and MOS modes.
  *
  * The two modes differ only in the aperture their steps carry.  The sequence
- * opens with a "Nighttime Calibrations" atom and, when the science runs longer
- * than the calibration set interval, closes with one too.  Nothing is placed in
- * between: the observer takes any further sets.  Flamingos 2 never reaches the
- * long wavelength cutoff, so the interval is always the short one.
+ * opens with a single "Nighttime Calibrations" atom, however long the science
+ * runs: the observer takes any further sets.  A science cycle must be shorter
+ * than the calibration set interval, which is always the short one since
+ * Flamingos 2 never reaches the long wavelength cutoff.
  */
 object Science:
 
@@ -183,10 +183,9 @@ object Science:
   end StepDefinition
 
   case class Generator(
-    steps:         StepDefinition,
-    cycleEstimate: TimeSpan,
-    builder:       AtomBuilder[F2],
-    goalCycles:    NonNegInt
+    steps:      StepDefinition,
+    builder:    AtomBuilder[F2],
+    goalCycles: NonNegInt
   ) extends SequenceGenerator[F2]:
 
     override def generate: Stream[Pure, Atom[F2]] =
@@ -195,10 +194,7 @@ object Science:
 
       val protoAtoms: List[ProtoAtom[ProtoStep[F2]]] =
         if goalCycles.value === 0 then Nil
-        else
-          val science     = List.fill(goalCycles.value)(ProtoAtom(AbbaCycleTitle.some, steps.abbaCycle))
-          val scienceTime = cycleEstimate *| goalCycles.value
-          (gcalAtom :: science) ++ Option.when(scienceTime > Interval)(gcalAtom).toList
+        else gcalAtom :: List.fill(goalCycles.value)(ProtoAtom(AbbaCycleTitle.some, steps.abbaCycle))
 
       builder.buildStream(Stream.emits(protoAtoms))
 
@@ -226,19 +222,18 @@ object Science:
       EitherT.fromEither:
         time.filterOrElse(_.exposureTime.toNonNegMicroseconds.value > 0, zeroExposureTime(observationId, modeName))
 
-    def cycleEstimate(steps: StepDefinition): EitherT[F, OdbError, TimeSpan] =
+    def checkCycle(steps: StepDefinition): EitherT[F, OdbError, Unit] =
       val estimate = StepTimeEstimateCalculator.runEmpty(estimator.estimateTotalNel(static, steps.abbaCycle))
       EitherT.fromEither:
-        Either.cond(estimate < Interval, estimate, exposureTimeTooLong(observationId, estimate))
+        Either.cond(estimate < Interval, (), exposureTimeTooLong(observationId, estimate))
 
     val gen = for
       t <- posTime
       s <- StepDefinition.compute(modeName, config, t, static, expander, calRole).leftMap(m => definitionError(observationId, m))
-      e <- cycleEstimate(s)
+      _ <- checkCycle(s)
       c <- EitherT.fromEither(s.cycleCount(t).leftMap(m => definitionError(observationId, m)))
     yield Generator(
       s,
-      e,
       AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Science),
       c
     ): SequenceGenerator[F2]

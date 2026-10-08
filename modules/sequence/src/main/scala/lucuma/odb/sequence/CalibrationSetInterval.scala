@@ -28,7 +28,3 @@ object CalibrationSetInterval:
   def intervalsIn(interval: TimeSpan, scienceTime: TimeSpan): Int =
     val i = interval.toMicroseconds
     ((scienceTime.toMicroseconds + i - 1) / i).toInt
-
-  /** Calibration sets that `scienceTime` needs: one per started interval, at least one. */
-  def setCount(interval: TimeSpan, scienceTime: TimeSpan): Int =
-    intervalsIn(interval, scienceTime) max 1
