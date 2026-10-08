@@ -50,15 +50,16 @@ import skunk.Transaction
 import skunk.data.Arr
 import skunk.syntax.all.*
 
+import ConfigurationService.Request
 import Services.Syntax.*
 
 trait ConfigurationService[F[_]] {
 
   /** Selects all configuration requests that subsume this observation's configuration. */
-  def selectRequests(oid: Observation.Id)(using Transaction[F]): F[Result[List[ConfigurationRequest]]]
+  def selectRequests(oid: Observation.Id)(using Transaction[F]): F[Result[List[Request]]]
 
   /** Selects configuration requests relevant to the given program + observation pairs. The resulting map will contain every passed key. */
-  def selectRequests(pairs: List[(Program.Id, Observation.Id)]): F[Result[Map[(Program.Id, Observation.Id), List[ConfigurationRequest]]]]
+  def selectRequests(pairs: List[(Program.Id, Observation.Id)]): F[Result[Map[(Program.Id, Observation.Id), List[Request]]]]
 
   /** Selects observations relevant to the given configuration requests, if any. The resulting map will contain every passed request id. */
   def selectObservations(rids: List[ConfigurationRequest.Id]): F[Result[Map[ConfigurationRequest.Id, List[Observation.Id]]]]
@@ -70,10 +71,10 @@ trait ConfigurationService[F[_]] {
   def coneCandidates(cone: Cone, max: Int = ConfigurationService.MaxConeCandidates): F[Result[List[ConfigurationRequest.Id]]]
 
   /** Inserts (or selects) a `ConfigurationRequest` based on the configuration of `oid`. */
-  def canonicalizeRequest(input: CreateConfigurationRequestInput)(using Transaction[F]): F[Result[ConfigurationRequest]]
+  def canonicalizeRequest(input: CreateConfigurationRequestInput)(using Transaction[F]): F[Result[Request]]
 
   /** Creates`ConfigurationRequest`s as needed to ensure that one exists for each non-inactive, non-calibration observation in `pid`. */
-  def canonicalizeAll(pid: Program.Id)(using Transaction[F]): F[Result[Map[Observation.Id, ConfigurationRequest]]]
+  def canonicalizeAll(pid: Program.Id)(using Transaction[F]): F[Result[Map[Observation.Id, Request]]]
 
   /** Deletes all `ConfigurationRequest`s for `pid`, returning the ids of deleted configurations. */
   def deleteAll(pid: Program.Id)(using Transaction[F]): F[Result[List[ConfigurationRequest.Id]]]
@@ -87,6 +88,25 @@ trait ConfigurationService[F[_]] {
 }
 
 object ConfigurationService {
+
+  /**
+   * What the service's own logic reads of a configuration request: the configuration, to decide
+   * which observations it applies to, and the status, for workflow validation. The GraphQL
+   * `ConfigurationRequest` type is served from SQL and is not limited to these fields.
+   */
+  case class Request(
+    id:            ConfigurationRequest.Id,
+    status:        ConfigurationRequestStatus,
+    configuration: Configuration
+  )
+
+  object Request:
+    given Decoder[Request] = hc =>
+      for
+        id <- hc.downField("id").as[ConfigurationRequest.Id]
+        st <- hc.downField("status").as[ConfigurationRequestStatus]
+        cf <- hc.downField("configuration").as[Configuration]
+      yield Request(id, st, cf)
 
   /** Cap on `coneCandidates` matches; see its scaladoc. */
   val MaxConeCandidates: Int = ConeSearch.MaxCandidates
@@ -103,13 +123,13 @@ object ConfigurationService {
     new ConfigurationService[F] {
       val impl = Impl[F]
 
-      override def selectRequests(oid: Observation.Id)(using Transaction[F]): F[Result[List[ConfigurationRequest]]] =
+      override def selectRequests(oid: Observation.Id)(using Transaction[F]): F[Result[List[Request]]] =
         impl.selectRequests(oid).value
 
-      override def canonicalizeRequest(input: CreateConfigurationRequestInput)(using Transaction[F]): F[Result[ConfigurationRequest]] =
+      override def canonicalizeRequest(input: CreateConfigurationRequestInput)(using Transaction[F]): F[Result[Request]] =
         impl.canonicalizeRequest(input).value
 
-      override def canonicalizeAll(pid: Program.Id)(using Transaction[F]): F[Result[Map[Observation.Id, ConfigurationRequest]]] =
+      override def canonicalizeAll(pid: Program.Id)(using Transaction[F]): F[Result[Map[Observation.Id, Request]]] =
         impl.canonicalizeAll(pid).value
 
       override def deleteAll(pid: Program.Id)(using Transaction[F]): F[Result[List[ConfigurationRequest.Id]]] =
@@ -137,7 +157,7 @@ object ConfigurationService {
         if statusRequiresStaff || !SET.feedback.isAbsent then requireStaffAccess(doUpdate)
         else requirePiAccess(doUpdate)
 
-      override def selectRequests(pairs: List[(Program.Id, Observation.Id)]): F[Result[Map[(Program.Id, Observation.Id), List[ConfigurationRequest]]]] =
+      override def selectRequests(pairs: List[(Program.Id, Observation.Id)]): F[Result[Map[(Program.Id, Observation.Id), List[Request]]]] =
         impl.selectRequests(pairs).value
 
       override def selectObservations(rids: List[ConfigurationRequest.Id]): F[Result[Map[ConfigurationRequest.Id, List[Observation.Id]]]] =
@@ -190,20 +210,20 @@ object ConfigurationService {
             else res |+| OdbError.InvalidConfiguration(Some(s"Observation $oid is invalid or has an incomplete configuration.")).asWarning(Map.empty)
 
     @annotation.nowarn("msg=unused implicit parameter")
-    private def selectAllRequestsForProgram(oid: Observation.Id)(using Transaction[F]): ResultT[F, List[ConfigurationRequest]] =
+    private def selectAllRequestsForProgram(oid: Observation.Id)(using Transaction[F]): ResultT[F, List[Request]] =
       ResultT:
         services.runGraphQLQuery(Queries.selectAllRequestsForProgram(oid)).map: r =>
           r.flatMap: json =>
-            json.hcursor.downFields("observation", "program", "configurationRequests", "matches").as[List[ConfigurationRequest]] match
+            json.hcursor.downFields("observation", "program", "configurationRequests", "matches").as[List[Request]] match
               case Left(value)  => Result.failure(value.getMessage) // TODO: this probably isn't good enough
               case Right(value) => Result(value)
 
     private def queryRequestsAndConfigurations(
       pids: List[Program.Id],
       oids: List[Observation.Id]
-    ): ResultT[F, (Map[Program.Id, List[ConfigurationRequest]], Map[(Program.Id, Observation.Id), Configuration])] =
+    ): ResultT[F, (Map[Program.Id, List[Request]], Map[(Program.Id, Observation.Id), Configuration])] =
       if pids.isEmpty && oids.isEmpty then
-        ResultT.pure((Map.empty[Program.Id, List[ConfigurationRequest]], Map.empty[(Program.Id, Observation.Id), Configuration]))
+        ResultT.pure((Map.empty[Program.Id, List[Request]], Map.empty[(Program.Id, Observation.Id), Configuration]))
       else
         ResultT:
           services.runGraphQLQuery(Queries.RequestsAndConfigurations(pids, oids)).map: r =>
@@ -214,7 +234,7 @@ object ConfigurationService {
                 case Left(other) => Result.internalError(other.getMessage)
 
     @annotation.nowarn("msg=unused implicit parameter")
-    private def canonicalizeRequest(input: CreateConfigurationRequestInput, cfg: Configuration)(using Transaction[F]): ResultT[F, ConfigurationRequest] =
+    private def canonicalizeRequest(input: CreateConfigurationRequestInput, cfg: Configuration)(using Transaction[F]): ResultT[F, Request] =
       ResultT:
         session.prepareR(Statements.InsertRequest).use: pq =>
           pq.option(input, cfg).flatMap:
@@ -225,16 +245,16 @@ object ConfigurationService {
                   case Some(r) => Result(r)
                   case None => Result.internalError(s"Failed to insert a configuration request for ${input.oid}, likely due to an incorrect unique index.")
 
-    def selectRequests(oid: Observation.Id)(using Transaction[F]): ResultT[F, List[ConfigurationRequest]] =
+    def selectRequests(oid: Observation.Id)(using Transaction[F]): ResultT[F, List[Request]] =
       selectAllRequestsForProgram(oid).flatMap: crs =>
         if crs.isEmpty then Nil.pure[ResultT[F, *]] // in this case we can avoid the call to `selectConfiguration`
         else selectConfiguration(oid).map: cfg =>
           crs.filter(_.configuration.subsumes(cfg))
 
-    def canonicalizeRequest(input: CreateConfigurationRequestInput)(using Transaction[F]): ResultT[F, ConfigurationRequest] =
+    def canonicalizeRequest(input: CreateConfigurationRequestInput)(using Transaction[F]): ResultT[F, Request] =
       selectConfiguration(input.oid).flatMap(canonicalizeRequest(input, _))
 
-    def canonicalizeAll(pid: Program.Id)(using Transaction[F]): ResultT[F, Map[Observation.Id, ConfigurationRequest]] =
+    def canonicalizeAll(pid: Program.Id)(using Transaction[F]): ResultT[F, Map[Observation.Id, Request]] =
       ResultT
         .liftF:
           session.prepareR(Statements.SelectActiveNonCalibrations).use: pq =>
@@ -250,7 +270,7 @@ object ConfigurationService {
         session.prepareR(af.fragment.query(configuration_request_id)).use: pq =>
           pq.stream(af.argument, 1024).compile.toList
 
-    def selectRequests(pairs: List[(Program.Id, Observation.Id)]): ResultT[F, Map[(Program.Id, Observation.Id), List[ConfigurationRequest]]] =
+    def selectRequests(pairs: List[(Program.Id, Observation.Id)]): ResultT[F, Map[(Program.Id, Observation.Id), List[Request]]] =
       queryRequestsAndConfigurations(pairs.map(_._1).distinct, pairs.map(_._2).distinct).map: (pmap, omap) =>
         pairs
           .fproduct: key =>
@@ -262,7 +282,7 @@ object ConfigurationService {
 
     def queryRequestsAndObservations(
       rids: List[ConfigurationRequest.Id]
-    ): ResultT[F, List[(ConfigurationRequest, List[(Observation.Id, Configuration)])]] =
+    ): ResultT[F, List[(Request, List[(Observation.Id, Configuration)])]] =
       if rids.isEmpty then
         ResultT.pure(List.empty)
       else
@@ -280,7 +300,7 @@ object ConfigurationService {
 
     private def queryRequests(
       rids: List[ConfigurationRequest.Id]
-    ): ResultT[F, List[(ConfigurationRequest, Program.Id)]] =
+    ): ResultT[F, List[(Request, Program.Id)]] =
       ResultT:
         services.runGraphQLQuery(Queries.SelectRequests(rids)).map: r =>
           r.flatMap: json =>
@@ -319,12 +339,12 @@ object ConfigurationService {
   object Queries {
 
     object RequestsAndConfigurations:
-      type Response = (Map[Program.Id, List[ConfigurationRequest]], Map[(Program.Id, Observation.Id), Configuration])
+      type Response = (Map[Program.Id, List[Request]], Map[(Program.Id, Observation.Id), Configuration])
 
-      private given Decoder[(Program.Id, List[ConfigurationRequest])] = hc =>
+      private given Decoder[(Program.Id, List[Request])] = hc =>
         for
           id  <- hc.downField("id").as[Program.Id]
-          crs <- hc.downFields("configurationRequests", "matches").as[List[ConfigurationRequest]]
+          crs <- hc.downFields("configurationRequests", "matches").as[List[Request]]
         yield (id, crs)
 
       private given Decoder[((Program.Id, Observation.Id), Option[Configuration])] = hc =>
@@ -336,7 +356,7 @@ object ConfigurationService {
 
       given Decoder[Response] = hc =>
         for
-          m1 <- hc.downFields("programs", "matches").as[List[(Program.Id, List[ConfigurationRequest])]]
+          m1 <- hc.downFields("programs", "matches").as[List[(Program.Id, List[Request])]]
           m2 <- hc.downFields("observations", "matches").as[List[((Program.Id, Observation.Id), Option[Configuration])]]
         yield (m1.toMap, m2.collect { case ((pid, oid), Some(cfg)) => ((pid, oid), cfg) }.toMap)
 
@@ -769,11 +789,11 @@ object ConfigurationService {
     // Observations are fetched separately, per distinct program, by
     // `SelectProgramObservations` — see `queryRequestsAndObservations`.
     object SelectRequests:
-      type Response = List[(ConfigurationRequest, Program.Id)]
+      type Response = List[(Request, Program.Id)]
 
-      private given dr: Decoder[(ConfigurationRequest, Program.Id)] = hc =>
+      private given dr: Decoder[(Request, Program.Id)] = hc =>
         for
-          req <- hc.as[ConfigurationRequest]
+          req <- hc.as[Request]
           pid <- hc.downFields("program", "id").as[Program.Id]
         yield (req, pid)
 
@@ -1108,12 +1128,11 @@ object ConfigurationService {
     // Select the row a conflicting insert collided with. The matched columns are exactly the
     // columns of t_configuration_request_unique -- a discriminant belongs in both or in neither,
     // otherwise a genuinely distinct request collides and then fails to find its own row.
-    val SelectRequest: Query[(Observation.Id, Configuration), ConfigurationRequest] =
+    val SelectRequest: Query[(Observation.Id, Configuration), Request] =
       sql"""
         SELECT
           c_configuration_request_id,
           c_status,
-          c_justification,
           c_cloud_extinction,
           c_image_quality,
           c_sky_background,
@@ -1180,7 +1199,6 @@ object ConfigurationService {
         (
           configuration_request_id     *:
           configuration_request_status *:
-          text_nonempty.opt            *:
           cloud_extinction_preset      *:
           image_quality_preset         *:
           sky_background               *:
@@ -1215,7 +1233,6 @@ object ConfigurationService {
           { case
             id                       *:
             status                   *:
-            justification            *:
             cloudExtinction          *:
             imageQuality             *:
             skyBackground            *:
@@ -1340,10 +1357,9 @@ object ConfigurationService {
 
               mode.flatMap: m =>
                 target.map: t =>
-                  ConfigurationRequest(
+                  Request(
                     id,
                     status,
-                    justification,
                     Configuration(
                       Conditions(
                         cloudExtinction,
@@ -1396,7 +1412,7 @@ object ConfigurationService {
       }
 
     // insert and return row, or return nothing if a matching row exists
-    val InsertRequest: Query[(CreateConfigurationRequestInput, Configuration), ConfigurationRequest] =
+    val InsertRequest: Query[(CreateConfigurationRequestInput, Configuration), Request] =
       sql"""
         INSERT INTO t_configuration_request (
           c_program_id,
@@ -1469,7 +1485,6 @@ object ConfigurationService {
         RETURNING
           c_configuration_request_id,
           c_status,
-          c_justification,
           c_cloud_extinction,
           c_image_quality,
           c_sky_background,
@@ -1504,7 +1519,6 @@ object ConfigurationService {
         (
           configuration_request_id     *:
           configuration_request_status *:
-          text_nonempty.opt            *:
           cloud_extinction_preset      *:
           image_quality_preset         *:
           sky_background               *:
@@ -1539,7 +1553,6 @@ object ConfigurationService {
           { case
             id                       *:
             status                   *:
-            justification            *:
             cloudExtinction          *:
             imageQuality             *:
             skyBackground            *:
@@ -1666,10 +1679,9 @@ object ConfigurationService {
 
               mode.flatMap: m =>
                 target.map: t =>
-                  ConfigurationRequest(
+                  Request(
                     id,
                     status,
-                    justification,
                     Configuration(
                       Conditions(
                         cloudExtinction,

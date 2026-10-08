@@ -7,8 +7,8 @@ package mapping
 
 import cats.effect.Resource
 import cats.syntax.all.*
-import grackle.Context
 import grackle.Cursor
+import grackle.Cursor.ListTransformCursor
 import grackle.Env
 import grackle.Query
 import grackle.Query.*
@@ -18,8 +18,9 @@ import grackle.ResultT
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
 import grackle.syntax.*
-import io.circe.syntax.*
+import io.circe.Json
 import lucuma.core.model.Attachment
+import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
@@ -29,8 +30,8 @@ import lucuma.odb.data.ItcAcquisition
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.binding.BooleanBinding
+import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.TimingWindowView
-import lucuma.odb.json.configurationrequest.query.given
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services
@@ -46,6 +47,7 @@ import Services.Syntax.*
 
 trait ObservationMapping[F[_]]
   extends ObservationEffectHandler[F]
+     with Predicates[F]
      with ProgramView[F]
      with TimingWindowView[F]
      with AttachmentTable[F]
@@ -152,33 +154,69 @@ trait ObservationMapping[F[_]]
     effectHandler(readEnv, calculate)
   }
 
+  // Which requests apply to an observation is decided in Scala (`Configuration.subsumes`), but the
+  // requests themselves are then fetched through SQL with the caller's selection, so that every
+  // `ConfigurationRequest` field resolves exactly as it does on the program and top-level paths.
+  // Serving them as JSON instead left any field the encoder didn't carry unselectable here.
   lazy val configurationRequestsQueryHandler: EffectHandler[F] = { pairs =>
 
-    // Here's the collection of stuff we need to deal with: a pid+oid pair, the parent
-    // cursor, and the child context.
-    val sequence: ResultT[F, List[((Program.Id, Observation.Id), Cursor, Context)]] =
-      ResultT.fromResult:
-        pairs.traverse: (query, cursor) =>
-          for {
-            p <- cursor.fieldAs[Program.Id]("programId")
-            o <- cursor.fieldAs[Observation.Id]("id")
-            c <- Query.childContext(cursor.context, query)
-          } yield ((p, o), cursor, c)
+    val keys: Result[List[(Program.Id, Observation.Id)]] =
+      pairs.traverse: (_, cursor) =>
+        (cursor.fieldAs[Program.Id]("programId"), cursor.fieldAs[Observation.Id]("id")).tupled
 
-    // Pass the pid+oid pairs to configurationService.selectRequests to get the
-    // applicable configuration requests for each pair, then use this information
-    // to construct our list of outgoing cursors.
+    // The applicable request ids for each pid+oid pair, in the order the service returns them.
     @annotation.nowarn("msg=unused implicit parameter")
-    def query(using Services[F], Transaction[F]): ResultT[F, List[Cursor]] =
-      sequence.flatMap: pairs =>
-        ResultT(configurationService.selectRequests(pairs.map(_._1))).map: reqs =>
-          pairs.map: (key, cursor, childContext) =>
-            CirceCursor(childContext, reqs(key).asJson, Some(cursor), cursor.fullEnv)
+    def applicable(ks: List[(Program.Id, Observation.Id)])(using Services[F], Transaction[F]): F[Result[Map[(Program.Id, Observation.Id), List[ConfigurationRequest.Id]]]] =
+      configurationService.selectRequests(ks).map(_.map(_.view.mapValues(_.map(_.id)).toMap))
 
-    // Do it!
+    // Fetches the requests `rids` through SQL with the selection `child`, returning the result list
+    // cursor along with its elements keyed by id.
+    def fetch(child: Query, env: Env, rids: List[ConfigurationRequest.Id]): F[Result[(Cursor, Map[ConfigurationRequest.Id, Cursor])]] =
+      val q = Select("configurationRequests", None, Select("matches", None, Filter(Predicates.configurationRequest.id.in(rids), child)))
+      sqlCursor(q, env).map: res =>
+        for
+          root    <- res
+          matches <- root.field("configurationRequests", None).flatMap(_.field("matches", None))
+          elems   <- matches.asList
+          byId    <- elems.traverse(c => c.fieldAs[ConfigurationRequest.Id]("id").tupleRight(c))
+        yield (matches, byId.toMap)
+
+    // One SQL query per distinct child selection for the union of the ids its observations need,
+    // split back out into one list per observation. Grackle runs that child selection against the
+    // cursors we return, so aliases of this field that select the same fields share one query.
+    def cursors(ridLists: List[List[ConfigurationRequest.Id]]): F[Result[List[Cursor]]] =
+      pairs
+        .zip(ridLists)
+        .zipWithIndex
+        .groupBy { case (((query, _), _), _) => Query.extractChild(query) }
+        .toList
+        .traverse: (child, group) =>
+          val rids = group.flatMap(_._1._2).distinct
+          val fetched: F[Result[Option[(Cursor, Map[ConfigurationRequest.Id, Cursor])]]] =
+            child.toResultOrError("Configuration requests query has the wrong shape").flatTraverse: c =>
+              if rids.isEmpty then Option.empty.success.pure[F]
+              else fetch(c, group.head._1._1._2.fullEnv, rids).map(_.map(_.some))
+          fetched.map: res =>
+            res.flatMap: f =>
+              group.traverse:
+                case (((query, parent), rids), i) =>
+                  val cursor: Result[Cursor] =
+                    f match
+                      case Some((matches, byId)) =>
+                        val cs = rids.flatMap(byId.get)
+                        ListTransformCursor(matches, cs.size, cs).success
+                      case None                  =>
+                        Query.childContext(parent.context, query).map: ctx =>
+                          CirceCursor(ctx, Json.arr(), Some(parent), parent.fullEnv)
+                  cursor.tupleRight(i)
+        .map(_.sequence.map(_.flatten.sortBy(_._2).map(_._1)))
+
     UserEnv.traverse(UserEnv.fromQueries(pairs)):
-      services.useTransactionally:
-        query.value
+      (for
+        ks <- ResultT.fromResult(keys)
+        m  <- ResultT(services.useTransactionally(applicable(ks)))
+        cs <- ResultT(cursors(ks.map(k => m.getOrElse(k, Nil))))
+      yield cs).value
 
   }
 

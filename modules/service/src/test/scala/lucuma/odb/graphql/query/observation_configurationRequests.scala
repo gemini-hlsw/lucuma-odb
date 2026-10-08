@@ -6,6 +6,7 @@ package query
 
 import cats.effect.IO
 import cats.syntax.all.*
+import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
@@ -22,6 +23,7 @@ import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.model.CloudExtinction
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.Observation
+import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.syntax.string.*
 import lucuma.core.util.Enumerated
@@ -382,11 +384,11 @@ class observation_configurationRequests
     }
   }
 
-  // `Observation.configurationRequests` is the one route to `ConfigurationObservingMode` that is
-  // not SQL-mapped: `configurationRequestsQueryHandler` builds a `CirceCursor` from
-  // `Encoder[Configuration]`. Anything the schema declares but the encoder omits therefore fails
-  // only here, which is how `instrument` and `mode` went missing unnoticed. Select every field of
-  // the type so a third omission cannot hide the same way.
+  // `Observation.configurationRequests` used to serve its requests from a `CirceCursor` built by
+  // `Encoder[ConfigurationRequest]`, so anything the schema declares but the encoder omitted failed
+  // only on this path: first `instrument` and `mode`, later `feedback`, `createdAt`, `updatedAt`,
+  // `program` and `applicableObservations`. The handler now fetches the requests through SQL; these
+  // tests keep it that way.
   test("every field of the observing mode is selectable through an observation's requests"):
     for
       oid <- setup(too = false, ObservingModeType.GmosNorthLongSlit)
@@ -428,6 +430,112 @@ class observation_configurationRequests
                  }
                """)
              )
+    yield ()
+
+
+  private def setFeedbackAs(user: User, rid: ConfigurationRequest.Id, feedback: String): IO[Unit] =
+    query(
+      user  = user,
+      query = s"""
+        mutation {
+          updateConfigurationRequests(input: {
+            SET: { feedback: ${feedback.asJson} }
+            WHERE: { id: { EQ: ${rid.asJson} } }
+          }) {
+            requests { id }
+          }
+        }
+      """
+    ).void
+
+  test("fields outside the configuration are selectable through an observation's requests"):
+    for
+      oid  <- setup(too = false, ObservingModeType.GmosNorthLongSlit)
+      pid  <- query(pi, s"""query { observation(observationId: "$oid") { program { id } } }""").map:
+                _.hcursor.downFields("observation", "program", "id").require[Program.Id]
+      rid  <- createConfigurationRequestAs(pi, oid, NonEmptyString.unsafeFrom("Please").some)
+      _    <- setFeedbackAs(admin, rid, "Looks fine")
+      json <- query(
+                user  = pi,
+                query = s"""
+                  query {
+                    observation(observationId: "$oid") {
+                      configurationRequests {
+                        id
+                        status
+                        justification
+                        feedback
+                        createdAt
+                        updatedAt
+                        program { id }
+                        applicableObservations
+                      }
+                    }
+                  }
+                """
+              )
+    yield
+      val req = json.hcursor.downFields("observation", "configurationRequests").downN(0)
+      assertEquals(req.downField("id").as[ConfigurationRequest.Id], Right(rid))
+      assertEquals(req.downField("status").as[String], Right("REQUESTED"))
+      assertEquals(req.downField("justification").as[String], Right("Please"))
+      assertEquals(req.downField("feedback").as[String], Right("Looks fine"))
+      assert(req.downField("createdAt").as[String].isRight, "createdAt")
+      assert(req.downField("updatedAt").as[String].isRight, "updatedAt")
+      assertEquals(req.downFields("program", "id").as[Program.Id], Right(pid))
+      assertEquals(req.downField("applicableObservations").as[List[Observation.Id]], Right(List(oid)))
+
+  test("requests are split correctly across several observations and aliases"):
+    for
+      oid1 <- setup(too = false, ObservingModeType.GmosNorthLongSlit)
+      oid2 <- cloneObservationAs(pi, oid1)
+      _    <- Mutation.forGmosNorthLongSlit(pi, oid2, GmosNorthGrating.B1200_G5301)
+      oid3 <- cloneObservationAs(pi, oid1)
+      _    <- Mutation.forGmosNorthLongSlit(pi, oid3, GmosNorthGrating.B480_G5309)
+      rid1 <- createConfigurationRequestAs(pi, oid1)
+      rid2 <- createConfigurationRequestAs(pi, oid2)
+      _    <- setFeedbackAs(admin, rid2, "Second")
+      _    <- expect(
+                user  = pi,
+                query = s"""
+                  query {
+                    observations(WHERE: { id: { IN: ${List(oid1, oid2, oid3).asJson} } }) {
+                      matches {
+                        id
+                        a: configurationRequests { id applicableObservations }
+                        b: configurationRequests { feedback }
+                        c: configurationRequests { id applicableObservations }
+                      }
+                    }
+                  }
+                """,
+                expected = Right(json"""
+                  {
+                    "observations" : {
+                      "matches" : [
+                        {
+                          "id" : $oid1,
+                          "a"  : [ { "id" : $rid1, "applicableObservations" : [ $oid1 ] } ],
+                          "b"  : [ { "feedback" : null } ],
+                          "c"  : [ { "id" : $rid1, "applicableObservations" : [ $oid1 ] } ]
+                        },
+                        {
+                          "id" : $oid2,
+                          "a"  : [ { "id" : $rid2, "applicableObservations" : [ $oid2 ] } ],
+                          "b"  : [ { "feedback" : "Second" } ],
+                          "c"  : [ { "id" : $rid2, "applicableObservations" : [ $oid2 ] } ]
+                        },
+                        {
+                          "id" : $oid3,
+                          "a"  : [],
+                          "b"  : [],
+                          "c"  : []
+                        }
+                      ]
+                    }
+                  }
+                """)
+              )
     yield ()
 
 }
