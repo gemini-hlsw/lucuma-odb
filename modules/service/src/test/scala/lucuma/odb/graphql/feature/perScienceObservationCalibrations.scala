@@ -71,6 +71,7 @@ import lucuma.odb.service.ObsExtract
 import lucuma.odb.service.Services
 import lucuma.odb.service.TelluricTargetsServiceSuiteSupport
 import lucuma.odb.smartgcal.data.Gnirs
+import lucuma.odb.smartgcal.data.SmartGcalValue.LegacyInstrumentConfig
 import lucuma.odb.util.Codecs.observation_id
 import lucuma.odb.util.Codecs.user_state
 import lucuma.refined.*
@@ -2730,10 +2731,15 @@ class perScienceObservationCalibrations
     // The daytime pinhole flat looks up the same config but with the pinhole
     // FPU (Pinhole3 for the 0.15"/pix short camera).
     val pinholeKey = key.copy(fpu = GnirsFpu.Other(GnirsFpuOther.Pinhole3))
+    // A short pinhole exposure, like most of the real ones: below the minimum
+    // of the faint read modes, so it is only valid in Bright (or Very bright).
+    val pinholeFlat = gnirsSmartFlat.copy(
+      instrumentConfig = LegacyInstrumentConfig(TimeSpan.unsafeFromMicroseconds(5_000_000L), PosInt.unsafeFrom(2))
+    )
     val rows = List(
       Gnirs.TableRow(PosLong.unsafeFrom(1), key, gnirsSmartFlat),
       Gnirs.TableRow(PosLong.unsafeFrom(1), key, gnirsSmartArc),
-      Gnirs.TableRow(PosLong.unsafeFrom(1), pinholeKey, gnirsSmartFlat)
+      Gnirs.TableRow(PosLong.unsafeFrom(1), pinholeKey, pinholeFlat)
     )
     // The test DB is shared across the suite, so seed only once (multiple XD
     // tests call this; the gcal ids would otherwise collide).
@@ -2770,7 +2776,8 @@ class perScienceObservationCalibrations
     tid:  Target.Id,
     // Repeat an entry to exercise the multi-wavelength titles; one flat is still
     // generated per *distinct* wavelength.
-    wavelengthsNm: List[Int] = List(1650)
+    wavelengthsNm: List[Int] = List(1650),
+    explicitReadMode: Option[String] = None
   ): IO[Observation.Id] =
     query(
       user = user,
@@ -2788,6 +2795,7 @@ class perScienceObservationCalibrations
                   camera: SHORT_BLUE
                   slit: { fpu: LONG_SLIT_0_30 }
                   filter: ORDER3
+                  ${explicitReadMode.fold("")(m => s"explicitReadMode: $m")}
                   centralWavelengths: [
                     ${wavelengthsNm
                         .map(nm => s"{ centralWavelength: { nanometers: $nm } exposureTimeMode: { timeAndCount: { time: { seconds: 30.0 } count: 3 at: { nanometers: $nm } } } }")
@@ -3013,6 +3021,83 @@ class perScienceObservationCalibrations
                             ),
                             "possibleFuture" -> Json.arr(),
                             "hasMore"        -> false.asJson
+                          )
+                        )
+                      )
+                    ).asRight
+                )
+    } yield ()
+
+  test("daytime pinhole flat takes its read mode from its exposure, not the science read mode"):
+    // The pinhole calibration inherits the science observation's explicit read
+    // mode, but like the other GNIRS calibrations its flat picks the read mode
+    // from its SmartGcal exposure (5 s, so Bright).  Inheriting Very faint would
+    // put the flat below that read mode's 18 s minimum, an exposure the
+    // instrument can't take.
+    for {
+      pid    <- createProgramAs(pi)
+      tid    <- createTargetWithProfileAs(pi, pid)
+      _      <- seedGnirsXdSmartGcal
+      oid    <- createGnirsXdObservationAs(pi, pid, tid, explicitReadMode = "VERY_FAINT".some)
+      _      <- runObscalcUpdate(pid, oid)
+      _      <- recalculateCalibrations(pid, when, oid)
+      pinOid <- selectDaytimePinholeObservationFor(oid).map(_.get)
+      _      <- runObscalcUpdate(pid, pinOid)
+      _      <- expect(
+                  user     = pi,
+                  query    = executionConfigQuery(
+                               pinOid,
+                               "gnirs",
+                               "science",
+                               "steps { instrumentConfig { readMode exposure { seconds } } }",
+                               None
+                             ),
+                  expected =
+                    Json.obj(
+                      "executionConfig" -> Json.obj(
+                        "gnirs" -> Json.obj(
+                          "science" -> Json.obj(
+                            "nextAtom" -> Json.obj(
+                              "steps" -> Json.arr(
+                                Json.obj(
+                                  "instrumentConfig" -> Json.obj(
+                                    "readMode" -> "BRIGHT".asJson,
+                                    "exposure" -> Json.obj("seconds" -> BigDecimal("5.000000").asJson)
+                                  )
+                                )
+                              )
+                            ),
+                            "possibleFuture" -> Json.arr(),
+                            "hasMore"        -> false.asJson
+                          )
+                        )
+                      )
+                    ).asRight
+                )
+      // So the pinhole's digest reports no exposure time violations.
+      _      <- expect(
+                  user     = pi,
+                  query    = s"""
+                    query {
+                      observation(observationId: ${pinOid.asJson}) {
+                        execution {
+                          digest {
+                            value {
+                              science { exposureTimeViolations { severity description } }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  """,
+                  expected =
+                    Json.obj(
+                      "observation" -> Json.obj(
+                        "execution" -> Json.obj(
+                          "digest" -> Json.obj(
+                            "value" -> Json.obj(
+                              "science" -> Json.obj("exposureTimeViolations" -> Json.arr())
+                            )
                           )
                         )
                       )
