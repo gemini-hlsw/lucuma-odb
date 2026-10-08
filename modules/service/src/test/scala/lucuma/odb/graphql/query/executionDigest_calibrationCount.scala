@@ -31,6 +31,38 @@ class executionDigest_calibrationCount
       (1, 2, 0)
     )
 
+  test("the flats and arcs the sequence shows do not count as science"):
+    // Four 1298 second exposures make about 89 minutes of science: under the 90
+    // minute interval on its own, past it with the opening set of flats and arcs.
+    assertIO(
+      for
+        p <- createProgramAs(pi)
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createFlamingos2LongSlitObservationAs(pi, p, List(t))
+        _ <- query(
+               pi,
+               s"""mutation {
+                 updateObservations(input: {
+                   WHERE: { id: { EQ: "$o" } }
+                   SET: {
+                     observingMode: {
+                       flamingos2LongSlit: {
+                         exposureTimeMode: {
+                           timeAndCount: { time: { seconds: 1298 }, count: 4, at: { nanometers: 1390 } }
+                         }
+                       }
+                     }
+                   }
+                 }) {
+                   observations { id }
+                 }
+               }"""
+             )
+        c <- calibrationCount(p, o)
+      yield c,
+      1
+    )
+
   test("a mode that takes no telluric reports 0"):
     assertIO(
       for

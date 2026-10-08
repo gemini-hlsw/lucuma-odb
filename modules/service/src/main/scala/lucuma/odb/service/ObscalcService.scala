@@ -684,7 +684,7 @@ object ObscalcService:
       sql"""
         SELECT c_observation_id,
                CASE WHEN c_setup_count IS NOT NULL
-                    THEN c_sci_non_charged_time + c_sci_program_time
+                    THEN c_sci_science_non_charged_time + c_sci_science_program_time
                END
         FROM   t_obscalc
         WHERE  c_calibrations_stale
