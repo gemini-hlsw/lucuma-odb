@@ -87,7 +87,7 @@ class PdfSummaryJobDaemonSuite extends OdbSuite with ObservingModeSetupOperation
   // The daemon as Main wires it, on this suite's database, with the given renderer.
   def daemon(renderer: PdfRenderer[IO])(body: IO[Unit]): IO[Unit] =
     withServicesResourceForObscalc(service): services =>
-      PdfSummaryJobDaemon.run(200.millis, session, services, renderer).use(_ => body)
+      PdfSummaryJobDaemon.run(200.millis, session, services, renderer, IO.unit).use(_ => body)
 
   // Polls until every job of the program is gone (rendered) or failed.
   def awaitSettled(pid: Program.Id): IO[List[(String, Int, Option[String])]] =
