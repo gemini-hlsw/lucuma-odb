@@ -39,6 +39,7 @@ object PdfSummaryJobDaemon:
     session:    Resource[F, Session[F]],
     services:   Resource[F, Services[F]],
     renderer:   PdfRenderer[F],
+    heartbeat:  F[Unit],
     keepFiles:  Boolean = false
   ): Resource[F, Unit] =
     given L: Logger[F] = LF.getLoggerFromName("pdf-summary-jobs")
@@ -112,7 +113,7 @@ object PdfSummaryJobDaemon:
         wake <- Queue.bounded[F, Unit](1)
         _    <- wake.offer(())
         events = Stream.resource(session).flatMap(_.channel(Channel).listen(1024)).evalMap(_ => wake.tryOffer(()).void)
-        polls  = Stream.awakeEvery(pollPeriod).evalMap(_ => wake.tryOffer(()).void)
+        polls  = Stream.awakeEvery(pollPeriod).evalMap(_ => heartbeat *> wake.tryOffer(()).void)
         drains = Stream.repeatEval(wake.take *> drain)
         _    <- info"PDF summary job daemon: listening on $Channel, polling every $pollPeriod"
         // The LISTEN session dies with the database connection; restart the
