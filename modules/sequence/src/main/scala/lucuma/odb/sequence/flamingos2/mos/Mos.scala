@@ -12,7 +12,6 @@ import lucuma.core.enums.CalibrationRole
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig as F2Dynamic
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig as F2Static
-import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.StreamingExecutionConfig
@@ -32,14 +31,6 @@ import java.util.UUID
  */
 object Mos:
 
-  /**
-   * Science time past which the sequence closes with a "Nighttime
-   * Calibrations" atom.  MOS shares the long slit interval; Flamingos 2 never reaches the
-   * long wavelength cutoff, so the short wavelength interval always applies.
-   */
-  val MaxSciencePeriod: TimeSpan =
-    InfraredCalibration.ShortWavelengthSetInterval
-
   def instantiate[F[_]: Monad](
     observationId:  Observation.Id,
     estimator:      StepTimeEstimateCalculator[F2Static, F2Dynamic],
@@ -51,5 +42,5 @@ object Mos:
   ): F[Either[OdbError, StreamingExecutionConfig[Pure, F2Static, F2Dynamic]]] =
     (for
        a <- EitherT.fromEither(Acquisition.instantiate(observationId, estimator, Static, namespace, config))
-       s <- EitherT(spectroscopy.Science.instantiate(observationId, estimator, Static, namespace, expander, ObservingMode.Flamingos2MosName, MaxSciencePeriod, config, scienceItc, calRole))
+       s <- EitherT(spectroscopy.Science.instantiate(observationId, estimator, Static, namespace, expander, ObservingMode.Flamingos2MosName, config, scienceItc, calRole))
     yield StreamingExecutionConfig(Static, a.generate, s.generate)).value

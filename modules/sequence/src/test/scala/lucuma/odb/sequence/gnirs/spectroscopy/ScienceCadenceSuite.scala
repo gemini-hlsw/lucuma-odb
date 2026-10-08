@@ -108,11 +108,13 @@ class ScienceCadenceSuite extends FunSuite:
       ): StepEstimate =
         StepEstimate.fromMax(List(ConfigChangeEstimate("test", "test", next.value.exposure)), Nil)
 
-  private def generate(cycles: Int, ws: Wavelength*): Either[OdbError, List[Atom[GnirsDynamicConfig]]] =
-    val times = NonEmptyList.fromListUnsafe(ws.toList).map(w => w -> IntegrationTime(ExposureTime, PosInt.unsafeFrom(cycles * 4)))
+  private def instantiate(times: NonEmptyList[(Wavelength, IntegrationTime)]): Either[OdbError, SequenceGenerator[GnirsDynamicConfig]] =
     Science
-      .instantiate[Eval](Oid, estimator, Static, Namespace, expander, config(ws*), times.asRight, none)
+      .instantiate[Eval](Oid, estimator, Static, Namespace, expander, config(times.map(_._1).toList*), times.asRight, none)
       .value
+
+  private def generate(cycles: Int, ws: Wavelength*): Either[OdbError, List[Atom[GnirsDynamicConfig]]] =
+    instantiate(NonEmptyList.fromListUnsafe(ws.toList).map(w => w -> IntegrationTime(ExposureTime, PosInt.unsafeFrom(cycles * 4))))
       .map(_.generate.toList)
 
   private def titles(cycles: Int, ws: Wavelength*): List[String] =
@@ -131,15 +133,8 @@ class ScienceCadenceSuite extends FunSuite:
       assertEquals(titles(cycles, ThermalInfrared), List.fill(cycles)(Sci) ++ List.fill(sets)(Cal), s"$cycles cycles")
 
   test("thermal infrared: a cycle longer than an hour is rejected"):
-    val long = Science
-      .instantiate[Eval](
-        Oid, estimator, Static, Namespace, expander, config(ThermalInfrared),
-        NonEmptyList.one(ThermalInfrared -> IntegrationTime(20.minTimeSpan, PosInt.unsafeFrom(4))).asRight,
-        none
-      )
-      .value
+    val long = instantiate(NonEmptyList.one(ThermalInfrared -> IntegrationTime(20.minTimeSpan, PosInt.unsafeFrom(4))))
     assert(long.isLeft, "an 80 minute cycle should not fit the thermal infrared period")
-    assert(generate(1, NearInfrared).isRight)
 
   test("a near infrared cycle may run past an hour beside a thermal infrared wavelength"):
     // 80 minute cycles at 2200 nm, 20 minute cycles at 3500 nm: each wavelength
@@ -148,9 +143,7 @@ class ScienceCadenceSuite extends FunSuite:
       NearInfrared    -> IntegrationTime(20.minTimeSpan, PosInt.unsafeFrom(4)),
       ThermalInfrared -> IntegrationTime(ExposureTime, PosInt.unsafeFrom(4))
     )
-    val gen = Science
-      .instantiate[Eval](Oid, estimator, Static, Namespace, expander, config(NearInfrared, ThermalInfrared), times.asRight, none)
-      .value
+    val gen = instantiate(times)
     assert(gen.isRight, s"expected per wavelength limits, got $gen")
 
   test("mixed wavelengths: each runs contiguously and closes with its own calibrations"):

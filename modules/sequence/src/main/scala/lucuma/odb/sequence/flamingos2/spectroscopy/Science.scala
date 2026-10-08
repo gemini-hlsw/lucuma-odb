@@ -31,7 +31,6 @@ import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
 import lucuma.core.optics.syntax.lens.*
 import lucuma.core.util.TimeSpan
-import lucuma.core.util.Timestamp
 import lucuma.itc.IntegrationTime
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.*
@@ -46,11 +45,11 @@ import java.util.UUID
  * Flamingos 2 spectroscopy science sequence generation, shared by the long slit
  * and MOS modes.
  *
- * The sequence opens with a "Nighttime Calibrations" atom and, when the science
- * runs longer than `maxSciencePeriod`, closes with one too.  No further sets
- * appear: the observer takes those.
- * The two modes differ only in the aperture their steps carry and in the period,
- * which is the `maxSciencePeriod` parameter threaded through this object.
+ * The two modes differ only in the aperture their steps carry.  The sequence
+ * opens with a "Nighttime Calibrations" atom and, when the science runs longer
+ * than the calibration set interval, closes with one too.  Nothing is placed in
+ * between: the observer takes any further sets.  Flamingos 2 never reaches the
+ * long wavelength cutoff, so the interval is always the short one.
  */
 object Science:
 
@@ -64,9 +63,7 @@ object Science:
    */
   val NighttimeCalTitle: NonEmptyString = NonEmptyString.unsafeFrom("Nighttime Calibrations")
 
-  extension (start: Timestamp)
-    def timeUntil(end: Timestamp): TimeSpan =
-      if start < end then TimeSpan.between(start, end) else TimeSpan.Zero
+  private val Interval: TimeSpan = InfraredCalibration.ShortWavelengthSetInterval
 
   extension [A, B](lst: List[A])
     def removeFirstBy(b: B)(f: (A, B) => Boolean): List[A] =
@@ -186,49 +183,44 @@ object Science:
   end StepDefinition
 
   case class Generator(
-    steps:            StepDefinition,
-    cycleEstimate:    TimeSpan,
-    maxSciencePeriod: TimeSpan,
-    builder:          AtomBuilder[F2],
-    goalCycles:       NonNegInt
+    steps:         StepDefinition,
+    cycleEstimate: TimeSpan,
+    builder:       AtomBuilder[F2],
+    goalCycles:    NonNegInt
   ) extends SequenceGenerator[F2]:
 
     override def generate: Stream[Pure, Atom[F2]] =
 
       val gcalAtom: ProtoAtom[ProtoStep[F2]] = ProtoAtom(NighttimeCalTitle.some, steps.cals)
 
-      // Flats and arcs open the sequence and, when the science runs past the
-      // calibration period, close it as well.  Nothing is placed in between.
       val protoAtoms: List[ProtoAtom[ProtoStep[F2]]] =
         if goalCycles.value === 0 then Nil
         else
           val science     = List.fill(goalCycles.value)(ProtoAtom(AbbaCycleTitle.some, steps.abbaCycle))
           val scienceTime = cycleEstimate *| goalCycles.value
-          (gcalAtom :: science) ++ Option.when(scienceTime > maxSciencePeriod)(gcalAtom).toList
+          (gcalAtom :: science) ++ Option.when(scienceTime > Interval)(gcalAtom).toList
 
       builder.buildStream(Stream.emits(protoAtoms))
 
   end Generator
 
-  private def exposureTimeTooLong(oid: Observation.Id, estimate: TimeSpan, maxSciencePeriod: TimeSpan): OdbError =
-    def minutes(t: TimeSpan): BigDecimal = t.toMinutes.setScale(2, BigDecimal.RoundingMode.HALF_UP)
-    definitionError(oid, s"Estimated ABBA cycle time (${minutes(estimate)} minutes) for $oid must be less than ${minutes(maxSciencePeriod)} minutes.")
+  private def exposureTimeTooLong(oid: Observation.Id, estimate: TimeSpan): OdbError =
+    import InfraredCalibration.minutes
+    definitionError(oid, s"Estimated ABBA cycle time (${minutes(estimate)} minutes) for $oid must be less than ${minutes(Interval)} minutes.")
 
   /**
-   * @param modeName         observing mode name, for error messages
-   * @param maxSciencePeriod science time past which the sequence also closes with a "Nighttime Calibrations" atom
+   * @param modeName observing mode name, for error messages
    */
   def instantiate[F[_]: Monad](
-    observationId:    Observation.Id,
-    estimator:        StepTimeEstimateCalculator[Flamingos2StaticConfig, F2],
-    static:           Flamingos2StaticConfig,
-    namespace:        UUID,
-    expander:         SmartGcalExpander[F, Flamingos2StaticConfig, F2],
-    modeName:         String,
-    maxSciencePeriod: TimeSpan,
-    config:           Config,
-    time:             Either[OdbError, IntegrationTime],
-    calRole:          Option[CalibrationRole]
+    observationId: Observation.Id,
+    estimator:     StepTimeEstimateCalculator[Flamingos2StaticConfig, F2],
+    static:        Flamingos2StaticConfig,
+    namespace:     UUID,
+    expander:      SmartGcalExpander[F, Flamingos2StaticConfig, F2],
+    modeName:      String,
+    config:        Config,
+    time:          Either[OdbError, IntegrationTime],
+    calRole:       Option[CalibrationRole]
   ): F[Either[OdbError, SequenceGenerator[F2]]] =
 
     val posTime: EitherT[F, OdbError, IntegrationTime] =
@@ -238,7 +230,7 @@ object Science:
     def cycleEstimate(steps: StepDefinition): EitherT[F, OdbError, TimeSpan] =
       val estimate = StepTimeEstimateCalculator.runEmpty(estimator.estimateTotalNel(static, steps.abbaCycle))
       EitherT.fromEither:
-        Either.cond(estimate < maxSciencePeriod, estimate, exposureTimeTooLong(observationId, estimate, maxSciencePeriod))
+        Either.cond(estimate < Interval, estimate, exposureTimeTooLong(observationId, estimate))
 
     val gen = for
       t <- posTime
@@ -248,7 +240,6 @@ object Science:
     yield Generator(
       s,
       e,
-      maxSciencePeriod,
       AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Science),
       c
     ): SequenceGenerator[F2]

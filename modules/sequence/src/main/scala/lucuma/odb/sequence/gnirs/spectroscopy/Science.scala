@@ -218,10 +218,12 @@ object Science:
       val science = List.fill(b.goalCycles.value)(
         ProtoAtom(atomTitle(ScienceCycleTitle, b.titleSuffix).some, b.steps.scienceSteps)
       )
-      val closing = b.steps.cals.filter(_ => science.nonEmpty).toList.flatMap: cals =>
-        val interval = InfraredCalibration.calibrationSetInterval(b.steps.wavelength.centralWavelength)
-        val sets     = InfraredCalibration.setCount(interval, b.cycleEstimate *| b.goalCycles.value)
-        List.fill(sets)(ProtoAtom(atomTitle(NighttimeCalTitle, b.titleSuffix).some, cals))
+      val closing =
+        if b.goalCycles.value === 0 then Nil
+        else b.steps.cals.toList.flatMap: cals =>
+          val interval = InfraredCalibration.calibrationSetInterval(b.steps.wavelength.centralWavelength)
+          val sets     = InfraredCalibration.setCount(interval, b.cycleEstimate *| b.goalCycles.value)
+          List.fill(sets)(ProtoAtom(atomTitle(NighttimeCalTitle, b.titleSuffix).some, cals))
       science ++ closing
 
     // Atom ids come from the atom's index within a single builder, so every
@@ -282,7 +284,7 @@ object Science:
     definitionError(oid, s"ITC result wavelength $a does not match the configured ${nm(sw)}.")
 
   private def exposureTimeTooLong(oid: Observation.Id, sw: CentralWavelengthConfig, estimate: TimeSpan, interval: TimeSpan): OdbError =
-    def minutes(t: TimeSpan): BigDecimal = t.toMinutes.setScale(2, BigDecimal.RoundingMode.HALF_UP)
+    import InfraredCalibration.minutes
     definitionError(oid, s"Estimated science cycle time (${minutes(estimate)} minutes) at ${nm(sw)} for $oid must be less than ${minutes(interval)} minutes.")
 
   /**

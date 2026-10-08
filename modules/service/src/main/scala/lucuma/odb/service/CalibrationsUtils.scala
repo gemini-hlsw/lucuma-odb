@@ -119,8 +119,7 @@ object ObsExtract:
 
   /** Calibration sets over the lifetime of an observation: ceil(scienceTime / scienceSpan). */
   def calibrationSets(scienceSpan: TimeSpan, scienceTime: TimeSpan): NonNegInt =
-    NonNegInt.unsafeFrom:
-      math.ceil(scienceTime.toMicroseconds.toDouble / scienceSpan.toMicroseconds.toDouble).toInt
+    NonNegInt.unsafeFrom(InfraredCalibration.intervalsIn(scienceSpan, scienceTime))
 
   /** Placeholder charge for a telluric that has no sequence to estimate from. */
   val TelluricPlaceholderTime: TimeSpan = 15.minTimeSpan

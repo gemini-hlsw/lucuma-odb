@@ -13,7 +13,6 @@ import lucuma.core.enums.ObservingModeType
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig as F2Dynamic
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig as F2Static
-import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.StreamingExecutionConfig
@@ -21,14 +20,6 @@ import lucuma.odb.sequence.data.StreamingExecutionConfig
 import java.util.UUID
 
 object LongSlit:
-
-  /**
-   * Science time past which the sequence closes with a "Nighttime
-   * Calibrations" atom.  Flamingos 2 never reaches the long wavelength cutoff, so the
-   * short wavelength interval always applies.
-   */
-  val MaxSciencePeriod: TimeSpan =
-    InfraredCalibration.ShortWavelengthSetInterval
 
   def instantiate[F[_]: Monad](
     observationId:  Observation.Id,
@@ -49,7 +40,7 @@ object LongSlit:
       if isMosTelluric then
         spectroscopy.MosTelluric.instantiate(observationId, estimator, Static, namespace, expander, ObservingMode.Flamingos2LongSlitName, config, scienceItc, calRole)
       else
-        spectroscopy.Science.instantiate(observationId, estimator, Static, namespace, expander, ObservingMode.Flamingos2LongSlitName, MaxSciencePeriod, config, scienceItc, calRole)
+        spectroscopy.Science.instantiate(observationId, estimator, Static, namespace, expander, ObservingMode.Flamingos2LongSlitName, config, scienceItc, calRole)
 
     (for
        a <- EitherT.fromEither(Acquisition.instantiate(observationId, estimator, Static, namespace, config, acquisitionItc))

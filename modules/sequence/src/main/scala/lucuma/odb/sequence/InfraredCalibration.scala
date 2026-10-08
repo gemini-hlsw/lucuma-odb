@@ -24,6 +24,15 @@ object InfraredCalibration:
   def calibrationSetInterval(wavelength: Wavelength): TimeSpan =
     if wavelength < LongWavelengthCutoff then ShortWavelengthSetInterval else LongWavelengthSetInterval
 
+  /** Started intervals in `scienceTime`: ceil(scienceTime / interval), zero for no science. */
+  def intervalsIn(interval: TimeSpan, scienceTime: TimeSpan): Int =
+    val i = interval.toMicroseconds
+    ((scienceTime.toMicroseconds + i - 1) / i).toInt
+
   /** Calibration sets that `scienceTime` needs: one per started interval, at least one. */
   def setCount(interval: TimeSpan, scienceTime: TimeSpan): Int =
-    math.ceil(scienceTime.toMicroseconds.toDouble / interval.toMicroseconds.toDouble).toInt max 1
+    intervalsIn(interval, scienceTime) max 1
+
+  /** Minutes to two decimal places, for error messages. */
+  def minutes(t: TimeSpan): BigDecimal =
+    t.toMinutes.setScale(2, BigDecimal.RoundingMode.HALF_UP)
