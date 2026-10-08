@@ -221,8 +221,8 @@ object Science:
       val closing =
         if b.goalCycles.value === 0 then Nil
         else b.steps.cals.toList.flatMap: cals =>
-          val interval = InfraredCalibration.calibrationSetInterval(b.steps.wavelength.centralWavelength)
-          val sets     = InfraredCalibration.setCount(interval, b.cycleEstimate *| b.goalCycles.value)
+          val interval = CalibrationSetInterval.forWavelength(b.steps.wavelength.centralWavelength)
+          val sets     = CalibrationSetInterval.setCount(interval, b.cycleEstimate *| b.goalCycles.value)
           List.fill(sets)(ProtoAtom(atomTitle(NighttimeCalTitle, b.titleSuffix).some, cals))
       science ++ closing
 
@@ -284,8 +284,7 @@ object Science:
     definitionError(oid, s"ITC result wavelength $a does not match the configured ${nm(sw)}.")
 
   private def exposureTimeTooLong(oid: Observation.Id, sw: CentralWavelengthConfig, estimate: TimeSpan, interval: TimeSpan): OdbError =
-    import InfraredCalibration.minutes
-    definitionError(oid, s"Estimated science cycle time (${minutes(estimate)} minutes) at ${nm(sw)} for $oid must be less than ${minutes(interval)} minutes.")
+    definitionError(oid, s"Estimated science cycle time (${estimate.toRoundedMinutes} minutes) at ${nm(sw)} for $oid must be less than ${interval.toRoundedMinutes} minutes.")
 
   /**
    * Generates the sequence for a daytime pinhole flat calibration: a single
@@ -401,7 +400,7 @@ object Science:
     // own wavelength; the error names the offending one.
     def cycleEstimate(steps: StepDefinition): EitherT[F, OdbError, TimeSpan] =
       val estimate = StepTimeEstimateCalculator.runEmpty(estimator.estimateTotalNel(static, steps.scienceSteps))
-      val interval = InfraredCalibration.calibrationSetInterval(steps.wavelength.centralWavelength)
+      val interval = CalibrationSetInterval.forWavelength(steps.wavelength.centralWavelength)
       EitherT.fromEither:
         Either.cond(estimate < interval, estimate, exposureTimeTooLong(observationId, steps.wavelength, estimate, interval))
 

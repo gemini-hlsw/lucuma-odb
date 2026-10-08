@@ -45,7 +45,7 @@ import lucuma.odb.graphql.input.ScienceRequirementsInput
 import lucuma.odb.graphql.input.SpectroscopyScienceRequirementsInput
 import lucuma.odb.graphql.input.TargetEnvironmentInput
 import lucuma.odb.graphql.mapping.AccessControl
-import lucuma.odb.sequence.InfraredCalibration
+import lucuma.odb.sequence.CalibrationSetInterval
 import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.sequence.ObservingMode.Syntax.*
 import lucuma.odb.sequence.data.CalibrationGroupTellurics
@@ -93,7 +93,7 @@ object ObsExtract:
       case c: GnirsSpectroscopyConfig => c.telluricType =!= TelluricType.NoTelluric
       case _                          => true
 
-  export InfraredCalibration.{LongWavelengthCutoff, ShortWavelengthSetInterval, LongWavelengthSetInterval, calibrationSetInterval}
+  export CalibrationSetInterval.{LongWavelengthCutoff, ShortWavelength as ShortWavelengthSetInterval, LongWavelength as LongWavelengthSetInterval, forWavelength as calibrationSetInterval}
 
   /** Modes whose science observations are accompanied by tellurics. */
   def modeTakesTelluric(modeType: ObservingModeType): Boolean =
@@ -119,7 +119,7 @@ object ObsExtract:
 
   /** Calibration sets over the lifetime of an observation: ceil(scienceTime / scienceSpan). */
   def calibrationSets(scienceSpan: TimeSpan, scienceTime: TimeSpan): NonNegInt =
-    NonNegInt.unsafeFrom(InfraredCalibration.intervalsIn(scienceSpan, scienceTime))
+    NonNegInt.unsafeFrom(CalibrationSetInterval.intervalsIn(scienceSpan, scienceTime))
 
   /** Placeholder charge for a telluric that has no sequence to estimate from. */
   val TelluricPlaceholderTime: TimeSpan = 15.minTimeSpan

@@ -63,7 +63,7 @@ object Science:
    */
   val NighttimeCalTitle: NonEmptyString = NonEmptyString.unsafeFrom("Nighttime Calibrations")
 
-  private val Interval: TimeSpan = InfraredCalibration.ShortWavelengthSetInterval
+  private val Interval: TimeSpan = CalibrationSetInterval.ShortWavelength
 
   extension [A, B](lst: List[A])
     def removeFirstBy(b: B)(f: (A, B) => Boolean): List[A] =
@@ -205,8 +205,7 @@ object Science:
   end Generator
 
   private def exposureTimeTooLong(oid: Observation.Id, estimate: TimeSpan): OdbError =
-    import InfraredCalibration.minutes
-    definitionError(oid, s"Estimated ABBA cycle time (${minutes(estimate)} minutes) for $oid must be less than ${minutes(Interval)} minutes.")
+    definitionError(oid, s"Estimated ABBA cycle time (${estimate.toRoundedMinutes} minutes) for $oid must be less than ${Interval.toRoundedMinutes} minutes.")
 
   /**
    * @param modeName observing mode name, for error messages

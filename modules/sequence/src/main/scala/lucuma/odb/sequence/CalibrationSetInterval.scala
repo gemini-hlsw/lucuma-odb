@@ -9,20 +9,20 @@ import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 
 /**
- * Nighttime calibration cadence shared by the infrared spectrographs: one
- * calibration set per interval of science, shorter in the thermal infrared.
+ * How much science one nighttime calibration set covers on the infrared
+ * spectrographs: 90 minutes, or an hour from the long wavelength cutoff.
  */
-object InfraredCalibration:
+object CalibrationSetInterval:
 
   /** Wavelength from which infrared calibrations repeat hourly rather than every 90 minutes. 2.6 microns */
   val LongWavelengthCutoff: Wavelength = Wavelength.unsafeFromIntPicometers(2_600_000)
 
-  val ShortWavelengthSetInterval: TimeSpan = 90.minTimeSpan
+  val ShortWavelength: TimeSpan = 90.minTimeSpan
 
-  val LongWavelengthSetInterval: TimeSpan = 60.minTimeSpan
+  val LongWavelength: TimeSpan = 60.minTimeSpan
 
-  def calibrationSetInterval(wavelength: Wavelength): TimeSpan =
-    if wavelength < LongWavelengthCutoff then ShortWavelengthSetInterval else LongWavelengthSetInterval
+  def forWavelength(wavelength: Wavelength): TimeSpan =
+    if wavelength < LongWavelengthCutoff then ShortWavelength else LongWavelength
 
   /** Started intervals in `scienceTime`: ceil(scienceTime / interval), zero for no science. */
   def intervalsIn(interval: TimeSpan, scienceTime: TimeSpan): Int =
@@ -32,7 +32,3 @@ object InfraredCalibration:
   /** Calibration sets that `scienceTime` needs: one per started interval, at least one. */
   def setCount(interval: TimeSpan, scienceTime: TimeSpan): Int =
     intervalsIn(interval, scienceTime) max 1
-
-  /** Minutes to two decimal places, for error messages. */
-  def minutes(t: TimeSpan): BigDecimal =
-    t.toMinutes.setScale(2, BigDecimal.RoundingMode.HALF_UP)
