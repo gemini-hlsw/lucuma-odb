@@ -1251,7 +1251,7 @@ class updateCallsForProposals extends OdbSuite {
         """.asRight
       )
 
-  // Instrument edits and obscalc invalidation (sc-10718)
+  // CfP edits and obscalc invalidation (sc-10718)
 
   private val ObscalcRow: Query[Observation.Id, (CalculationState, Timestamp)] =
     sql"""
@@ -1303,6 +1303,21 @@ class updateCallsForProposals extends OdbSuite {
        .downFields("gemini", "instruments")
        .require[List[String]]
 
+  private def updateCall(cid: CallForProposals.Id, set: String): IO[Unit] =
+    query(
+      staff,
+      s"""
+        mutation {
+          updateCallsForProposals(input: {
+            SET: { $set },
+            WHERE: { id: { EQ: "$cid" } }
+          }) {
+            callsForProposals { id }
+          }
+        }
+      """
+    ).void
+
   test("instruments - adding one invalidates obscalc"):
     for
       (cid, oid) <- callWithObservation
@@ -1352,5 +1367,29 @@ class updateCallsForProposals extends OdbSuite {
       (cid, _) <- callWithObservation
       _        <- assertIO(setInstruments(cid, "GMOS_SOUTH", "GHOST").map(_.sorted), List("GHOST", "GMOS_SOUTH"))
       _        <- assertIO(setInstruments(cid, "GHOST", "FLAMINGOS2").map(_.sorted), List("FLAMINGOS2", "GHOST"))
+    yield ()
+
+  test("a title edit does not invalidate obscalc"):
+    for
+      (cid, oid) <- callWithObservation
+      _          <- setObscalcState(oid, CalculationState.Ready)
+      _          <- updateCall(cid, "title: \"Foo\"")
+      _          <- assertIOBoolean(obscalcRow(oid).map(_._1 === CalculationState.Ready))
+    yield ()
+
+  test("an active period edit invalidates obscalc"):
+    for
+      (cid, oid) <- callWithObservation
+      _          <- setObscalcState(oid, CalculationState.Ready)
+      _          <- updateCall(cid, "activeStart: \"2024-12-31\"")
+      _          <- assertIOBoolean(obscalcRow(oid).map(_._1 === CalculationState.Pending))
+    yield ()
+
+  test("a coordinate limit edit invalidates obscalc"):
+    for
+      (cid, oid) <- callWithObservation
+      _          <- setObscalcState(oid, CalculationState.Ready)
+      _          <- updateCall(cid, "gemini: { coordinateLimits: { north: { raStart: { hms: \"00:00:00\" } } } }")
+      _          <- assertIOBoolean(obscalcRow(oid).map(_._1 === CalculationState.Pending))
     yield ()
 }
