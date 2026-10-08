@@ -4,15 +4,12 @@
 package lucuma.odb.json
 
 import cats.syntax.all.*
-import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Decoder
 import io.circe.DecodingFailure
 import io.circe.Encoder
 import io.circe.Json
-import io.circe.refined.*
 import io.circe.syntax.*
 import lucuma.core.enums.AltairMode
-import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.enums.ExchangeObservingModeType
 import lucuma.core.enums.Flamingos2Disperser
 import lucuma.core.enums.GmosNorthFilter
@@ -38,7 +35,6 @@ import lucuma.core.model.Configuration
 import lucuma.core.model.Configuration.Conditions
 import lucuma.core.model.Configuration.ObservingMode
 import lucuma.core.model.Configuration.ObservingMode.*
-import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.ImageQuality
 import lucuma.odb.json.angle.query.given
 import lucuma.odb.json.coordinates.query.given
@@ -244,22 +240,6 @@ object configurationrequest:
         "observingMode" -> c.observingMode.asJson,
         "altairMode" -> c.altair.asJson,
         "schedulingMode" -> c.schedulingMode.asJson
-      )
-
-    given Decoder[ConfigurationRequest] = hc =>
-      for
-        id <- hc.downField("id").as[ConfigurationRequest.Id]
-        st <- hc.downField("status").as[ConfigurationRequestStatus]
-        ju <- hc.downField("justification").as[Option[NonEmptyString]]
-        cf <- hc.downField("configuration").as[Configuration]
-      yield ConfigurationRequest(id, st, ju, cf)
-
-    given Encoder[ConfigurationRequest] = cr =>
-      Json.obj(
-        "id" -> cr.id.asJson,
-        "status" -> cr.status.asJson,
-        "justification" -> cr.justification.asJson,
-        "configuration" -> cr.configuration.asJson
       )
 
   object query extends QueryCodec
