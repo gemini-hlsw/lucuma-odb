@@ -1,0 +1,28 @@
+apiVersion: syntheticmonitoring.ext.grafana.app/v1alpha1
+kind: Check
+metadata:
+  name: itc-dev-ready
+spec:
+  job: itc-dev-ready
+  target: https://itc-dev.lucuma.xyz/health/ready
+  frequency: 900000
+  timeout: 10000
+  enabled: true
+  labels:
+    - name: environment
+      value: dev
+    - name: system
+      value: itc
+    - name: kind
+      value: readiness
+  probes:
+    - NorthVirginia
+    - SaoPaulo
+  basicMetricsOnly: true
+  settings:
+    http:
+      method: GET
+      validStatusCodes: [200]
+      failIfBodyNotMatchesRegexp:
+        - '"status":"ok"'
+      ipVersion: V4

@@ -1,0 +1,57 @@
+{
+  "uid": "lucuma-worker-stale",
+  "title": "Worker loop stalled",
+  "folderUID": "lucuma-health",
+  "ruleGroup": "lucuma-health-readiness",
+  "condition": "C",
+  "for": "5m",
+  "noDataState": "Alerting",
+  "execErrState": "Error",
+  "labels": {
+    "severity": "critical",
+    "team": "gpp"
+  },
+  "annotations": {
+    "summary": "{{ $labels.service }} ({{ $labels.deployment_environment_name }}) has not completed a poll iteration for over 10 minutes",
+    "description": "The worker records lucuma_worker_last_iteration_epoch_seconds after every poll. A stalled value means the dyno is down, stuck, or cannot reach Postgres. Check the dyno logs on Heroku.",
+    "runbook_url": "https://github.com/gemini-hlsw/lucuma-odb/blob/main/ODB-README.md#health-endpoints"
+  },
+  "data": [
+    {
+      "refId": "A",
+      "relativeTimeRange": {
+        "from": 600,
+        "to": 0
+      },
+      "datasourceUid": "grafanacloud-prom",
+      "model": {
+        "refId": "A",
+        "instant": true,
+        "expr": "time() - max by (service, deployment_environment_name) (lucuma_worker_last_iteration_epoch_seconds)"
+      }
+    },
+    {
+      "refId": "C",
+      "relativeTimeRange": {
+        "from": 0,
+        "to": 0
+      },
+      "datasourceUid": "__expr__",
+      "model": {
+        "refId": "C",
+        "type": "threshold",
+        "expression": "A",
+        "conditions": [
+          {
+            "evaluator": {
+              "type": "gt",
+              "params": [
+                300
+              ]
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
