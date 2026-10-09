@@ -15,3 +15,5 @@ trait TelluricTypeGraphQLFormat:
     case TelluricType.Manual(starTypes) =>
       val types = starTypes.toList.map(s => s""""$s"""").mkString("[", ", ", "]")
       s"{ tag: MANUAL, starTypes: $types }"
+    case TelluricType.UserDefined(count) =>
+      s"{ tag: USER_DEFINED, count: ${count.value.value} }"

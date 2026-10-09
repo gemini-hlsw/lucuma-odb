@@ -175,22 +175,32 @@ trait AccessControl[F[_]] extends Predicates[F] {
    * by the current user and satisfy the supplied filters *without regard to workflow state*.
    */
   def writableOids(
-    includeDeleted:      Option[Boolean],
-    WHERE:               Option[Predicate],
-    includeCalibrations: Boolean,
-    admittedTelluricModes: List[ObservingModeType] = Nil
+    includeDeleted:              Option[Boolean],
+    WHERE:                       Option[Predicate],
+    includeCalibrations:         Boolean,
+    includeUserDefinedTellurics: Boolean,
+    admittedTelluricModes:       List[ObservingModeType] = Nil
   )(using Services[F]): Result[AppliedFragment] =
+    // A user-defined telluric is edited like a science observation.
+    val science: Predicate =
+      if includeUserDefinedTellurics then
+        Or(
+          Predicates.observation.calibrationRole.isNull(true),
+          Predicates.observation.isUserDefinedTelluric.eql(true)
+        )
+      else Predicates.observation.calibrationRole.isNull(true)
+
     val calibrations: Predicate =
       if includeCalibrations then True
       else if admittedTelluricModes.nonEmpty then
         Or(
-          Predicates.observation.calibrationRole.isNull(true),
+          science,
           And(
             Predicates.observation.calibrationRole.eql(CalibrationRole.Telluric.some),
             Predicates.observation.observingModeType.in(admittedTelluricModes)
           )
         )
-      else Predicates.observation.calibrationRole.isNull(true)
+      else science
 
     idSelectFromPredicate(
       ObservationType,
@@ -215,7 +225,7 @@ trait AccessControl[F[_]] extends Predicates[F] {
     admittedTelluricModes: List[ObservingModeType] = Nil
   )(using Services[F], NoTransaction[F]): F[Result[List[Observation.Id]]] =
     Services.asSuperUser:
-      writableOids(includeDeleted, WHERE, includeCalibrations, admittedTelluricModes)
+      writableOids(includeDeleted, WHERE, includeCalibrations, includeUserDefinedTellurics = true, admittedTelluricModes)
         .flatTraverse: which =>
           observationWorkflowService.filterState(which, allowedStates)
 
@@ -228,7 +238,7 @@ trait AccessControl[F[_]] extends Predicates[F] {
     WHERE:               Option[Predicate],
     includeCalibrations: Boolean,
   )(using Services[F], NoTransaction[F]): F[Result[List[Observation.Id]]] =
-    writableOids(includeDeleted, WHERE, includeCalibrations)
+    writableOids(includeDeleted, WHERE, includeCalibrations, includeUserDefinedTellurics = false)
       .flatTraverse: af =>
         session
           .prepareR(af.fragment.query(observation_id))

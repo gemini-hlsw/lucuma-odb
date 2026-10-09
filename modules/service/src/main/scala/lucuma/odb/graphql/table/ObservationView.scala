@@ -26,6 +26,7 @@ trait ObservationView[F[_]] extends BaseMapping[F] {
       val GroupId: ColumnRef               = col("c_group_id",                  group_id.opt)
       val GroupIndex: ColumnRef            = col("c_group_index",               int2_nonneg)
       val CalibrationRole: ColumnRef       = col("c_calibration_role",          calibration_role.opt)
+      val IsUserDefinedTelluric: ColumnRef = col("c_is_user_defined_telluric",  bool)
       val ObserverNotes: ColumnRef         = col("c_observer_notes",            text_nonempty.opt)
       val Priority: ColumnRef              = col("c_priority",                  observation_priority)
       val ReferenceTime: ColumnRef         = col("c_reference_time",            core_timestamp.opt)

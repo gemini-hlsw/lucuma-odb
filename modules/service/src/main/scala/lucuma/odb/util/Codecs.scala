@@ -33,6 +33,7 @@ import lucuma.core.math.RightAscension
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
 import lucuma.core.model.*
+import lucuma.core.model.IsUserDefinedTelluric
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.CalibrationDigest
 import lucuma.core.model.sequence.CalibrationEstimate
@@ -418,6 +419,9 @@ trait Codecs extends CoreCodecs {
 
   val keck_instrument: Codec[KeckInstrument] =
     enumerated(Type("e_keck_instrument"))
+
+  val is_user_defined_telluric: Codec[IsUserDefinedTelluric] =
+    bool.imap(IsUserDefinedTelluric(_))(_.value)
 
   val md5_hash: Codec[Md5Hash] =
     bytea.eimap(b => Md5Hash.fromByteArray(b).toRight(s"Expected an MD5 hash value but found ${b.size} bytes"))(_.toByteArray)

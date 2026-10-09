@@ -8,6 +8,7 @@ import cats.syntax.all.*
 import grackle.Result
 import grackle.Value
 import grackle.syntax.*
+import lucuma.core.model.TelluricCount
 import lucuma.core.model.TelluricType
 
 object TelluricTypeBinding extends Matcher[TelluricType]:
@@ -40,6 +41,16 @@ object TelluricTypeBinding extends Matcher[TelluricType]:
                     }
                   case None => Result.failure("starTypes is required when tag is Manual")
                   case _    => Result.failure("starTypes must be a list")
+                }
+              case "USER_DEFINED" =>
+                fieldMap.get("count") match {
+                  case Some(Value.IntValue(count)) =>
+                    TelluricCount.from(count).fold(
+                      _ => Result.failure("count must be 1 or 2 for UserDefined telluric type"),
+                      c => TelluricType.UserDefined(c).success
+                    )
+                  case None => Result.failure("count is required when tag is UserDefined")
+                  case _    => Result.failure("count must be an integer")
                 }
               case other => Result.failure(s"Unknown telluric type tag: $other")
             }
