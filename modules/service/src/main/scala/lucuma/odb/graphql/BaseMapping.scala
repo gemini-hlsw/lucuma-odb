@@ -311,6 +311,7 @@ trait BaseMapping[F[_]]
   lazy val ImagingScienceRequirementsType          = schema.ref("ImagingScienceRequirements")
   lazy val ImagingVariantObjectType                = schema.ref("ImagingVariant")
   lazy val ImagingVariantTypeType                  = schema.ref("ImagingVariantType")
+  lazy val InsertSmartGcalResultType               = schema.ref("InsertSmartGcalResult")
   lazy val InterleavedImagingVariantType           = schema.ref("InterleavedImagingVariant")
   lazy val InstrumentType                          = schema.ref("Instrument")
   lazy val IntPercentType                          = schema.ref("IntPercent")

@@ -4008,6 +4008,14 @@ type Mutation {
   deleteSequence(input: DeleteSequenceInput!): DeleteSequenceResult!
 
   """
+  Inserts the GCAL steps corresponding to one or more smart GCAL types (e.g.,
+  an arc and/or a flat) into a sequence.  The sequence is materialized first,
+  if necessary, and is afterwards considered customized.  Prior to execution a
+  PI may make this edit, afterwards it requires staff (or better) access.
+  """
+  insertSmartGcal(input: InsertSmartGcalInput!): InsertSmartGcalResult!
+
+  """
   Ties a specific user to an existing ProgramUser, which must not already be
   associated with any user.
   """
@@ -5647,6 +5655,52 @@ Select one of `observationId` or `observationReference`.
 input DeleteSequenceInput {
   observationId: ObservationId
   observationReference: ObservationReferenceLabel
+}
+
+"""
+Input parameters for inserting smart GCAL steps into a sequence.  Select one of
+`observationId` or `observationReference`.
+"""
+input InsertSmartGcalInput {
+  observationId: ObservationId
+  observationReference: ObservationReferenceLabel
+
+  """
+  The sequence into which the steps are inserted.  Defaults to SCIENCE.
+  """
+  sequenceType: SequenceType! = SCIENCE
+
+  """
+  The smart GCAL steps to insert, in order.  Each is replaced by the GCAL
+  step(s) that the smart GCAL lookup produces for the instrument configuration
+  of the step they follow (see `afterStepId`).  It is an error if there is no
+  smart GCAL mapping for any of these types.
+  """
+  smartGcalTypes: [SmartGcalType!]!
+
+  """
+  The new steps are inserted immediately after this step, are configured to
+  match it, and join its atom.  It must be either a step that has not started
+  executing or the most recently executed (or executing) step.  In the latter
+  case, if the step was executed in an earlier visit, the new steps are placed
+  in an atom of their own instead.  Either way they will be the next steps to
+  execute.
+
+  When not specified, the most recently executed step is used.  If nothing has
+  been executed, the new steps are instead inserted at the start of the
+  sequence, configured to match and joining the atom of the first step.
+  """
+  afterStepId: StepId
+}
+
+"""
+The result of inserting smart GCAL steps into a sequence.
+"""
+type InsertSmartGcalResult {
+  """
+  The observation whose sequence was edited.
+  """
+  observation: Observation!
 }
 
 """

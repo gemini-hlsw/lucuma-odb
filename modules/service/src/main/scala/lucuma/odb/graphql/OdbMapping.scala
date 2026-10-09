@@ -245,6 +245,7 @@ object OdbMapping {
           with HourAngleRangeMapping[F]
           with ImagingConfigOptionMapping[F]
           with ImagingScienceRequirementsMapping[F]
+          with InsertSmartGcalResultMapping[F]
           with LeafMappings[F]
           with LinkUserResultMapping[F]
           with MutationMapping[F]
@@ -510,6 +511,7 @@ object OdbMapping {
                 ImagingConfigOptionFlamingos2Mapping,
                 ImagingConfigOptionGnirsMapping,
                 ImagingScienceRequirementsMapping,
+                InsertSmartGcalResultMapping,
                 HourAngleRangeMapping,
                 LargeProgramMapping,
                 LibraryProgramReferenceMapping,

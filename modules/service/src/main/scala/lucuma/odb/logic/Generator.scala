@@ -23,6 +23,7 @@ import lucuma.core.enums.ExchangeObservingModeType
 import lucuma.core.enums.ExecutionState
 import lucuma.core.enums.GuideProbe
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.enums.SequenceType
 import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Atom
@@ -39,6 +40,7 @@ import lucuma.core.model.sequence.StepDigest
 import lucuma.core.model.sequence.StepDigests
 import lucuma.core.model.sequence.exposure.PendingExposureRules
 import lucuma.core.syntax.timespan.*
+import lucuma.core.util.Enumerated
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.Itc
 import lucuma.odb.data.ItcAcquisition
@@ -120,10 +122,12 @@ sealed trait Generator[F[_]]:
   /**
    * Materializes the execution sequence (if not already materialized) and then,
    * in the same transaction, executes the given action.  The generator context
-   * used for the materialization is passed to the action.
+   * used for the materialization is passed to the action.  Only the sequence
+   * types in `sequenceTypes` are materialized.
    */
   def materializeAndThen[A](
-    oid:  Observation.Id
+    oid:           Observation.Id,
+    sequenceTypes: Set[SequenceType] = Enumerated[SequenceType].all.toSet
   )(
     f: GeneratorContext => Transaction[F] ?=> F[Either[OdbError, A]]
   )(using NoTransaction[F], Services.ServiceAccess): F[Either[OdbError, A]]
@@ -686,7 +690,8 @@ object Generator:
         calcDigestFromContext(ctx).value
 
       override def materializeAndThen[A](
-        oid:  Observation.Id
+        oid:           Observation.Id,
+        sequenceTypes: Set[SequenceType]
       )(
         f: GeneratorContext => Transaction[F] ?=> F[Either[OdbError, A]]
       )(using NoTransaction[F], Services.ServiceAccess): F[Either[OdbError, A]] =
@@ -698,62 +703,62 @@ object Generator:
 
             case ObservingModeType.Flamingos2Imaging  =>
               EitherT(streaming.generateFlamingos2Imaging(ctx))
-                .flatMap(s => EitherT.liftF(sequenceService.materializeFlamingos2ExecutionConfig(oid, s)))
+                .flatMap(s => EitherT.liftF(sequenceService.materializeFlamingos2ExecutionConfig(oid, s, sequenceTypes)))
 
             case ObservingModeType.Flamingos2LongSlit =>
               EitherT(streaming.generateFlamingos2LongSlit(ctx))
-                .flatMap(s => EitherT.liftF(sequenceService.materializeFlamingos2ExecutionConfig(oid, s)))
+                .flatMap(s => EitherT.liftF(sequenceService.materializeFlamingos2ExecutionConfig(oid, s, sequenceTypes)))
 
             case ObservingModeType.Flamingos2Mos      =>
               EitherT(streaming.generateFlamingos2Mos(ctx))
-                .flatMap(s => EitherT.liftF(sequenceService.materializeFlamingos2ExecutionConfig(oid, s)))
+                .flatMap(s => EitherT.liftF(sequenceService.materializeFlamingos2ExecutionConfig(oid, s, sequenceTypes)))
 
             case ObservingModeType.GhostIfu           =>
               EitherT(streaming.generateGhost(ctx))
-                .flatMap(s => EitherT.liftF(sequenceService.materializeGhostExecutionConfig(oid, s)))
+                .flatMap(s => EitherT.liftF(sequenceService.materializeGhostExecutionConfig(oid, s, sequenceTypes)))
 
             case ObservingModeType.GmosNorthImaging   =>
               EitherT(streaming.generateGmosNorthImaging(ctx))
-                .flatMap(s => EitherT.liftF(sequenceService.materializeGmosNorthExecutionConfig(oid, s)))
+                .flatMap(s => EitherT.liftF(sequenceService.materializeGmosNorthExecutionConfig(oid, s, sequenceTypes)))
 
             case ObservingModeType.GmosNorthMos       =>
               EitherT(streaming.generateGmosNorthMos(ctx))
-                .flatMap(s => EitherT.liftF(sequenceService.materializeGmosNorthExecutionConfig(oid, s)))
+                .flatMap(s => EitherT.liftF(sequenceService.materializeGmosNorthExecutionConfig(oid, s, sequenceTypes)))
 
             case ObservingModeType.GmosNorthLongSlit  =>
               EitherT(streaming.generateGmosNorthLongSlit(ctx))
-                .flatMap(s => EitherT.liftF(sequenceService.materializeGmosNorthExecutionConfig(oid, s)))
+                .flatMap(s => EitherT.liftF(sequenceService.materializeGmosNorthExecutionConfig(oid, s, sequenceTypes)))
 
             case ObservingModeType.GmosSouthImaging   =>
               EitherT(streaming.generateGmosSouthImaging(ctx))
-                .flatMap(s => EitherT.liftF(sequenceService.materializeGmosSouthExecutionConfig(oid, s)))
+                .flatMap(s => EitherT.liftF(sequenceService.materializeGmosSouthExecutionConfig(oid, s, sequenceTypes)))
 
             case ObservingModeType.GmosSouthLongSlit  =>
               EitherT(streaming.generateGmosSouthLongSlit(ctx))
-                .flatMap(s => EitherT.liftF(sequenceService.materializeGmosSouthExecutionConfig(oid, s)))
+                .flatMap(s => EitherT.liftF(sequenceService.materializeGmosSouthExecutionConfig(oid, s, sequenceTypes)))
 
             case ObservingModeType.GmosSouthMos       =>
               EitherT(streaming.generateGmosSouthMos(ctx))
-                .flatMap(s => EitherT.liftF(sequenceService.materializeGmosSouthExecutionConfig(oid, s)))
+                .flatMap(s => EitherT.liftF(sequenceService.materializeGmosSouthExecutionConfig(oid, s, sequenceTypes)))
 
             case ObservingModeType.GmosNorthIfu       =>
               EitherT(streaming.generateGmosNorthIfu(ctx))
-                .flatMap(s => EitherT.liftF(sequenceService.materializeGmosNorthExecutionConfig(oid, s)))
+                .flatMap(s => EitherT.liftF(sequenceService.materializeGmosNorthExecutionConfig(oid, s, sequenceTypes)))
 
             case ObservingModeType.GmosSouthIfu       =>
               EitherT(streaming.generateGmosSouthIfu(ctx))
-                .flatMap(s => EitherT.liftF(sequenceService.materializeGmosSouthExecutionConfig(oid, s)))
+                .flatMap(s => EitherT.liftF(sequenceService.materializeGmosSouthExecutionConfig(oid, s, sequenceTypes)))
             case ObservingModeType.GnirsImaging       =>
               EitherT(streaming.generateGnirsImaging(ctx))
-                .flatMap(s => EitherT.liftF(sequenceService.materializeGnirsExecutionConfig(oid, s)))
+                .flatMap(s => EitherT.liftF(sequenceService.materializeGnirsExecutionConfig(oid, s, sequenceTypes)))
 
             case ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu =>
               EitherT(streaming.generateGnirsSpectroscopy(ctx))
-                .flatMap(s => EitherT.liftF(sequenceService.materializeGnirsExecutionConfig(oid, s)))
+                .flatMap(s => EitherT.liftF(sequenceService.materializeGnirsExecutionConfig(oid, s, sequenceTypes)))
 
             case ObservingModeType.Igrins2LongSlit    =>
               EitherT(streaming.generateIgrins2LongSlit(ctx))
-                .flatMap(s => EitherT.liftF(sequenceService.materializeIgrins2ExecutionConfig(oid, s)))
+                .flatMap(s => EitherT.liftF(sequenceService.materializeIgrins2ExecutionConfig(oid, s, sequenceTypes)))
 
             case _: VisitorObservingModeType          =>
               EitherT.pure(())

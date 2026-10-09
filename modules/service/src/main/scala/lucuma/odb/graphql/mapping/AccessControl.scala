@@ -21,6 +21,7 @@ import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.SequenceType
 import lucuma.core.model.Access
 import lucuma.core.model.Observation
+import lucuma.core.model.ObservationReference
 import lucuma.core.model.ObservationWorkflow
 import lucuma.core.model.Program
 import lucuma.core.model.ProgramNote
@@ -45,6 +46,7 @@ import lucuma.odb.graphql.input.CreateProgramNoteInput
 import lucuma.odb.graphql.input.CreateTargetInput
 import lucuma.odb.graphql.input.DeleteSequenceInput
 import lucuma.odb.graphql.input.EditAsterismsPatchInput
+import lucuma.odb.graphql.input.InsertSmartGcalInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
 import lucuma.odb.graphql.input.ObservationTimesInput
 import lucuma.odb.graphql.input.ProgramNotePropertiesInput
@@ -793,16 +795,20 @@ trait AccessControl[F[_]] extends Predicates[F] {
                 Result(AccessControl.unchecked((om, calibrationRole, w, input.state), input.observationId, observation_id))
               else Result.failure(OdbError.InvalidWorkflowTransition(w.state, input.state).asProblem)
 
-  def selectForUpdate[D](
-    input: ReplaceSequenceInput[D]
-  )(using Services[F], NoTransaction[F]): F[Result[CheckedWithId[(SequenceType, List[ProtoAtom[ProtoStep[D]]]), Observation.Id]]] =
+  // A PI may edit the sequence prior to execution, staff at any time.
+  private def selectForSequenceEdit[A](
+    observationId:  Option[Observation.Id],
+    observationRef: Option[ObservationReference],
+    edit:           A,
+    description:    String
+  )(using Services[F], NoTransaction[F]): F[Result[CheckedWithId[A, Observation.Id]]] =
     val allowedStates: Set[ObservationWorkflowState] =
       if user.role.access <= Access.Pi then ObservationWorkflowState.preExecutionSet // ok prior to execution
       else ObservationWorkflowState.fullSet
 
     Services.asSuperUser:
       (for
-        o  <- ResultT(observationService.resolveOid(input.observationId, input.observationRef))
+        o  <- ResultT(observationService.resolveOid(observationId, observationRef))
         os <- ResultT(selectForObservationUpdateImpl(
                 includeDeleted      = None,
                 oids                = List(o),
@@ -811,10 +817,20 @@ trait AccessControl[F[_]] extends Predicates[F] {
               ))
         c  <- ResultT.fromResult:
                 os match
-                  case Nil     => Result.failure(OdbError.NotAuthorized(user.id, s"User cannot replace the sequence in the current observation workflow state.".some).asProblem)
-                  case List(o) => Result(AccessControl.unchecked(input.sequenceType -> input.sequence, o, observation_id))
+                  case Nil     => Result.failure(OdbError.NotAuthorized(user.id, s"User cannot $description in the current observation workflow state.".some).asProblem)
+                  case List(o) => Result(AccessControl.unchecked(edit, o, observation_id))
                   case o       => Result.internalError(s"Checked one id '$o', but got a list of ids back: $os")
       yield c).value
+
+  def selectForUpdate[D](
+    input: ReplaceSequenceInput[D]
+  )(using Services[F], NoTransaction[F]): F[Result[CheckedWithId[(SequenceType, List[ProtoAtom[ProtoStep[D]]]), Observation.Id]]] =
+    selectForSequenceEdit(input.observationId, input.observationRef, input.sequenceType -> input.sequence, "replace the sequence")
+
+  def selectForUpdate(
+    input: InsertSmartGcalInput
+  )(using Services[F], NoTransaction[F]): F[Result[CheckedWithId[InsertSmartGcalInput, Observation.Id]]] =
+    selectForSequenceEdit(input.observationId, input.observationRef, input, "insert smart GCAL steps")
 
   def selectForUpdate(
     input: DeleteSequenceInput

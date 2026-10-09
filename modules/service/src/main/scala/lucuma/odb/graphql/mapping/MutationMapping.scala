@@ -98,6 +98,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] with UserEnv {
       DeleteProgramUser,
       DeleteProposal,
       DeleteSequence,
+      InsertSmartGcal,
       LinkUser,
       RecordDataset,
       RecordFlamingos2Visit,
@@ -560,6 +561,24 @@ trait MutationMapping[F[_]] extends AccessControl[F] with UserEnv {
                     .deleteSequence(oid)
                     .nestMap: _ =>
                       Filter(Predicates.deleteSequenceResult.observation.id.eql(oid), child)
+
+  private lazy val InsertSmartGcal: MutationField =
+    MutationField("insertSmartGcal", InsertSmartGcalInput.Binding): (input, child) =>
+      services.useNonTransactionally:
+        selectForUpdate(input).flatMap: res =>
+          res.flatTraverse: checked =>
+            checked.foldWithId(OdbError.InvalidArgument().asFailureF): (in, oid) =>
+              Services.asSuperUser:
+                generator
+                  .materializeAndThen(oid, Set(in.sequenceType)): ctx =>
+                    sequenceService
+                      .insertSmartGcal(oid, in.sequenceType, in.smartGcalTypes, in.afterStepId, ctx.params.calibrationRole)
+                      // don't leave a sequence materialized by a failed insert
+                      .flatTap(r => transaction.rollback.unlessA(r.hasValue))
+                      .map(_.asRight[OdbError])
+                  .map(_.fold(_.asFailure, identity))
+                  .nestMap: _ =>
+                    Filter(Predicates.insertSmartGcalResult.observation.id.eql(oid), child)
 
   private lazy val ReplaceFlamingos2Sequence =
     MutationField.json("replaceFlamingos2Sequence", ReplaceSequenceInput.ReplaceFlamingos2Binding): input =>
