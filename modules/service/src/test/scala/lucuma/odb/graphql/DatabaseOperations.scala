@@ -139,6 +139,43 @@ trait DatabaseOperations { this: OdbSuite =>
       requireServiceAccessOrThrow:
         services.transactionally(ObscalcService.instantiate[IO].refreshCalibrations(1024))
 
+  // Obscalc state and last invalidation, for tests that check whether an edit
+  // invalidated the calculation.
+  def obscalcRow(oid: Observation.Id): IO[(CalculationState, Timestamp)] =
+    withSession(_.unique(sql"""
+      SELECT c_obscalc_state, c_last_invalidation
+        FROM t_obscalc
+       WHERE c_observation_id = $observation_id
+    """.query(calculation_state *: core_timestamp))(oid))
+
+  // As `obscalcRow`, for every observation in the program, ordered by id.
+  def programObscalcRows(pid: Program.Id): IO[List[(Observation.Id, CalculationState, Timestamp)]] =
+    withSession(_.execute(sql"""
+      SELECT c_observation_id, c_obscalc_state, c_last_invalidation
+        FROM t_obscalc
+       WHERE c_program_id = $program_id
+       ORDER BY c_observation_id
+    """.query(observation_id *: calculation_state *: core_timestamp))(pid))
+
+  // Sets the obscalc state, moving the last invalidation into the past so that
+  // a new invalidation is detectable within the same test.
+  def setObscalcState(oid: Observation.Id, state: CalculationState): IO[Unit] =
+    withSession(_.execute(sql"""
+      UPDATE t_obscalc
+         SET c_obscalc_state     = $calculation_state,
+             c_last_invalidation = now() - interval '1 day'
+       WHERE c_observation_id = $observation_id
+    """.command)(state, oid).void)
+
+  // As `setObscalcState`, for every observation in the program.
+  def setProgramObscalcState(pid: Program.Id, state: CalculationState): IO[Unit] =
+    withSession(_.execute(sql"""
+      UPDATE t_obscalc
+         SET c_obscalc_state     = $calculation_state,
+             c_last_invalidation = now() - interval '1 day'
+       WHERE c_program_id = $program_id
+    """.command)(state, pid).void)
+
   def selectCalculationStates: IO[Map[Observation.Id, CalculationState]] =
     withSession: session =>
       val states: Query[Void, (Observation.Id, CalculationState)] = sql"""
