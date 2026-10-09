@@ -1105,32 +1105,66 @@ class perProgramPerConfigCalibrations
       assertSpecPhotoTimeAndCount(etmForScience(ob), 300, DefaultSnAt.some)
     }
 
-  test("spec photo still on signal to noise is converted to time and count"):
+  def specPhotoId(ob: List[CalibObs]): Observation.Id =
+    ob.collectFirst { case CalibObs(id = cid, calibrationRole = Some(CalibrationRole.SpectroPhotometric)) => cid }.get
+
+  // Simulates a spec-phot observation created before the T&C default
+  def revertToSignalToNoise(cid: Observation.Id): IO[Unit] =
+    withSession: s =>
+      s.execute(sql"""
+        UPDATE t_exposure_time_mode
+           SET c_exposure_time_mode = 'signal_to_noise',
+               c_signal_to_noise    = 100,
+               c_exposure_time      = NULL,
+               c_exposure_count     = NULL
+         WHERE c_observation_id = '#${cid.show}'
+      """.command).void
+
+  def specPhotoConvertedTo(modeType: ObservingModeType, seconds: Int): IO[Unit] =
+    for {
+      pid <- createProgramAs(pi)
+      tid <- createTargetAs(pi, pid, "One")
+      oid <- createObservationAs(pi, pid, modeType.some, tid)
+      _   <- prepareObservation(pi, pid, oid, tid)
+      _   <- recalculateCalibrations(pid, when, oid)
+      _   <- queryObservations(pid).flatMap(ob => revertToSignalToNoise(specPhotoId(ob)))
+      bef <- queryObservations(pid)
+      _   <- recalculateCalibrations(pid, when, oid)
+      aft <- queryObservations(pid)
+    } yield {
+      assert(etmRequirement(bef).flatMap(_.signalToNoise).isDefined)
+      assert(etmForScience(bef).flatMap(_.signalToNoise).isDefined)
+      assertSpecPhotoTimeAndCount(etmRequirement(aft), seconds, DefaultSnAt.some)
+      assertSpecPhotoTimeAndCount(etmForScience(aft), seconds, DefaultSnAt.some)
+    }
+
+  test("spec photo long slit still on signal to noise is converted to time and count"):
+    specPhotoConvertedTo(ObservingModeType.GmosNorthLongSlit, 120)
+
+  test("spec photo IFU still on signal to noise is converted to time and count"):
+    specPhotoConvertedTo(ObservingModeType.GmosSouthIfu, 300)
+
+  test("spec photo still on signal to noise is not converted once it has started executing"):
+    val setupEvent =
+      ExecutionQuerySetupOperations
+        .Setup(offset = 200, atomCount = 1, stepCount = 1, datasetCount = 1)
+
     for {
       pid <- createProgramAs(pi)
       tid <- createTargetAs(pi, pid, "One")
       oid <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
       _   <- prepareObservation(pi, pid, oid, tid)
       _   <- recalculateCalibrations(pid, when, oid)
-      ob  <- queryObservations(pid)
-      cid  = ob.collectFirst { case CalibObs(id = cid, calibrationRole = Some(CalibrationRole.SpectroPhotometric)) => cid }.get
-      // Simulate a spec-phot observation created before the T&C default
-      _   <- withSession: s =>
-               s.execute(sql"""
-                 UPDATE t_exposure_time_mode
-                    SET c_exposure_time_mode = 'signal_to_noise',
-                        c_signal_to_noise    = 100,
-                        c_exposure_time      = NULL,
-                        c_exposure_count     = NULL
-                  WHERE c_observation_id = '#${cid.show}'
-               """.command).void
-      bef <- queryObservations(pid)
+      cid <- queryObservations(pid).map(specPhotoId)
+      _   <- revertToSignalToNoise(cid)
+      _   <- recordVisit(setupEvent, service, cid)
+      _   <- runObscalcUpdate(pid, cid)
+      _   <- setCalculatedWorkflowState(cid, ObservationWorkflowState.Ongoing)
       _   <- recalculateCalibrations(pid, when, oid)
       aft <- queryObservations(pid)
     } yield {
-      assert(etmRequirement(bef).flatMap(_.signalToNoise).isDefined)
-      assertSpecPhotoTimeAndCount(etmRequirement(aft), 120, DefaultSnAt.some)
-      assertSpecPhotoTimeAndCount(etmForScience(aft), 120, DefaultSnAt.some)
+      assert(etmRequirement(aft).flatMap(_.signalToNoise).isDefined)
+      assert(etmForScience(aft).flatMap(_.signalToNoise).isDefined)
     }
 
   test("spec photo signal to noise at updates when science S/N wavelength changes"):
@@ -1159,7 +1193,7 @@ class perProgramPerConfigCalibrations
   test("spec photo signal to noise at is not touched once the calibration has started executing"):
     val setupEvent =
       ExecutionQuerySetupOperations
-        .Setup(offset = 200, atomCount = 1, stepCount = 1, datasetCount = 1)
+        .Setup(offset = 400, atomCount = 1, stepCount = 1, datasetCount = 1)
 
     for {
       pid      <- createProgramAs(pi)
