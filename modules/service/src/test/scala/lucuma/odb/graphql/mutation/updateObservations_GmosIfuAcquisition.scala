@@ -8,6 +8,7 @@ import cats.effect.IO
 import cats.syntax.all.*
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.CalibrationRole
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.StandardUser
@@ -16,8 +17,9 @@ import lucuma.core.model.User
 
 /**
  * The GMOS IFU acquisition ROI (sc-10044).  It pairs the ROI for the field image with the ROI used
- * through the IFU, and its default depends on the observation's calibration role, so an explicit
- * choice has to survive an update and a clear has to fall back rather than stick.
+ * through the IFU, and defaults to CCD2 + Full Frame (sc-10735: also for spectrophotometric
+ * standards), so an explicit choice has to survive an update and a clear has to fall back rather
+ * than stick.
  */
 class updateObservations_GmosIfuAcquisition extends OdbSuite:
 
@@ -125,7 +127,7 @@ class updateObservations_GmosIfuAcquisition extends OdbSuite:
                expected("STAMP_FULL_FRAME", "\"STAMP_FULL_FRAME\"").asRight)
     yield ()
 
-  // Null clears the override, so the effective ROI falls back to the calibration-role default.
+  // Null clears the override, so the effective ROI falls back to the default.
   test("clearing the acquisition ROI reverts to the default"):
     for
       oid <- setup
@@ -173,3 +175,31 @@ class updateObservations_GmosIfuAcquisition extends OdbSuite:
                }
              """.asRight)
       yield ()
+
+  test("spectrophotometric standards default to CCD2 + Full Frame"):
+    for
+      oid <- setup
+      _   <- setObservationCalibrationRole(List(oid), CalibrationRole.SpectroPhotometric)
+      _   <- expect(pi, s"""
+               query {
+                 observation(observationId: "$oid") {
+                   observingMode {
+                     gmosNorthIfu { acquisition { roi defaultRoi } }
+                   }
+                 }
+               }
+             """, json"""
+               {
+                 "observation": {
+                   "observingMode": {
+                     "gmosNorthIfu": {
+                       "acquisition": {
+                         "roi": "CCD2_FULL_FRAME",
+                         "defaultRoi": "CCD2_FULL_FRAME"
+                       }
+                     }
+                   }
+                 }
+               }
+             """.asRight)
+    yield ()
