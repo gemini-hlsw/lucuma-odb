@@ -4,7 +4,9 @@
 package lucuma.odb.graphql
 package query
 
+import cats.effect.IO
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.model.Observation
 import lucuma.odb.graphql.feature.TelluricCalibrationsTestSupport
 
 import java.time.Instant
@@ -59,9 +61,34 @@ class executionDigest_calibrationCount
                }"""
              )
         c <- calibrationCount(p, o)
-      yield c,
+        m <- scienceMinutes(o)
+      yield
+        // Preconditions: without them the count of 1 would prove nothing.
+        assert(m.steps < 90, s"science steps should be under 90 minutes, got ${m.steps}")
+        assert(m.total > 90, s"science with its flats and arcs should pass 90 minutes, got ${m.total}")
+        c,
       1
     )
+
+  private case class ScienceMinutes(total: BigDecimal, steps: BigDecimal)
+
+  private def scienceMinutes(oid: Observation.Id): IO[ScienceMinutes] =
+    query(
+      pi,
+      s"""query {
+        observation(observationId: "$oid") {
+          execution { digest { value { science {
+            timeEstimate { total { minutes } }
+            steps { science { time { total { minutes } } } }
+          } } } }
+        }
+      }"""
+    ).map: json =>
+      val sci = json.hcursor.downFields("observation", "execution", "digest", "value", "science")
+      ScienceMinutes(
+        sci.downFields("timeEstimate", "total", "minutes").require[BigDecimal],
+        sci.downFields("steps", "science", "time", "total", "minutes").require[BigDecimal]
+      )
 
   test("a mode that takes no telluric reports 0"):
     assertIO(

@@ -65,16 +65,6 @@ object Science:
 
   private val Interval: TimeSpan = CalibrationSetInterval.ShortWavelength
 
-  extension [A, B](lst: List[A])
-    def removeFirstBy(b: B)(f: (A, B) => Boolean): List[A] =
-      @annotation.tailrec
-      def loop(rem: List[A], acc: List[A]): List[A] =
-        rem match
-          case Nil    => lst
-          case h :: t => if f(h, b) then acc.reverse ++ t else loop(t, h :: acc)
-
-      loop(lst, Nil)
-
   case class StepDefinition(
     a0:   ProtoStep[F2],
     b0:   ProtoStep[F2],
@@ -158,8 +148,9 @@ object Science:
             b1 <- f2ScienceStep(b1Off, sciClass)
             a1 <- f2ScienceStep(a1Off, sciClass)
             _  <- F2.fpu         := Flamingos2FpuMask.builtin(config.gcalFpu)
-            f  <- flatStep(a1.telescopeConfig.copy(guiding = Disabled), ObserveClass.NightCal)
-            r  <- arcStep(a1.telescopeConfig.copy(guiding = Disabled), ObserveClass.NightCal)
+            // Taken at a0 since the set opens the sequence, so no offset precedes the first cycle.
+            f  <- flatStep(a0.telescopeConfig.copy(guiding = Disabled), ObserveClass.NightCal)
+            r  <- arcStep(a0.telescopeConfig.copy(guiding = Disabled), ObserveClass.NightCal)
           yield PreDef(a0, b0, b1, a1, f, r)
 
     def compute[F[_]: Monad](

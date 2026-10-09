@@ -93,8 +93,6 @@ object ObsExtract:
       case c: GnirsSpectroscopyConfig => c.telluricType =!= TelluricType.NoTelluric
       case _                          => true
 
-  export CalibrationSetInterval.{LongWavelengthCutoff, ShortWavelength as ShortWavelengthSetInterval, LongWavelength as LongWavelengthSetInterval, forWavelength as calibrationSetInterval}
-
   /** Modes whose science observations are accompanied by tellurics. */
   def modeTakesTelluric(modeType: ObservingModeType): Boolean =
     modeType match
@@ -111,9 +109,9 @@ object ObsExtract:
   def telluricPerScience(mode: ObservingMode): Option[TimeSpan] =
     mode match
       case c: GnirsSpectroscopyConfig =>
-        calibrationSetInterval(c.wavelengths.map(_.centralWavelength).maximum).some
+        CalibrationSetInterval.forWavelength(c.wavelengths.map(_.centralWavelength).maximum).some
       case _ if modeTakesTelluric(mode.modeType) =>
-        ShortWavelengthSetInterval.some
+        CalibrationSetInterval.ShortWavelength.some
       case _ =>
         none
 

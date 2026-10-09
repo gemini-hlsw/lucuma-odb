@@ -133,7 +133,7 @@ class executionSciFlamingos2_4x5min extends ExecutionTestSupportForFlamingos2:
             "executionConfig" -> Json.obj(
               "flamingos2" -> Json.obj(
                 "science" -> Json.obj(
-                  "nextAtom" -> flamingos2ExpectedGcals((300, 65)),
+                  "nextAtom" -> flamingos2ExpectedGcals((300, 55)),
                   "possibleFuture" -> List(
                     flamingos2ExpectedScienceAtom(ExposureTime, (300, 55, Disabled), (0, -5, Enabled), (0, 5, Enabled), (300, 65, Disabled)),
                     flamingos2ExpectedScienceAtom(ExposureTime, (300, 55, Disabled), (0, -5, Enabled), (0, 5, Enabled), (300, 65, Disabled))
