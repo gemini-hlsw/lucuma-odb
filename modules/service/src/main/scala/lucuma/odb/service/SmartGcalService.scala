@@ -271,7 +271,7 @@ object SmartGcalService:
           .prepareR(af.fragment.query(step_config_gcal ~ int4_pos ~ time_span ~ int4_pos))
           .use(_.stream(af.argument, chunkSize = 16).compile.to(List))
           .map:
-            _.flatMap: 
+            _.flatMap:
               case (((gcal, count), exposureTime), coadds) =>
                 List.fill(count.value)(((_: Gnirs).copy(exposure = exposureTime, coadds = coadds)) -> gcal)
 
@@ -468,6 +468,11 @@ object SmartGcalService:
         case SmartGcalType.DayBaseline   => void"g.c_gcal_baseline  = 'Day'"
         case SmartGcalType.NightBaseline => void"g.c_gcal_baseline  = 'Night'"
 
+    // Matches an optional search key column.  Equivalent to `IS NOT DISTINCT
+    // FROM`, but written so that Postgres can use a b-tree index on the column.
+    private def eqOrNull[A](col: String, enc: Encoder[A], a: Option[A]): AppliedFragment =
+      a.fold(sql"#$col IS NULL"(Void))(sql"#$col = $enc"(_))
+
     private val GcalColumns: List[String] =
       List(
         "c_gcal_continuum",
@@ -530,10 +535,10 @@ object SmartGcalService:
       sgt: SmartGcalType
     ): AppliedFragment =
       val where = List(
-        sql"s.c_disperser       IS NOT DISTINCT FROM ${gmos_north_grating.opt}"(gn.grating.map(_.grating)),
-        sql"s.c_filter          IS NOT DISTINCT FROM ${gmos_north_filter.opt}"(gn.filter),
-        sql"s.c_fpu             IS NOT DISTINCT FROM ${gmos_north_fpu.opt}"(gn.fpu),
-        sql"s.c_disperser_order IS NOT DISTINCT FROM ${gmos_grating_order.opt}"(gn.grating.map(_.order)),
+        eqOrNull("s.c_disperser", gmos_north_grating, gn.grating.map(_.grating)),
+        eqOrNull("s.c_filter", gmos_north_filter, gn.filter),
+        eqOrNull("s.c_fpu", gmos_north_fpu, gn.fpu),
+        eqOrNull("s.c_disperser_order", gmos_grating_order, gn.grating.map(_.order)),
         sql"s.c_x_binning = ${gmos_binning}"(gn.xBin.value),
         sql"s.c_y_binning = ${gmos_binning}"(gn.yBin.value),
         sql"s.c_amp_gain  = ${gmos_amp_gain}"(gn.gain),
@@ -550,10 +555,10 @@ object SmartGcalService:
       sgt: SmartGcalType
     ): AppliedFragment =
       val where = List(
-        sql"s.c_disperser       IS NOT DISTINCT FROM ${gmos_south_grating.opt}"(gs.grating.map(_.grating)),
-        sql"s.c_filter          IS NOT DISTINCT FROM ${gmos_south_filter.opt}"(gs.filter),
-        sql"s.c_fpu             IS NOT DISTINCT FROM ${gmos_south_fpu.opt}"(gs.fpu),
-        sql"s.c_disperser_order IS NOT DISTINCT FROM ${gmos_grating_order.opt}"(gs.grating.map(_.order)),
+        eqOrNull("s.c_disperser", gmos_south_grating, gs.grating.map(_.grating)),
+        eqOrNull("s.c_filter", gmos_south_filter, gs.filter),
+        eqOrNull("s.c_fpu", gmos_south_fpu, gs.fpu),
+        eqOrNull("s.c_disperser_order", gmos_grating_order, gs.grating.map(_.order)),
         sql"s.c_x_binning = ${gmos_binning}"(gs.xBin.value),
         sql"s.c_y_binning = ${gmos_binning}"(gs.yBin.value),
         sql"s.c_amp_gain  = ${gmos_amp_gain}"(gs.gain),
@@ -570,9 +575,9 @@ object SmartGcalService:
       sgt: SmartGcalType
     ): AppliedFragment =
       val where = List(
-        sql"s.c_disperser       IS NOT DISTINCT FROM ${flamingos_2_disperser.opt}"(f2.disperser),
-        sql"s.c_filter          IS NOT DISTINCT FROM $flamingos_2_filter"(f2.filter),
-        sql"s.c_fpu             IS NOT DISTINCT FROM ${flamingos_2_fpu.opt}"(f2.fpu),
+        eqOrNull("s.c_disperser", flamingos_2_disperser, f2.disperser),
+        sql"s.c_filter = $flamingos_2_filter"(f2.filter),
+        eqOrNull("s.c_fpu", flamingos_2_fpu, f2.fpu),
         whereSmartGcalType(sgt),
       )
 
@@ -777,11 +782,11 @@ object SmartGcalService:
     ): AppliedFragment =
       val where = List(
         sql"s.c_pixel_scale     = ${gnirs_pixel_scale}"(key.pixelScale),
-        sql"s.c_disperser       IS NOT DISTINCT FROM ${gnirs_grating.opt}"(key.disperser),
-        sql"s.c_cross_dispersed IS NOT DISTINCT FROM ${gnirs_prism.opt}"(key.crossDispersed),
-        sql"s.c_fpu_slit        IS NOT DISTINCT FROM ${gnirs_fpu_slit.opt}"(GnirsFpu.slit.getOption(key.fpu)),
-        sql"s.c_fpu_other       IS NOT DISTINCT FROM ${gnirs_fpu_other.opt}"(GnirsFpu.other.getOption(key.fpu)),
-        sql"s.c_fpu_ifu         IS NOT DISTINCT FROM ${gnirs_fpu_ifu.opt}"(GnirsFpu.ifu.getOption(key.fpu)),
+        eqOrNull("s.c_disperser", gnirs_grating, key.disperser),
+        eqOrNull("s.c_cross_dispersed", gnirs_prism, key.crossDispersed),
+        eqOrNull("s.c_fpu_slit", gnirs_fpu_slit, GnirsFpu.slit.getOption(key.fpu)),
+        eqOrNull("s.c_fpu_other", gnirs_fpu_other, GnirsFpu.other.getOption(key.fpu)),
+        eqOrNull("s.c_fpu_ifu", gnirs_fpu_ifu, GnirsFpu.ifu.getOption(key.fpu)),
         sql"s.c_well_depth      = ${gnirs_well_depth}"(key.wellDepth),
         key.wavelength.fold(void"s.c_wavelength_range IS NULL")(
           sql"s.c_wavelength_range @> ${wavelength_pm}"
