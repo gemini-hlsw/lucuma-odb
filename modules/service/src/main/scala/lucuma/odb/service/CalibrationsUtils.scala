@@ -8,6 +8,7 @@ import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegInt
+import eu.timepit.refined.types.numeric.PosInt
 import grackle.Result
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ChargeClass
@@ -457,9 +458,9 @@ trait CalibrationObservations {
     config: CalibrationConfigSubset.Gmos
   ): F[Observation.Id] =
     val matchingProps: Option[CalObsProps] = propsForConfig(props, CalibrationRole.SpectroPhotometric, config)
-    val wavelengthAt: Option[Wavelength]   = matchingProps.flatMap(_.wavelengthAt)
+    val etm: ExposureTimeMode              = CalibrationObservations.specPhotoExposureTimeMode(config, matchingProps.flatMap(_.wavelengthAt))
     val band: Option[ScienceBand]          = matchingProps.flatMap(_.band)
-    specPhotoObservation(pid, gid, tid, wavelengthAt, band, config.toInput)
+    specPhotoObservation(pid, gid, tid, etm, band, config.toInput)
 
   def roleConstraints(role: CalibrationRole) =
     role match
@@ -471,7 +472,7 @@ trait CalibrationObservations {
     pid:     Program.Id,
     gid:     Group.Id,
     tid:     Target.Id,
-    wvAt:    Option[Wavelength],
+    etm:     ExposureTimeMode,
     band:    Option[ScienceBand],
     obsMode: ObservingModeInput.Create
   ): F[Observation.Id] =
@@ -498,11 +499,7 @@ trait CalibrationObservations {
               observingMode = obsMode.some,
               scienceRequirements =
                 ScienceRequirementsInput(
-                  exposureTimeMode = Nullable.orNull(wvAt).map: w =>
-                    ExposureTimeMode.SignalToNoiseMode(
-                      SignalToNoise.unsafeFromBigDecimalExact(100.0),
-                      w
-                    ),
+                  exposureTimeMode = Nullable.NonNull(etm),
                   spectroscopy = SpectroscopyScienceRequirementsInput.Default.some,
                   imaging      = none
                 ).some
@@ -561,3 +558,19 @@ trait CalibrationObservations {
             )
       ).orError
 }
+
+object CalibrationObservations:
+
+  // Matches the OT static configurations; S/N can be unreachable in worst-case conditions
+  val SpecPhotoLongSlitTime: TimeSpan = 120.secondTimeSpan
+  val SpecPhotoIfuTime: TimeSpan      = 300.secondTimeSpan
+  val SpecPhotoCount: PosInt          = PosInt.unsafeFrom(1)
+
+  def specPhotoExposureTimeMode(
+    config:       CalibrationConfigSubset.Gmos,
+    wavelengthAt: Option[Wavelength]
+  ): ExposureTimeMode =
+    val time = config match
+      case _: (CalibrationConfigSubset.GmosNConfigs | CalibrationConfigSubset.GmosSConfigs)       => SpecPhotoLongSlitTime
+      case _: (CalibrationConfigSubset.GmosNIfuConfigs | CalibrationConfigSubset.GmosSIfuConfigs) => SpecPhotoIfuTime
+    ExposureTimeMode.TimeAndCountMode(time, SpecPhotoCount, wavelengthAt.getOrElse(config.centralWavelength))
