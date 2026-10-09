@@ -219,15 +219,20 @@ object CallForProposalsService:
         val delete =
           session.executeCommand(Statements.DeleteInstruments(cids)).void
 
-        def insert(vals: List[Instrument]) =
-          session
-            .prepareR(Statements.InsertGeminiInstruments(cids, vals))
-            .use(_.execute(cids, vals))
-            .whenA(vals.nonEmpty)
-            .void
+        // Every write to `t_gemini_cfp_instrument` invalidates the obscalc
+        // results of all observations in the CfPs' programs, so only remove the
+        // instruments that were dropped and only add the ones that are new.
+        def replace(vals: List[Instrument]) =
+          NonEmptyList.fromList(vals).fold(delete): nel =>
+            val keep = nel.toList
+            session.executeCommand(Statements.DeleteInstrumentsExcept(cids, nel)) *>
+              session
+                .prepareR(Statements.InsertGeminiInstruments(cids, keep))
+                .use(_.execute(cids, keep))
+                .void
 
         instruments
-          .fold(delete, Concurrent[F].unit, is => delete *> insert(is))
+          .fold(delete, Concurrent[F].unit, replace)
           .map(_.success)
 
       private def updateExchangePartners(
@@ -281,12 +286,17 @@ object CallForProposalsService:
               case Some(Edit.ObservatoryCallProperties.Gemini(g)) => g.exchangePartners
               case _                                              => Nullable.Absent
 
+          // The per-call tables are keyed by the matched ids, and their
+          // statements can't be built from an empty id list.
+          def forMatched(cids: List[CallForProposals.Id])(update: => F[Result[Unit]]): ResultT[F, Unit] =
+            ResultT(if cids.isEmpty then Result.unit.pure[F] else update)
+
           (for
             _    <- ResultT(checkObservatory(SET, which))
             cids <- ResultT(updateCfpTable(SET, which))
-            _    <- ResultT(updatePartners(cids, SET.partners))
-            _    <- ResultT(updateGeminiInstruments(cids, geminiInstruments))
-            _    <- ResultT(updateExchangePartners(cids, exchangePartners))
+            _    <- forMatched(cids)(updatePartners(cids, SET.partners))
+            _    <- forMatched(cids)(updateGeminiInstruments(cids, geminiInstruments))
+            _    <- forMatched(cids)(updateExchangePartners(cids, exchangePartners))
           yield cids).value
 
   object Statements:
@@ -481,6 +491,7 @@ object CallForProposalsService:
           c_cfp_id,
           c_instrument
         ) VALUES ${(cfp_id *: instrument).values.list(cids.length * instruments.length)}
+        ON CONFLICT (c_cfp_id, c_instrument) DO NOTHING
       """.command
          .contramap:
            case (cids, instruments) => cids.flatMap(instruments.tupleLeft(_))
@@ -490,6 +501,16 @@ object CallForProposalsService:
         DELETE FROM t_gemini_cfp_instrument
           WHERE c_cfp_id IN ${cfp_id.list(cids.length).values}
       """.apply(cids)
+
+    def DeleteInstrumentsExcept(
+      cids: List[CallForProposals.Id],
+      keep: NonEmptyList[Instrument]
+    ): AppliedFragment =
+      sql"""
+        DELETE FROM t_gemini_cfp_instrument
+          WHERE c_cfp_id IN ${cfp_id.list(cids.length).values}
+            AND c_instrument NOT IN ${instrument.list(keep.length).values}
+      """.apply(cids, keep.toList)
 
     def InsertExchangePartners(
       cids:     List[CallForProposals.Id],

@@ -11,7 +11,15 @@ import cats.syntax.option.*
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.model.CallForProposals
+import lucuma.core.model.Observation
+import lucuma.core.util.CalculationState
 import lucuma.core.util.DateInterval
+import lucuma.core.util.Timestamp
+import lucuma.odb.util.Codecs.calculation_state
+import lucuma.odb.util.Codecs.core_timestamp
+import lucuma.odb.util.Codecs.observation_id
+import skunk.*
+import skunk.implicits.*
 
 import java.time.LocalDate
 import java.time.Month
@@ -1242,4 +1250,207 @@ class updateCallsForProposals extends OdbSuite {
           }
         """.asRight
       )
+
+  // CfP edits and obscalc invalidation (sc-10718)
+
+  private val ObscalcRow: Query[Observation.Id, (CalculationState, Timestamp)] =
+    sql"""
+      SELECT c_obscalc_state, c_last_invalidation
+        FROM t_obscalc
+       WHERE c_observation_id = $observation_id
+    """.query(calculation_state *: core_timestamp)
+
+  private def obscalcRow(oid: Observation.Id): IO[(CalculationState, Timestamp)] =
+    withSession(_.unique(ObscalcRow)(oid))
+
+  // Moves the invalidation time into the past so that a new invalidation is
+  // detectable within the same test.
+  private def setObscalcState(oid: Observation.Id, state: CalculationState): IO[Unit] =
+    withSession: session =>
+      session.execute(sql"""
+        UPDATE t_obscalc
+           SET c_obscalc_state     = $calculation_state,
+               c_last_invalidation = now() - interval '1 day'
+         WHERE c_observation_id = $observation_id
+      """.command)(state, oid).void
+
+  // A call (initially with GMOS_NORTH) in use by a program with one observation.
+  private val callWithObservation: IO[(CallForProposals.Id, Observation.Id)] =
+    for
+      cid <- createCall
+      pid <- createProgramAs(pi)
+      _   <- addProposal(pi, pid, cid.some)
+      oid <- createObservationAs(pi, pid)
+    yield (cid, oid)
+
+  private def setInstruments(cid: CallForProposals.Id, instruments: String*): IO[List[String]] =
+    query(
+      staff,
+      s"""
+        mutation {
+          updateCallsForProposals(input: {
+            SET: { gemini: { instruments: [${instruments.mkString(", ")}] } },
+            WHERE: { id: { EQ: "$cid" } }
+          }) {
+            callsForProposals { gemini { instruments } }
+          }
+        }
+      """
+    ).map:
+      _.hcursor
+       .downFields("updateCallsForProposals", "callsForProposals")
+       .downArray
+       .downFields("gemini", "instruments")
+       .require[List[String]]
+
+  private def updateCall(cid: CallForProposals.Id, set: String): IO[Unit] =
+    query(
+      staff,
+      s"""
+        mutation {
+          updateCallsForProposals(input: {
+            SET: { $set },
+            WHERE: { id: { EQ: "$cid" } }
+          }) {
+            callsForProposals { id }
+          }
+        }
+      """
+    ).void
+
+  test("instruments - adding one invalidates obscalc"):
+    for
+      (cid, oid) <- callWithObservation
+      _          <- setObscalcState(oid, CalculationState.Ready)
+      _          <- setInstruments(cid, "GMOS_NORTH", "GMOS_SOUTH")
+      _          <- assertIO(obscalcRow(oid).map(_._1), CalculationState.Pending)
+    yield ()
+
+  test("instruments - removing one invalidates obscalc"):
+    for
+      (cid, oid) <- callWithObservation
+      _          <- setInstruments(cid, "GMOS_NORTH", "GMOS_SOUTH")
+      _          <- setObscalcState(oid, CalculationState.Ready)
+      _          <- assertIO(setInstruments(cid, "GMOS_NORTH"), List("GMOS_NORTH"))
+      _          <- assertIO(obscalcRow(oid).map(_._1), CalculationState.Pending)
+    yield ()
+
+  test("instruments - removing all invalidates obscalc"):
+    for
+      (cid, oid) <- callWithObservation
+      _          <- setObscalcState(oid, CalculationState.Ready)
+      _          <- assertIO(setInstruments(cid), Nil)
+      _          <- assertIO(obscalcRow(oid).map(_._1), CalculationState.Pending)
+    yield ()
+
+  test("instruments - an unchanged list does not invalidate obscalc"):
+    for
+      (cid, oid) <- callWithObservation
+      _          <- setObscalcState(oid, CalculationState.Ready)
+      _          <- assertIO(setInstruments(cid, "GMOS_NORTH"), List("GMOS_NORTH"))
+      _          <- assertIO(obscalcRow(oid).map(_._1), CalculationState.Ready)
+    yield ()
+
+  test("instruments - a calculating observation stays calculating but is marked invalidated"):
+    for
+      (cid, oid)  <- callWithObservation
+      _           <- setObscalcState(oid, CalculationState.Calculating)
+      (_, before) <- obscalcRow(oid)
+      _           <- setInstruments(cid, "GMOS_SOUTH")
+      (s, after)  <- obscalcRow(oid)
+    yield
+      assertEquals(s, CalculationState.Calculating)
+      assert(after.toInstant.isAfter(before.toInstant))
+
+  test("instruments - adding and removing at once stores exactly the requested list and invalidates obscalc"):
+    for
+      (cid, oid) <- callWithObservation
+      _          <- assertIO(setInstruments(cid, "GMOS_SOUTH", "GHOST").map(_.sorted), List("GHOST", "GMOS_SOUTH"))
+      _          <- setObscalcState(oid, CalculationState.Ready)
+      _          <- assertIO(setInstruments(cid, "GHOST", "FLAMINGOS2").map(_.sorted), List("FLAMINGOS2", "GHOST"))
+      _          <- assertIO(obscalcRow(oid).map(_._1), CalculationState.Pending)
+    yield ()
+
+  test("instruments - editing several calls invalidates only those whose list changed"):
+    for
+      (cidA, oidA) <- callWithObservation
+      (cidB, oidB) <- callWithObservation
+      _            <- setInstruments(cidB, "GMOS_SOUTH")
+      _            <- setObscalcState(oidA, CalculationState.Ready)
+      _            <- setObscalcState(oidB, CalculationState.Ready)
+      _            <- expect(
+                        staff,
+                        s"""
+                          mutation {
+                            updateCallsForProposals(input: {
+                              SET: { gemini: { instruments: [GMOS_NORTH] } },
+                              WHERE: { id: { IN: ["$cidA", "$cidB"] } }
+                            }) {
+                              callsForProposals { gemini { instruments } }
+                            }
+                          }
+                        """,
+                        json"""
+                          {
+                            "updateCallsForProposals": {
+                              "callsForProposals": [
+                                { "gemini": { "instruments": ["GMOS_NORTH"] } },
+                                { "gemini": { "instruments": ["GMOS_NORTH"] } }
+                              ]
+                            }
+                          }
+                        """.asRight
+                      )
+      _            <- assertIO(obscalcRow(oidA).map(_._1), CalculationState.Ready)
+      _            <- assertIO(obscalcRow(oidB).map(_._1), CalculationState.Pending)
+    yield ()
+
+  test("a title edit does not invalidate obscalc"):
+    for
+      (cid, oid) <- callWithObservation
+      _          <- setObscalcState(oid, CalculationState.Ready)
+      _          <- updateCall(cid, "title: \"Foo\"")
+      _          <- assertIO(obscalcRow(oid).map(_._1), CalculationState.Ready)
+    yield ()
+
+  test("an active period edit invalidates obscalc"):
+    for
+      (cid, oid) <- callWithObservation
+      _          <- setObscalcState(oid, CalculationState.Ready)
+      _          <- updateCall(cid, "activeStart: \"2024-12-31\"")
+      _          <- assertIO(obscalcRow(oid).map(_._1), CalculationState.Pending)
+    yield ()
+
+  test("a coordinate limit edit invalidates obscalc"):
+    for
+      (cid, oid) <- callWithObservation
+      _          <- setObscalcState(oid, CalculationState.Ready)
+      _          <- updateCall(cid, "gemini: { coordinateLimits: { north: { raStart: { hms: \"00:00:00\" } } } }")
+      _          <- assertIO(obscalcRow(oid).map(_._1), CalculationState.Pending)
+    yield ()
+
+  test("instruments and partners - no matching calls"):
+    expect(
+      staff,
+      s"""
+        mutation {
+          updateCallsForProposals(input: {
+            SET: {
+              partners: [{ geminiPartner: US }]
+              gemini: { instruments: [GMOS_SOUTH] }
+            },
+            WHERE: { id: { EQ: "c-ffff" } }
+          }) {
+            callsForProposals { id }
+          }
+        }
+      """,
+      json"""
+        {
+          "updateCallsForProposals": {
+            "callsForProposals": []
+          }
+        }
+      """.asRight
+    )
 }
