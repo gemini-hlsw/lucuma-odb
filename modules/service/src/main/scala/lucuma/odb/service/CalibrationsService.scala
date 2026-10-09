@@ -120,7 +120,7 @@ object CalibrationsService extends CalibrationObservations {
       ): PartialFunction[(Observation.Id, Either[GeneratorParamsService.Error, GeneratorParams]), ObsExtract[ObservingMode]] =
         {
           case (oid, Right(GeneratorParams(itcInput = itc, scienceBand = band, observingMode = mode, calibrationRole = calibRole))) if itc.isReady || !requiresItcInputs =>
-            ObsExtract(oid, itc.toOption, band, calibRole, mode, ObsExtract.modeRequiresTelluric(mode))
+            ObsExtract(oid, itc.toOption, band, calibRole, mode, ObsExtract.modeTelluricType(mode))
         }
 
       /**

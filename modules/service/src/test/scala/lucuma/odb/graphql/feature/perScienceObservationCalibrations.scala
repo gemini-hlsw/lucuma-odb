@@ -3954,3 +3954,176 @@ class perScienceObservationCalibrations
       assertEquals(tellurics.size, 2)
       assert(!tellurics.contains(tel))
       assertEquals(explicit, List(false, false))
+
+  // ---- User-defined tellurics ----
+
+  private def setUserDefinedTellurics(oid: Observation.Id, count: Int): IO[Unit] =
+    query(
+      pi,
+      s"""mutation {
+        updateObservations(input: {
+          WHERE: { id: { EQ: "$oid" } }
+          SET: { observingMode: { flamingos2LongSlit: { telluricType: { tag: USER_DEFINED, count: $count } } } }
+        }) {
+          observations { id }
+        }
+      }"""
+    ).void
+
+  private def queryF2TelluricCount(oid: Observation.Id): IO[Option[Int]] =
+    query(
+      pi,
+      s"""query {
+        observation(observationId: "$oid") {
+          observingMode { flamingos2LongSlit { telluricType { tag count } } }
+        }
+      }"""
+    ).map: json =>
+      json.hcursor
+        .downFields("observation", "observingMode", "flamingos2LongSlit", "telluricType", "count")
+        .require[Option[Int]]
+
+  private def queryUserDefinedTelluric(oid: Observation.Id): IO[Boolean] =
+    query(
+      pi,
+      s"""query {
+        observation(observationId: "$oid") { isUserDefinedTelluric }
+      }"""
+    ).map(_.hcursor.downFields("observation", "isUserDefinedTelluric").require[Boolean])
+
+  private def queryValidationMessages(oid: Observation.Id): IO[List[String]] =
+    query(
+      pi,
+      s"""query {
+        observation(observationId: "$oid") {
+          workflow { value { validationErrors { messages } } }
+        }
+      }"""
+    ).map: json =>
+      json.hcursor
+        .downFields("observation", "workflow", "value", "validationErrors")
+        .values.toList.flatten
+        .flatMap(_.hcursor.downField("messages").as[List[String]].toOption.toList.flatten)
+
+  private def groupTellurics(oid: Observation.Id): IO[List[Observation.Id]] =
+    queryObservation(oid).flatMap: obs =>
+      obs.groupId.foldMapM: gid =>
+        queryObservationsInGroup(gid).map(_.filter(_.calibrationRole.contains(CalibrationRole.Telluric)).map(_.id))
+
+  test("USER_DEFINED generates an empty telluric the PI can edit"):
+    for
+      pid       <- createProgramAs(pi)
+      tid       <- createTargetWithProfileAs(pi, pid)
+      oid       <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _         <- setUserDefinedTellurics(oid, 1)
+      _         <- runObscalcUpdate(pid, oid)
+      _         <- recalculateCalibrations(pid, when, oid)
+      tellurics <- groupTellurics(oid)
+      tel        = tellurics.head
+      flagged   <- queryUserDefinedTelluric(tel)
+      state     <- calculationState(tel)
+      empty     <- queryObservationWithTarget(tel)
+      standard  <- createTargetWithProfileAs(pi, pid)
+      _         <- editAsterismAs(pi, tel, List(standard), Nil)
+      edited    <- queryObservationWithTarget(tel)
+    yield
+      assertEquals(tellurics.size, 1)
+      assert(flagged)
+      assertEquals(state, CalculationState.Ready)
+      assertEquals(empty.targetId, None)
+      assertEquals(edited.targetId, Some(standard))
+
+  test("USER_DEFINED count decides the telluric count, not the science duration"):
+    for
+      pid  <- createProgramAs(pi)
+      tid  <- createTargetWithProfileAs(pi, pid)
+      oid  <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _    <- setUserDefinedTellurics(oid, 2)
+      cnt  <- queryF2TelluricCount(oid)
+      _    <- runObscalcUpdate(pid, oid)
+      _    <- recalculateCalibrations(pid, when, oid)
+      two  <- groupTellurics(oid)
+      _    <- setUserDefinedTellurics(oid, 1)
+      _    <- recalculateCalibrations(pid, when, oid)
+      one  <- groupTellurics(oid)
+      _    <- setTelluricType(oid, "flamingos2LongSlit", "HOT")
+      _    <- recalculateCalibrations(pid, when, oid)
+      hot  <- groupTellurics(oid)
+      flag <- hot.traverse(queryUserDefinedTelluric)
+    yield
+      assertEquals(cnt, Some(2))
+      assertEquals(two.size, 2)
+      assertEquals(one.size, 1)
+      // Only the After telluric survives the count change.
+      assert(two.contains(one.head))
+      // Back to a generated type the user-defined telluric is rebuilt.
+      assertEquals(hot.size, 1)
+      assert(!hot.contains(one.head))
+      assertEquals(flag, List(false))
+
+  test("switching to USER_DEFINED converts the generated telluric and keeps its star"):
+    for
+      pid     <- createProgramAs(pi)
+      tid     <- createTargetWithProfileAs(pi, pid)
+      oid     <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _       <- setScienceRequirements(oid)
+      _       <- runObscalcUpdate(pid, oid)
+      _       <- recalculateCalibrations(pid, when, oid)
+      _       <- sleep >> resolveTelluricTargets
+      tel     <- selectTelluricObservationFor(oid).map(_.get)
+      before  <- queryObservationWithTarget(tel)
+      _       <- setUserDefinedTellurics(oid, 1)
+      _       <- recalculateCalibrations(pid, when, oid)
+      after   <- groupTellurics(oid)
+      flagged <- queryUserDefinedTelluric(tel)
+      state   <- calculationState(tel)
+      kept    <- queryObservationWithTarget(tel)
+      // A later science change neither re-searches nor resyncs it.
+      _       <- updateFlamingos2Fpu(oid, Flamingos2Fpu.LongSlit2)
+      _       <- runObscalcUpdate(pid, oid)
+      _       <- sleep >> recalculateCalibrations(pid, when, oid)
+      _       <- resolveTelluricTargets
+      fpu     <- queryObservationFpu(tel)
+      still   <- queryObservationWithTarget(tel)
+      state2  <- calculationState(tel)
+    yield
+      assertEquals(before.targetName, Some("HIP 12345"))
+      assertEquals(after, List(tel))
+      assert(flagged)
+      assertEquals(state, CalculationState.Ready)
+      assertEquals(kept.targetId, before.targetId)
+      assertEquals(fpu, Flamingos2Fpu.LongSlit1.some)
+      assertEquals(still.targetId, before.targetId)
+      assertEquals(state2, CalculationState.Ready)
+
+  test("a generated telluric still rejects PI edits"):
+    for
+      pid      <- createProgramAs(pi)
+      tid      <- createTargetWithProfileAs(pi, pid)
+      oid      <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _        <- runObscalcUpdate(pid, oid)
+      _        <- recalculateCalibrations(pid, when, oid)
+      tel      <- selectTelluricObservationFor(oid).map(_.get)
+      standard <- createTargetWithProfileAs(pi, pid)
+      _        <- editAsterismAs(pi, tel, List(standard), Nil)
+      obs      <- queryObservationWithTarget(tel)
+    yield assertEquals(obs.targetId, None)
+
+  test("an empty user-defined telluric is validated like science"):
+    for
+      pid      <- createProgramAs(pi)
+      tid      <- createTargetWithProfileAs(pi, pid)
+      oid      <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _        <- setUserDefinedTellurics(oid, 1)
+      _        <- runObscalcUpdate(pid, oid)
+      _        <- recalculateCalibrations(pid, when, oid)
+      tel      <- groupTellurics(oid).map(_.head)
+      _        <- runObscalcUpdate(pid, tel)
+      missing  <- queryValidationMessages(tel)
+      standard <- createTargetWithProfileAs(pi, pid)
+      _        <- editAsterismAs(pi, tel, List(standard), Nil)
+      _        <- runObscalcUpdate(pid, tel)
+      complete <- queryValidationMessages(tel)
+    yield
+      assert(missing.exists(_.contains("target")), missing.toString)
+      assertEquals(complete, Nil)

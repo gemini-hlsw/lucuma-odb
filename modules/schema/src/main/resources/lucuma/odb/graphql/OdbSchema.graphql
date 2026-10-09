@@ -10749,6 +10749,7 @@ enum TelluricTag {
   A0V
   SOLAR
   MANUAL
+  USER_DEFINED
   NO_TELLURIC
 }
 
@@ -10758,11 +10759,13 @@ Telluric calibration type
 type TelluricType {
   tag: TelluricTag!
   starTypes: [String!] # when tag is MANUAL
+  count: Int           # when tag is USER_DEFINED, 1 or 2
 }
 
 input TelluricTypeInput {
   tag: TelluricTag!
   starTypes: [String!] # when tag is MANUAL
+  count: Int           # when tag is USER_DEFINED, 1 or 2
 }
 
 """
@@ -16870,6 +16873,13 @@ type Observation {
   The Calibration role of this observation
   """
   calibrationRole: CalibrationRole
+
+  """
+  Whether this is a telluric calibration whose target and configuration the
+  user defines (science telluric type USER_DEFINED).  Such a telluric is
+  editable like a science observation and is never regenerated.
+  """
+  isUserDefinedTelluric: Boolean!
 
   """
   Notes for the observer

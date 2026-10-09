@@ -35,6 +35,7 @@ import lucuma.core.math.Wavelength
 import lucuma.core.model.CallCoordinatesLimits
 import lucuma.core.model.CallForProposals
 import lucuma.core.model.ConstraintSet
+import lucuma.core.model.IsUserDefinedTelluric
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.SiteCoordinatesLimits
@@ -70,6 +71,7 @@ case class ObservationValidationInfo(
   coordinates:            Option[Coordinates],  // explicit base, or coordinates at CFP midpoint, if any
   explicitBase:           Option[Coordinates],
   calibrationRole:        Option[CalibrationRole],
+  isUserDefinedTelluric:  IsUserDefinedTelluric,
   userState:              Option[ObservationWorkflowService.UserState],
   declaredExecutionState: Option[DeclaredExecutionState],
   proposalStatus:         ProposalStatus,
@@ -341,6 +343,7 @@ object ObservationValidationInfo {
           o.c_explicit_ra,
           o.c_explicit_dec,
           o.c_calibration_role,
+          o.c_is_user_defined_telluric,
           o.c_workflow_user_state,
           o.c_declared_state,
           p.c_proposal_status,
@@ -392,6 +395,7 @@ object ObservationValidationInfo {
         right_ascension.opt             *:
         declination.opt                 *:
         calibration_role.opt            *:
+        is_user_defined_telluric        *:
         user_state.opt                  *:
         declared_execution_state.opt    *:
         proposal_status                 *:
@@ -416,13 +420,13 @@ object ObservationValidationInfo {
         altair_nd_filter.opt
       )
       .map:
-        case (pid, tpe, oid, mode, ra, dec, cal, state, ds, ps, too, sched, ceil, permitted, cfp, sci, state2, ce, iq, sb, wv, er, wl, ovcs, egp, altairMode, fieldLens, cassRotator, ndFilter) =>
+        case (pid, tpe, oid, mode, ra, dec, cal, isUserDefinedTelluric, state, ds, ps, too, sched, ceil, permitted, cfp, sci, state2, ce, iq, sb, wv, er, wl, ovcs, egp, altairMode, fieldLens, cassRotator, ndFilter) =>
           val cs = ConstraintSet(iq, ce, sb, wv, er)
           // All-or-nothing (field lens aside) is a DB CHECK; the fallbacks here
           // are unreachable in practice, not a second source of truth for them.
           val altair = altairMode.map: m =>
             AltairConfiguration(m, fieldLens, cassRotator.getOrElse(CassRotator.Following), ndFilter.getOrElse(AltairNdFilter.Out))
-          ObservationValidationInfo(pid, tpe, oid, cs, wl, mode, None, (ra, dec).mapN(Coordinates.apply), cal, state, ds, ps, too, sched, ceil, permitted, cfp, sci, Nil, state2, ovcs, explicitGuideProbe = egp, altair = altair)
+          ObservationValidationInfo(pid, tpe, oid, cs, wl, mode, None, (ra, dec).mapN(Coordinates.apply), cal, isUserDefinedTelluric, state, ds, ps, too, sched, ceil, permitted, cfp, sci, Nil, state2, ovcs, explicitGuideProbe = egp, altair = altair)
 
     def ProgramAllocations[A <: NonEmptyList[Program.Id]](enc: Encoder[A]): Query[A, (Program.Id, ScienceBand)] =
       sql"""

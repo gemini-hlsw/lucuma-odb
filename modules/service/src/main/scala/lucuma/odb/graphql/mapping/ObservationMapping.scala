@@ -90,6 +90,7 @@ trait ObservationMapping[F[_]]
       SqlField("groupId", ObservationView.GroupId),
       SqlField("groupIndex", ObservationView.GroupIndex),
       SqlField("calibrationRole", ObservationView.CalibrationRole),
+      SqlField("isUserDefinedTelluric", ObservationView.IsUserDefinedTelluric),
       SqlField("observerNotes", ObservationView.ObserverNotes),
       SqlField("priority", ObservationView.Priority),
       SqlObject("configuration"),

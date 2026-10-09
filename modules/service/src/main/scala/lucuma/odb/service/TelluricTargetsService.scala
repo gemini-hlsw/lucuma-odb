@@ -95,6 +95,25 @@ trait TelluricTargetsService[F[_]]:
   )(using ServiceAccess, Transaction[F]): F[Unit]
 
   /**
+   * Records a user-defined telluric: its resolution row keeps the order but is
+   * never searched for.
+   */
+  def registerUserDefinedTelluric(
+    pid:        Program.Id,
+    telluricId: Observation.Id,
+    scienceId:  Observation.Id,
+    order:      TelluricCalibrationOrder
+  )(using ServiceAccess, Transaction[F]): F[Unit]
+
+  /**
+   * Turns a generated telluric into a user-defined one, keeping its current
+   * target and discarding any search in flight.
+   */
+  def markUserDefined(
+    telluricId: Observation.Id
+  )(using ServiceAccess, Transaction[F]): F[Unit]
+
+  /**
    * Replaces the science duration of a telluric's resolution request and requeues the search.
    */
   def updateScienceDuration(
@@ -126,9 +145,10 @@ object HminBrightnessCache extends NewType[Map[HminBrightnessKey, (Option[BigDec
     telluricType match
       case TelluricType.Solar      => hminSolar
       case TelluricType.Hot        => hminHot
-      case TelluricType.A0V        => hminHot
-      case _: TelluricType.Manual  => hminHot
-      case TelluricType.NoTelluric => hminHot // Not in use
+      case TelluricType.A0V            => hminHot
+      case _: TelluricType.Manual      => hminHot
+      case TelluricType.UserDefined(_) => hminHot // Not in use
+      case TelluricType.NoTelluric     => hminHot // Not in use
 
   private def lookupF2Key(
     m:            HminBrightnessCache,
@@ -361,6 +381,21 @@ object TelluricTargetsService:
       )(using ServiceAccess, Transaction[F]): F[Unit] =
         session.execute(Statements.InsertResolutionRequest)(telluricId, pid, scienceId, scienceDuration, order).void
 
+      override def registerUserDefinedTelluric(
+        pid:        Program.Id,
+        telluricId: Observation.Id,
+        scienceId:  Observation.Id,
+        order:      TelluricCalibrationOrder
+      )(using ServiceAccess, Transaction[F]): F[Unit] =
+        session.execute(Statements.InsertUserDefinedResolution)(telluricId, pid, scienceId, order) *>
+          session.execute(Statements.MarkUserDefinedTelluric)(telluricId).void
+
+      override def markUserDefined(
+        telluricId: Observation.Id
+      )(using ServiceAccess, Transaction[F]): F[Unit] =
+        session.execute(Statements.MarkUserDefinedTelluric)(telluricId) *>
+          session.execute(Statements.SupersedeResolution)(telluricId).void
+
       override def updateScienceDuration(
         telluricId:      Observation.Id,
         scienceDuration: TimeSpan
@@ -529,6 +564,10 @@ object TelluricTargetsService:
             case TelluricType.NoTelluric =>
               info"Science observation ${pending.scienceObservationId} requests no telluric standard, skipping search for ${pending.observationId}" *>
                 resetToReady.as(none)
+            // Never loaded as pending; a race with the science edit could still get here.
+            case TelluricType.UserDefined(_) =>
+              info"Science observation ${pending.scienceObservationId} defines its own telluric standards, skipping search for ${pending.observationId}" *>
+                resetToReady.as(none)
             case _ =>
               pending.paramsHash match
                 case Some(storedHash) if storedHash === paramsHash =>
@@ -602,16 +641,26 @@ object TelluricTargetsService:
             WHERE  c_state = 'calculating'
           """.command
 
+        // A user-defined telluric's row is never searched for.
+        private val notUserDefined: String =
+          """NOT EXISTS (
+               SELECT 1
+               FROM   t_observation o
+               WHERE  o.c_observation_id = r.c_observation_id
+                 AND  o.c_is_user_defined_telluric
+             )"""
+
         val LoadPending: Query[Int, TelluricTargets.Pending] =
           sql"""
             UPDATE t_telluric_resolution
             SET    c_state = 'calculating'
             WHERE  c_observation_id IN (
-              SELECT c_observation_id
-              FROM   t_telluric_resolution
-              WHERE  c_state IN ('pending', 'retry')
-                AND  (c_retry_at IS NULL OR c_retry_at <= now())
-              ORDER BY c_last_invalidation
+              SELECT r.c_observation_id
+              FROM   t_telluric_resolution r
+              WHERE  r.c_state IN ('pending', 'retry')
+                AND  (r.c_retry_at IS NULL OR r.c_retry_at <= now())
+                AND  #$notUserDefined
+              ORDER BY r.c_last_invalidation
               LIMIT  $int4
               FOR UPDATE SKIP LOCKED
             )
@@ -620,11 +669,12 @@ object TelluricTargetsService:
 
         val LoadPendingObs: Query[Observation.Id, TelluricTargets.Pending] =
           sql"""
-            UPDATE t_telluric_resolution
+            UPDATE t_telluric_resolution r
             SET    c_state = 'calculating'
-            WHERE  c_observation_id = $observation_id
-              AND  c_state IN ('pending', 'retry')
-              AND  (c_retry_at IS NULL OR c_retry_at <= now())
+            WHERE  r.c_observation_id = $observation_id
+              AND  r.c_state IN ('pending', 'retry')
+              AND  (r.c_retry_at IS NULL OR r.c_retry_at <= now())
+              AND  #$notUserDefined
             RETURNING #$pendingColumns
           """.query(pending)
 
@@ -659,12 +709,54 @@ object TelluricTargetsService:
 
         val RequeueSuperseded: Command[Observation.Id] =
           sql"""
-            UPDATE t_telluric_resolution
-            SET    c_state = 'pending',
+            UPDATE t_telluric_resolution r
+            SET    c_state = CASE WHEN #$notUserDefined THEN 'pending'::e_calculation_state
+                                  ELSE 'ready'::e_calculation_state END,
                    c_retry_at = NULL,
                    c_failure_count = 0
+            WHERE  r.c_observation_id = $observation_id
+              AND  r.c_state = 'calculating'
+          """.command
+
+        val InsertUserDefinedResolution: Command[(Observation.Id, Program.Id, Observation.Id, TelluricCalibrationOrder)] =
+          sql"""
+            INSERT INTO t_telluric_resolution (
+              c_observation_id,
+              c_program_id,
+              c_science_observation_id,
+              c_science_duration,
+              c_calibration_order,
+              c_state,
+              c_last_invalidation
+            ) VALUES (
+              $observation_id,
+              $program_id,
+              $observation_id,
+              '0 seconds'::interval,
+              $telluric_calibration_order,
+              'ready',
+              now()
+            )
+          """.command
+
+        val MarkUserDefinedTelluric: Command[Observation.Id] =
+          sql"""
+            UPDATE t_observation
+            SET    c_is_user_defined_telluric = true
             WHERE  c_observation_id = $observation_id
-              AND  c_state = 'calculating'
+          """.command
+
+        // A search in flight writes its result only against the invalidation it
+        // read, so bumping it discards that result.
+        val SupersedeResolution: Command[Observation.Id] =
+          sql"""
+            UPDATE t_telluric_resolution
+            SET    c_last_invalidation = now(),
+                   c_retry_at          = NULL,
+                   c_failure_count     = 0,
+                   c_state             = CASE WHEN c_state = 'calculating' THEN c_state
+                                              ELSE 'ready'::e_calculation_state END
+            WHERE  c_observation_id = $observation_id
           """.command
 
         val ResetToReady: Query[(Observation.Id, Timestamp), TelluricTargets.Meta] =
