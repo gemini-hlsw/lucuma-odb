@@ -226,4 +226,64 @@ trait GuideTargetNameSuite extends ExecutionTestSupport {
     }
   }
 
+  test("recording a visit keeps name") {
+    val setup: IO[Observation.Id] =
+      for {
+        p <- createProgramAs(pi)
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createObservationAs(pi, p, List(t))
+        _ <- setObservationTimeAndDuration(pi, o, ObsTime.some, none)
+        _ <- setGuideTargetName(pi, o, targetName1.some)
+        _ <- recordVisitAs(serviceUser, o)
+      } yield o
+    setup.flatMap { oid =>
+      expect(
+        pi,
+        guideTargetNameQuery(oid),
+        expected = guideTargetNameResult(targetName1.some))
+    }
+  }
+
+  test("executing a step keeps name") {
+    val setup: IO[Observation.Id] =
+      for {
+        p   <- createProgramAs(pi)
+        t   <- createTargetWithProfileAs(pi, p)
+        o   <- createObservationAs(pi, p, List(t))
+        _   <- setObservationTimeAndDuration(pi, o, ObsTime.some, none)
+        _   <- setGuideTargetName(pi, o, targetName1.some)
+        v   <- recordVisitAs(serviceUser, o)
+        sid <- firstScienceAtomStepIds(serviceUser, o).map(_.head)
+        _   <- addEndStepEvent(sid, v)
+      } yield o
+    setup.flatMap { oid =>
+      expect(
+        pi,
+        guideTargetNameQuery(oid),
+        expected = guideTargetNameResult(targetName1.some))
+    }
+  }
+
+  test("executing a second step keeps name") {
+    val setup: IO[Observation.Id] =
+      for {
+        p    <- createProgramAs(pi)
+        t    <- createTargetWithProfileAs(pi, p)
+        o    <- createObservationAs(pi, p, List(t))
+        _    <- setObservationTimeAndDuration(pi, o, ObsTime.some, none)
+        _    <- setGuideTargetName(pi, o, targetName1.some)
+        v    <- recordVisitAs(serviceUser, o)
+        sids <- scienceStepIds(serviceUser, o)
+        _    <- addEndStepEvent(sids(0), v)
+        _    <- setGuideTargetName(staff, o, targetName1.some)
+        _    <- addEndStepEvent(sids(1), v)
+      } yield o
+    setup.flatMap { oid =>
+      expect(
+        pi,
+        guideTargetNameQuery(oid),
+        expected = guideTargetNameResult(targetName1.some))
+    }
+  }
+
 }

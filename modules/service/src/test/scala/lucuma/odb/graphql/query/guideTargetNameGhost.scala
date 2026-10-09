@@ -13,4 +13,4 @@ import lucuma.core.model.User
 class guideTargetNameGhost extends ExecutionTestSupportForGhost with GuideTargetNameSuite:
 
   override def createObservationAs(user: User, pid: Program.Id, tids: List[Target.Id]): IO[Observation.Id] =
-    createGhostIfuObservationAs(user, pid, tids)
+    createGhostIfuObservationAs(user, pid, tids, stepCount = 2)
