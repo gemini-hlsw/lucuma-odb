@@ -51,6 +51,20 @@ trait VisitService[F[_]]:
     observationId: Observation.Id
   )(using Transaction[F]): F[Boolean]
 
+  /**
+   * The visit in which the observation is currently being executed, if any.
+   * An observation that uses the telescope has one only for as long as the
+   * site's most recent chargeable visit of the current observing night is one
+   * of its own.  For any other observation, it is its most recent visit of the
+   * current observing night.
+   *
+   * @param observation the observation's instrument and calibration role
+   */
+  def selectCurrent(
+    observationId: Observation.Id,
+    observation:   VisitService.ObsDescription
+  )(using Transaction[F]): F[Option[Visit.Id]]
+
   def lookupOrInsertForSlew(
     observationId:  Observation.Id,
     idempotencyKey: Option[IdempotencyKey],
@@ -116,25 +130,38 @@ object VisitService:
           session.option(Statements.SelectObsDescription)(observationId).map: od =>
             Either.fromOption(od, OdbError.InvalidObservation(observationId, s"Observation '$observationId' not found or is not associated with any instrument.".some))
 
+      private def lookupVisit(
+        observationId: Observation.Id,
+        desc:          ObsDescription,
+        night:         ObservingNight
+      ): F[Option[VisitRecord]] =
+        if desc.isChargeable then
+          // Lookup the current chargeable visit if any, assuming it is
+          // associated with the same observation.
+          session
+            .option(Statements.SelectChargeableVisit)(night)
+            .map: o =>
+              o.collect:
+                case vr if vr.observationId === observationId => vr
+        else
+          session
+            .option(Statements.SelectLastVisit)(night, observationId)
+
+      override def selectCurrent(
+        observationId: Observation.Id,
+        observation:   ObsDescription
+      )(using Transaction[F]): F[Option[Visit.Id]] =
+        timeService
+          .currentObservingNight(observation.site)
+          .flatMap(lookupVisit(observationId, observation, _))
+          .map(_.map(_.visitId))
+
       private def lookupOrInsertImpl(
         observationId:  Observation.Id,
         origin:         VisitOrigin,
         idempotencyKey: Option[IdempotencyKey],
         clientCreated:  Option[Timestamp]
       )(using Transaction[F], Services.ServiceAccess): EitherT[F, OdbError, VisitRecord] =
-
-        def lookupVisit(desc:  ObsDescription, night: ObservingNight): F[Option[VisitRecord]] =
-          if desc.isChargeable then
-            // Lookup the current chargeable visit if any, assuming it is
-            // associated with the same observation.
-            session
-              .option(Statements.SelectChargeableVisit)(night)
-              .map: o =>
-                o.collect:
-                  case vr if vr.observationId === observationId => vr
-          else
-            session
-              .option(Statements.SelectLastVisit)(night, observationId)
 
         def insertNewVisit(desc: ObsDescription): F[VisitRecord] =
           session.unique(Statements.InsertVisit)(observationId, desc, origin, idempotencyKey, clientCreated)
@@ -172,7 +199,7 @@ object VisitService:
               // simultaneously and coming to the conclusion to each create a new
               // visit.
               _  <- session.unique(Statements.LockCreation)(Statements.VisitCreationLockId)
-              v  <- lookupVisit(d, n)
+              v  <- lookupVisit(observationId, d, n)
               vʹ <- go(d, v)
             yield vʹ
 
