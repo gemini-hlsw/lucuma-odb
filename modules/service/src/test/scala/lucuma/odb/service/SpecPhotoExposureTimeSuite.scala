@@ -13,12 +13,12 @@ import lucuma.odb.service.arb.ArbCalibrationConfigSubset.given
 import munit.ScalaCheckSuite
 import org.scalacheck.Prop.forAll
 
-class SpecPhotoExposureTimeModeSuite extends ScalaCheckSuite:
+class SpecPhotoExposureTimeSuite extends ScalaCheckSuite:
 
   private val One: PosInt = PosInt.unsafeFrom(1)
 
   private def etm(config: CalibrationConfigSubset.Gmos, at: Option[Wavelength]) =
-    CalibrationObservations.specPhotoExposureTimeMode(config, at)
+    SpecPhotoExposureTime.forConfig(config, at)
 
   property("long slit uses 120s x 1 at the science wavelength"):
     forAll: (gn: GmosNConfigs, gs: GmosSConfigs, at: Wavelength) =>

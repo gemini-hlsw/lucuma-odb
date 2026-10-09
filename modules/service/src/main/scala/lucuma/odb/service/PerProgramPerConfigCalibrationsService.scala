@@ -359,7 +359,7 @@ object PerProgramPerConfigCalibrationsService:
         val expected: List[(Observation.Id, ObservingModeType, ExposureTimeMode)] =
           calibrations.flatMap: (o, props) =>
             gmosModeType(o.data).map: (modeType, config) =>
-              (o.id, modeType, CalibrationObservations.specPhotoExposureTimeMode(config, props.wavelengthAt))
+              (o.id, modeType, SpecPhotoExposureTime.forConfig(config, props.wavelengthAt))
 
         val roles = List(ExposureTimeModeRole.Requirement, ExposureTimeModeRole.Science)
 

@@ -458,7 +458,7 @@ trait CalibrationObservations {
     config: CalibrationConfigSubset.Gmos
   ): F[Observation.Id] =
     val matchingProps: Option[CalObsProps] = propsForConfig(props, CalibrationRole.SpectroPhotometric, config)
-    val etm: ExposureTimeMode              = CalibrationObservations.specPhotoExposureTimeMode(config, matchingProps.flatMap(_.wavelengthAt))
+    val etm: ExposureTimeMode              = SpecPhotoExposureTime.forConfig(config, matchingProps.flatMap(_.wavelengthAt))
     val band: Option[ScienceBand]          = matchingProps.flatMap(_.band)
     specPhotoObservation(pid, gid, tid, etm, band, config.toInput)
 
@@ -559,18 +559,24 @@ trait CalibrationObservations {
       ).orError
 }
 
-object CalibrationObservations:
+/**
+ * The Spec-Phot Exposure Time every GMOS spectrophotometric standard takes: one 120s exposure
+ * through a long slit, one 300s exposure through the IFU.
+ */
+object SpecPhotoExposureTime:
 
-  // Matches the OT static configurations; S/N can be unreachable in worst-case conditions
-  val SpecPhotoLongSlitTime: TimeSpan = 120.secondTimeSpan
-  val SpecPhotoIfuTime: TimeSpan      = 300.secondTimeSpan
-  val SpecPhotoCount: PosInt          = PosInt.unsafeFrom(1)
+  val LongSlit: TimeSpan = 120.secondTimeSpan
 
-  def specPhotoExposureTimeMode(
+  val Ifu: TimeSpan = 300.secondTimeSpan
+
+  val Count: PosInt = PosInt.unsafeFrom(1)
+
+  /** At the science observations' average S/N wavelength, else the central wavelength. */
+  def forConfig(
     config:       CalibrationConfigSubset.Gmos,
     wavelengthAt: Option[Wavelength]
   ): ExposureTimeMode =
     val time = config match
-      case _: (CalibrationConfigSubset.GmosNConfigs | CalibrationConfigSubset.GmosSConfigs)       => SpecPhotoLongSlitTime
-      case _: (CalibrationConfigSubset.GmosNIfuConfigs | CalibrationConfigSubset.GmosSIfuConfigs) => SpecPhotoIfuTime
-    ExposureTimeMode.TimeAndCountMode(time, SpecPhotoCount, wavelengthAt.getOrElse(config.centralWavelength))
+      case _: (CalibrationConfigSubset.GmosNConfigs | CalibrationConfigSubset.GmosSConfigs)       => LongSlit
+      case _: (CalibrationConfigSubset.GmosNIfuConfigs | CalibrationConfigSubset.GmosSIfuConfigs) => Ifu
+    ExposureTimeMode.TimeAndCountMode(time, Count, wavelengthAt.getOrElse(config.centralWavelength))
