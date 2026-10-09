@@ -9,17 +9,18 @@ import cats.syntax.all.*
 import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.enums.GeminiCallForProposalsType
 import lucuma.core.enums.ObservationWorkflowState
+import lucuma.core.enums.ObservingModeType
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationValidation
 import lucuma.core.model.ObservationWorkflow
 import lucuma.core.model.Program
+import lucuma.core.model.User
 import lucuma.core.util.CalculationState
 import lucuma.core.util.Timestamp
 import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
 import lucuma.odb.util.Codecs.*
 import skunk.*
-import skunk.codec.text.text
 import skunk.syntax.all.*
 
 // Configuration requests only affect workflows once the proposal is accepted,
@@ -30,31 +31,10 @@ class configurationRequestObscalcInvalidation extends ExecutionTestSupportForGmo
 
   override val httpRequestHandler = invitationEmailRequestHandler
 
-  private val ProgramObscalc: Query[Program.Id, (Observation.Id, CalculationState, Timestamp)] =
-    sql"""
-      SELECT c_observation_id, c_obscalc_state, c_last_invalidation
-        FROM t_obscalc
-       WHERE c_program_id = $program_id
-       ORDER BY c_observation_id
-    """.query(observation_id *: calculation_state *: core_timestamp)
-
-  private def programObscalc(pid: Program.Id): IO[List[(Observation.Id, CalculationState, Timestamp)]] =
-    withSession(_.execute(ProgramObscalc)(pid))
-
   // Marks every observation in the program Ready, with its invalidation moved
-  // into the past so that a new invalidation is detectable within the test.
+  // into the past, and returns the resulting rows to compare against.
   private def settle(pid: Program.Id): IO[List[(Observation.Id, CalculationState, Timestamp)]] =
-    withSession: session =>
-      session.execute(sql"""
-        UPDATE t_obscalc
-           SET c_obscalc_state     = 'ready',
-               c_last_invalidation = now() - interval '1 day'
-         WHERE c_program_id = $program_id
-      """.command)(pid).void
-    *> programObscalc(pid)
-
-  private def recalculate(pid: Program.Id): IO[Unit] =
-    programObscalc(pid).flatMap(_.traverse_((oid, _, _) => runObscalcUpdate(pid, oid)))
+    setProgramObscalcState(pid, CalculationState.Ready) *> programObscalcRows(pid)
 
   private def requestIds(pid: Program.Id): IO[List[ConfigurationRequest.Id]] =
     withSession: session =>
@@ -63,6 +43,30 @@ class configurationRequestObscalcInvalidation extends ExecutionTestSupportForGmo
           FROM t_configuration_request
          WHERE c_program_id = $program_id
       """.query(configuration_request_id))(pid)
+
+  private def requestIdFor(pid: Program.Id, mode: ObservingModeType): IO[ConfigurationRequest.Id] =
+    withSession: session =>
+      session.unique(sql"""
+        SELECT c_configuration_request_id
+          FROM t_configuration_request
+         WHERE c_program_id          = $program_id
+           AND c_observing_mode_type = $observing_mode_type
+      """.query(configuration_request_id))(pid, mode)
+
+  private def updateRequest(user: User, rid: ConfigurationRequest.Id, set: String): IO[Unit] =
+    query(
+      user,
+      s"""
+        mutation {
+          updateConfigurationRequests(input: {
+            SET: { $set }
+            WHERE: { id: { EQ: "$rid" } }
+          }) {
+            requests { id }
+          }
+        }
+      """
+    ).void
 
   // A submittable program with one GMOS North long slit observation.
   private val submittable: IO[(Program.Id, Observation.Id)] =
@@ -93,7 +97,7 @@ class configurationRequestObscalcInvalidation extends ExecutionTestSupportForGmo
       before   <- settle(pid)
       _        <- setProposalStatus(pi, pid, "SUBMITTED")
       rids     <- requestIds(pid)
-      after    <- programObscalc(pid)
+      after    <- programObscalcRows(pid)
     yield
       assert(rids.nonEmpty, "submission should create configuration requests")
       assertEquals(after, before)
@@ -105,7 +109,7 @@ class configurationRequestObscalcInvalidation extends ExecutionTestSupportForGmo
       before   <- settle(pid)
       _        <- setProposalStatus(pi, pid, "NOT_SUBMITTED")
       rids     <- requestIds(pid)
-      after    <- programObscalc(pid)
+      after    <- programObscalcRows(pid)
     yield
       assert(rids.isEmpty, "withdrawal should delete configuration requests")
       assertEquals(after, before)
@@ -114,27 +118,18 @@ class configurationRequestObscalcInvalidation extends ExecutionTestSupportForGmo
     for
       (pid, oid) <- submittable
       _          <- setProposalStatus(pi, pid, "SUBMITTED")
-      _          <- recalculate(pid)
+      _          <- runProgramObscalc(pid)
       _          <- assertIO(workflow(oid).map(_.state), ObservationWorkflowState.Defined)
       before     <- settle(pid)
       _          <- setProposalStatus(staff, pid, "ACCEPTED")
-      after      <- programObscalc(pid)
+      after      <- programObscalcRows(pid)
       _           = assertEquals(after.map(_._2), before.as(CalculationState.Pending))
       _           = assert(after.zip(before).forall((a, b) => a._3 > b._3))
-      _          <- recalculate(pid)
+      _          <- runProgramObscalc(pid)
       wf         <- workflow(oid)
     yield
       assertEquals(wf.state, ObservationWorkflowState.Unapproved)
       assertEquals(wf.validationErrors, List(ObservationValidation.configurationRequestPending))
-
-  private def requestIdFor(pid: Program.Id, mode: String): IO[ConfigurationRequest.Id] =
-    withSession: session =>
-      session.unique(sql"""
-        SELECT c_configuration_request_id
-          FROM t_configuration_request
-         WHERE c_program_id          = $program_id
-           AND c_observing_mode_type = ${text}::e_observing_mode_type
-      """.query(configuration_request_id))(pid, mode)
 
   // Staff may move an accepted proposal back to either status.  Leaving
   // Accepted clears the program reference, which recalculates everything
@@ -154,16 +149,16 @@ class configurationRequestObscalcInvalidation extends ExecutionTestSupportForGmo
         _        <- computeItcResultAs(pi, south)
         _        <- setProposalStatus(pi, pid, "SUBMITTED")
         _        <- setProposalStatus(staff, pid, "ACCEPTED")
-        rid      <- requestIdFor(pid, "gmos_north_long_slit")
+        rid      <- requestIdFor(pid, ObservingModeType.GmosNorthLongSlit)
         _        <- setConfigurationRequestStatusAs(staff, rid, ConfigurationRequestStatus.Approved)
-        _        <- recalculate(pid)
+        _        <- runProgramObscalc(pid)
         _        <- assertIO(workflow(south).map(_.state), ObservationWorkflowState.Unapproved)
         before   <- settle(pid)
         _        <- setProposalStatus(staff, pid, status)
-        after    <- programObscalc(pid)
+        after    <- programObscalcRows(pid)
         _         = assertEquals(after.map(_._2), before.as(CalculationState.Pending))
         _         = assert(after.zip(before).forall((a, b) => a._3 > b._3))
-        _        <- recalculate(pid)
+        _        <- runProgramObscalc(pid)
         wf       <- workflow(south)
       yield
         assertEquals(wf.state, ObservationWorkflowState.Defined)
@@ -174,15 +169,27 @@ class configurationRequestObscalcInvalidation extends ExecutionTestSupportForGmo
       (pid, oid) <- submittable
       _          <- setProposalStatus(pi, pid, "SUBMITTED")
       _          <- setProposalStatus(staff, pid, "ACCEPTED")
-      _          <- recalculate(pid)
+      _          <- runProgramObscalc(pid)
       _          <- assertIO(workflow(oid).map(_.state), ObservationWorkflowState.Unapproved)
       before     <- settle(pid)
       rids       <- requestIds(pid)
       _          <- rids.traverse_(setConfigurationRequestStatusAs(staff, _, ConfigurationRequestStatus.Approved))
-      after      <- programObscalc(pid)
+      after      <- programObscalcRows(pid)
       _           = assertEquals(after.map(_._2), before.as(CalculationState.Pending))
-      _          <- recalculate(pid)
+      _          <- runProgramObscalc(pid)
       wf         <- workflow(oid)
     yield
       assertEquals(wf.state, ObservationWorkflowState.Defined)
       assert(wf.validTransitions.contains(ObservationWorkflowState.Ready))
+
+  test("editing a request's justification or feedback on an accepted proposal does not invalidate obscalc"):
+    for
+      (pid, _) <- submittable
+      _        <- setProposalStatus(pi, pid, "SUBMITTED")
+      _        <- setProposalStatus(staff, pid, "ACCEPTED")
+      rid      <- requestIdFor(pid, ObservingModeType.GmosNorthLongSlit)
+      before   <- settle(pid)
+      _        <- updateRequest(pi, rid, """justification: "Needed for the science."""")
+      _        <- updateRequest(staff, rid, """feedback: "Looks fine."""")
+      after    <- programObscalcRows(pid)
+    yield assertEquals(after, before)

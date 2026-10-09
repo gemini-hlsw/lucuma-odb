@@ -14,12 +14,6 @@ import lucuma.core.model.CallForProposals
 import lucuma.core.model.Observation
 import lucuma.core.util.CalculationState
 import lucuma.core.util.DateInterval
-import lucuma.core.util.Timestamp
-import lucuma.odb.util.Codecs.calculation_state
-import lucuma.odb.util.Codecs.core_timestamp
-import lucuma.odb.util.Codecs.observation_id
-import skunk.*
-import skunk.implicits.*
 
 import java.time.LocalDate
 import java.time.Month
@@ -1252,27 +1246,6 @@ class updateCallsForProposals extends OdbSuite {
       )
 
   // CfP edits and obscalc invalidation (sc-10718)
-
-  private val ObscalcRow: Query[Observation.Id, (CalculationState, Timestamp)] =
-    sql"""
-      SELECT c_obscalc_state, c_last_invalidation
-        FROM t_obscalc
-       WHERE c_observation_id = $observation_id
-    """.query(calculation_state *: core_timestamp)
-
-  private def obscalcRow(oid: Observation.Id): IO[(CalculationState, Timestamp)] =
-    withSession(_.unique(ObscalcRow)(oid))
-
-  // Moves the invalidation time into the past so that a new invalidation is
-  // detectable within the same test.
-  private def setObscalcState(oid: Observation.Id, state: CalculationState): IO[Unit] =
-    withSession: session =>
-      session.execute(sql"""
-        UPDATE t_obscalc
-           SET c_obscalc_state     = $calculation_state,
-               c_last_invalidation = now() - interval '1 day'
-         WHERE c_observation_id = $observation_id
-      """.command)(state, oid).void
 
   // A call (initially with GMOS_NORTH) in use by a program with one observation.
   private val callWithObservation: IO[(CallForProposals.Id, Observation.Id)] =

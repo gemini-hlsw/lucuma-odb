@@ -51,7 +51,8 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations wi
   def runObscalcUpdate(p: Program.Id, o: Observation.Id): IO[Unit] =
     runObscalcUpdateAs(serviceUser, p, o)
 
-  private def runProgramObscalc(pid: Program.Id): IO[Unit] =
+  // Runs obscalc for each of the program's observations that is waiting on it.
+  def runProgramObscalc(pid: Program.Id): IO[Unit] =
     withSession: session =>
       session.execute(
         sql"""
