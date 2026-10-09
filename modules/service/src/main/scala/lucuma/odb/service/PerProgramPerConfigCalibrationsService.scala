@@ -287,10 +287,15 @@ object PerProgramPerConfigCalibrationsService:
           case other                               =>
             sys.error(s"gmosScienceEtmEdit: unexpected observing mode type $other")
 
+      private def oidIn(oids: List[Observation.Id]): AppliedFragment =
+        void"o.c_observation_id IN (" |+| oids.map(sql"$observation_id").intercalate(void", ") |+| void")"
+
       private def updatePropsAt(
         calibrationUpdates: List[(Observation.Id, CalObsProps)]
       )(using Transaction[F]): F[Unit] =
-        calibrationUpdates.groupBy(_._2).toList
+        calibrationUpdates
+          .filter((_, props) => props.band.isDefined || props.wavelengthAt.isDefined)
+          .groupBy(_._2).toList
           .traverse_ : (props, entries) =>
             val oids = entries.map(_._1)
 
@@ -304,8 +309,7 @@ object PerProgramPerConfigCalibrationsService:
             val waveFragment = props.wavelengthAt.map(w => sql"(e.c_signal_to_noise_at <> $wavelength_pm AND e.c_role = $exposure_time_mode_role)".apply(w, ExposureTimeModeRole.Science))
             val needsUpdate  = List(bandFragment, waveFragment).flatten.intercalate(void" OR ")
 
-            val oidInClause =
-              void"o.c_observation_id IN (" |+| oids.map(sql"$observation_id").intercalate(void", ") |+| void")"
+            val oidInClause = oidIn(oids)
 
             def selection(extraFilter: AppliedFragment): AppliedFragment =
               void"""
@@ -357,15 +361,14 @@ object PerProgramPerConfigCalibrationsService:
         calibrations: List[(ObsExtract[CalibrationConfigSubset], CalObsProps)]
       )(using Transaction[F]): F[Unit] =
         val expected: List[(Observation.Id, ObservingModeType, ExposureTimeMode)] =
-          calibrations.flatMap: (o, props) =>
-            gmosModeType(o.data).map: (modeType, config) =>
-              (o.id, modeType, SpecPhotoExposureTime.forConfig(config, props.wavelengthAt))
+          calibrations.collect:
+            case (ObsExtract(id = oid, data = config: CalibrationConfigSubset.Gmos), props) =>
+              (oid, config.modeType, SpecPhotoExposureTime.forConfig(config, props.wavelengthAt))
 
         val roles = List(ExposureTimeModeRole.Requirement, ExposureTimeModeRole.Science)
 
         def oidSelection(oids: List[Observation.Id]): AppliedFragment =
-          void"SELECT c_observation_id FROM t_observation WHERE c_observation_id IN (" |+|
-            oids.map(sql"$observation_id").intercalate(void", ") |+| void")"
+          void"SELECT c_observation_id FROM t_observation o WHERE " |+| oidIn(oids)
 
         NonEmptyList.fromList(expected.map(_._1)).traverse_ : oids =>
           services.exposureTimeModeService.select(oids.toList, roles*).flatMap: current =>
@@ -392,14 +395,6 @@ object PerProgramPerConfigCalibrationsService:
                   observingMode = Nullable.NonNull(gmosScienceEtmEdit(modeType, etm))
                 )
               )
-
-      private def gmosModeType(config: CalibrationConfigSubset): Option[(ObservingModeType, CalibrationConfigSubset.Gmos)] =
-        config match
-          case c: GmosNConfigs    => (ObservingModeType.GmosNorthLongSlit, c).some
-          case c: GmosSConfigs    => (ObservingModeType.GmosSouthLongSlit, c).some
-          case c: GmosNIfuConfigs => (ObservingModeType.GmosNorthIfu, c).some
-          case c: GmosSIfuConfigs => (ObservingModeType.GmosSouthIfu, c).some
-          case _                  => none
 
       private def deleteEmptyCalibrationGroup(pid: Program.Id)(using Transaction[F], ServiceAccess): F[Unit] =
         groupService.selectGroups(pid).flatMap:
@@ -443,11 +438,10 @@ object PerProgramPerConfigCalibrationsService:
           addedOids      <- generateGMOSLSCalibrations(pid, propsByRole, configsPerRole, gnTgt, gsTgt)
           _              <- (info"Program $pid added calibrations $addedOids").whenA(addedOids.nonEmpty)
           calibUpdates   <- prepareCalibrationUpdates(gmosCalibs, removedOids, propsByRole)
-          (specPhot, others) = calibUpdates.partition(_._1.role.contains(CalibrationRole.SpectroPhotometric))
-          // The spec-phot ETM is synced separately, so only its band goes through here
-          bandAndWave    = others.map((o, p) => (o.id, p)) ++ specPhot.map((o, p) => (o.id, p.copy(wavelengthAt = none)))
-          _              <- updatePropsAt(bandAndWave.filter((_, p) => p.band.isDefined || p.wavelengthAt.isDefined))
-          _              <- syncSpecPhotoExposureTimeModes(specPhot)
+          // The spec-phot ETM is synced separately, so only its band goes through updatePropsAt
+          isSpecPhot      = (o: ObsExtract[CalibrationConfigSubset]) => o.role.contains(CalibrationRole.SpectroPhotometric)
+          _              <- updatePropsAt(calibUpdates.map((o, p) => (o.id, if isSpecPhot(o) then p.copy(wavelengthAt = none) else p)))
+          _              <- syncSpecPhotoExposureTimeModes(calibUpdates.filter((o, _) => isSpecPhot(o)))
           // Delete the calibration group if empty
           _              <- deleteEmptyCalibrationGroup(pid)
         } yield (addedOids, removedOids)
