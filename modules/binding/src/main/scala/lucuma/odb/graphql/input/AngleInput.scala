@@ -5,7 +5,6 @@ package lucuma.odb.graphql
 
 package input
 
-import cats.syntax.all.*
 import lucuma.core.math.Angle
 import lucuma.core.math.HourAngle
 import lucuma.odb.graphql.binding.*
@@ -33,37 +32,18 @@ object AngleInput {
   val HMS             = StringBinding.emap(getHMS)
 
   val Binding: Matcher[Angle] =
-    ObjectFieldsBinding.rmap {
-      case List(
-        Microarcseconds.Option("microarcseconds", rMicroarcseconds),
-        Microseconds.Option("microseconds", rMicroseconds),
-        Milliarcseconds.Option("milliarcseconds", rMilliarcseconds),
-        Milliseconds.Option("milliseconds", rMilliseconds),
-        ArcSeconds.Option("arcseconds", rArcSeconds),
-        Seconds.Option("seconds", rSeconds),
-        ArcMinutes.Option("arcminutes", rArcMinutes),
-        Minutes.Option("minutes", rMinutes),
-        Degrees.Option("degrees", rDegrees),
-        Hours.Option("hours", rHours),
-        DMS.Option("dms", rDMS),
-        HMS.Option("hms", rHMS),
-      ) =>
-        (rMicroarcseconds, rMicroseconds, rMilliarcseconds, rMilliseconds, rArcSeconds, rSeconds, rArcMinutes, rMinutes, rDegrees, rHours, rDMS, rHMS).parTupled.flatMap {
-          case (microarcseconds, microseconds, milliarcseconds, milliseconds, arcseconds, seconds, arcminutes, minutes, degrees, hours, dms, hms) =>
-            oneOrFail(
-              microarcseconds -> "microarcseconds",
-              microseconds    -> "microseconds",
-              milliarcseconds -> "milliarcseconds",
-              milliseconds    -> "milliseconds",
-              arcseconds      -> "arcseconds",
-              seconds         -> "seconds",
-              arcminutes      -> "arcminutes",
-              minutes         -> "minutes",
-              degrees         -> "degrees",
-              hours           -> "hours",
-              dms             -> "dms",
-              hms             -> "hms"
-            )
-        }
-    }
+    OneOfBinding(
+      "microarcseconds" -> Microarcseconds,
+      "microseconds"    -> Microseconds,
+      "milliarcseconds" -> Milliarcseconds,
+      "milliseconds"    -> Milliseconds,
+      "arcseconds"      -> ArcSeconds,
+      "seconds"         -> Seconds,
+      "arcminutes"      -> ArcMinutes,
+      "minutes"         -> Minutes,
+      "degrees"         -> Degrees,
+      "hours"           -> Hours,
+      "dms"             -> DMS,
+      "hms"             -> HMS
+    )
 }

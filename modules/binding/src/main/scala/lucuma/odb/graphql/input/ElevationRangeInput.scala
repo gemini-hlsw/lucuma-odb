@@ -5,9 +5,7 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.flatMap.*
-import cats.syntax.functor.*
 import cats.syntax.option.*
-import cats.syntax.parallel.*
 import grackle.Result
 import lucuma.core.model.ElevationRange
 import lucuma.odb.graphql.binding.*
@@ -18,10 +16,10 @@ final case class ElevationRangeInput(
 ) {
 
   def create: Result[ElevationRange] =
-    atMostOne[Result[ElevationRange]](
+    oneOrDefault(Result(ElevationRange.ByAirMass.Default))(
       airMass.map(_.create)   -> "airMass",
       hourAngle.map(_.create) -> "hourAngle"
-    ).flatMap(_.getOrElse(Result(ElevationRange.ByAirMass.Default)))
+    ).flatten
 
 }
 
@@ -35,12 +33,9 @@ object ElevationRangeInput {
 
 
   val Binding: Matcher[ElevationRangeInput] =
-    ObjectFieldsBinding.rmap {
-      case List(
-        AirMassRangeInput.Binding.Option("airMass", rAir),
-        HourAngleRangeInput.Binding.Option("hourAngle", rHour)
-      ) => (rAir, rHour).parMapN(ElevationRangeInput(_, _)).flatTap: e =>
-        atMostOne(e.airMass.void -> "airMass", e.hourAngle.void -> "hourAngle")
-    }
+    OneOfOrDefaultBinding(ElevationRangeInput(none, none))(
+      "airMass"   -> AirMassRangeInput.Binding.map(a => ElevationRangeInput(a.some, none)),
+      "hourAngle" -> HourAngleRangeInput.Binding.map(h => ElevationRangeInput(none, h.some))
+    )
 
 }

@@ -4,7 +4,6 @@
 package lucuma.odb.graphql
 package input
 
-import cats.syntax.parallel.*
 import lucuma.core.math.WavelengthDither
 import lucuma.core.optics.Format
 import lucuma.odb.graphql.binding.*
@@ -29,22 +28,11 @@ object WavelengthDitherInput {
     matchDecimal("micrometer", WavelengthDither.decimalMicrometers)
 
   val Binding: Matcher[WavelengthDither] =
-    ObjectFieldsBinding.rmap {
-      case List(
-        Picometers.Option("picometers", rPicometers),
-        Angstroms.Option("angstroms", rAngstroms),
-        Nanometers.Option("nanometers", rNanometers),
-        Micrometers.Option("micrometers", rMicrometers)
-      ) =>
-        (rPicometers, rAngstroms, rNanometers, rMicrometers).parTupled.flatMap {
-          case (picometers, angstroms, nanometers, micrometers) =>
-            oneOrFail(
-              picometers  -> "picometers",
-              angstroms   -> "angstroms",
-              nanometers  -> "nanometers",
-              micrometers -> "micrometers"
-            )
-        }
-    }
+    OneOfBinding(
+      "picometers"  -> Picometers,
+      "angstroms"   -> Angstroms,
+      "nanometers"  -> Nanometers,
+      "micrometers" -> Micrometers
+    )
 
 }

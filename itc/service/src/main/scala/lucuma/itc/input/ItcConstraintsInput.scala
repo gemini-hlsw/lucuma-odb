@@ -3,7 +3,6 @@
 
 package lucuma.itc.input
 
-import cats.syntax.flatMap.*
 import cats.syntax.parallel.*
 import grackle.Result
 import lucuma.core.enums.SkyBackground
@@ -77,34 +76,16 @@ object ItcConstraintsInput:
     enumeratedBinding[WaterVapor]
 
   val ImageQualityInputBinding: Matcher[ImageQualityInput] =
-    ObjectFieldsBinding.rmap:
-      case List(
-            ImageQualityPresetBinding.Option("preset", rPreset),
-            BigDecimalBinding.Option("arcsec", rArcsec)
-          ) =>
-        (rPreset, rArcsec).parFlatMapN: (presetOpt, arcsecOpt) =>
-          oneOrFail(
-            presetOpt -> "preset",
-            arcsecOpt -> "arcsec"
-          ).map:
-            case p: ImageQuality.Preset => ImageQualityInput.preset(p)
-            case b: BigDecimal          => ImageQualityInput.arcsec(b)
+    OneOfBinding(
+      "preset" -> ImageQualityPresetBinding.map(ImageQualityInput.preset),
+      "arcsec" -> BigDecimalBinding.map(ImageQualityInput.arcsec)
+    )
 
   val CloudExtinctionInputBinding: Matcher[CloudExtinctionInput] =
-    ObjectFieldsBinding.rmap:
-      case List(
-            CloudExtinctionPresetBinding.Option("preset", rPreset),
-            BigDecimalBinding.Option("extinction", rExtinction)
-          ) =>
-        (rPreset, rExtinction)
-          .parMapN: (presetOpt, extinctionOpt) =>
-            oneOrFail(
-              presetOpt     -> "preset",
-              extinctionOpt -> "extinction"
-            ).map:
-              case p: CloudExtinction.Preset => CloudExtinctionInput.preset(p)
-              case b: BigDecimal             => CloudExtinctionInput.extinction(b)
-          .flatten
+    OneOfBinding(
+      "preset"     -> CloudExtinctionPresetBinding.map(CloudExtinctionInput.preset),
+      "extinction" -> BigDecimalBinding.map(CloudExtinctionInput.extinction)
+    )
 
   val Binding: Matcher[ItcConstraintsInput] =
     ObjectFieldsBinding.rmap:

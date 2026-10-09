@@ -4,8 +4,6 @@
 package lucuma.odb.graphql
 package input
 
-import cats.data.Nested
-import cats.syntax.all.*
 import coulomb.*
 import coulomb.syntax.withUnit
 import lucuma.core.math.ProperMotion
@@ -27,20 +25,9 @@ object ProperMotionComponentInput {
   }
 
   private def binding[A]: Matcher[ProperMotion.AngularVelocity Of A] =
-    ObjectFieldsBinding.rmap {
-      case List(
-        LongBinding.Option("microarcsecondsPerYear", rMicroarcsecondsPerYear),
-        BigDecimalBinding.Option("milliarcsecondsPerYear", rMilliarcsecondsPerYear),
-     ) =>
-        val rMicroarcsecondsPerYearʹ = Nested(rMicroarcsecondsPerYear).map(_.withUnit[MicroArcSecondPerYear]).value
-        val rMilliarcsecondsPerYearʹ = Nested(rMilliarcsecondsPerYear).map(n => (n * 1000).toLong.withUnit[MicroArcSecondPerYear]).value
-        (rMicroarcsecondsPerYearʹ, rMilliarcsecondsPerYearʹ).parTupled.flatMap {
-          (microarcsecondsPerYear, milliarcsecondsPerYear) =>
-            oneOrFail(
-              microarcsecondsPerYear -> "microarcsecondsPerYear",
-              milliarcsecondsPerYear -> "milliarcsecondsPerYear"
-            ).map(a => ProperMotion.AngularVelocity(a).tag[A])
-        }
-    }
+    OneOfBinding(
+      "microarcsecondsPerYear" -> LongBinding.map(_.withUnit[MicroArcSecondPerYear]),
+      "milliarcsecondsPerYear" -> BigDecimalBinding.map(n => (n * 1000).toLong.withUnit[MicroArcSecondPerYear])
+    ).map(a => ProperMotion.AngularVelocity(a).tag[A])
 
 }

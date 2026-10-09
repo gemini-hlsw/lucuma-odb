@@ -3,22 +3,14 @@
 
 package lucuma.itc.input
 
-import cats.syntax.parallel.*
 import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.odb.graphql.binding.*
-import lucuma.odb.graphql.input.*
 
 // A GNIRS spectroscopy FPU: exactly one of a long slit or an IFU (`@oneOf`).
 object GnirsFpuSpectroscopyInput:
 
   val Binding: Matcher[GnirsFpu.Spectroscopy] =
-    ObjectFieldsBinding.rmap:
-      case List(
-            GnirsFpuSlitBinding.Option("slitWidth", slitWidth),
-            GnirsFpuIfuBinding.Option("ifu", ifu)
-          ) =>
-        (slitWidth, ifu).parTupled.flatMap: (slitWidth, ifu) =>
-          oneOrFail(
-            slitWidth.map(GnirsFpu.Spectroscopy.Slit(_)) -> "slitWidth",
-            ifu.map(GnirsFpu.Spectroscopy.Ifu(_))        -> "ifu"
-          )
+    OneOfBinding(
+      "slitWidth" -> GnirsFpuSlitBinding.map(GnirsFpu.Spectroscopy.Slit(_)),
+      "ifu"       -> GnirsFpuIfuBinding.map(GnirsFpu.Spectroscopy.Ifu(_))
+    )

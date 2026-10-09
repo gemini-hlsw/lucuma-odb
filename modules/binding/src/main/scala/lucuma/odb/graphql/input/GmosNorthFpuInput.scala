@@ -4,8 +4,6 @@
 package lucuma.odb.graphql
 package input
 
-import cats.syntax.functor.*
-import cats.syntax.parallel.*
 import lucuma.core.enums.GmosNorthFpu
 import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.odb.graphql.binding.*
@@ -13,16 +11,9 @@ import lucuma.odb.graphql.binding.*
 object GmosNorthFpuInput {
 
   val Binding: Matcher[GmosFpuMask[GmosNorthFpu]] =
-    ObjectFieldsBinding.rmap {
-      case List(
-        GmosCustomMaskInput.Binding.Option("customMask", rCustomMask),
-        GmosNorthFpuBinding.Option("builtin", rBuiltin)
-      ) => (rCustomMask, rBuiltin).parTupled.flatMap { (custom, builtin) =>
-        oneOrFail(
-          custom.widen[GmosFpuMask[GmosNorthFpu]] -> "customMask",
-          builtin.map(GmosFpuMask.Builtin(_))     -> "builtin"
-        )
-      }
-    }
+    OneOfBinding(
+      "customMask" -> GmosCustomMaskInput.Binding,
+      "builtin"    -> GmosNorthFpuBinding.map(GmosFpuMask.Builtin(_))
+    )
 
 }

@@ -88,10 +88,10 @@ object GnirsSpectroscopyInput:
     slit: Option[GnirsSpectroscopyLongSlitInput.Value],
     ifu:  Option[GnirsSpectroscopyIfuInput.Value]
   ): Result[(Option[GnirsFpu.Spectroscopy], Nullable[SlitTelescopeConfigs], Option[NonEmptyList[TelescopeConfig]])] =
-    atMostOne(slit.map(Left(_)) -> "slit", ifu.map(Right(_)) -> "ifu").map:
-      case None           => (None, Nullable.Absent, None)
-      case Some(Left(s))  => (s.fpu.map(GnirsFpu.Spectroscopy.Slit(_)), s.explicitTelescopeConfigs, None)
-      case Some(Right(i)) => (i.fpu.map(GnirsFpu.Spectroscopy.Ifu(_)), Nullable.Absent, i.telescopeConfigs)
+    oneOrDefault((None, Nullable.Absent, None))(
+      slit.map(s => (s.fpu.map(GnirsFpu.Spectroscopy.Slit(_)), s.explicitTelescopeConfigs, None)) -> "slit",
+      ifu.map(i => (i.fpu.map(GnirsFpu.Spectroscopy.Ifu(_)), Nullable.Absent, i.telescopeConfigs)) -> "ifu"
+    )
 
   // GnirsSpectroscopyLongSlitInput: fpu (required on create) + a clearable explicit telescope-config override.
   object GnirsSpectroscopyLongSlitInput:

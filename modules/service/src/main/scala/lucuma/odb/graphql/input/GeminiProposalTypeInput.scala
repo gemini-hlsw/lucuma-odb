@@ -358,25 +358,13 @@ object GeminiProposalTypeInput:
     queue:              Matcher[A],
     systemVerification: Matcher[A]
   ): Matcher[A] =
-    ObjectFieldsBinding.rmap:
-      case List(
-        classical.Option("classical", rClassical),
-        demoScience.Option("demoScience", rDemo),
-        directorsTime.Option("directorsTime", rDirector),
-        fastTurnaround.Option("fastTurnaround", rFast),
-        largeProgram.Option("largeProgram", rLarge),
-        poorWeather.Option("poorWeather", rPoor),
-        queue.Option("queue", rQueue),
-        systemVerification.Option("systemVerification", rSystem)
-      ) => (rClassical, rDemo, rDirector, rFast, rLarge, rPoor, rQueue, rSystem).parFlatMapN:
-        (classical, demo, director, fast, large, poor, queue, system) =>
-          oneOrFail(
-            classical -> "classical",
-            demo      -> "demoScience",
-            director  -> "directorsTime",
-            fast      -> "fastTurnaround",
-            large     -> "largeProgram",
-            poor      -> "poorWeather",
-            queue     -> "queue",
-            system    -> "systemVerification"
-          )
+    OneOfBinding(
+      "classical"          -> classical,
+      "demoScience"        -> demoScience,
+      "directorsTime"      -> directorsTime,
+      "fastTurnaround"     -> fastTurnaround,
+      "largeProgram"       -> largeProgram,
+      "poorWeather"        -> poorWeather,
+      "queue"              -> queue,
+      "systemVerification" -> systemVerification
+    )

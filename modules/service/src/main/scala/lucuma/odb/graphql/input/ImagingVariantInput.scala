@@ -133,14 +133,8 @@ object ImagingVariantInput:
         ) => (rOffset1, rOffset2, rOffset3, rOffset4).parMapN: (o1, o2, o3, o4) =>
           PreImaging(o1, o2, o3, o4)
 
-    ObjectFieldsBinding.rmap:
-      case List(
-        GroupedBinding.Option("grouped", rGrouped),
-        InterleavedBinding.Option("interleaved", rInterleaved),
-        PreImagingBinding.Option("preImaging", rPreImaging)
-      ) => (rGrouped, rInterleaved, rPreImaging).parTupled.flatMap: (g, i, p) =>
-        oneOrFail(
-          g -> "grouped",
-          i -> "interleaved",
-          p -> "preImaging"
-        )
+    OneOfBinding(
+      "grouped"     -> GroupedBinding,
+      "interleaved" -> InterleavedBinding,
+      "preImaging"  -> PreImagingBinding
+    )

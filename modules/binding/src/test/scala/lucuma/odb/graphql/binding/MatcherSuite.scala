@@ -149,6 +149,85 @@ class MatcherSuite extends FunSuite {
     assertEquals(r, Result.warning(warning, 1))
   }
 
+  val IntOrStringBinding: Matcher[Int | String] =
+    OneOfBinding("n" -> IntBinding, "s" -> StringBinding)
+
+  val AtMostIntOrStringBinding: Matcher[Option[Int | String]] =
+    AtMostOneBinding("n" -> IntBinding, "s" -> StringBinding)
+
+  test("OneOfBinding gives the value of the one field that is set") {
+    val r = IntOrStringBinding.validate(Binding("v", obj("s" -> StringValue("x"), "n" -> AbsentValue)))
+    assertEquals(r, Result[Int | String]("x"))
+  }
+
+  test("OneOfBinding fails when no field is set") {
+    val r = IntOrStringBinding.validate(Binding("v", obj("n" -> NullValue, "s" -> AbsentValue)))
+    assertEquals(messages(r), List("Argument 'v' is invalid: Expected exactly one of n, s"))
+  }
+
+  test("OneOfBinding fails when more than one field is set") {
+    val r = IntOrStringBinding.validate(Binding("v", obj("n" -> IntValue(1), "s" -> StringValue("x"))))
+    assertEquals(messages(r), List("Argument 'v' is invalid: Expected exactly one of n, s"))
+  }
+
+  test("OneOfBinding keeps the problems of all invalid fields") {
+    val r = IntOrStringBinding.validate(Binding("v", obj("n" -> StringValue("x"), "s" -> IntValue(1))))
+    assertEquals(
+      messages(r),
+      List(
+        "Argument 'v.n' is invalid: expected Int, found StringValue(x)",
+        "Argument 'v.s' is invalid: expected String, found IntValue(1)"
+      )
+    )
+  }
+
+  test("OneOfBinding fails when the input has a field that is not listed") {
+    val r = IntOrStringBinding.validate(Binding("v", obj("n" -> AbsentValue, "s" -> AbsentValue, "b" -> BooleanValue(true))))
+    assertEquals(messages(r), List("Argument 'v' is invalid: Unhandled field(s) b; expected only n, s"))
+  }
+
+  test("OneOfBinding fails when a listed field is not in the input") {
+    val r = IntOrStringBinding.validate(Binding("v", obj("n" -> IntValue(1))))
+    assertEquals(messages(r), List("Argument 'v' is invalid: Missing field(s) s; expected n, s"))
+  }
+
+  test("OneOfBinding rejects duplicate field names") {
+    intercept[IllegalArgumentException](OneOfBinding("n" -> IntBinding, "n" -> StringBinding))
+  }
+
+  test("AtMostOneBinding gives None when no field is set") {
+    val r = AtMostIntOrStringBinding.validate(Binding("v", obj("n" -> AbsentValue, "s" -> NullValue)))
+    assertEquals(r, Result(None))
+  }
+
+  test("AtMostOneBinding gives the value of the one field that is set") {
+    val r = AtMostIntOrStringBinding.validate(Binding("v", obj("n" -> IntValue(1), "s" -> AbsentValue)))
+    assertEquals(r, Result(Some(1)))
+  }
+
+  test("AtMostOneBinding fails when more than one field is set") {
+    val r = AtMostIntOrStringBinding.validate(Binding("v", obj("n" -> IntValue(1), "s" -> StringValue("x"))))
+    assertEquals(messages(r), List("Argument 'v' is invalid: Expected at most one of n, s"))
+  }
+
+  val IntOrStringOrDefaultBinding: Matcher[Int | String] =
+    OneOfOrDefaultBinding[Int | String](0)("n" -> IntBinding, "s" -> StringBinding)
+
+  test("OneOfOrDefaultBinding gives the default when no field is set") {
+    val r = IntOrStringOrDefaultBinding.validate(Binding("v", obj("n" -> AbsentValue, "s" -> NullValue)))
+    assertEquals(r, Result[Int | String](0))
+  }
+
+  test("OneOfOrDefaultBinding gives the value of the one field that is set") {
+    val r = IntOrStringOrDefaultBinding.validate(Binding("v", obj("n" -> AbsentValue, "s" -> StringValue("x"))))
+    assertEquals(r, Result[Int | String]("x"))
+  }
+
+  test("OneOfOrDefaultBinding fails when more than one field is set") {
+    val r = IntOrStringOrDefaultBinding.validate(Binding("v", obj("n" -> IntValue(1), "s" -> StringValue("x"))))
+    assertEquals(messages(r), List("Argument 'v' is invalid: Expected at most one of n, s"))
+  }
+
   test("rmap passes InternalError through unchanged") {
     val boom = new RuntimeException("boom")
     val r    = IntBinding.rmap { case _ => Result.internalError[Int](boom) }.validate(Binding("n", IntValue(1)))

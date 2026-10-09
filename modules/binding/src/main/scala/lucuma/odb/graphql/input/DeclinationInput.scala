@@ -4,7 +4,6 @@
 package lucuma.odb.graphql
 package input
 
-import cats.syntax.all.*
 import grackle.syntax.*
 import lucuma.core.math.Angle
 import lucuma.core.math.Declination
@@ -13,20 +12,11 @@ import lucuma.odb.graphql.binding.*
 object DeclinationInput {
 
   val Binding: Matcher[Declination] =
-    ObjectFieldsBinding.rmap {
-      case List(
-        AngleBinding.Microarcseconds.Option("microarcseconds", rMicroarcseconds),
-        AngleBinding.Degrees.Option("degrees", rDegrees),
-        AngleBinding.Dms.Option("dms", rDms),
-      ) => (rMicroarcseconds, rDegrees, rDms).parFlatMapN {
-        (microarcseconds, degrees, dms) =>
-          oneOrFail(
-            microarcseconds -> "microarcseconds",
-            degrees         -> "degrees",
-            dms             -> "dms"
-          ).flatMap: a =>
-            Declination.fromAngle.getOption(a).toResult(s"Invalid declination: ${Angle.fromStringDMS.reverseGet(a)}")
-      }
-    }
+    OneOfBinding(
+      "microarcseconds" -> AngleBinding.Microarcseconds,
+      "degrees"         -> AngleBinding.Degrees,
+      "dms"             -> AngleBinding.Dms
+    ).rmap: a =>
+      Declination.fromAngle.getOption(a).toResult(s"Invalid declination: ${Angle.fromStringDMS.reverseGet(a)}")
 
 }
