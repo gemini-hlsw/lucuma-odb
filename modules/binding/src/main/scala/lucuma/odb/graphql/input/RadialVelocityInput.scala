@@ -4,8 +4,6 @@
 package lucuma.odb.graphql
 package input
 
-import cats.data.OptionT
-import cats.syntax.all.*
 import grackle.Result
 import lucuma.core.math.RadialVelocity
 import lucuma.odb.graphql.binding.*
@@ -13,24 +11,11 @@ import lucuma.odb.graphql.binding.*
 object RadialVelocityInput {
 
   val Binding: Matcher[RadialVelocity] =
-    ObjectFieldsBinding.rmap {
-      case List(
-        LongBinding.Option("centimetersPerSecond", rCentimetersPerSecond),
-        BigDecimalBinding.Option("metersPerSecond", rMetersPerSecond),
-        BigDecimalBinding.Option("kilometersPerSecond", rKilometersPerSecond),
-      ) =>
-        val rCentimetersPerSecondʹ = OptionT(rCentimetersPerSecond).map(BigDecimal(_)).semiflatMap(resultFromCentimetersPerSecond).value
-        val rMetersPerSecondʹ      = OptionT(rMetersPerSecond).semiflatMap(resultFromMetersPerSecond).value
-        val rKilometersPerSecondʹ  = OptionT(rKilometersPerSecond).semiflatMap(resultFromKilometersPerSecond).value
-        (rCentimetersPerSecondʹ, rMetersPerSecondʹ, rKilometersPerSecondʹ).parFlatMapN {
-          (centimetersPerSecond, metersPerSecond, kilometersPerSecond) =>
-            oneOrFail(
-              centimetersPerSecond -> "centimetersPerSecond",
-              metersPerSecond      -> "metersPerSecond",
-              kilometersPerSecond  -> "kilometersPerSecond"
-            )
-        }
-    }
+    OneOfBinding(
+      "centimetersPerSecond" -> LongBinding.rmap(cmps => resultFromCentimetersPerSecond(BigDecimal(cmps))),
+      "metersPerSecond"      -> BigDecimalBinding.rmap(resultFromMetersPerSecond(_)),
+      "kilometersPerSecond"  -> BigDecimalBinding.rmap(resultFromKilometersPerSecond(_))
+    )
 
   def resultFromCentimetersPerSecond(cmps: BigDecimal): Result[RadialVelocity] =
     resultFromMetersPerSecond(cmps / BigDecimal(100))

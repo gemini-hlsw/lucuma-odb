@@ -3,23 +3,18 @@
 
 package lucuma.odb.graphql.input
 
-import cats.syntax.all.*
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.odb.graphql.binding.GroupIdBinding
-import lucuma.odb.graphql.binding.ObjectFieldsBinding
+import lucuma.odb.graphql.binding.Matcher
 import lucuma.odb.graphql.binding.ObservationIdBinding
+import lucuma.odb.graphql.binding.OneOfBinding
 
 final case class GroupElementInput(value: Either[Group.Id, Observation.Id])
 
 object GroupElementInput:
-  val Binding = ObjectFieldsBinding.rmap:
-    case List(
-      GroupIdBinding.Option("groupId", rGroupId),
-      ObservationIdBinding.Option("observationId", rObservationId),
-    ) =>
-      (rGroupId, rObservationId).parFlatMapN: (g, o) =>
-        oneOrFail(
-          g.map(_.asLeft[Observation.Id]) -> "groupId",
-          o.map(_.asRight[Group.Id])      -> "observationId"
-        ).map(GroupElementInput(_))
+  val Binding: Matcher[GroupElementInput] =
+    OneOfBinding(
+      "groupId"       -> GroupIdBinding.map(g => GroupElementInput(Left(g))),
+      "observationId" -> ObservationIdBinding.map(o => GroupElementInput(Right(o)))
+    )

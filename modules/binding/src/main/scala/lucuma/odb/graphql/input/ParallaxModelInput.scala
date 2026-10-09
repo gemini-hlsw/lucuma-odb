@@ -4,27 +4,15 @@
 package lucuma.odb.graphql
 package input
 
-import cats.data.OptionT
-import cats.syntax.all.*
 import lucuma.core.math.Parallax
 import lucuma.odb.graphql.binding.*
 
 object ParallaxModelInput {
 
   val Binding: Matcher[Parallax] =
-    ObjectFieldsBinding.rmap {
-      case List(
-        LongBinding.Option("microarcseconds", rMicroarcseconds),
-        BigDecimalBinding.Option("milliarcseconds", rMilliarcseconds),
-      ) =>
-        val rMicroarcsecondsʹ = OptionT(rMicroarcseconds).map(Parallax.microarcseconds.reverseGet).value
-        val rMilliarcsecondsʹ = OptionT(rMilliarcseconds).map(Parallax.milliarcseconds.reverseGet).value
-        (rMicroarcsecondsʹ, rMilliarcsecondsʹ).parTupled.flatMap { (microarcseconds, milliarcseconds) =>
-          oneOrFail(
-            microarcseconds -> "microarcseconds",
-            milliarcseconds -> "milliarcseconds"
-          )
-        }
-    }
+    OneOfBinding(
+      "microarcseconds" -> LongBinding.map(Parallax.microarcseconds.reverseGet),
+      "milliarcseconds" -> BigDecimalBinding.map(Parallax.milliarcseconds.reverseGet)
+    )
 
 }

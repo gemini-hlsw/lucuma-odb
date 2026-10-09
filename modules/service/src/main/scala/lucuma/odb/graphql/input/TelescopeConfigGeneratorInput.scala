@@ -107,16 +107,9 @@ object TelescopeConfigGeneratorInput:
         UniformInput(a, b)
 
   val Binding: Matcher[TelescopeConfigGeneratorInput] =
-    ObjectFieldsBinding.rmap:
-      case List(
-        EnumeratedBinding.Option("enumerated", rEnumerated),
-        RandomBinding.Option("random", rRandom),
-        SpiralBinding.Option("spiral", rSpiral),
-        UniformBinding.Option("uniform", rUniform)
-      ) => (rEnumerated, rRandom, rSpiral, rUniform).parTupled.flatMap: (e, r, s, u) =>
-        atMostOne(
-          e -> "enumerated",
-          r -> "random",
-          s -> "spiral",
-          u -> "uniform"
-        ).map(_.getOrElse(NoGeneratorInput))
+    OneOfOrDefaultBinding(NoGeneratorInput)(
+      "enumerated" -> EnumeratedBinding,
+      "random"     -> RandomBinding,
+      "spiral"     -> SpiralBinding,
+      "uniform"    -> UniformBinding
+    )

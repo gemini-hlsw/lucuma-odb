@@ -6,7 +6,6 @@ package input
 package sourceprofile
 
 import cats.data.Ior
-import cats.syntax.all.*
 import grackle.Result
 import grackle.syntax.*
 import lucuma.core.model.SourceProfile
@@ -24,63 +23,45 @@ object SourceProfileInput {
   }
 
   val CreateBinding: Matcher[SourceProfile] =
-    ObjectFieldsBinding.rmap {
-      case List(
-        SpectralDefinitionInput.Integrated.CreateBinding.Option("point", rPoint),
-        SpectralDefinitionInput.Surface.CreateBinding.Option("uniform", rUniform),
-        GaussianInput.CreateBinding.Option("gaussian", rGaussian),
-      ) =>
-        (rPoint, rUniform, rGaussian).parFlatMapN { (point, uniform, gaussian) =>
-          oneOrFail[SourceProfile](
-            point.map(Point(_))     -> "point",
-            uniform.map(Uniform(_)) -> "uniform",
-            gaussian                -> "gaussian"
-          )
-        }
-    }
+    OneOfBinding(
+      "point"    -> SpectralDefinitionInput.Integrated.CreateBinding.map(Point(_)),
+      "uniform"  -> SpectralDefinitionInput.Surface.CreateBinding.map(Uniform(_)),
+      "gaussian" -> GaussianInput.CreateBinding
+    )
 
   val EditBinding: Matcher[SourceProfile => Result[SourceProfile]] = {
-    ObjectFieldsBinding.rmap {
-      case List(
-        SpectralDefinitionInput.Integrated.CreateOrEditBinding.Option("point", rPoint),
-        SpectralDefinitionInput.Surface.CreateOrEditBinding.Option("uniform", rUniform),
-        GaussianInput.CreateOrEditBinding.Option("gaussian", rGaussian),
-      ) =>
-        (rPoint, rUniform, rGaussian).parFlatMapN { (point, uniform, gaussian) =>
-          oneOrFail(
-            point.map[SourceProfile => Result[SourceProfile]] {
-              // If the user provides an input that can be used for editing or replacement, apply the edit if the source profile types match,
-              // otherwise interpret it as a replacement.
-              case Ior.Both(c, e) =>
-                sp =>
-                  sp.point.toOption.map(_.spectralDefinition)
-                    // do a replace if the original is bandNormalized and the new is emissionLines, or vice verse
-                    .filter(_.matches(c))
-                    .fold(c.success)(e)
-                    .map(Point(_))
-              // If the user provides a full definition then we will replace the source profile
-              case Ior.Left(p)    => _ => Point(p).success
-              // Otherwise we will try to apply an edit, which may fail.
-              case Ior.Right(f)   => sp => sp.point.flatMap(ps => f(ps.spectralDefinition)).map(Point(_))
-            } -> "point",
-            uniform.map[SourceProfile => Result[SourceProfile]] {
-              case Ior.Both(c, e) =>
-                sp =>
-                  sp.uniform.toOption.map(_.spectralDefinition)
-                    .filter(_.matches(c))
-                    .fold(c.success)(e)
-                    .map(Uniform(_))
-              case Ior.Left(u)    => _ => Uniform(u).success
-              case Ior.Right(f)   => sp => sp.uniform.flatMap(us => f(us.spectralDefinition)).map(Uniform(_))
-            } -> "uniform",
-            gaussian.map[SourceProfile => Result[SourceProfile]] {
-              case Ior.Both(c, e) => sp => sp.gaussian.toOption.fold(c.success)(e)
-              case Ior.Left(g)    => _ => g.success
-              case Ior.Right(f)   => sp => sp.gaussian.flatMap(f)
-            } -> "gaussian"
-          )
-        }
-    }
+    OneOfBinding(
+      "point" -> SpectralDefinitionInput.Integrated.CreateOrEditBinding.map[SourceProfile => Result[SourceProfile]] {
+        // If the user provides an input that can be used for editing or replacement, apply the edit if the source profile types match,
+        // otherwise interpret it as a replacement.
+        case Ior.Both(c, e) =>
+          sp =>
+            sp.point.toOption.map(_.spectralDefinition)
+              // do a replace if the original is bandNormalized and the new is emissionLines, or vice verse
+              .filter(_.matches(c))
+              .fold(c.success)(e)
+              .map(Point(_))
+        // If the user provides a full definition then we will replace the source profile
+        case Ior.Left(p)    => _ => Point(p).success
+        // Otherwise we will try to apply an edit, which may fail.
+        case Ior.Right(f)   => sp => sp.point.flatMap(ps => f(ps.spectralDefinition)).map(Point(_))
+      },
+      "uniform" -> SpectralDefinitionInput.Surface.CreateOrEditBinding.map[SourceProfile => Result[SourceProfile]] {
+        case Ior.Both(c, e) =>
+          sp =>
+            sp.uniform.toOption.map(_.spectralDefinition)
+              .filter(_.matches(c))
+              .fold(c.success)(e)
+              .map(Uniform(_))
+        case Ior.Left(u)    => _ => Uniform(u).success
+        case Ior.Right(f)   => sp => sp.uniform.flatMap(us => f(us.spectralDefinition)).map(Uniform(_))
+      },
+      "gaussian" -> GaussianInput.CreateOrEditBinding.map[SourceProfile => Result[SourceProfile]] {
+        case Ior.Both(c, e) => sp => sp.gaussian.toOption.fold(c.success)(e)
+        case Ior.Left(g)    => _ => g.success
+        case Ior.Right(f)   => sp => sp.gaussian.flatMap(f)
+      }
+    )
   }
 
 }

@@ -127,7 +127,7 @@ set, identifying the event type.  Unlike the singular mutations, every event in
 a batch must supply both a 'clientTime' and an 'idempotencyKey' (see
 'addEventBatch').
 """
-input AddEventBatchEntryInput {
+input AddEventBatchEntryInput @oneOf {
   dataset:  AddDatasetEventInput
   sequence: AddSequenceEventInput
   slew:     AddSlewEventInput
@@ -2429,7 +2429,7 @@ type GmosNorthFpu {
 """
 GMOS North FPU input parameters (choose custom or builtin).
 """
-input GmosNorthFpuInput {
+input GmosNorthFpuInput @oneOf {
   """
   Custom mask FPU option
   """
@@ -2899,7 +2899,7 @@ type GmosSouthFpu {
 """
 GMOS South FPU input parameters (choose custom or builtin).
 """
-input GmosSouthFpuInput {
+input GmosSouthFpuInput @oneOf {
   """
   Custom mask FPU option
   """
@@ -4716,7 +4716,7 @@ An offset generator is specified by defining one of the `enumerated`, `random`,
 `spiral` or `uniform` options.  If none are defined, the generator type will be
 `NONE`.
 """
-input TelescopeConfigGeneratorInput @oneOf {
+input TelescopeConfigGeneratorInput {
   enumerated: EnumeratedTelescopeConfigGeneratorInput
   random:     RandomTelescopeConfigGeneratorInput
   spiral:     SpiralTelescopeConfigGeneratorInput
@@ -12468,7 +12468,7 @@ input TelescopeConfigAlongSlitInput {
   guiding: GuideState!
 }
 
-input SlitTelescopeConfigsInput {
+input SlitTelescopeConfigsInput @oneOf {
   alongSlit: [TelescopeConfigAlongSlitInput!]
   toSky: [TelescopeConfigInput!]
 }

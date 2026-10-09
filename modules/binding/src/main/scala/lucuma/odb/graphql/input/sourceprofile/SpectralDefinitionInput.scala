@@ -6,7 +6,6 @@ package input
 package sourceprofile
 
 import cats.data.Ior
-import cats.syntax.all.*
 import grackle.Result
 import lucuma.core.math.BrightnessUnits.*
 import lucuma.core.model.SpectralDefinition
@@ -94,35 +93,19 @@ object SpectralDefinitionInput {
     bandNormalized: Matcher[BandNormalized[A]],
     emissionLines: Matcher[EmissionLines[A]],
   ): Matcher[SpectralDefinition[A]] =
-    ObjectFieldsBinding.rmap {
-      case List(
-        bandNormalized.Option("bandNormalized", rBandNormalized),
-        emissionLines.Option("emissionLines", rEmissionLines),
-      ) =>
-        (rBandNormalized, rEmissionLines).parTupled.flatMap { (bandNormalized, emissionLines) =>
-          oneOrFail[SpectralDefinition[A]](
-            bandNormalized -> "bandNormalized",
-            emissionLines  -> "emissionLines"
-          )
-        }
-    }
+    OneOfBinding(
+      "bandNormalized" -> bandNormalized,
+      "emissionLines"  -> emissionLines
+    )
 
   def editBinding[A](
     bandNormalized: Matcher[BandNormalized[A] => Result[BandNormalized[A]]],
     emissionLines: Matcher[EmissionLines[A] => EmissionLines[A]],
   ): Matcher[SpectralDefinition[A] => Result[SpectralDefinition[A]]] =
-    ObjectFieldsBinding.rmap {
-      case List(
-        bandNormalized.Option("bandNormalized", rBandNormalized),
-        emissionLines.Option("emissionLines", rEmissionLines),
-      ) =>
-        (rBandNormalized, rEmissionLines).parTupled.flatMap { (bandNormalized, emissionLines) =>
-          oneOrFail[SpectralDefinition[A] => Result[SpectralDefinition[A]]](
-            bandNormalized.map(f => (a: SpectralDefinition[A]) => a.bandNormalized.flatMap(f)) -> "bandNormalized",
-            emissionLines.map(f => (a: SpectralDefinition[A]) => a.emissionLines.map(f))       -> "emissionLines"
-          )
-        }
-    }
+    OneOfBinding(
+      "bandNormalized" -> bandNormalized.map(f => (a: SpectralDefinition[A]) => a.bandNormalized.flatMap(f)),
+      "emissionLines"  -> emissionLines.map(f => (a: SpectralDefinition[A]) => a.emissionLines.map(f))
+    )
 
 }
 

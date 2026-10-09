@@ -4,7 +4,6 @@
 package lucuma.odb.graphql.input
 
 import cats.syntax.option.*
-import cats.syntax.parallel.*
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ProgramType
 import lucuma.core.enums.ScienceSubtype
@@ -12,7 +11,7 @@ import lucuma.core.enums.SubaruCallForProposalsType
 import lucuma.core.model.ProgramReference
 import lucuma.core.model.Semester
 import lucuma.odb.graphql.binding.Matcher
-import lucuma.odb.graphql.binding.ObjectFieldsBinding
+import lucuma.odb.graphql.binding.OneOfBinding
 
 case class ProgramReferencePropertiesInput(
   input: ProgramReferencePropertiesCalibrationInput   |
@@ -88,33 +87,17 @@ case class ProgramReferencePropertiesInput(
 object ProgramReferencePropertiesInput {
 
   val Binding: Matcher[ProgramReferencePropertiesInput] =
-    ObjectFieldsBinding.rmap {
-      case List(
-        ProgramReferencePropertiesCalibrationInput.Binding.Option("calibration", rCal),
-        ProgramReferencePropertiesCommissioningInput.Binding.Option("commissioning", rCom),
-        ProgramReferencePropertiesEngineeringInput.Binding.Option("engineering", rEng),
-        ProgramReferencePropertiesExampleInput.Binding.Option("example", rXpl),
-        ProgramReferencePropertiesKeckInput.Binding.Option("keck", rKeck),
-        ProgramReferencePropertiesLibraryInput.Binding.Option("library", rLib),
-        ProgramReferencePropertiesMonitoringInput.Binding.Option("monitoring", rMon),
-        ProgramReferencePropertiesScienceInput.Binding.Option("science", rSci),
-        ProgramReferencePropertiesSubaruInput.Binding.Option("subaru", rSubaru),
-        ProgramReferencePropertiesSystemInput.Binding.Option("system", rSys)
-      ) => (rCal, rCom, rEng, rXpl, rKeck, rLib, rMon, rSci, rSubaru, rSys).parFlatMapN {
-        (cal, com, eng, xpl, keck, lib, mon, sci, subaru, sys) =>
-          oneOrFail(
-            cal.map(ProgramReferencePropertiesInput(_))    -> "calibration",
-            com.map(ProgramReferencePropertiesInput(_))    -> "commissioning",
-            eng.map(ProgramReferencePropertiesInput(_))    -> "engineering",
-            xpl.map(ProgramReferencePropertiesInput(_))    -> "example",
-            keck.map(ProgramReferencePropertiesInput(_))   -> "keck",
-            lib.map(ProgramReferencePropertiesInput(_))    -> "library",
-            mon.map(ProgramReferencePropertiesInput(_))    -> "monitoring",
-            sci.map(ProgramReferencePropertiesInput(_))    -> "science",
-            subaru.map(ProgramReferencePropertiesInput(_)) -> "subaru",
-            sys.map(ProgramReferencePropertiesInput(_))    -> "system"
-          )
-      }
-    }
+    OneOfBinding(
+      "calibration"   -> ProgramReferencePropertiesCalibrationInput.Binding.map(ProgramReferencePropertiesInput(_)),
+      "commissioning" -> ProgramReferencePropertiesCommissioningInput.Binding.map(ProgramReferencePropertiesInput(_)),
+      "engineering"   -> ProgramReferencePropertiesEngineeringInput.Binding.map(ProgramReferencePropertiesInput(_)),
+      "example"       -> ProgramReferencePropertiesExampleInput.Binding.map(ProgramReferencePropertiesInput(_)),
+      "keck"          -> ProgramReferencePropertiesKeckInput.Binding.map(ProgramReferencePropertiesInput(_)),
+      "library"       -> ProgramReferencePropertiesLibraryInput.Binding.map(ProgramReferencePropertiesInput(_)),
+      "monitoring"    -> ProgramReferencePropertiesMonitoringInput.Binding.map(ProgramReferencePropertiesInput(_)),
+      "science"       -> ProgramReferencePropertiesScienceInput.Binding.map(ProgramReferencePropertiesInput(_)),
+      "subaru"        -> ProgramReferencePropertiesSubaruInput.Binding.map(ProgramReferencePropertiesInput(_)),
+      "system"        -> ProgramReferencePropertiesSystemInput.Binding.map(ProgramReferencePropertiesInput(_))
+    )
 
 }

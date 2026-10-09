@@ -88,70 +88,27 @@ object ObservingModeInput:
       )
 
     val Binding: Matcher[Create] =
-      ObjectFieldsBinding.rmap:
-        case List(
-          ExchangeInput.CreateBinding.Option("exchange", rExchange),
-          Flamingos2ImagingInput.Create.Binding.Option("flamingos2Imaging", rFlamingos2Imaging),
-          Flamingos2LongSlitInput.Create.Binding.Option("flamingos2LongSlit", rFlamingos2LongSlit),
-          Flamingos2MosInput.Create.Binding.Option("flamingos2Mos", rFlamingos2Mos),
-          GhostIfuInput.Create.Binding.Option("ghostIfu", rGhostIfu),
-          GmosIfuInput.Create.North.Binding.Option("gmosNorthIfu", rGmosNorthIfu),
-          GmosImagingInput.Create.NorthBinding.Option("gmosNorthImaging", rGmosNorthImaging),
-          GmosLongSlitInput.Create.North.Binding.Option("gmosNorthLongSlit", rGmosNorthLongSlit),
-          GmosMosInput.Create.North.Binding.Option("gmosNorthMos", rGmosNorthMos),
-          GmosIfuInput.Create.South.Binding.Option("gmosSouthIfu", rGmosSouthIfu),
-          GmosImagingInput.Create.SouthBinding.Option("gmosSouthImaging", rGmosSouthImaging),
-          GmosLongSlitInput.Create.South.Binding.Option("gmosSouthLongSlit", rGmosSouthLongSlit),
-          GmosMosInput.Create.South.Binding.Option("gmosSouthMos", rGmosSouthMos),
-          GnirsIfuInput.Create.Binding.Option("gnirsIfu", rGnirsIfu),
-          GnirsImagingInput.Create.Binding.Option("gnirsImaging", rGnirsImaging),
-          GnirsLongSlitInput.Create.Binding.Option("gnirsLongSlit", rGnirsLongSlit),
-          GnirsSpectroscopyInput.Create.Binding.Option("gnirsSpectroscopy", rGnirsSpectroscopy),
-          Igrins2LongSlitInput.Create.Binding.Option("igrins2LongSlit", rIgrins2LongSlit),
-          VisitorInput.CreateBinding.Option("visitor", rVisitor)
-        ) =>
-          (rExchange,
-           rFlamingos2Imaging,
-           rFlamingos2LongSlit,
-           rFlamingos2Mos,
-           rGhostIfu,
-           rGmosNorthIfu,
-           rGmosNorthImaging,
-           rGmosNorthLongSlit,
-           rGmosNorthMos,
-           rGmosSouthIfu,
-           rGmosSouthImaging,
-           rGmosSouthLongSlit,
-           rGmosSouthMos,
-           rGnirsIfu,
-           rGnirsImaging,
-           rGnirsLongSlit,
-           rGnirsSpectroscopy,
-           rIgrins2LongSlit,
-           rVisitor
-          ).parTupled.flatMap:
-            case (exchange, flamingos2Imaging, flamingos2LongSlit, flamingos2Mos, ghostIfu, gmosNorthIfu, gmosNorthImaging, gmosNorthLongSlit, gmosNorthMos, gmosSouthIfu, gmosSouthImaging, gmosSouthLongSlit, gmosSouthMos, gnirsIfu, gnirsImaging, gnirsLongSlit, gnirsSpectroscopy, igrins2LongSlit, visitor) =>
-              oneOrFail(
-                exchange           -> "exchange",
-                flamingos2Imaging  -> "flamingos2Imaging",
-                flamingos2LongSlit -> "flamingos2LongSlit",
-                flamingos2Mos      -> "flamingos2Mos",
-                ghostIfu           -> "ghostIfu",
-                gmosNorthIfu       -> "gmosNorthIfu",
-                gmosNorthImaging   -> "gmosNorthImaging",
-                gmosNorthLongSlit  -> "gmosNorthLongSlit",
-                gmosNorthMos       -> "gmosNorthMos",
-                gmosSouthIfu       -> "gmosSouthIfu",
-                gmosSouthImaging   -> "gmosSouthImaging",
-                gmosSouthLongSlit  -> "gmosSouthLongSlit",
-                gmosSouthMos       -> "gmosSouthMos",
-                gnirsIfu           -> "gnirsIfu",
-                gnirsImaging       -> "gnirsImaging",
-                gnirsLongSlit      -> "gnirsLongSlit",
-                gnirsSpectroscopy  -> "gnirsSpectroscopy",
-                igrins2LongSlit    -> "igrins2LongSlit",
-                visitor            -> "visitor"
-              ).as(Create(exchange, flamingos2Imaging, flamingos2LongSlit, flamingos2Mos, ghostIfu, gmosNorthIfu, gmosNorthImaging, gmosNorthLongSlit, gmosNorthMos, gmosSouthIfu, gmosSouthImaging, gmosSouthLongSlit, gmosSouthMos, gnirsImaging, gnirsSpectroscopy.orElse(gnirsLongSlit).orElse(gnirsIfu), igrins2LongSlit, visitor))
+      OneOfBinding(
+        "exchange"           -> ExchangeInput.CreateBinding.map(m => Empty.copy(exchange = Some(m))),
+        "flamingos2Imaging"  -> Flamingos2ImagingInput.Create.Binding.map(m => Empty.copy(flamingos2Imaging = Some(m))),
+        "flamingos2LongSlit" -> Flamingos2LongSlitInput.Create.Binding.map(m => Empty.copy(flamingos2LongSlit = Some(m))),
+        "flamingos2Mos"      -> Flamingos2MosInput.Create.Binding.map(m => Empty.copy(flamingos2Mos = Some(m))),
+        "ghostIfu"           -> GhostIfuInput.Create.Binding.map(m => Empty.copy(ghostIfu = Some(m))),
+        "gmosNorthIfu"       -> GmosIfuInput.Create.North.Binding.map(m => Empty.copy(gmosNorthIfu = Some(m))),
+        "gmosNorthImaging"   -> GmosImagingInput.Create.NorthBinding.map(m => Empty.copy(gmosNorthImaging = Some(m))),
+        "gmosNorthLongSlit"  -> GmosLongSlitInput.Create.North.Binding.map(m => Empty.copy(gmosNorthLongSlit = Some(m))),
+        "gmosNorthMos"       -> GmosMosInput.Create.North.Binding.map(m => Empty.copy(gmosNorthMos = Some(m))),
+        "gmosSouthIfu"       -> GmosIfuInput.Create.South.Binding.map(m => Empty.copy(gmosSouthIfu = Some(m))),
+        "gmosSouthImaging"   -> GmosImagingInput.Create.SouthBinding.map(m => Empty.copy(gmosSouthImaging = Some(m))),
+        "gmosSouthLongSlit"  -> GmosLongSlitInput.Create.South.Binding.map(m => Empty.copy(gmosSouthLongSlit = Some(m))),
+        "gmosSouthMos"       -> GmosMosInput.Create.South.Binding.map(m => Empty.copy(gmosSouthMos = Some(m))),
+        "gnirsIfu"           -> GnirsIfuInput.Create.Binding.map(m => Empty.copy(gnirsSpectroscopy = Some(m))),
+        "gnirsImaging"       -> GnirsImagingInput.Create.Binding.map(m => Empty.copy(gnirsImaging = Some(m))),
+        "gnirsLongSlit"      -> GnirsLongSlitInput.Create.Binding.map(m => Empty.copy(gnirsSpectroscopy = Some(m))),
+        "gnirsSpectroscopy"  -> GnirsSpectroscopyInput.Create.Binding.map(m => Empty.copy(gnirsSpectroscopy = Some(m))),
+        "igrins2LongSlit"    -> Igrins2LongSlitInput.Create.Binding.map(m => Empty.copy(igrins2LongSlit = Some(m))),
+        "visitor"            -> VisitorInput.CreateBinding.map(m => Empty.copy(visitor = Some(m)))
+      )
 
   final case class Edit(
     exchange:           Option[ExchangeInput.Edit],
@@ -258,68 +215,47 @@ object ObservingModeInput:
 
   object Edit:
 
+    /** No mode selected.  See `Create.Empty`. */
+    val Empty: Edit =
+      Edit(
+        exchange           = None,
+        flamingos2Imaging  = None,
+        flamingos2LongSlit = None,
+        flamingos2Mos      = None,
+        ghostIfu           = None,
+        gmosNorthIfu       = None,
+        gmosNorthImaging   = None,
+        gmosNorthLongSlit  = None,
+        gmosNorthMos       = None,
+        gmosSouthIfu       = None,
+        gmosSouthImaging   = None,
+        gmosSouthLongSlit  = None,
+        gmosSouthMos       = None,
+        gnirsImaging       = None,
+        gnirsSpectroscopy  = None,
+        igrins2LongSlit    = None,
+        visitor            = None
+      )
+
     val Binding: Matcher[Edit] =
-      ObjectFieldsBinding.rmap:
-        case List(
-          ExchangeInput.EditBinding.Option("exchange", rExchange),
-          Flamingos2ImagingInput.Edit.Binding.Option("flamingos2Imaging", rFlamingos2Imaging),
-          Flamingos2LongSlitInput.Edit.Binding.Option("flamingos2LongSlit", rFlamingos2LongSlit),
-          Flamingos2MosInput.Edit.Binding.Option("flamingos2Mos", rFlamingos2Mos),
-          GhostIfuInput.Edit.Binding.Option("ghostIfu", rGhostIfu),
-          GmosIfuInput.Edit.North.Binding.Option("gmosNorthIfu", rGmosNorthIfu),
-          GmosImagingInput.Edit.NorthBinding.Option("gmosNorthImaging", rGmosNorthImaging),
-          GmosLongSlitInput.Edit.North.Binding.Option("gmosNorthLongSlit", rGmosNorthLongSlit),
-          GmosMosInput.Edit.North.Binding.Option("gmosNorthMos", rGmosNorthMos),
-          GmosIfuInput.Edit.South.Binding.Option("gmosSouthIfu", rGmosSouthIfu),
-          GmosImagingInput.Edit.SouthBinding.Option("gmosSouthImaging", rGmosSouthImaging),
-          GmosLongSlitInput.Edit.South.Binding.Option("gmosSouthLongSlit", rGmosSouthLongSlit),
-          GmosMosInput.Edit.South.Binding.Option("gmosSouthMos", rGmosSouthMos),
-          GnirsIfuInput.Edit.Binding.Option("gnirsIfu", rGnirsIfu),
-          GnirsImagingInput.Edit.Binding.Option("gnirsImaging", rGnirsImaging),
-          GnirsLongSlitInput.Edit.Binding.Option("gnirsLongSlit", rGnirsLongSlit),
-          GnirsSpectroscopyInput.Edit.Binding.Option("gnirsSpectroscopy", rGnirsSpectroscopy),
-          Igrins2LongSlitInput.Edit.Binding.Option("igrins2LongSlit", rIgrins2LongSlit),
-          VisitorInput.EditBinding.Option("visitor", rVisitor),
-        ) =>
-          (rExchange,
-           rFlamingos2Imaging,
-           rFlamingos2LongSlit,
-           rFlamingos2Mos,
-           rGhostIfu,
-           rGmosNorthIfu,
-           rGmosNorthImaging,
-           rGmosNorthLongSlit,
-           rGmosNorthMos,
-           rGmosSouthIfu,
-           rGmosSouthImaging,
-           rGmosSouthLongSlit,
-           rGmosSouthMos,
-           rGnirsIfu,
-           rGnirsImaging,
-           rGnirsLongSlit,
-           rGnirsSpectroscopy,
-           rIgrins2LongSlit,
-           rVisitor,
-          ).parTupled.flatMap:
-            case (exchange, flamingos2Imaging, flamingos2LongSlit, flamingos2Mos, ghostIfu, gmosNorthIfu, gmosNorthImaging, gmosNorthLongSlit, gmosNorthMos, gmosSouthIfu, gmosSouthImaging, gmosSouthLongSlit, gmosSouthMos, gnirsIfu, gnirsImaging, gnirsLongSlit, gnirsSpectroscopy, igrins2LongSlit, visitor) =>
-              oneOrFail(
-                exchange           -> "exchange",
-                flamingos2Imaging  -> "flamingos2Imaging",
-                flamingos2LongSlit -> "flamingos2LongSlit",
-                flamingos2Mos      -> "flamingos2Mos",
-                ghostIfu           -> "ghostIfu",
-                gmosNorthIfu       -> "gmosNorthIfu",
-                gmosNorthImaging   -> "gmosNorthImaging",
-                gmosNorthLongSlit  -> "gmosNorthLongSlit",
-                gmosNorthMos       -> "gmosNorthMos",
-                gmosSouthIfu       -> "gmosSouthIfu",
-                gmosSouthImaging   -> "gmosSouthImaging",
-                gmosSouthLongSlit  -> "gmosSouthLongSlit",
-                gmosSouthMos       -> "gmosSouthMos",
-                gnirsIfu           -> "gnirsIfu",
-                gnirsImaging       -> "gnirsImaging",
-                gnirsLongSlit      -> "gnirsLongSlit",
-                gnirsSpectroscopy  -> "gnirsSpectroscopy",
-                igrins2LongSlit    -> "igrins2LongSlit",
-                visitor            -> "visitor"
-              ).as(Edit(exchange, flamingos2Imaging, flamingos2LongSlit, flamingos2Mos, ghostIfu, gmosNorthIfu, gmosNorthImaging, gmosNorthLongSlit, gmosNorthMos, gmosSouthIfu, gmosSouthImaging, gmosSouthLongSlit, gmosSouthMos, gnirsImaging, gnirsSpectroscopy.orElse(gnirsLongSlit).orElse(gnirsIfu), igrins2LongSlit, visitor))
+      OneOfBinding(
+        "exchange"           -> ExchangeInput.EditBinding.map(m => Empty.copy(exchange = Some(m))),
+        "flamingos2Imaging"  -> Flamingos2ImagingInput.Edit.Binding.map(m => Empty.copy(flamingos2Imaging = Some(m))),
+        "flamingos2LongSlit" -> Flamingos2LongSlitInput.Edit.Binding.map(m => Empty.copy(flamingos2LongSlit = Some(m))),
+        "flamingos2Mos"      -> Flamingos2MosInput.Edit.Binding.map(m => Empty.copy(flamingos2Mos = Some(m))),
+        "ghostIfu"           -> GhostIfuInput.Edit.Binding.map(m => Empty.copy(ghostIfu = Some(m))),
+        "gmosNorthIfu"       -> GmosIfuInput.Edit.North.Binding.map(m => Empty.copy(gmosNorthIfu = Some(m))),
+        "gmosNorthImaging"   -> GmosImagingInput.Edit.NorthBinding.map(m => Empty.copy(gmosNorthImaging = Some(m))),
+        "gmosNorthLongSlit"  -> GmosLongSlitInput.Edit.North.Binding.map(m => Empty.copy(gmosNorthLongSlit = Some(m))),
+        "gmosNorthMos"       -> GmosMosInput.Edit.North.Binding.map(m => Empty.copy(gmosNorthMos = Some(m))),
+        "gmosSouthIfu"       -> GmosIfuInput.Edit.South.Binding.map(m => Empty.copy(gmosSouthIfu = Some(m))),
+        "gmosSouthImaging"   -> GmosImagingInput.Edit.SouthBinding.map(m => Empty.copy(gmosSouthImaging = Some(m))),
+        "gmosSouthLongSlit"  -> GmosLongSlitInput.Edit.South.Binding.map(m => Empty.copy(gmosSouthLongSlit = Some(m))),
+        "gmosSouthMos"       -> GmosMosInput.Edit.South.Binding.map(m => Empty.copy(gmosSouthMos = Some(m))),
+        "gnirsIfu"           -> GnirsIfuInput.Edit.Binding.map(m => Empty.copy(gnirsSpectroscopy = Some(m))),
+        "gnirsImaging"       -> GnirsImagingInput.Edit.Binding.map(m => Empty.copy(gnirsImaging = Some(m))),
+        "gnirsLongSlit"      -> GnirsLongSlitInput.Edit.Binding.map(m => Empty.copy(gnirsSpectroscopy = Some(m))),
+        "gnirsSpectroscopy"  -> GnirsSpectroscopyInput.Edit.Binding.map(m => Empty.copy(gnirsSpectroscopy = Some(m))),
+        "igrins2LongSlit"    -> Igrins2LongSlitInput.Edit.Binding.map(m => Empty.copy(igrins2LongSlit = Some(m))),
+        "visitor"            -> VisitorInput.EditBinding.map(m => Empty.copy(visitor = Some(m)))
+      )

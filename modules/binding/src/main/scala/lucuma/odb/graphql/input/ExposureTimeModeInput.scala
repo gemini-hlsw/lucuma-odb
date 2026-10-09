@@ -38,13 +38,7 @@ object ExposureTimeModeInput:
           (rTimeʹ, rCount, rAt).parMapN(TimeAndCountMode.apply)
 
   val Binding: Matcher[ExposureTimeMode] =
-    ObjectFieldsBinding.rmap:
-      case List(
-        SignalToNoise.Binding.Option("signalToNoise", rSignal),
-        TimeAndCount.Binding.Option("timeAndCount", rTimeAndCount)
-      ) =>
-        (rSignal, rTimeAndCount).parFlatMapN: (signal, timeAndCount) =>
-          oneOrFail(
-            signal.map(ExposureTimeMode.signalToNoise.reverseGet)      -> "signalToNoise",
-            timeAndCount.map(ExposureTimeMode.timeAndCount.reverseGet) -> "timeAndCount"
-          )
+    OneOfBinding(
+      "signalToNoise" -> SignalToNoise.Binding.map(ExposureTimeMode.signalToNoise.reverseGet),
+      "timeAndCount"  -> TimeAndCount.Binding.map(ExposureTimeMode.timeAndCount.reverseGet)
+    )

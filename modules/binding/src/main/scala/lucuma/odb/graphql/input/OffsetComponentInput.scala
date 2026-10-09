@@ -4,7 +4,6 @@
 package lucuma.odb.graphql
 package input
 
-import cats.syntax.all.*
 import lucuma.core.math.Angle
 import lucuma.core.math.Offset.Component
 import lucuma.core.math.Offset.P
@@ -17,20 +16,11 @@ object OffsetComponentInput {
   private def componentBinding[A](
     componentIso: Iso[Component[A], Angle]
   ): Matcher[Component[A]] =
-    ObjectFieldsBinding.rmap {
-      case List(
-        AngleBinding.Microarcseconds.Option("microarcseconds", rMicroarcseconds),
-        AngleBinding.Milliarcseconds.Option("milliarcseconds", rMilliarcseconds),
-        AngleBinding.Arcseconds.Option("arcseconds", rArcseconds)
-      ) => (rMicroarcseconds, rMilliarcseconds, rArcseconds).parTupled.flatMap {
-        (microarcseconds, milliarcseconds, arcseconds) =>
-          oneOrFail(
-            microarcseconds -> "microarcseconds",
-            milliarcseconds -> "milliarcseconds",
-            arcseconds      -> "arcseconds"
-          ).map(componentIso.reverseGet)
-      }
-    }
+    OneOfBinding(
+      "microarcseconds" -> AngleBinding.Microarcseconds,
+      "milliarcseconds" -> AngleBinding.Milliarcseconds,
+      "arcseconds"      -> AngleBinding.Arcseconds
+    ).map(componentIso.reverseGet)
 
   val BindingP: Matcher[P] =
     componentBinding(P.angle)

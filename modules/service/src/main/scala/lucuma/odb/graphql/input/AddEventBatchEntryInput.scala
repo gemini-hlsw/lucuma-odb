@@ -4,7 +4,6 @@
 package lucuma.odb.graphql
 package input
 
-import cats.syntax.all.*
 import grackle.Result
 import lucuma.core.util.IdempotencyKey
 import lucuma.core.util.Timestamp
@@ -33,20 +32,12 @@ enum AddEventBatchEntryInput:
 object AddEventBatchEntryInput:
 
   val Binding: Matcher[AddEventBatchEntryInput] =
-    ObjectFieldsBinding.rmap:
-      case List(
-        AddDatasetEventInput.Binding.Option("dataset", rDataset),
-        AddSequenceEventInput.Binding.Option("sequence", rSequence),
-        AddSlewEventInput.Binding.Option("slew", rSlew),
-        AddStepEventInput.Binding.Option("step", rStep)
-      ) =>
-        (rDataset, rSequence, rSlew, rStep).parFlatMapN: (d, sq, sl, st) =>
-          oneOrFail(
-            d.map(Dataset(_))   -> "dataset",
-            sq.map(Sequence(_)) -> "sequence",
-            sl.map(Slew(_))     -> "slew",
-            st.map(Step(_))     -> "step"
-          ).flatMap(requireComplete)
+    OneOfBinding[AddEventBatchEntryInput](
+      "dataset"  -> AddDatasetEventInput.Binding.map(Dataset(_)),
+      "sequence" -> AddSequenceEventInput.Binding.map(Sequence(_)),
+      "slew"     -> AddSlewEventInput.Binding.map(Slew(_)),
+      "step"     -> AddStepEventInput.Binding.map(Step(_))
+    ).rmap(requireComplete(_))
 
   // A batched event, unlike a singular one, must carry both its own client time
   // (its recorded time would otherwise collapse onto the batch transaction's) and

@@ -3,11 +3,9 @@
 
 package lucuma.itc.input
 
-import cats.syntax.parallel.*
 import lucuma.core.enums.PortDisposition
 import lucuma.core.model.ExposureTimeMode
 import lucuma.odb.graphql.binding.*
-import lucuma.odb.graphql.input.*
 
 trait InstrumentModesInput:
   def port: PortDisposition
@@ -21,54 +19,15 @@ trait InstrumentModesInput:
 object InstrumentModesInput:
 
   val Binding: Matcher[InstrumentModesInput] =
-    ObjectFieldsBinding.rmap:
-      case List(
-            GmosNSpectroscopyInput.binding.Option("gmosNSpectroscopy", gmosNSpectroscopy),
-            GmosSSpectroscopyInput.binding.Option("gmosSSpectroscopy", gmosSSpectroscopy),
-            GmosNImagingInput.binding.Option("gmosNImaging", gmosNImaging),
-            GmosSImagingInput.binding.Option("gmosSImaging", gmosSImaging),
-            Flamingos2SpectroscopyInput.binding
-              .Option("flamingos2Spectroscopy", flamingos2Spectroscopy),
-            Flamingos2ImagingInput.binding.Option("flamingos2Imaging", flamingos2Imaging),
-            Igrins2SpectroscopyInput.binding
-              .Option("igrins2Spectroscopy", igrins2Spectroscopy),
-            GhostSpectroscopyInput.Binding.Option("ghostSpectroscopy", ghostSpectroscopy),
-            GnirsSpectroscopyInput.binding.Option("gnirsSpectroscopy", gnirsSpectroscopy),
-            GnirsImagingInput.binding.Option("gnirsImaging", gnirsImaging)
-          ) =>
-        (gmosNSpectroscopy,
-         gmosSSpectroscopy,
-         gmosNImaging,
-         gmosSImaging,
-         flamingos2Spectroscopy,
-         flamingos2Imaging,
-         igrins2Spectroscopy,
-         ghostSpectroscopy,
-         gnirsSpectroscopy,
-         gnirsImaging
-        ).parTupled
-          .flatMap {
-            case (gmosNSpectroscopy,
-                  gmosSSpectroscopy,
-                  gmosNImaging,
-                  gmosSImaging,
-                  flamingos2Spectroscopy,
-                  flamingos2Imaging,
-                  igrins2Spectroscopy,
-                  ghostSpectroscopy,
-                  gnirsSpectroscopy,
-                  gnirsImaging
-                )      =>
-              oneOrFail(
-                gmosNSpectroscopy      -> "gmosNSpectroscopy",
-                gmosSSpectroscopy      -> "gmosSSpectroscopy",
-                gmosNImaging           -> "gmosNImaging",
-                gmosSImaging           -> "gmosSImaging",
-                flamingos2Spectroscopy -> "flamingos2Spectroscopy",
-                flamingos2Imaging      -> "flamingos2Imaging",
-                igrins2Spectroscopy    -> "igrins2Spectroscopy",
-                ghostSpectroscopy      -> "ghostSpectroscopy",
-                gnirsSpectroscopy      -> "gnirsSpectroscopy",
-                gnirsImaging           -> "gnirsImaging"
-              )
-          }
+    OneOfBinding(
+      "gmosNSpectroscopy"      -> GmosNSpectroscopyInput.binding,
+      "gmosSSpectroscopy"      -> GmosSSpectroscopyInput.binding,
+      "gmosNImaging"           -> GmosNImagingInput.binding,
+      "gmosSImaging"           -> GmosSImagingInput.binding,
+      "flamingos2Spectroscopy" -> Flamingos2SpectroscopyInput.binding,
+      "flamingos2Imaging"      -> Flamingos2ImagingInput.binding,
+      "igrins2Spectroscopy"    -> Igrins2SpectroscopyInput.binding,
+      "ghostSpectroscopy"      -> GhostSpectroscopyInput.Binding,
+      "gnirsSpectroscopy"      -> GnirsSpectroscopyInput.binding,
+      "gnirsImaging"           -> GnirsImagingInput.binding
+    )
