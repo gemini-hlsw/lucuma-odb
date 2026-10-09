@@ -8,6 +8,7 @@ import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegInt
+import eu.timepit.refined.types.numeric.PosInt
 import grackle.Result
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ChargeClass
@@ -457,9 +458,9 @@ trait CalibrationObservations {
     config: CalibrationConfigSubset.Gmos
   ): F[Observation.Id] =
     val matchingProps: Option[CalObsProps] = propsForConfig(props, CalibrationRole.SpectroPhotometric, config)
-    val wavelengthAt: Option[Wavelength]   = matchingProps.flatMap(_.wavelengthAt)
+    val etm: ExposureTimeMode              = SpecPhotoExposureTime.forConfig(config, matchingProps.flatMap(_.wavelengthAt))
     val band: Option[ScienceBand]          = matchingProps.flatMap(_.band)
-    specPhotoObservation(pid, gid, tid, wavelengthAt, band, config.toInput)
+    specPhotoObservation(pid, gid, tid, etm, band, config.toInput)
 
   def roleConstraints(role: CalibrationRole) =
     role match
@@ -471,7 +472,7 @@ trait CalibrationObservations {
     pid:     Program.Id,
     gid:     Group.Id,
     tid:     Target.Id,
-    wvAt:    Option[Wavelength],
+    etm:     ExposureTimeMode,
     band:    Option[ScienceBand],
     obsMode: ObservingModeInput.Create
   ): F[Observation.Id] =
@@ -498,11 +499,7 @@ trait CalibrationObservations {
               observingMode = obsMode.some,
               scienceRequirements =
                 ScienceRequirementsInput(
-                  exposureTimeMode = Nullable.orNull(wvAt).map: w =>
-                    ExposureTimeMode.SignalToNoiseMode(
-                      SignalToNoise.unsafeFromBigDecimalExact(100.0),
-                      w
-                    ),
+                  exposureTimeMode = Nullable.NonNull(etm),
                   spectroscopy = SpectroscopyScienceRequirementsInput.Default.some,
                   imaging      = none
                 ).some
@@ -561,3 +558,25 @@ trait CalibrationObservations {
             )
       ).orError
 }
+
+/**
+ * The Spec-Phot Exposure Time every GMOS spectrophotometric standard takes: one 120s exposure
+ * through a long slit, one 300s exposure through the IFU.
+ */
+object SpecPhotoExposureTime:
+
+  val LongSlit: TimeSpan = 120.secondTimeSpan
+
+  val Ifu: TimeSpan = 300.secondTimeSpan
+
+  val Count: PosInt = PosInt.unsafeFrom(1)
+
+  /** At the science observations' average S/N wavelength, else the central wavelength. */
+  def forConfig(
+    config:       CalibrationConfigSubset.Gmos,
+    wavelengthAt: Option[Wavelength]
+  ): ExposureTimeMode =
+    val time = config match
+      case _: (CalibrationConfigSubset.GmosNConfigs | CalibrationConfigSubset.GmosSConfigs)       => LongSlit
+      case _: (CalibrationConfigSubset.GmosNIfuConfigs | CalibrationConfigSubset.GmosSIfuConfigs) => Ifu
+    ExposureTimeMode.TimeAndCountMode(time, Count, wavelengthAt.getOrElse(config.centralWavelength))

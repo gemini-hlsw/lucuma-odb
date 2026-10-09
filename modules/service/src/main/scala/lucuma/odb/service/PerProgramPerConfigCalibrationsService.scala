@@ -240,7 +240,8 @@ object PerProgramPerConfigCalibrationsService:
       }
 
       // Update the signal to noise at wavelength for each calbiration observation depending
-      // on the average wavelength of the configuration
+      // on the average wavelength of the configuration.  The spec-phot ETM is a fixed time
+      // and count, so only its band follows the science.
       private def prepareCalibrationUpdates(
         calibrations: List[ObsExtract[CalibrationConfigSubset]],
         removedOids:  List[Observation.Id],
@@ -249,7 +250,10 @@ object PerProgramPerConfigCalibrationsService:
         val candidates =
           calibrations
             .filterNot { o => removedOids.contains(o.id) }
-            .map { o => (o.id, o.role.flatMap(role => propsByRole.get(role).flatMap(_.get(o.data)))) }
+            .map { o => (o.id, o.role.flatMap(calibrationRole =>
+              propsByRole.get(calibrationRole).flatMap(_.get(o.data)).map: props =>
+                if calibrationRole === CalibrationRole.SpectroPhotometric then props.copy(wavelengthAt = none) else props
+            )) }
             .collect { case (oid, Some(props)) if props.band.isDefined || props.wavelengthAt.isDefined => (oid, props) }
         excludeOngoingAndCompleted(candidates, _._1)
 

@@ -182,6 +182,10 @@ _Avoid_: telluric (names the observation, not the classification), requires-tell
 The signal-to-noise a Telluric's science exposure time mode is defaulted to: twice its science observation's, never below 100 and uncapped above, so the standard is measured at least as deeply as the target. The floor is also the value used until a science S/N is known. Where the science's own S/N comes from depends on how the PI expressed it — a requested signal-to-noise is taken at face value, while a Time & Count science has no requested S/N, so the ITC's achieved total signal-to-noise is used instead. Read from the science's live configurations only. Where a mode carries an exposure time mode per central wavelength, the Telluric has one configuration per *distinct* science wavelength, sized from the deepest science configuration at that wavelength, with the averaged reference wavelength and the largest coadds of the group; a daytime pinhole keeps the science list row for row, at a fixed S/N of 100, since its flat's exposure comes from SmartGcal. Always system-owned: it is written as derived, never as a PI's choice, and is recomputed whenever its science observation's ITC result changes.
 _Avoid_: telluric signal-to-noise (ambiguous — the ITC also computes one *for* the telluric), doubled S/N, telluric S/N target.
 
+**Spec-Phot Exposure Time**:
+The fixed exposure a GMOS spectrophotometric standard takes: one 120s exposure through a long slit, one 300s exposure through the IFU, matching the OT's static configurations. A time and count rather than a signal-to-noise target, because the sequence is generated for the worst conditions the constraints allow, where a S/N target may be unreachable, and the standard is not user-editable. Set once when the standard is created, at the science observations' average S/N wavelength (else the central wavelength); later science edits change only the standard's band.
+_Avoid_: spec-phot S/N, default specphot ETM.
+
 ### Time Estimates
 
 **Step Digest**:
