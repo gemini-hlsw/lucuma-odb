@@ -60,7 +60,7 @@ class ShortCut_7147 extends ExecutionTestSupportForFlamingos2:
             executionConfig(observationId: "$oid", futureLimit: 1) {
               flamingos2 {
                 science {
-                  nextAtom {
+                  possibleFuture {
                     steps {
                       instrumentConfig {
                         readMode
@@ -78,30 +78,32 @@ class ShortCut_7147 extends ExecutionTestSupportForFlamingos2:
               "executionConfig": {
                 "flamingos2": {
                   "science": {
-                    "nextAtom": {
-                      "steps": [
-                        {
-                          "instrumentConfig": {
-                            "readMode": "BRIGHT"
+                    "possibleFuture": [
+                      {
+                        "steps": [
+                          {
+                            "instrumentConfig": {
+                              "readMode": "BRIGHT"
+                            }
+                          },
+                          {
+                            "instrumentConfig": {
+                              "readMode": "BRIGHT"
+                            }
+                          },
+                          {
+                            "instrumentConfig": {
+                              "readMode": "BRIGHT"
+                            }
+                          },
+                          {
+                            "instrumentConfig": {
+                              "readMode": "BRIGHT"
+                            }
                           }
-                        },
-                        {
-                          "instrumentConfig": {
-                            "readMode": "BRIGHT"
-                          }
-                        },
-                        {
-                          "instrumentConfig": {
-                            "readMode": "BRIGHT"
-                          }
-                        },
-                        {
-                          "instrumentConfig": {
-                            "readMode": "BRIGHT"
-                          }
-                        }
-                      ]
-                    }
+                        ]
+                      }
+                    ]
                   }
                 }
               }

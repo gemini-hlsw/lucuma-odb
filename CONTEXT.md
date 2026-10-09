@@ -143,7 +143,7 @@ The night-time calibrations one interval of science is expected to consume: a te
 _Avoid_: calibration epoch (an epoch is a reference instant, as in coordinate epochs), visit (a scheduling unit), telluric interval.
 
 **Calibration Set Interval**:
-How much science time one Calibration Set covers: 90 minutes when the science is shorter than the Long Wavelength Cutoff, 60 minutes at or beyond it. GNIRS is judged by the longest central wavelength in its configuration; Flamingos-2 and IGRINS-2 cannot reach the cutoff and always take the 90-minute interval. Distinct from the Multi-Telluric Threshold, which happens to share the 90-minute value.
+How much science time one Calibration Set covers: 90 minutes when the science is shorter than the Long Wavelength Cutoff, 60 minutes at or beyond it. GNIRS is judged by the longest central wavelength in its configuration; Flamingos-2 and IGRINS-2 cannot reach the cutoff and always take the 90-minute interval. It also bounds a single science cycle, which must be shorter than it; there each GNIRS central wavelength is judged by its own interval. Distinct from the Multi-Telluric Threshold, which happens to share the 90-minute value.
 _Avoid_: calibration frequency (the inverse), epoch interval, telluric interval, visit length.
 
 **Long Wavelength Cutoff**:
@@ -191,6 +191,13 @@ _Avoid_: GCAL digest (the buckets are not only GCAL steps), calibration digest (
 **GCAL Set**:
 An atom that contains at least one GCAL step, counted per sequence as `gcalSets`. GMOS puts an arc and a flat in every science atom, so it has one set per atom; Flamingos-2 and GNIRS put theirs in a single calibration atom, which may hold only a flat or only an arc. Not deducible from the arc and flat step counts, since a set need not contain one of each. It is what a Calibration Set brings on instruments that repeat their lamp calibrations, so the cost of one set and the sets left in a sequence both come from it.
 _Avoid_: calibration set (calibrations also means telluric observations), flat/arc pair (a set may hold only one).
+
+**Opening Set**:
+The single GCAL Set a Flamingos-2 science sequence starts with, before any science, and is its only one, however long the science runs. Any further sets the observation needs are taken by the observer.
+
+**Closing Set**:
+The single GCAL Set that ends each central wavelength's science on GNIRS, which runs as one contiguous segment, however long the segment runs. GNIRS has no other sets; any further sets are taken by the observer.
+_Avoid_: end cal, trailing flat.
 
 **Science Steps**:
 The step digest of the steps whose step type is `Science`: science exposures and offsets, and in an acquisition sequence the acquisition exposures, including the science-fold move back to sky. Exposed as `steps.science`. Excludes setup time.

@@ -45,6 +45,7 @@ import lucuma.odb.graphql.input.ScienceRequirementsInput
 import lucuma.odb.graphql.input.SpectroscopyScienceRequirementsInput
 import lucuma.odb.graphql.input.TargetEnvironmentInput
 import lucuma.odb.graphql.mapping.AccessControl
+import lucuma.odb.sequence.CalibrationSetInterval
 import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.sequence.ObservingMode.Syntax.*
 import lucuma.odb.sequence.data.CalibrationGroupTellurics
@@ -92,16 +93,6 @@ object ObsExtract:
       case c: GnirsSpectroscopyConfig => c.telluricType =!= TelluricType.NoTelluric
       case _                          => true
 
-  /** Wavelength from which infrared calibrations repeat hourly rather than every 90 minutes. 2.6 microns */
-  val LongWavelengthCutoff: Wavelength = Wavelength.unsafeFromIntPicometers(2_600_000)
-
-  val ShortWavelengthSetInterval: TimeSpan = 90.minTimeSpan
-
-  val LongWavelengthSetInterval: TimeSpan = 60.minTimeSpan
-
-  def calibrationSetInterval(wavelength: Wavelength): TimeSpan =
-    if wavelength < LongWavelengthCutoff then ShortWavelengthSetInterval else LongWavelengthSetInterval
-
   /** Modes whose science observations are accompanied by tellurics. */
   def modeTakesTelluric(modeType: ObservingModeType): Boolean =
     modeType match
@@ -118,16 +109,15 @@ object ObsExtract:
   def telluricPerScience(mode: ObservingMode): Option[TimeSpan] =
     mode match
       case c: GnirsSpectroscopyConfig =>
-        calibrationSetInterval(c.wavelengths.map(_.centralWavelength).maximum).some
+        CalibrationSetInterval.forWavelength(c.wavelengths.map(_.centralWavelength).maximum).some
       case _ if modeTakesTelluric(mode.modeType) =>
-        ShortWavelengthSetInterval.some
+        CalibrationSetInterval.ShortWavelength.some
       case _ =>
         none
 
   /** Calibration sets over the lifetime of an observation: ceil(scienceTime / scienceSpan). */
   def calibrationSets(scienceSpan: TimeSpan, scienceTime: TimeSpan): NonNegInt =
-    NonNegInt.unsafeFrom:
-      math.ceil(scienceTime.toMicroseconds.toDouble / scienceSpan.toMicroseconds.toDouble).toInt
+    NonNegInt.unsafeFrom(CalibrationSetInterval.intervalsIn(scienceSpan, scienceTime))
 
   /** Placeholder charge for a telluric that has no sequence to estimate from. */
   val TelluricPlaceholderTime: TimeSpan = 15.minTimeSpan

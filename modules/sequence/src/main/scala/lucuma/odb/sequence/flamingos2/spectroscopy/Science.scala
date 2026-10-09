@@ -14,7 +14,6 @@ import cats.syntax.option.*
 import cats.syntax.order.*
 import eu.timepit.refined.*
 import eu.timepit.refined.types.numeric.NonNegInt
-import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Pure
 import fs2.Stream
@@ -31,10 +30,7 @@ import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig as F2
 import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
 import lucuma.core.optics.syntax.lens.*
-import lucuma.core.refined.numeric.NonZeroInt
-import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
-import lucuma.core.util.Timestamp
 import lucuma.itc.IntegrationTime
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.*
@@ -49,9 +45,11 @@ import java.util.UUID
  * Flamingos 2 spectroscopy science sequence generation, shared by the long slit
  * and MOS modes.
  *
- * The two modes differ only in the aperture their steps carry and in how often
- * a "Nighttime Calibrations" atom must be inserted; the latter is the
- * `maxSciencePeriod` parameter threaded through this object.
+ * The two modes differ only in the aperture their steps carry.  The sequence
+ * opens with a single "Nighttime Calibrations" atom, however long the science
+ * runs: the observer takes any further sets.  A science cycle must be shorter
+ * than the calibration set interval, which is always the short one since
+ * Flamingos 2 never reaches the long wavelength cutoff.
  */
 object Science:
 
@@ -65,28 +63,7 @@ object Science:
    */
   val NighttimeCalTitle: NonEmptyString = NonEmptyString.unsafeFrom("Nighttime Calibrations")
 
-  /**
-   * A visit shouldn't take more than this, since we need to break to do a
-   * telluric.
-   */
-  val MaxVisitLength: TimeSpan =
-    3.hourTimeSpan
-
-  private val Two: NonZeroInt = NonZeroInt.unsafeFrom(2)
-
-  extension (start: Timestamp)
-    def timeUntil(end: Timestamp): TimeSpan =
-      if start < end then TimeSpan.between(start, end) else TimeSpan.Zero
-
-  extension [A, B](lst: List[A])
-    def removeFirstBy(b: B)(f: (A, B) => Boolean): List[A] =
-      @annotation.tailrec
-      def loop(rem: List[A], acc: List[A]): List[A] =
-        rem match
-          case Nil    => lst
-          case h :: t => if f(h, b) then acc.reverse ++ t else loop(t, h :: acc)
-
-      loop(lst, Nil)
+  private val Interval: TimeSpan = CalibrationSetInterval.ShortWavelength
 
   case class StepDefinition(
     a0:   ProtoStep[F2],
@@ -171,8 +148,9 @@ object Science:
             b1 <- f2ScienceStep(b1Off, sciClass)
             a1 <- f2ScienceStep(a1Off, sciClass)
             _  <- F2.fpu         := Flamingos2FpuMask.builtin(config.gcalFpu)
-            f  <- flatStep(a1.telescopeConfig.copy(guiding = Disabled), ObserveClass.NightCal)
-            r  <- arcStep(a1.telescopeConfig.copy(guiding = Disabled), ObserveClass.NightCal)
+            // Taken at a0 since the set opens the sequence, so no offset precedes the first cycle.
+            f  <- flatStep(a0.telescopeConfig.copy(guiding = Disabled), ObserveClass.NightCal)
+            r  <- arcStep(a0.telescopeConfig.copy(guiding = Disabled), ObserveClass.NightCal)
           yield PreDef(a0, b0, b1, a1, f, r)
 
     def compute[F[_]: Monad](
@@ -196,122 +174,57 @@ object Science:
   end StepDefinition
 
   case class Generator(
-    steps:            StepDefinition,
-    cycleEstimate:    TimeSpan,
-    maxSciencePeriod: TimeSpan,
-    estimate:         (NonEmptyList[ProtoStep[F2]], StepTimeEstimateCalculator.Last[F2]) => TimeSpan,
-    builder:          AtomBuilder[F2],
-    goalCycles:       NonNegInt
+    steps:      StepDefinition,
+    builder:    AtomBuilder[F2],
+    goalCycles: NonNegInt
   ) extends SequenceGenerator[F2]:
-
-    // Computes the atoms remaining in a 3 hour science blocklimited to `maxCycles`
-    // at most.
-    private def atomsInBlock(maxCycles: NonNegInt): (Int, List[ProtoAtom[ProtoStep[F2]]]) =
-
-      // How many full ABBA cycles would fit in the given time span?
-      def cyclesIn(timeSpan: TimeSpan): Int =
-        (timeSpan.toMicroseconds / cycleEstimate.toMicroseconds).toInt
-
-      // Roughly, how many more cycles can we fit in the remaining time?
-      val cycles: Int = cyclesIn(MaxVisitLength) min maxCycles.value
-
-      // Remaining science time in this visit. If it reaches the cadence we need
-      // to insert a flat roughly after science-time / 2.
-      val scienceTime: TimeSpan = cycleEstimate *| cycles
-
-      val abbaAtom: ProtoAtom[ProtoStep[F2]] = ProtoAtom(AbbaCycleTitle.some, steps.abbaCycle)
-      val gcalAtom: ProtoAtom[ProtoStep[F2]] = ProtoAtom(NighttimeCalTitle.some, steps.cals)
-
-      cycles ->
-        Option
-          .when(scienceTime >= maxSciencePeriod)(scienceTime /| Two)
-          .fold(
-            // The science time is not long enough to warrant a mid-science cal in this block.
-            List.fill(cycles)(abbaAtom) ++ Option.when(cycles > 0)(gcalAtom).toList
-          ): timeUntilMidScienceCals =>
-
-            // How many more full cycles can we do before the mid-science cal time?
-            val fullPreCalCycles: Int        = cyclesIn(timeUntilMidScienceCals)
-            val leftOverPreCalTime: TimeSpan = timeUntilMidScienceCals -| (cycleEstimate *| fullPreCalCycles)
-
-            // If the nominal cal time falls in the middle of an ABBA cycle, make it so
-            // the break to do calibrations falls closest to an ABBA cycle boundary.
-            val extraPreCalCycle: Int =
-              if leftOverPreCalTime >= (cycleEstimate /| Two) then 1 min cycles else 0
-
-            // How many new ABBA cycles before and after the mid-science cals
-            val preCalCycles:  Int = fullPreCalCycles + extraPreCalCycle
-            val postCalCycles: Int = cycles - preCalCycles
-
-            List.fill(preCalCycles)(abbaAtom).appended(gcalAtom) ++
-            List.fill(postCalCycles)(abbaAtom)                   ++
-            Option.when(postCalCycles > 0)(gcalAtom).toList
 
     override def generate: Stream[Pure, Atom[F2]] =
 
-      // Add future blocks until we've completed all the cycles.
-      val future =
-        Stream
-          .unfold(0): c =>
-            PosInt.from(goalCycles.value - c).toOption.map: remainingCycles =>
-              val (cycles, atoms) = atomsInBlock(NonNegInt.unsafeFrom(remainingCycles.value))
+      val gcalAtom: ProtoAtom[ProtoStep[F2]] = ProtoAtom(NighttimeCalTitle.some, steps.cals)
 
-              // Sanity check....
-              assert(cycles > 0, "No progress made generating future F2 spectroscopy sequence!")
+      val protoAtoms: List[ProtoAtom[ProtoStep[F2]]] =
+        if goalCycles.value === 0 then Nil
+        else gcalAtom :: List.fill(goalCycles.value)(ProtoAtom(AbbaCycleTitle.some, steps.abbaCycle))
 
-              (atoms, c + cycles)
-          .flatMap(Stream.emits)
-
-      // Convert the proto atoms into real atoms with ids and estimates.
-      future
-        .mapAccumulate((0, 0, StepTimeEstimateCalculator.Last.empty[F2])) { case ((a, s, calcState), protoAtom) =>
-          val (csʹ, atom) = builder.build(protoAtom.description, a, s, protoAtom.steps).run(calcState).value
-          ((a + 1, 0, csʹ), atom)
-        }
-        .map(_._2)
+      builder.buildStream(Stream.emits(protoAtoms))
 
   end Generator
 
-  private def exposureTimeTooLong(oid: Observation.Id, estimate: TimeSpan, maxSciencePeriod: TimeSpan): OdbError =
-    def minutes(t: TimeSpan): BigDecimal = t.toMinutes.setScale(2, BigDecimal.RoundingMode.HALF_UP)
-    definitionError(oid, s"Estimated ABBA cycle time (${minutes(estimate)} minutes) for $oid must be less than ${minutes(maxSciencePeriod)} minutes.")
+  private def exposureTimeTooLong(oid: Observation.Id, estimate: TimeSpan): OdbError =
+    definitionError(oid, s"Estimated ABBA cycle time (${estimate.toRoundedMinutes} minutes) for $oid must be less than ${Interval.toRoundedMinutes} minutes.")
 
   /**
-   * @param modeName         observing mode name, for error messages
-   * @param maxSciencePeriod cadence of the "Nighttime Calibrations" atoms
+   * @param modeName observing mode name, for error messages
    */
   def instantiate[F[_]: Monad](
-    observationId:    Observation.Id,
-    estimator:        StepTimeEstimateCalculator[Flamingos2StaticConfig, F2],
-    static:           Flamingos2StaticConfig,
-    namespace:        UUID,
-    expander:         SmartGcalExpander[F, Flamingos2StaticConfig, F2],
-    modeName:         String,
-    maxSciencePeriod: TimeSpan,
-    config:           Config,
-    time:             Either[OdbError, IntegrationTime],
-    calRole:          Option[CalibrationRole]
+    observationId: Observation.Id,
+    estimator:     StepTimeEstimateCalculator[Flamingos2StaticConfig, F2],
+    static:        Flamingos2StaticConfig,
+    namespace:     UUID,
+    expander:      SmartGcalExpander[F, Flamingos2StaticConfig, F2],
+    modeName:      String,
+    config:        Config,
+    time:          Either[OdbError, IntegrationTime],
+    calRole:       Option[CalibrationRole]
   ): F[Either[OdbError, SequenceGenerator[F2]]] =
 
     val posTime: EitherT[F, OdbError, IntegrationTime] =
       EitherT.fromEither:
         time.filterOrElse(_.exposureTime.toNonNegMicroseconds.value > 0, zeroExposureTime(observationId, modeName))
 
-    def cycleEstimate(steps: StepDefinition): EitherT[F, OdbError, TimeSpan] =
+    def checkCycle(steps: StepDefinition): EitherT[F, OdbError, Unit] =
       val estimate = StepTimeEstimateCalculator.runEmpty(estimator.estimateTotalNel(static, steps.abbaCycle))
       EitherT.fromEither:
-        Either.cond(estimate < maxSciencePeriod, estimate, exposureTimeTooLong(observationId, estimate, maxSciencePeriod))
+        Either.cond(estimate < Interval, (), exposureTimeTooLong(observationId, estimate))
 
     val gen = for
       t <- posTime
       s <- StepDefinition.compute(modeName, config, t, static, expander, calRole).leftMap(m => definitionError(observationId, m))
-      e <- cycleEstimate(s)
+      _ <- checkCycle(s)
       c <- EitherT.fromEither(s.cycleCount(t).leftMap(m => definitionError(observationId, m)))
     yield Generator(
       s,
-      e,
-      maxSciencePeriod,
-      (nel, calcState) => estimator.estimateTotalNel(static, nel).runA(calcState).value,
       AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Science),
       c
     ): SequenceGenerator[F2]

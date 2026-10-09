@@ -259,11 +259,12 @@ object Generator:
       /**
        * Adds the calibration estimate to a digest. It follows the group's tellurics, which the
        * generator hash leaves out so that a telluric change keeps the science observation's cached
-       * digest and guide star, so it is worked out on every read rather than cached.
+       * digest and guide star, so it is worked out on every read rather than cached.  It reads the
+       * science steps only, so the flats and arcs the sequence shows do not change the count.
        */
       private def withCalibrations(ctx: GeneratorContext, d: ExecutionDigest): ExecutionDigest =
         ExecutionDigest.calibrations.replace(
-          ObsExtract.calibrationEstimate(ctx.params, d.science.timeEstimate.sum)
+          ObsExtract.calibrationEstimate(ctx.params, d.science.steps.observing.time.sum)
         )(d)
 
       private def calcDigestFromContext(

@@ -4,7 +4,9 @@
 package lucuma.odb.graphql
 package query
 
+import cats.effect.IO
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.model.Observation
 import lucuma.odb.graphql.feature.TelluricCalibrationsTestSupport
 
 import java.time.Instant
@@ -30,6 +32,63 @@ class executionDigest_calibrationCount
       yield (c1, c2, c0),
       (1, 2, 0)
     )
+
+  test("the flats and arcs the sequence shows do not count as science"):
+    // Four 1298 second exposures make about 89 minutes of science: under the 90
+    // minute interval on its own, past it with the opening set of flats and arcs.
+    assertIO(
+      for
+        p <- createProgramAs(pi)
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createFlamingos2LongSlitObservationAs(pi, p, List(t))
+        _ <- query(
+               pi,
+               s"""mutation {
+                 updateObservations(input: {
+                   WHERE: { id: { EQ: "$o" } }
+                   SET: {
+                     observingMode: {
+                       flamingos2LongSlit: {
+                         exposureTimeMode: {
+                           timeAndCount: { time: { seconds: 1298 }, count: 4, at: { nanometers: 1390 } }
+                         }
+                       }
+                     }
+                   }
+                 }) {
+                   observations { id }
+                 }
+               }"""
+             )
+        c <- calibrationCount(p, o)
+        m <- scienceMinutes(o)
+      yield
+        // Preconditions: without them the count of 1 would prove nothing.
+        assert(m.steps < 90, s"science steps should be under 90 minutes, got ${m.steps}")
+        assert(m.total > 90, s"science with its flats and arcs should pass 90 minutes, got ${m.total}")
+        c,
+      1
+    )
+
+  private case class ScienceMinutes(total: BigDecimal, steps: BigDecimal)
+
+  private def scienceMinutes(oid: Observation.Id): IO[ScienceMinutes] =
+    query(
+      pi,
+      s"""query {
+        observation(observationId: "$oid") {
+          execution { digest { value { science {
+            timeEstimate { total { minutes } }
+            steps { science { time { total { minutes } } } }
+          } } } }
+        }
+      }"""
+    ).map: json =>
+      val sci = json.hcursor.downFields("observation", "execution", "digest", "value", "science")
+      ScienceMinutes(
+        sci.downFields("timeEstimate", "total", "minutes").require[BigDecimal],
+        sci.downFields("steps", "science", "time", "total", "minutes").require[BigDecimal]
+      )
 
   test("a mode that takes no telluric reports 0"):
     assertIO(

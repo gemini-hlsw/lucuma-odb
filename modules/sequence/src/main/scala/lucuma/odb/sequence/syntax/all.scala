@@ -7,3 +7,4 @@ object all extends ToDatasetQaStateOps
               with ToHashBytesOps
               with ToSequenceDigestOps
               with ToStepGuideStateOps
+              with ToTimeSpanOps

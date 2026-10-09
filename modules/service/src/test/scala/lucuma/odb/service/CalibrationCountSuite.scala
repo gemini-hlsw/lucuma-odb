@@ -8,6 +8,7 @@ import lucuma.core.enums.ChargeClass
 import lucuma.core.math.Wavelength
 import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.util.TimeSpan
+import lucuma.odb.sequence.CalibrationSetInterval
 import lucuma.odb.sequence.data.CalibrationGroupTelluric
 import lucuma.odb.sequence.data.CalibrationGroupTellurics
 import munit.FunSuite
@@ -23,7 +24,7 @@ class CalibrationCountSuite extends FunSuite:
     Wavelength.fromIntNanometers(n).get
 
   test("one set per interval, rounded up"):
-    val i = ObsExtract.ShortWavelengthSetInterval
+    val i = CalibrationSetInterval.ShortWavelength
     assertEquals(ObsExtract.calibrationSets(i, minutes(0)).value, 0)
     assertEquals(ObsExtract.calibrationSets(i, minutes(60)).value, 1)
     assertEquals(ObsExtract.calibrationSets(i, minutes(90)).value, 1)
@@ -31,24 +32,24 @@ class CalibrationCountSuite extends FunSuite:
     assertEquals(ObsExtract.calibrationSets(i, minutes(300)).value, 4)
 
   test("the long-wavelength interval is one hour"):
-    val i = ObsExtract.LongWavelengthSetInterval
+    val i = CalibrationSetInterval.LongWavelength
     assertEquals(ObsExtract.calibrationSets(i, minutes(60)).value, 1)
     assertEquals(ObsExtract.calibrationSets(i, minutes(61)).value, 2)
     assertEquals(ObsExtract.calibrationSets(i, minutes(300)).value, 5)
 
   test("the interval is 90 minutes strictly below 2.6 µm, 60 minutes from 2.6 µm up"):
-    val short = ObsExtract.ShortWavelengthSetInterval
-    val long  = ObsExtract.LongWavelengthSetInterval
-    assertEquals(ObsExtract.calibrationSetInterval(nm(2200)), short)
-    assertEquals(ObsExtract.calibrationSetInterval(nm(2599)), short)
-    assertEquals(ObsExtract.calibrationSetInterval(nm(2600)), long)
-    assertEquals(ObsExtract.calibrationSetInterval(nm(3400)), long)
+    val short = CalibrationSetInterval.ShortWavelength
+    val long  = CalibrationSetInterval.LongWavelength
+    assertEquals(CalibrationSetInterval.forWavelength(nm(2200)), short)
+    assertEquals(CalibrationSetInterval.forWavelength(nm(2599)), short)
+    assertEquals(CalibrationSetInterval.forWavelength(nm(2600)), long)
+    assertEquals(CalibrationSetInterval.forWavelength(nm(3400)), long)
 
   // The count is an estimate; the group still holds at most two tellurics.
   test("ten hours of science: seven sets below 2.6 µm, ten above, two tellurics per visit"):
     val tenHours = minutes(600)
-    val short    = ObsExtract.ShortWavelengthSetInterval
-    val long     = ObsExtract.LongWavelengthSetInterval
+    val short    = CalibrationSetInterval.ShortWavelength
+    val long     = CalibrationSetInterval.LongWavelength
     assertEquals(ObsExtract.calibrationSets(short, tenHours).value, 7)
     assertEquals(ObsExtract.calibrationSets(long, tenHours).value, 10)
     assertEquals(ObsExtract.telluricsForVisit(tenHours).value, 2)

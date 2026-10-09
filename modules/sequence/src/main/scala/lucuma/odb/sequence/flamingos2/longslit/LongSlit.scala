@@ -13,8 +13,6 @@ import lucuma.core.enums.ObservingModeType
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig as F2Dynamic
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig as F2Static
-import lucuma.core.syntax.timespan.*
-import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.StreamingExecutionConfig
@@ -22,10 +20,6 @@ import lucuma.odb.sequence.data.StreamingExecutionConfig
 import java.util.UUID
 
 object LongSlit:
-
-  /** Maximum time that may pass between "Nighttime Calibrations" atoms. */
-  val MaxSciencePeriod: TimeSpan =
-    90.minuteTimeSpan
 
   def instantiate[F[_]: Monad](
     observationId:  Observation.Id,
@@ -46,7 +40,7 @@ object LongSlit:
       if isMosTelluric then
         spectroscopy.MosTelluric.instantiate(observationId, estimator, Static, namespace, expander, ObservingMode.Flamingos2LongSlitName, config, scienceItc, calRole)
       else
-        spectroscopy.Science.instantiate(observationId, estimator, Static, namespace, expander, ObservingMode.Flamingos2LongSlitName, MaxSciencePeriod, config, scienceItc, calRole)
+        spectroscopy.Science.instantiate(observationId, estimator, Static, namespace, expander, ObservingMode.Flamingos2LongSlitName, config, scienceItc, calRole)
 
     (for
        a <- EitherT.fromEither(Acquisition.instantiate(observationId, estimator, Static, namespace, config, acquisitionItc))
