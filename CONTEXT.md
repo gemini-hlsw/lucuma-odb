@@ -183,7 +183,7 @@ The signal-to-noise a Telluric's science exposure time mode is defaulted to: twi
 _Avoid_: telluric signal-to-noise (ambiguous — the ITC also computes one *for* the telluric), doubled S/N, telluric S/N target.
 
 **Spec-Phot Exposure Time**:
-The fixed exposure a GMOS spectrophotometric standard takes: one 120s exposure through a long slit, one 300s exposure through the IFU, matching the OT's static configurations. A time and count rather than a signal-to-noise target, because the sequence is generated for the worst conditions the constraints allow, where a S/N target may be unreachable, and the standard is not user-editable. Resynced from the science observations' wavelength on every calibration recalculation until the standard starts executing.
+The fixed exposure a GMOS spectrophotometric standard takes: one 120s exposure through a long slit, one 300s exposure through the IFU, matching the OT's static configurations. A time and count rather than a signal-to-noise target, because the sequence is generated for the worst conditions the constraints allow, where a S/N target may be unreachable, and the standard is not user-editable. Set once when the standard is created, at the science observations' average S/N wavelength (else the central wavelength); later science edits change only the standard's band.
 _Avoid_: spec-phot S/N, default specphot ETM.
 
 ### Time Estimates

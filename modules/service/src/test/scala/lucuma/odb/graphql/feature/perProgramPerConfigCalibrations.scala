@@ -1068,12 +1068,6 @@ class perProgramPerConfigCalibrations
       case CalibObs(calibrationRole = Some(`calibrationRole`), observingMode = Some(m)) => m.exposureTimeMode
     }.flatten
 
-  def wvAtRequirement(ob: List[CalibObs]): Option[Wavelength] =
-    etmRequirement(ob).flatMap(_.at)
-
-  def wvAtForScience(ob: List[CalibObs]): Option[Wavelength] =
-    etmForScience(ob).flatMap(_.at)
-
   def assertSpecPhotoTimeAndCount(etm: Option[ExposureTimeMode], seconds: Int, at: Option[Wavelength])(using munit.Location): Unit =
     assertEquals(etm.flatMap(_.timeAndCount), at.map(TimeAndCount(Seconds(BigDecimal(seconds)), 1, _)))
     assertEquals(etm.flatMap(_.signalToNoise), None)
@@ -1105,69 +1099,7 @@ class perProgramPerConfigCalibrations
       assertSpecPhotoTimeAndCount(etmForScience(ob), 300, DefaultSnAt.some)
     }
 
-  def specPhotoId(ob: List[CalibObs]): Observation.Id =
-    ob.collectFirst { case CalibObs(id = cid, calibrationRole = Some(CalibrationRole.SpectroPhotometric)) => cid }.get
-
-  // Simulates a spec-phot observation created before the T&C default
-  def revertToSignalToNoise(cid: Observation.Id): IO[Unit] =
-    withSession: s =>
-      s.execute(sql"""
-        UPDATE t_exposure_time_mode
-           SET c_exposure_time_mode = 'signal_to_noise',
-               c_signal_to_noise    = 100,
-               c_exposure_time      = NULL,
-               c_exposure_count     = NULL
-         WHERE c_observation_id = '#${cid.show}'
-      """.command).void
-
-  def specPhotoConvertedTo(modeType: ObservingModeType, seconds: Int): IO[Unit] =
-    for {
-      pid <- createProgramAs(pi)
-      tid <- createTargetAs(pi, pid, "One")
-      oid <- createObservationAs(pi, pid, modeType.some, tid)
-      _   <- prepareObservation(pi, pid, oid, tid)
-      _   <- recalculateCalibrations(pid, when, oid)
-      _   <- queryObservations(pid).flatMap(ob => revertToSignalToNoise(specPhotoId(ob)))
-      bef <- queryObservations(pid)
-      _   <- recalculateCalibrations(pid, when, oid)
-      aft <- queryObservations(pid)
-    } yield {
-      assert(etmRequirement(bef).flatMap(_.signalToNoise).isDefined)
-      assert(etmForScience(bef).flatMap(_.signalToNoise).isDefined)
-      assertSpecPhotoTimeAndCount(etmRequirement(aft), seconds, DefaultSnAt.some)
-      assertSpecPhotoTimeAndCount(etmForScience(aft), seconds, DefaultSnAt.some)
-    }
-
-  test("spec photo long slit still on signal to noise is converted to time and count"):
-    specPhotoConvertedTo(ObservingModeType.GmosNorthLongSlit, 120)
-
-  test("spec photo IFU still on signal to noise is converted to time and count"):
-    specPhotoConvertedTo(ObservingModeType.GmosSouthIfu, 300)
-
-  test("spec photo still on signal to noise is not converted once it has started executing"):
-    val setupEvent =
-      ExecutionQuerySetupOperations
-        .Setup(offset = 200, atomCount = 1, stepCount = 1, datasetCount = 1)
-
-    for {
-      pid <- createProgramAs(pi)
-      tid <- createTargetAs(pi, pid, "One")
-      oid <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
-      _   <- prepareObservation(pi, pid, oid, tid)
-      _   <- recalculateCalibrations(pid, when, oid)
-      cid <- queryObservations(pid).map(specPhotoId)
-      _   <- revertToSignalToNoise(cid)
-      _   <- recordVisit(setupEvent, service, cid)
-      _   <- runObscalcUpdate(pid, cid)
-      _   <- setCalculatedWorkflowState(cid, ObservationWorkflowState.Ongoing)
-      _   <- recalculateCalibrations(pid, when, oid)
-      aft <- queryObservations(pid)
-    } yield {
-      assert(etmRequirement(aft).flatMap(_.signalToNoise).isDefined)
-      assert(etmForScience(aft).flatMap(_.signalToNoise).isDefined)
-    }
-
-  test("spec photo signal to noise at updates when science S/N wavelength changes"):
+  test("spec photo keeps its time and count when the science S/N wavelength changes"):
     for {
       pid      <- createProgramAs(pi)
       tid      <- createTargetAs(pi, pid, "One")
@@ -1176,47 +1108,14 @@ class perProgramPerConfigCalibrations
       _        <- updateScienceExposureTimeMode(oid, Wavelength.fromIntNanometers(500).get, GmosRoi.FullFrame.some)
       _        <- runObscalcUpdate(pid, oid)
       _        <- recalculateCalibrations(pid, when, oid)
-      obBefore <- queryObservations(pid)
       // Edit the science observation's S/N wavelength
       _        <- updateScienceExposureTimeMode(oid, Wavelength.fromIntNanometers(650).get)
       _        <- runObscalcUpdate(pid, oid)
       _        <- recalculateCalibrations(pid, when, oid)
       obAfter  <- queryObservations(pid)
     } yield {
-      // requirement and science ETM should match
-      assertEquals(wvAtRequirement(obBefore), Wavelength.fromIntNanometers(500))
-      assertEquals(wvAtForScience(obBefore), Wavelength.fromIntNanometers(500))
-      assertEquals(wvAtRequirement(obAfter), Wavelength.fromIntNanometers(650))
-      assertEquals(wvAtForScience(obAfter), Wavelength.fromIntNanometers(650))
-    }
-
-  test("spec photo signal to noise at is not touched once the calibration has started executing"):
-    val setupEvent =
-      ExecutionQuerySetupOperations
-        .Setup(offset = 400, atomCount = 1, stepCount = 1, datasetCount = 1)
-
-    for {
-      pid      <- createProgramAs(pi)
-      tid      <- createTargetAs(pi, pid, "One")
-      oid      <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
-      _        <- updateTargetPropertiesAs(pi, tid, Coordinates.Zero)
-      _        <- updateScienceExposureTimeMode(oid, Wavelength.fromIntNanometers(500).get)
-      _        <- runObscalcUpdate(pid, oid)
-      _        <- recalculateCalibrations(pid, when, oid)
-      ob1      <- queryObservations(pid)
-      calibId  = ob1.callibrationIds.head
-      // Start executing the specphot calibration
-      _        <- recordVisit(setupEvent, service, calibId)
-      _        <- runObscalcUpdate(pid, calibId)
-      _        <- setCalculatedWorkflowState(calibId, ObservationWorkflowState.Ongoing)
-      // Edit the science observation's S/N wavelength it should not affect the calibration
-      _        <- updateScienceExposureTimeMode(oid, Wavelength.fromIntNanometers(650).get)
-      _        <- runObscalcUpdate(pid, oid)
-      _        <- recalculateCalibrations(pid, when, oid)
-      obAfter  <- queryObservations(pid)
-    } yield {
-      assertEquals(wvAtRequirement(obAfter), Wavelength.fromIntNanometers(500))
-      assertEquals(wvAtForScience(obAfter), Wavelength.fromIntNanometers(500))
+      assertSpecPhotoTimeAndCount(etmRequirement(obAfter), 120, Wavelength.fromIntNanometers(500))
+      assertSpecPhotoTimeAndCount(etmForScience(obAfter), 120, Wavelength.fromIntNanometers(500))
     }
 
   test("Don't add calibrations if science is inactive"):

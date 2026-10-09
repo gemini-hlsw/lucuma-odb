@@ -26,7 +26,6 @@ import lucuma.odb.data.Existence
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.data.GroupTree
 import lucuma.odb.data.Nullable
-import lucuma.odb.graphql.input.GmosIfuInput
 import lucuma.odb.graphql.input.GmosLongSlitInput
 import lucuma.odb.graphql.input.GroupPropertiesInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
@@ -240,23 +239,35 @@ object PerProgramPerConfigCalibrationsService:
           }
       }
 
-      // Calibrations whose band or ETM may need to follow the science observations
+      // Update the signal to noise at wavelength for each calbiration observation depending
+      // on the average wavelength of the configuration.  The spec-phot ETM is a fixed time
+      // and count, so only its band follows the science.
       private def prepareCalibrationUpdates(
         calibrations: List[ObsExtract[CalibrationConfigSubset]],
         removedOids:  List[Observation.Id],
         propsByRole:  Map[CalibrationRole, Map[CalibrationConfigSubset, CalObsProps]]
-      ): F[List[(ObsExtract[CalibrationConfigSubset], CalObsProps)]] =
+      ): F[List[(Observation.Id, CalObsProps)]] =
         val candidates =
           calibrations
             .filterNot { o => removedOids.contains(o.id) }
-            .flatMap { o => o.role.flatMap(calibrationRole => propsByRole.get(calibrationRole).flatMap(_.get(o.data))).tupleLeft(o) }
-        excludeOngoingAndCompleted(candidates, _._1.id)
+            .map { o => (o.id, o.role.flatMap(calibrationRole =>
+              propsByRole.get(calibrationRole).flatMap(_.get(o.data)).map: props =>
+                if calibrationRole === CalibrationRole.SpectroPhotometric then props.copy(wavelengthAt = none) else props
+            )) }
+            .collect { case (oid, Some(props)) if props.band.isDefined || props.wavelengthAt.isDefined => (oid, props) }
+        excludeOngoingAndCompleted(candidates, _._1)
 
-      // A partial GMOS spectroscopy mode edit that touches only the science ETM
-      private def gmosScienceEtmEdit(modeType: ObservingModeType, etm: ExposureTimeMode): ObservingModeInput.Edit =
-        val ls  = GmosLongSlitInput.Edit.Common.AllUndefined.copy(exposureTimeMode = etm.some)
-        val ifu = GmosIfuInput.Edit.Common.AllUndefined.copy(exposureTimeMode = etm.some)
-        val edit = ObservingModeInput.Edit(
+      // A partial GMOS Long Slit mode edit that touches only the science ETM
+      private def gmosLongSlitScienceEtmEdit(modeType: ObservingModeType, etm: ExposureTimeMode): ObservingModeInput.Edit =
+        val common = GmosLongSlitInput.Edit.Common.AllUndefined.copy(exposureTimeMode = etm.some)
+        val (gn, gs) = modeType match
+          case ObservingModeType.GmosNorthLongSlit =>
+            (GmosLongSlitInput.Edit.North(none, Nullable.Absent, none, common, none).some, none)
+          case ObservingModeType.GmosSouthLongSlit =>
+            (none, GmosLongSlitInput.Edit.South(none, Nullable.Absent, none, common, none).some)
+          case other =>
+            sys.error(s"gmosLongSlitScienceEtmEdit: unexpected observing mode type $other")
+        ObservingModeInput.Edit(
           exchange           = none,
           flamingos2Imaging  = none,
           flamingos2LongSlit = none,
@@ -264,38 +275,22 @@ object PerProgramPerConfigCalibrationsService:
           ghostIfu           = none,
           gmosNorthIfu       = none,
           gmosNorthImaging   = none,
-          gmosNorthLongSlit  = none,
+          gmosNorthLongSlit  = gn,
           gmosNorthMos       = none,
           gmosSouthIfu       = none,
           gmosSouthImaging   = none,
-          gmosSouthLongSlit  = none,
+          gmosSouthLongSlit  = gs,
           gmosSouthMos       = none,
           gnirsImaging       = none,
           gnirsSpectroscopy  = none,
           igrins2LongSlit    = none,
           visitor            = none
         )
-        modeType match
-          case ObservingModeType.GmosNorthLongSlit =>
-            edit.copy(gmosNorthLongSlit = GmosLongSlitInput.Edit.North(none, Nullable.Absent, none, ls, none).some)
-          case ObservingModeType.GmosSouthLongSlit =>
-            edit.copy(gmosSouthLongSlit = GmosLongSlitInput.Edit.South(none, Nullable.Absent, none, ls, none).some)
-          case ObservingModeType.GmosNorthIfu      =>
-            edit.copy(gmosNorthIfu = GmosIfuInput.Edit.North(none, Nullable.Absent, none, none, ifu).some)
-          case ObservingModeType.GmosSouthIfu      =>
-            edit.copy(gmosSouthIfu = GmosIfuInput.Edit.South(none, Nullable.Absent, none, none, ifu).some)
-          case other                               =>
-            sys.error(s"gmosScienceEtmEdit: unexpected observing mode type $other")
-
-      private def oidIn(oids: List[Observation.Id]): AppliedFragment =
-        void"o.c_observation_id IN (" |+| oids.map(sql"$observation_id").intercalate(void", ") |+| void")"
 
       private def updatePropsAt(
         calibrationUpdates: List[(Observation.Id, CalObsProps)]
       )(using Transaction[F]): F[Unit] =
-        calibrationUpdates
-          .filter((_, props) => props.band.isDefined || props.wavelengthAt.isDefined)
-          .groupBy(_._2).toList
+        calibrationUpdates.groupBy(_._2).toList
           .traverse_ : (props, entries) =>
             val oids = entries.map(_._1)
 
@@ -309,7 +304,8 @@ object PerProgramPerConfigCalibrationsService:
             val waveFragment = props.wavelengthAt.map(w => sql"(e.c_signal_to_noise_at <> $wavelength_pm AND e.c_role = $exposure_time_mode_role)".apply(w, ExposureTimeModeRole.Science))
             val needsUpdate  = List(bandFragment, waveFragment).flatten.intercalate(void" OR ")
 
-            val oidInClause = oidIn(oids)
+            val oidInClause =
+              void"o.c_observation_id IN (" |+| oids.map(sql"$observation_id").intercalate(void", ") |+| void")"
 
             def selection(extraFilter: AppliedFragment): AppliedFragment =
               void"""
@@ -347,54 +343,13 @@ object PerProgramPerConfigCalibrationsService:
                   Services.asSuperUser:
                     AccessControl.unchecked(
                       ObservationPropertiesInput.Edit.Empty.copy(
-                        observingMode = Nullable.NonNull(gmosScienceEtmEdit(modeType, etm))
+                        observingMode = Nullable.NonNull(gmosLongSlitScienceEtmEdit(modeType, etm))
                       ),
                       selection(sql" AND o.c_observing_mode_type = $observing_mode_type".apply(modeType))
                     )
                 ).void
 
             requirementUpdate *> modeUpdate(ObservingModeType.GmosNorthLongSlit) *> modeUpdate(ObservingModeType.GmosSouthLongSlit)
-
-      // Spec-phot calibrations use a fixed time and count; rewrite any whose
-      // requirement or science ETM differs, including those still on S/N.
-      private def syncSpecPhotoExposureTimeModes(
-        calibrations: List[(ObsExtract[CalibrationConfigSubset], CalObsProps)]
-      )(using Transaction[F]): F[Unit] =
-        val expected: List[(Observation.Id, ObservingModeType, ExposureTimeMode)] =
-          calibrations.collect:
-            case (ObsExtract(id = oid, data = config: CalibrationConfigSubset.Gmos), props) =>
-              (oid, config.modeType, SpecPhotoExposureTime.forConfig(config, props.wavelengthAt))
-
-        val roles = List(ExposureTimeModeRole.Requirement, ExposureTimeModeRole.Science)
-
-        def oidSelection(oids: List[Observation.Id]): AppliedFragment =
-          void"SELECT c_observation_id FROM t_observation o WHERE " |+| oidIn(oids)
-
-        NonEmptyList.fromList(expected.map(_._1)).traverse_ : oids =>
-          services.exposureTimeModeService.select(oids.toList, roles*).flatMap: current =>
-            val stale = expected.filterNot: (oid, _, etm) =>
-              roles.forall(r => current.get(oid).flatMap(_.get(r)).exists(_.forall(_ === etm)))
-            stale.groupBy((_, modeType, etm) => (modeType, etm)).toList.traverse_ : (key, entries) =>
-              val (modeType, etm) = key
-              val selection       = oidSelection(entries.map(_._1))
-              def update(edit: ObservationPropertiesInput.Edit): F[Unit] =
-                services.observationService.updateObservations(
-                  Services.asSuperUser:
-                    AccessControl.unchecked(edit, selection)
-                ).void
-              update(
-                ObservationPropertiesInput.Edit.Empty.copy(
-                  scienceRequirements = ScienceRequirementsInput(
-                    exposureTimeMode = Nullable.NonNull(etm),
-                    spectroscopy     = SpectroscopyScienceRequirementsInput.Default.some,
-                    imaging          = None
-                  ).some
-                )
-              ) *> update(
-                ObservationPropertiesInput.Edit.Empty.copy(
-                  observingMode = Nullable.NonNull(gmosScienceEtmEdit(modeType, etm))
-                )
-              )
 
       private def deleteEmptyCalibrationGroup(pid: Program.Id)(using Transaction[F], ServiceAccess): F[Unit] =
         groupService.selectGroups(pid).flatMap:
@@ -438,10 +393,7 @@ object PerProgramPerConfigCalibrationsService:
           addedOids      <- generateGMOSLSCalibrations(pid, propsByRole, configsPerRole, gnTgt, gsTgt)
           _              <- (info"Program $pid added calibrations $addedOids").whenA(addedOids.nonEmpty)
           calibUpdates   <- prepareCalibrationUpdates(gmosCalibs, removedOids, propsByRole)
-          // The spec-phot ETM is synced separately, so only its band goes through updatePropsAt
-          isSpecPhot      = (o: ObsExtract[CalibrationConfigSubset]) => o.role.contains(CalibrationRole.SpectroPhotometric)
-          _              <- updatePropsAt(calibUpdates.map((o, p) => (o.id, if isSpecPhot(o) then p.copy(wavelengthAt = none) else p)))
-          _              <- syncSpecPhotoExposureTimeModes(calibUpdates.filter((o, _) => isSpecPhot(o)))
+          _              <- updatePropsAt(calibUpdates)
           // Delete the calibration group if empty
           _              <- deleteEmptyCalibrationGroup(pid)
         } yield (addedOids, removedOids)
