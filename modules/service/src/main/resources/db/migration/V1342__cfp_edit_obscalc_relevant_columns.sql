@@ -15,10 +15,13 @@
 CREATE OR REPLACE FUNCTION cfp_edit_obscalc_invalidate()
   RETURNS TRIGGER AS $$
 BEGIN
-  CALL invalidate_all_obscalc_for_cfp(NEW.c_cfp_id);
+  CALL invalidate_all_obscalc_for_cfps(ARRAY[NEW.c_cfp_id]);
   RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
+
+-- Its last caller was the function above.
+DROP PROCEDURE invalidate_all_obscalc_for_cfp(d_cfp_id);
 
 DROP TRIGGER cfp_edit_invalidate_obscalc_trigger ON t_cfp;
 

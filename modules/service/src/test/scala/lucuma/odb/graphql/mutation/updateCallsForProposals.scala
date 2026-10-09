@@ -1323,7 +1323,7 @@ class updateCallsForProposals extends OdbSuite {
       (cid, oid) <- callWithObservation
       _          <- setObscalcState(oid, CalculationState.Ready)
       _          <- setInstruments(cid, "GMOS_NORTH", "GMOS_SOUTH")
-      _          <- assertIOBoolean(obscalcRow(oid).map(_._1 === CalculationState.Pending))
+      _          <- assertIO(obscalcRow(oid).map(_._1), CalculationState.Pending)
     yield ()
 
   test("instruments - removing one invalidates obscalc"):
@@ -1332,7 +1332,7 @@ class updateCallsForProposals extends OdbSuite {
       _          <- setInstruments(cid, "GMOS_NORTH", "GMOS_SOUTH")
       _          <- setObscalcState(oid, CalculationState.Ready)
       _          <- assertIO(setInstruments(cid, "GMOS_NORTH"), List("GMOS_NORTH"))
-      _          <- assertIOBoolean(obscalcRow(oid).map(_._1 === CalculationState.Pending))
+      _          <- assertIO(obscalcRow(oid).map(_._1), CalculationState.Pending)
     yield ()
 
   test("instruments - removing all invalidates obscalc"):
@@ -1340,7 +1340,7 @@ class updateCallsForProposals extends OdbSuite {
       (cid, oid) <- callWithObservation
       _          <- setObscalcState(oid, CalculationState.Ready)
       _          <- assertIO(setInstruments(cid), Nil)
-      _          <- assertIOBoolean(obscalcRow(oid).map(_._1 === CalculationState.Pending))
+      _          <- assertIO(obscalcRow(oid).map(_._1), CalculationState.Pending)
     yield ()
 
   test("instruments - an unchanged list does not invalidate obscalc"):
@@ -1348,7 +1348,7 @@ class updateCallsForProposals extends OdbSuite {
       (cid, oid) <- callWithObservation
       _          <- setObscalcState(oid, CalculationState.Ready)
       _          <- assertIO(setInstruments(cid, "GMOS_NORTH"), List("GMOS_NORTH"))
-      _          <- assertIOBoolean(obscalcRow(oid).map(_._1 === CalculationState.Ready))
+      _          <- assertIO(obscalcRow(oid).map(_._1), CalculationState.Ready)
     yield ()
 
   test("instruments - a calculating observation stays calculating but is marked invalidated"):
@@ -1368,7 +1368,7 @@ class updateCallsForProposals extends OdbSuite {
       _          <- assertIO(setInstruments(cid, "GMOS_SOUTH", "GHOST").map(_.sorted), List("GHOST", "GMOS_SOUTH"))
       _          <- setObscalcState(oid, CalculationState.Ready)
       _          <- assertIO(setInstruments(cid, "GHOST", "FLAMINGOS2").map(_.sorted), List("FLAMINGOS2", "GHOST"))
-      _          <- assertIOBoolean(obscalcRow(oid).map(_._1 === CalculationState.Pending))
+      _          <- assertIO(obscalcRow(oid).map(_._1), CalculationState.Pending)
     yield ()
 
   test("instruments - editing several calls invalidates only those whose list changed"):
@@ -1401,8 +1401,8 @@ class updateCallsForProposals extends OdbSuite {
                           }
                         """.asRight
                       )
-      _            <- assertIOBoolean(obscalcRow(oidA).map(_._1 === CalculationState.Ready))
-      _            <- assertIOBoolean(obscalcRow(oidB).map(_._1 === CalculationState.Pending))
+      _            <- assertIO(obscalcRow(oidA).map(_._1), CalculationState.Ready)
+      _            <- assertIO(obscalcRow(oidB).map(_._1), CalculationState.Pending)
     yield ()
 
   test("a title edit does not invalidate obscalc"):
@@ -1410,7 +1410,7 @@ class updateCallsForProposals extends OdbSuite {
       (cid, oid) <- callWithObservation
       _          <- setObscalcState(oid, CalculationState.Ready)
       _          <- updateCall(cid, "title: \"Foo\"")
-      _          <- assertIOBoolean(obscalcRow(oid).map(_._1 === CalculationState.Ready))
+      _          <- assertIO(obscalcRow(oid).map(_._1), CalculationState.Ready)
     yield ()
 
   test("an active period edit invalidates obscalc"):
@@ -1418,7 +1418,7 @@ class updateCallsForProposals extends OdbSuite {
       (cid, oid) <- callWithObservation
       _          <- setObscalcState(oid, CalculationState.Ready)
       _          <- updateCall(cid, "activeStart: \"2024-12-31\"")
-      _          <- assertIOBoolean(obscalcRow(oid).map(_._1 === CalculationState.Pending))
+      _          <- assertIO(obscalcRow(oid).map(_._1), CalculationState.Pending)
     yield ()
 
   test("a coordinate limit edit invalidates obscalc"):
@@ -1426,7 +1426,7 @@ class updateCallsForProposals extends OdbSuite {
       (cid, oid) <- callWithObservation
       _          <- setObscalcState(oid, CalculationState.Ready)
       _          <- updateCall(cid, "gemini: { coordinateLimits: { north: { raStart: { hms: \"00:00:00\" } } } }")
-      _          <- assertIOBoolean(obscalcRow(oid).map(_._1 === CalculationState.Pending))
+      _          <- assertIO(obscalcRow(oid).map(_._1), CalculationState.Pending)
     yield ()
 
   test("instruments and partners - no matching calls"):

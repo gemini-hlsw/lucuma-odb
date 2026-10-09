@@ -7,12 +7,13 @@
 -- removing an instrument invalidated nothing.
 --
 -- Here the invalidation becomes set-based and the instrument trigger fires
--- once per statement.
+-- once per statement.  invalidate_obscalc becomes a wrapper around the
+-- set-based procedure so there is a single implementation, and target edits
+-- invalidate their observations through it in one call.
 
--- Set-based counterpart of invalidate_obscalc, with the same semantics: rows
--- are created if missing, observations that no longer exist are ignored, and an
--- observation being calculated keeps its state but has its invalidation time
--- bumped.
+-- Invalidates the obscalc results for the given observations: rows are created
+-- if missing, observations that no longer exist are ignored, and an observation
+-- being calculated keeps its state but has its invalidation time bumped.
 CREATE OR REPLACE PROCEDURE invalidate_obscalc_many(
   observation_ids d_observation_id[]
 )
@@ -54,6 +55,34 @@ BEGIN
 END;
 $$;
 
+CREATE OR REPLACE PROCEDURE invalidate_obscalc(
+  observation_id d_observation_id
+)
+  LANGUAGE plpgsql AS $$
+BEGIN
+  CALL invalidate_obscalc_many(ARRAY[observation_id]);
+END;
+$$;
+
+-- Invalidate the obscalc results for all observations that use the edited
+-- target.
+CREATE OR REPLACE FUNCTION target_invalidate()
+  RETURNS TRIGGER AS $$
+DECLARE
+  obs_ids d_observation_id[];
+BEGIN
+  IF ROW(NEW.*) IS DISTINCT FROM ROW(OLD.*) THEN
+    SELECT array_agg(c_observation_id) INTO obs_ids
+      FROM t_asterism_target
+     WHERE c_program_id = NEW.c_program_id
+       AND c_target_id  = NEW.c_target_id;
+
+    CALL invalidate_obscalc_many(obs_ids);
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
 -- Invalidate the obscalc results for all observations in the program
 CREATE OR REPLACE PROCEDURE invalidate_all_obscalc_for_program(
   pid d_program_id
@@ -87,15 +116,6 @@ BEGIN
      AND o.c_existence = 'present';
 
   CALL invalidate_obscalc_many(obs_ids);
-END;
-$$;
-
-CREATE OR REPLACE PROCEDURE invalidate_all_obscalc_for_cfp(
-  cfp_id d_cfp_id
-)
-  LANGUAGE plpgsql AS $$
-BEGIN
-  CALL invalidate_all_obscalc_for_cfps(ARRAY[cfp_id]);
 END;
 $$;
 
