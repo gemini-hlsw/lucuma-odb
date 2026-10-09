@@ -5,8 +5,6 @@ package lucuma.odb.graphql.input
 
 import cats.syntax.option.*
 import cats.syntax.parallel.*
-import grackle.Result
-import grackle.syntax.*
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ProgramType
 import lucuma.core.enums.ScienceSubtype
@@ -102,19 +100,20 @@ object ProgramReferencePropertiesInput {
         ProgramReferencePropertiesScienceInput.Binding.Option("science", rSci),
         ProgramReferencePropertiesSubaruInput.Binding.Option("subaru", rSubaru),
         ProgramReferencePropertiesSystemInput.Binding.Option("system", rSys)
-      ) => (rCal, rCom, rEng, rXpl, rKeck, rLib, rMon, rSci, rSubaru, rSys).parTupled.flatMap {
-         case (Some(cal), None, None, None, None, None, None, None, None, None) => ProgramReferencePropertiesInput(cal).success
-         case (None, Some(com), None, None, None, None, None, None, None, None) => ProgramReferencePropertiesInput(com).success
-         case (None, None, Some(eng), None, None, None, None, None, None, None) => ProgramReferencePropertiesInput(eng).success
-         case (None, None, None, Some(xpl), None, None, None, None, None, None) => ProgramReferencePropertiesInput(xpl).success
-         case (None, None, None, None, Some(keck), None, None, None, None, None) => ProgramReferencePropertiesInput(keck).success
-         case (None, None, None, None, None, Some(lib), None, None, None, None) => ProgramReferencePropertiesInput(lib).success
-         case (None, None, None, None, None, None, Some(mon), None, None, None) => ProgramReferencePropertiesInput(mon).success
-         case (None, None, None, None, None, None, None, Some(sci), None, None) => ProgramReferencePropertiesInput(sci).success
-         case (None, None, None, None, None, None, None, None, Some(subaru), None) => ProgramReferencePropertiesInput(subaru).success
-         case (None, None, None, None, None, None, None, None, None, Some(sys)) => ProgramReferencePropertiesInput(sys).success
-         case _                                               =>
-           Result.failure("Exactly one of 'calibration', 'commissioning', 'engineering', 'example', 'keck', 'library', 'monitoring', 'science', 'subaru' or 'system' expected.")
+      ) => (rCal, rCom, rEng, rXpl, rKeck, rLib, rMon, rSci, rSubaru, rSys).parFlatMapN {
+        (cal, com, eng, xpl, keck, lib, mon, sci, subaru, sys) =>
+          oneOrFail(
+            cal.map(ProgramReferencePropertiesInput(_))    -> "calibration",
+            com.map(ProgramReferencePropertiesInput(_))    -> "commissioning",
+            eng.map(ProgramReferencePropertiesInput(_))    -> "engineering",
+            xpl.map(ProgramReferencePropertiesInput(_))    -> "example",
+            keck.map(ProgramReferencePropertiesInput(_))   -> "keck",
+            lib.map(ProgramReferencePropertiesInput(_))    -> "library",
+            mon.map(ProgramReferencePropertiesInput(_))    -> "monitoring",
+            sci.map(ProgramReferencePropertiesInput(_))    -> "science",
+            subaru.map(ProgramReferencePropertiesInput(_)) -> "subaru",
+            sys.map(ProgramReferencePropertiesInput(_))    -> "system"
+          )
       }
     }
 

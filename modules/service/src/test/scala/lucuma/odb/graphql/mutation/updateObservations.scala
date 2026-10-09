@@ -364,7 +364,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
           }
         }
       """,
-      expected = "Argument 'input.SET.constraintSet.elevationRange' is invalid: Only one of airMass or hourAngle may be specified.".asLeft
+      expected = "Argument 'input.SET.constraintSet.elevationRange' is invalid: Expected at most one of airMass, hourAngle".asLeft
     )
 
   }
@@ -1582,6 +1582,37 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
 
     val expected =  "A centralWavelength is required in order to create a GMOS North Long Slit observing mode.".asLeft
     oneUpdateTest(pi, update, query, expected)
+  }
+
+  test("observing mode: (fail to) create in an existing observation, with several missing fields") {
+
+    val update = """
+      observingMode: {
+        gmosNorthLongSlit: {
+          filter: G_PRIME
+        }
+      }
+    """
+
+    val query = """
+      observations {
+        id
+      }
+    """
+
+    for
+      pid <- createProgramAs(pi)
+      oid <- createObservationAs(pi, pid)
+      _   <- expect(
+        user     = pi,
+        query    = updateObservationsMutation(oid, update, query),
+        expected = List(
+          "A grating is required in order to create a GMOS North Long Slit observing mode.",
+          "A fpu is required in order to create a GMOS North Long Slit observing mode.",
+          "A centralWavelength is required in order to create a GMOS North Long Slit observing mode."
+        ).asLeft
+      )
+    yield ()
   }
 
   test("observing mode: update existing changing mode") {
@@ -5169,12 +5200,18 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
         }
       }
     """
-    oneUpdateTest(
-      user     = pi,
-      update   = update,
-      query    = AlienVisitorQuery,
-      expected = "Visitor mode VisitorNorth requires both `name` and `totalRequestTime` to be provided.".asLeft
-    )
+    // Goes through `createViaUpdate`, outside of any binding, so the problem must still be tagged.
+    for
+      pid <- createProgramAs(pi)
+      oid <- createObservationAs(pi, pid, None)
+      _   <- expectOdbError(
+               user     = pi,
+               query    = updateObservationsMutation(oid, update, AlienVisitorQuery),
+               expected = {
+                 case OdbError.InvalidArgument(Some("Visitor mode VisitorNorth requires both `name` and `totalRequestTime` to be provided.")) => ()
+               }
+             )
+    yield ()
 
   test("observing mode: visitor update to VISITOR_NORTH with name and totalRequestTime succeeds"):
     val update = """

@@ -4,7 +4,7 @@
 package lucuma.odb.graphql.input
 
 import cats.syntax.all.*
-import grackle.syntax.*
+import grackle.Result
 import lucuma.core.enums.ExchangePartner
 import lucuma.core.enums.Observatory
 import lucuma.core.enums.Partner
@@ -20,9 +20,6 @@ object ProposalPropertiesInput {
 
   // A proposal is one of three mutually-exclusive kinds: a Gemini proposal (with
   // a science subtype), a Keck exchange proposal, or a Subaru exchange proposal.
-
-  private val onlyOneMessage: String =
-    "Specify only one of 'gemini', 'keck' or 'subaru'."
 
   case class Create(
     category:    Option[Tag],
@@ -90,9 +87,8 @@ object ProposalPropertiesInput {
   }
 
   // Reject more than one of gemini/keck/subaru.
-  private def atMostOne[A](gemini: Option[?], keck: Option[?], subaru: Option[?], a: => A): grackle.Result[A] =
-    if List(gemini, keck, subaru).count(_.isDefined) > 1 then Matcher.validationFailure(onlyOneMessage)
-    else a.success
+  private def checkKind(gemini: Option[?], keck: Option[?], subaru: Option[?]): Result[Unit] =
+    atMostOne(gemini.void -> "gemini", keck.void -> "keck", subaru.void -> "subaru").void
 
   val CreateBinding: Matcher[Create] =
     ObjectFieldsBinding.rmap {
@@ -104,12 +100,12 @@ object ProposalPropertiesInput {
         KeckProposalTypeInput.Create.Binding.Option("keck", rKeck),
         SubaruProposalTypeInput.Create.Binding.Option("subaru", rSubaru)
       ) =>
-        (rCategory, rCid, rTimeRequest, rGemini, rKeck, rSubaru).parTupled.flatMap { case (category, cid, timeRequest, gemini, keck, subaru) =>
-          atMostOne(gemini, keck, subaru, {
+        (rCategory, rCid, rTimeRequest, rGemini, rKeck, rSubaru).parFlatMapN { (category, cid, timeRequest, gemini, keck, subaru) =>
+          checkKind(gemini, keck, subaru).as {
             // If no variant is specified, assume a regular semester queue proposal.
             val g = if gemini.isEmpty && keck.isEmpty && subaru.isEmpty then GeminiProposalTypeInput.Create.Default.some else gemini
             Create(category, cid, timeRequest, g, keck, subaru)
-          })
+          }
         }
     }
 
@@ -123,8 +119,8 @@ object ProposalPropertiesInput {
         KeckProposalTypeInput.Edit.Binding.Option("keck", rKeck),
         SubaruProposalTypeInput.Edit.Binding.Option("subaru", rSubaru)
       ) =>
-        (rCategory, rCid, rTimeRequest, rGemini, rKeck, rSubaru).parTupled.flatMap { case (category, cid, timeRequest, gemini, keck, subaru) =>
-          atMostOne(gemini, keck, subaru, Edit(category, cid, timeRequest, gemini, keck, subaru))
+        (rCategory, rCid, rTimeRequest, rGemini, rKeck, rSubaru).parFlatMapN { (category, cid, timeRequest, gemini, keck, subaru) =>
+          checkKind(gemini, keck, subaru).as(Edit(category, cid, timeRequest, gemini, keck, subaru))
         }
     }
 

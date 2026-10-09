@@ -5,7 +5,6 @@ package lucuma.odb.graphql.input
 
 import cats.syntax.all.*
 import grackle.Result
-import grackle.syntax.*
 import lucuma.core.enums.ExchangeObservingModeType
 import lucuma.core.enums.KeckInstrument
 import lucuma.core.enums.SubaruInstrument
@@ -47,11 +46,12 @@ object ExchangeInput:
         SubaruInstrumentBinding.Option("subaruInstrument", rSubaru),
         TimeSpanInput.Binding("totalRequestTime", rTotalRequestTime)
       ) =>
-        val rInstrument = (rKeck, rSubaru).parTupled.flatMap:
-          case (Some(k), None) => Left(k).success
-          case (None, Some(s)) => Right(s).success
-          case _               => Matcher.validationFailure("Exactly one of 'keckInstrument' or 'subaruInstrument' must be provided.")
-        (rInstrument, rTotalRequestTime).mapN(Create.apply)
+        val rInstrument = (rKeck, rSubaru).parFlatMapN: (k, s) =>
+          oneOrFail(
+            k.map(_.asLeft[SubaruInstrument]) -> "keckInstrument",
+            s.map(_.asRight[KeckInstrument])  -> "subaruInstrument"
+          )
+        (rInstrument, rTotalRequestTime).parMapN(Create.apply)
 
   val EditBinding: Matcher[Edit] =
     ObjectFieldsBinding.rmap:
@@ -60,9 +60,9 @@ object ExchangeInput:
         SubaruInstrumentBinding.Option("subaruInstrument", rSubaru),
         TimeSpanInput.Binding.Option("totalRequestTime", rTotalRequestTime)
       ) =>
-        val rInstrument = (rKeck, rSubaru).parTupled.flatMap:
-          case (Some(k), None) => Some(Left(k)).success
-          case (None, Some(s)) => Some(Right(s)).success
-          case (None, None)    => None.success
-          case _               => Matcher.validationFailure("At most one of 'keckInstrument' or 'subaruInstrument' may be provided.")
-        (rInstrument, rTotalRequestTime).mapN(Edit.apply)
+        val rInstrument = (rKeck, rSubaru).parFlatMapN: (k, s) =>
+          atMostOne(
+            k.map(_.asLeft[SubaruInstrument]) -> "keckInstrument",
+            s.map(_.asRight[KeckInstrument])  -> "subaruInstrument"
+          )
+        (rInstrument, rTotalRequestTime).parMapN(Edit.apply)

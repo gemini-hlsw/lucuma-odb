@@ -4,7 +4,7 @@
 package lucuma.odb.graphql
 package input
 
-import cats.syntax.apply.*
+import cats.syntax.parallel.*
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.odb.graphql.binding.*
@@ -21,7 +21,7 @@ object TargetEditInput {
       TargetIdBinding.Option("targetId", rTargetId),
       ProgramIdBinding.Option("programId", rProgramId)
     ) =>
-      (rTargetId, rProgramId).mapN(apply)
+      (rTargetId, rProgramId).parMapN(apply)
   }
 
 }

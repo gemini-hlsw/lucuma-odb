@@ -1818,7 +1818,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
           }
         """,
         expected =
-          List("Argument 'input.SET' is invalid: Specify only one of 'gemini', 'keck' or 'subaru'.").asLeft
+          List("Argument 'input.SET' is invalid: Expected at most one of gemini, keck, subaru").asLeft
       )
 
   // The proposal's observatory must agree with its Call for Proposals.

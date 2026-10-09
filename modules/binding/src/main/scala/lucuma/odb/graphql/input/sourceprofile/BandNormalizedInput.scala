@@ -50,7 +50,7 @@ object BandNormalizedInput {
       ) =>
         (rSed, rBrightnesses).parTupled.flatMap {
           case (sed, Some(brightnesses)) => Result(BandNormalized(sed, brightnesses))
-          case _                         => Matcher.validationFailure("Brightness is required.")
+          case _                         => Result.failure("Brightness is required.")
         }
     }
 

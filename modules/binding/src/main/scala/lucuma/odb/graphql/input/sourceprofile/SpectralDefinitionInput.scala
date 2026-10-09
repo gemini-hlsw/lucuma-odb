@@ -99,10 +99,11 @@ object SpectralDefinitionInput {
         bandNormalized.Option("bandNormalized", rBandNormalized),
         emissionLines.Option("emissionLines", rEmissionLines),
       ) =>
-        (rBandNormalized, rEmissionLines).parTupled.flatMap {
-          case (Some(bandNormalized), None) => Result(bandNormalized)
-          case (None, Some(emissionLines))  => Result(emissionLines)
-          case _                            => Matcher.validationFailure("Expected exactly one of bandNormalized or emissionLines.")
+        (rBandNormalized, rEmissionLines).parTupled.flatMap { (bandNormalized, emissionLines) =>
+          oneOrFail[SpectralDefinition[A]](
+            bandNormalized -> "bandNormalized",
+            emissionLines  -> "emissionLines"
+          )
         }
     }
 
@@ -115,10 +116,11 @@ object SpectralDefinitionInput {
         bandNormalized.Option("bandNormalized", rBandNormalized),
         emissionLines.Option("emissionLines", rEmissionLines),
       ) =>
-        (rBandNormalized, rEmissionLines).parTupled.flatMap {
-          case (Some(f), None) => Result(a => a.bandNormalized.flatMap(f))
-          case (None, Some(f)) => Result(a => a.emissionLines.map(f))
-          case _               => Matcher.validationFailure("Expected exactly one of bandNormalized or emissionLines.")
+        (rBandNormalized, rEmissionLines).parTupled.flatMap { (bandNormalized, emissionLines) =>
+          oneOrFail[SpectralDefinition[A] => Result[SpectralDefinition[A]]](
+            bandNormalized.map(f => (a: SpectralDefinition[A]) => a.bandNormalized.flatMap(f)) -> "bandNormalized",
+            emissionLines.map(f => (a: SpectralDefinition[A]) => a.emissionLines.map(f))       -> "emissionLines"
+          )
         }
     }
 

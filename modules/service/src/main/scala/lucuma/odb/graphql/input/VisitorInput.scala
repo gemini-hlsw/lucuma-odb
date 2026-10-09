@@ -48,7 +48,7 @@ object VisitorInput:
         NonEmptyStringBinding.Option("name", rName),
         TimeSpanInput.Binding.Option("totalRequestTime", rTotalRequestTime)
       ) =>
-        (rMode, rWavelength, rAgsDiameter, rScienceFovDiameter, rName, rTotalRequestTime).mapN(Create.apply)
+        (rMode, rWavelength, rAgsDiameter, rScienceFovDiameter, rName, rTotalRequestTime).parMapN(Create.apply)
 
   val EditBinding: Matcher[Edit] =
     ObjectFieldsBinding.rmap:
@@ -60,4 +60,4 @@ object VisitorInput:
         NonEmptyStringBinding.Option("name", rName),
         TimeSpanInput.Binding.Option("totalRequestTime", rTotalRequestTime)
       ) =>
-        (rMode, rWavelength, rAgsDiameter, rScienceFovDiameter, rName, rTotalRequestTime).mapN(Edit.apply)
+        (rMode, rWavelength, rAgsDiameter, rScienceFovDiameter, rName, rTotalRequestTime).parMapN(Edit.apply)

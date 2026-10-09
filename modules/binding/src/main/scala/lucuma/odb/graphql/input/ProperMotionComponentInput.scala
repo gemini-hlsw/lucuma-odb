@@ -8,7 +8,6 @@ import cats.data.Nested
 import cats.syntax.all.*
 import coulomb.*
 import coulomb.syntax.withUnit
-import grackle.Result
 import lucuma.core.math.ProperMotion
 import lucuma.core.math.VelocityAxis
 import lucuma.core.math.units.*
@@ -36,11 +35,11 @@ object ProperMotionComponentInput {
         val rMicroarcsecondsPerYearʹ = Nested(rMicroarcsecondsPerYear).map(_.withUnit[MicroArcSecondPerYear]).value
         val rMilliarcsecondsPerYearʹ = Nested(rMilliarcsecondsPerYear).map(n => (n * 1000).toLong.withUnit[MicroArcSecondPerYear]).value
         (rMicroarcsecondsPerYearʹ, rMilliarcsecondsPerYearʹ).parTupled.flatMap {
-          case (microarcsecondsPerYear, milliarcsecondsPerYear) =>
-            List(microarcsecondsPerYear, milliarcsecondsPerYear).flatten match {
-              case List(a) => Result(ProperMotion.AngularVelocity(a).tag[A])
-              case as => Matcher.validationFailure(s"Expected exactly one proper motion component format; found ${as.length}.")
-            }
+          (microarcsecondsPerYear, milliarcsecondsPerYear) =>
+            oneOrFail(
+              microarcsecondsPerYear -> "microarcsecondsPerYear",
+              milliarcsecondsPerYear -> "milliarcsecondsPerYear"
+            ).map(a => ProperMotion.AngularVelocity(a).tag[A])
         }
     }
 

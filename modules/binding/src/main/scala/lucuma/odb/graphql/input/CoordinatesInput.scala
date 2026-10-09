@@ -4,7 +4,7 @@
 package lucuma.odb.graphql
 package input
 
-import cats.syntax.apply.*
+import cats.syntax.all.*
 import lucuma.core.math.Coordinates
 import lucuma.core.math.Declination
 import lucuma.core.math.RightAscension
@@ -33,7 +33,7 @@ object CoordinatesInput {
         case List(
           RightAscensionInput.Binding.Option("ra", rRa),
           DeclinationInput.Binding.Option("dec", rDec)
-        ) => (rRa, rDec).mapN(Edit(_, _))
+        ) => (rRa, rDec).parMapN(Edit(_, _))
       }
 
 }

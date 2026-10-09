@@ -6,7 +6,7 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.all.*
-import grackle.syntax.*
+import grackle.Result
 import lucuma.core.enums.Partner
 import lucuma.core.model.IntPercent
 import lucuma.odb.graphql.binding.*
@@ -30,10 +30,11 @@ object PartnerSplitInput:
     Binding.List.Option.rmap: splits =>
       val map = splits.getOrElse(List.empty).map(a => (a.partner -> a.percent)).toMap
 
-      Matcher
-        .validationFailure("Each partner may only appear once.")
-        .unlessA(splits.forall(_.length === map.size)) *>
-      Matcher
-        .validationFailure("Percentages must sum to exactly 100.")
-        .unlessA(splits.forall(_.foldMap(_.percent.value) === 100)) *>
-      map.success
+      (
+        Result
+          .failure("Each partner may only appear once.")
+          .unlessA(splits.forall(_.length === map.size)),
+        Result
+          .failure("Percentages must sum to exactly 100.")
+          .unlessA(splits.forall(_.foldMap(_.percent.value) === 100))
+      ).parTupled.as(map)

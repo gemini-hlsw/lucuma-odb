@@ -4,7 +4,7 @@
 package lucuma.odb.graphql
 package input
 
-import cats.syntax.apply.*
+import cats.syntax.parallel.*
 import lucuma.core.model.Group
 import lucuma.core.model.Program
 import lucuma.odb.data.Nullable
@@ -22,7 +22,7 @@ object GroupEditInput {
       GroupIdBinding.Nullable("groupId", rGroupId),
       ProgramIdBinding.Option("programId", rProgramId)
     ) =>
-      (rGroupId, rProgramId).mapN(apply)
+      (rGroupId, rProgramId).parMapN(apply)
   }
 
 }

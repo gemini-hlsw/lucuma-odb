@@ -35,7 +35,7 @@ object GeminiCallPropertiesInput:
           NonNegIntBinding.Option("proprietaryMonths", rProprietary),
           CallForProposalsExchangePartnerInput.Binding.List.Option("exchangePartners", rExchange)
         ) =>
-          val rTypeʹ        = rType.flatMap(Result.fromOption(_, Matcher.validationProblem("'type' is required for Gemini calls.")))
+          val rTypeʹ        = rType.flatMap(Result.fromOption(_, "'type' is required for Gemini calls."))
           val rInstrumentsʹ = dedup("instruments",      rInstruments)(_.tag.toScreamingSnakeCase).map(_.toList.flatten)
           val rExchangeʹ    = dedup("exchangePartners", rExchange)(_.exchangePartner.tag.toScreamingSnakeCase).map(_.toList.flatten)
           (

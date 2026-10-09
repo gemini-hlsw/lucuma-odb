@@ -73,10 +73,11 @@ object GmosImagingInput extends ImagingFilterCheck:
     common:  Edit.Common
   ):
     def toCreate: Result[Create[L]] =
-      for
-        v  <- Result.fromOption(variant, OdbError.InvalidArgument("An imaging variant must be suplied for GMOS imaging observations".some).asProblem)
-        fs <- Result.fromOption(filters, atLeastOne("GMOS").asProblem)
-      yield Create(v, fs, common.toCreate)
+      (
+        Result.fromOption(variant, OdbError.InvalidArgument("An imaging variant must be suplied for GMOS imaging observations".some).asProblem),
+        Result.fromOption(filters, atLeastOne("GMOS").asProblem)
+      ).parMapN:
+        Create(_, _, common.toCreate)
 
   object Edit:
 

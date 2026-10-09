@@ -22,9 +22,7 @@ object DatasetPropertiesInput {
       case List(
         DatasetQaStateBinding.Nullable("qaState", rQaState),
         NonEmptyStringBinding.Nullable("comment", rComment)
-      ) => (rQaState, rComment).mapN { (qa, comment) =>
-        DatasetPropertiesInput(qa, comment)
-      }
+      ) => (rQaState, rComment).parMapN(DatasetPropertiesInput.apply)
     }
 
 }

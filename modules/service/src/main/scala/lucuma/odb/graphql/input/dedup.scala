@@ -8,7 +8,6 @@ import cats.Traverse
 import cats.syntax.traverse.*
 import grackle.Result
 import grackle.syntax.*
-import lucuma.odb.graphql.binding.Matcher
 
 /**
  * Fails with a validation error if the list contains duplicates according to
@@ -27,7 +26,7 @@ private[input] def mapDedup[F[_]: Traverse, A, B](
       val bs   = as.map(f)
       val dups = bs.diff(bs.distinct)
       if dups.isEmpty then as.success
-      else Matcher.validationFailure(s"duplicate '$name' specified: ${dups.map(toString).mkString(", ")}")
+      else Result.failure(s"duplicate '$name' specified: ${dups.map(toString).mkString(", ")}")
 
 private[input] def dedup[F[_]: Traverse, A](
   name: String,

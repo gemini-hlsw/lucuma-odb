@@ -5,9 +5,9 @@ package lucuma.odb.graphql
 package input
 
 import cats.data.NonEmptyList
-import cats.syntax.apply.*
 import cats.syntax.parallel.*
-import grackle.Result
+import cats.syntax.traverse.*
+import grackle.syntax.*
 import lucuma.core.model.SlitTelescopeConfigs
 import lucuma.core.model.sequence.TelescopeConfigAlongSlit
 import lucuma.odb.graphql.binding.*
@@ -28,14 +28,12 @@ object SlitTelescopeConfigsInput:
         TelescopeConfigAlongSlitInput.Binding.List.Option("alongSlit", rAlongSlit),
         TelescopeConfigInput.Binding.List.Option("toSky", rOnSky)
       ) =>
-        (rAlongSlit, rOnSky).tupled.flatMap:
-          case (Some(cs), None) =>
-            NonEmptyList.fromList(cs).fold(
-              Matcher.validationFailure("alongSlit must not be empty")
-            )(nel => Result(SlitTelescopeConfigs.AlongSlit(nel)))
-          case (None, Some(cs)) =>
-            NonEmptyList.fromList(cs).fold(
-              Matcher.validationFailure("toSky must not be empty")
-            )(nel => Result(SlitTelescopeConfigs.ToSky(nel)))
-          case _ =>
-            Matcher.validationFailure("Exactly one of alongSlit or toSky must be provided")
+        val rAlongSlitʹ =
+          rAlongSlit.flatMap(_.traverse(cs => NonEmptyList.fromList(cs).toResult("alongSlit must not be empty").map(SlitTelescopeConfigs.AlongSlit(_))))
+        val rOnSkyʹ     =
+          rOnSky.flatMap(_.traverse(cs => NonEmptyList.fromList(cs).toResult("toSky must not be empty").map(SlitTelescopeConfigs.ToSky(_))))
+        (rAlongSlitʹ, rOnSkyʹ).parFlatMapN: (alongSlit, onSky) =>
+          oneOrFail[SlitTelescopeConfigs](
+            alongSlit -> "alongSlit",
+            onSky     -> "toSky"
+          )

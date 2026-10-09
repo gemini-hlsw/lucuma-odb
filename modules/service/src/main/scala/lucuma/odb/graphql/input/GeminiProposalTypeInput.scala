@@ -6,12 +6,10 @@ package input
 
 import cats.data.State
 import cats.syntax.applicative.*
-import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
 import cats.syntax.parallel.*
 import grackle.Result
-import grackle.syntax.*
 import lucuma.core.enums.ConsiderForBand3
 import lucuma.core.enums.ExchangePartner
 import lucuma.core.enums.Instrument
@@ -29,23 +27,6 @@ import monocle.Lens
 
 object GeminiProposalTypeInput:
 
-  private val fieldNames: List[String] =
-    List(
-      "classical",
-      "demoScience",
-      "directorsTime",
-      "fastTurnaround",
-      "largeProgram",
-      "poorWeather",
-      "queue",
-      "systemVerfication"
-    )
-
-  private lazy val formattedFieldNames: String =
-    val fs = fieldNames.map(n => s"'$n'")
-    val prefix = fs.init.intercalate(", ")
-    s"$prefix or ${fs.last}"
-
   private lazy val ZeroPercent    = IntPercent.unsafeFrom(0)
   private lazy val HundredPercent = IntPercent.unsafeFrom(100)
 
@@ -55,8 +36,8 @@ object GeminiProposalTypeInput:
     exchangePartner: Option[ExchangePartner],
     partnerSplits:   Option[Map[Partner, IntPercent]]
   ): Result[Unit] =
-    Matcher
-      .validationFailure("Specify either 'partnerSplits' or 'exchangePartner', not both.")
+    Result
+      .failure("Specify either 'partnerSplits' or 'exchangePartner', not both.")
       .whenA(exchangePartner.isDefined && partnerSplits.exists(_.nonEmpty))
 
   case class Create(
@@ -389,8 +370,13 @@ object GeminiProposalTypeInput:
         systemVerification.Option("systemVerification", rSystem)
       ) => (rClassical, rDemo, rDirector, rFast, rLarge, rPoor, rQueue, rSystem).parFlatMapN:
         (classical, demo, director, fast, large, poor, queue, system) =>
-          val typeOption = List(classical, demo, director, fast, large, poor, queue, system).flatten
-          typeOption match
-            case Nil      => Matcher.validationFailure(s"One of $formattedFieldNames must be provided.")
-            case a :: Nil => a.success
-            case _        => Matcher.validationFailure(s"Only one of $formattedFieldNames may be provided.")
+          oneOrFail(
+            classical -> "classical",
+            demo      -> "demoScience",
+            director  -> "directorsTime",
+            fast      -> "fastTurnaround",
+            large     -> "largeProgram",
+            poor      -> "poorWeather",
+            queue     -> "queue",
+            system    -> "systemVerification"
+          )

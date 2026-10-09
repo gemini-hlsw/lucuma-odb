@@ -5,7 +5,6 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.all.*
-import grackle.Result
 import lucuma.core.math.RightAscension
 import lucuma.odb.graphql.binding.*
 
@@ -18,12 +17,14 @@ object RightAscensionInput {
         HourAngleBinding.Degrees.Option("degrees", rDegrees),
         HourAngleBinding.Hours.Option("hours", rHours),
         HourAngleBinding.Hms.Option("hms", rHms),
-      ) => (rMicroseconds, rDegrees, rHours, rHms).parTupled.flatMap {
-        case (microseconds, degrees, hours, hms) =>
-          List(microseconds, degrees, hours, hms).flatten match {
-            case List(ha) => Result(RightAscension(ha))
-            case has => Matcher.validationFailure(s"Expected exactly one right ascension format; found ${has.length}.")
-          }
+      ) => (rMicroseconds, rDegrees, rHours, rHms).parFlatMapN {
+        (microseconds, degrees, hours, hms) =>
+          oneOrFail(
+            microseconds -> "microseconds",
+            degrees      -> "degrees",
+            hours        -> "hours",
+            hms          -> "hms"
+          ).map(RightAscension(_))
       }
     }
 }

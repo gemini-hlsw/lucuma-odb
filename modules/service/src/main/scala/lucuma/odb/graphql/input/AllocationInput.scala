@@ -25,7 +25,7 @@ object AllocationInput {
         TimeAccountingCategoryBinding("category", rCategory),
         ScienceBandBinding("scienceBand", rBand),
         TimeSpanInput.Binding("duration", rDuration),
-      ) => (rCategory, rBand, rDuration).mapN(apply)
+      ) => (rCategory, rBand, rDuration).parMapN(apply)
     }
 
 }

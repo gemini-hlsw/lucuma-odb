@@ -36,7 +36,7 @@ object CloneObservationInput {
         ObservationPropertiesInput.Edit.Binding.Option("SET", rSET),
         CloneSequenceModeBinding.Option("sequence", rSequence)
       ) =>
-        (rObservationId, rObservationRef, rSET, rSequence).mapN: (oid, ref, set, seq) =>
+        (rObservationId, rObservationRef, rSET, rSequence).parMapN: (oid, ref, set, seq) =>
           CloneObservationInput(oid, ref, set, seq.getOrElse(CloneSequenceMode.None))
     }
 

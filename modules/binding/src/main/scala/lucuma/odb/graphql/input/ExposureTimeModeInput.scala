@@ -3,10 +3,9 @@
 
 package lucuma.odb.graphql.input
 
-import cats.syntax.applicative.*
-import cats.syntax.apply.*
 import cats.syntax.parallel.*
 import grackle.Result
+import grackle.syntax.*
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.ExposureTimeMode.SignalToNoiseMode
 import lucuma.core.model.ExposureTimeMode.TimeAndCountMode
@@ -33,12 +32,10 @@ object ExposureTimeModeInput:
           PosIntBinding("count", rCount),
           WavelengthInput.Binding("at", rAt)
         ) =>
-          for
-            t <- rTime
-            _ <- Matcher.validationFailure("Exposure `time` parameter must be positive.").unlessA(t.toNonNegMicroseconds.value > 0)
-            c <- rCount
-            a <- rAt
-          yield TimeAndCountMode(t, c, a)
+          val rTimeʹ = rTime.flatMap: t =>
+            if t.toNonNegMicroseconds.value > 0 then t.success
+            else Result.failure("Exposure `time` parameter must be positive.")
+          (rTimeʹ, rCount, rAt).parMapN(TimeAndCountMode.apply)
 
   val Binding: Matcher[ExposureTimeMode] =
     ObjectFieldsBinding.rmap:
@@ -46,8 +43,8 @@ object ExposureTimeModeInput:
         SignalToNoise.Binding.Option("signalToNoise", rSignal),
         TimeAndCount.Binding.Option("timeAndCount", rTimeAndCount)
       ) =>
-        (rSignal, rTimeAndCount).tupled.flatMap:
-          case (None,    None   ) => Matcher.validationFailure("One of 'signalToNoise' or 'timeAndCount' must be selected.")
-          case (Some(s), None   ) => Result(ExposureTimeMode.signalToNoise.reverseGet(s))
-          case (None,    Some(f)) => Result(ExposureTimeMode.timeAndCount.reverseGet(f))
-          case _                  => Matcher.validationFailure("Exactly one of 'signalToNoise' or 'timeAndCount' must be selected, not both.")
+        (rSignal, rTimeAndCount).parFlatMapN: (signal, timeAndCount) =>
+          oneOrFail(
+            signal.map(ExposureTimeMode.signalToNoise.reverseGet)      -> "signalToNoise",
+            timeAndCount.map(ExposureTimeMode.timeAndCount.reverseGet) -> "timeAndCount"
+          )

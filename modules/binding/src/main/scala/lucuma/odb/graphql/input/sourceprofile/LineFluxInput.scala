@@ -16,7 +16,7 @@ object LineFluxInput {
       DecimalInput("LineFluxIntegrated") {
         case (bd, tag) =>
           LineFluxValue.from(bd) match {
-            case Left(err) => Matcher.validationFailure(err)
+            case Left(err) => Result.failure(err)
             case Right(lfv) =>
               tag match {
                 case "W_PER_M_SQUARED" =>
@@ -32,7 +32,7 @@ object LineFluxInput {
       DecimalInput("LineFluxSurface") {
         case (bd, tag) =>
           LineFluxValue.from(bd) match {
-            case Left(err) => Matcher.validationFailure(err)
+            case Left(err) => Result.failure(err)
             case Right(lfv) =>
               tag match {
                 case "W_PER_M_SQUARED_PER_ARCSEC_SQUARED" =>

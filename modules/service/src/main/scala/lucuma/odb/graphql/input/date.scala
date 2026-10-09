@@ -11,7 +11,6 @@ import cats.syntax.traverse.*
 import grackle.Result
 import grackle.syntax.*
 import lucuma.core.util.DateInterval
-import lucuma.odb.graphql.binding.Matcher
 import org.typelevel.cats.time.*
 
 import java.time.LocalDate
@@ -28,7 +27,7 @@ object date:
 
   def validate(name: String, date: LocalDate): Result[LocalDate] =
     if ((date >= DefaultStart) && (date <= DefaultEnd)) date.success
-    else Matcher.validationFailure(s"'$name' date (${date.format(ISO_LOCAL_DATE)}) must be between 1900 and 2100 UTC (exclusive)")
+    else Result.failure(s"'$name' date (${date.format(ISO_LOCAL_DATE)}) must be between 1900 and 2100 UTC (exclusive)")
 
   def validateInput(name: String, rDate: Result[LocalDate]): Result[LocalDate] =
     rDate.flatMap(validate(name, _))
@@ -47,7 +46,7 @@ object date:
     ).parTupled.flatMap: (start, end) =>
       Result.fromOption(
         Option.when(start < end)(DateInterval.between(start, end)),
-        Matcher.validationProblem(s"'$startName' must come before '$endName'")
+        s"'$startName' must come before '$endName'"
       )
 
   def validateOptionalInputInterval(
@@ -60,6 +59,6 @@ object date:
      validateOptionalInput(endName, rEnd)
     ).parTupled.flatMap:
       case (Some(s), Some(e)) if s > e =>
-        Matcher.validationFailure(s"'$startName' must come before '$endName'")
+        Result.failure(s"'$startName' must come before '$endName'")
       case (s, e)                      =>
         Result(Ior.fromOptions(s, e))

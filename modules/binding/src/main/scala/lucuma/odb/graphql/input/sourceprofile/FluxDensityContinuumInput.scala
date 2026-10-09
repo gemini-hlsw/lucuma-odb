@@ -33,7 +33,7 @@ object FluxDensityContinuumInput {
         unitsBinding("units", rUnits),
         FluxDensityContinuumBinding.Option("error", rError),
       ) =>
-        (rUnits, rValue, rError).mapN(_.withValueTagged(_, _))
+        (rUnits, rValue, rError).parMapN(_.withValueTagged(_, _))
     }
 
 }

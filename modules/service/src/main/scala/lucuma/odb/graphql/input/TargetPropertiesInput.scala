@@ -7,6 +7,7 @@ package input
 import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
+import grackle.syntax.*
 import lucuma.core.model.SourceProfile
 import lucuma.odb.data.Existence
 import lucuma.odb.graphql.binding.*
@@ -37,16 +38,15 @@ object TargetPropertiesInput {
         OpportunityInput.EditBinding.Option("opportunity", rOpportunity),
         SourceProfileInput.EditBinding.Option("sourceProfile", rSourceProfile),
         ExistenceBinding.Option("existence", rExistence)
-      ) => (rName, rSidereal, rNonsidereal, rOpportunity, rSourceProfile, rExistence).parTupled.flatMap {
-        case (name, sidereal, nonsidereal, opportunity, sourceProfile, existence) =>
-          (sidereal, nonsidereal, opportunity) match {
-            case (Some(s), None, None) => Result(Some(s))
-            case (None, Some(n), None) => Result(Some(n))
-            case (None, None, Some(o)) => Result(Some(o))
-            case (None, None, None)    => Result(None)
-            case _ => Matcher.validationFailure("At most one of sidereal, nonsidereal, or opportunity may be specified (found multiple).")
-          } map  { Edit(name, _, sourceProfile, existence) }
-      } 
+      ) =>
+        val rSubtypeInfo =
+          (rSidereal, rNonsidereal, rOpportunity).parFlatMapN: (s, n, o) =>
+            atMostOne[SiderealInput.Edit | NonsiderealInput.Edit | OpportunityInput.Edit](
+              s -> "sidereal",
+              n -> "nonsidereal",
+              o -> "opportunity"
+            )
+        (rName, rSubtypeInfo, rSourceProfile, rExistence).parMapN(Edit.apply)
     }
 
   val Binding: Matcher[Create] =
@@ -58,16 +58,17 @@ object TargetPropertiesInput {
         OpportunityInput.CreateBinding.Option("opportunity", rOpportunity),
         SourceProfileInput.CreateBinding.Option("sourceProfile", rSourceProfile),
         ExistenceBinding.Option("existence", rExistence)
-      ) => (rName, rSidereal, rNonsidereal, rOpportunity, rSourceProfile, rExistence).parTupled.flatMap {
-        case (name, sidereal, nonsidereal, opportunity, sourceProfile, existence) =>
-          (name, sourceProfile, sidereal, nonsidereal, opportunity) match {
-            case (None, _, _, _, _)             => Matcher.validationFailure("Target name is required on creation.")
-            case (_, None, _, _, _)             => Matcher.validationFailure("Source Profile is required on creation.")
-            case (Some(t), Some(p), Some(s), None, None) => Result(Create(t, s, p, existence.getOrElse(Existence.Default)))
-            case (Some(t), Some(p), None, Some(n), None) => Result(Create(t, n, p, existence.getOrElse(Existence.Default)))
-            case (Some(t), Some(p), None, None, Some(o)) => Result(Create(t, o, p, existence.getOrElse(Existence.Default)))
-            case _ => Matcher.validationFailure("Exactly one of sidereal, nonsidereal, or opportunity must be specified.")
-          }
-      }
+      ) =>
+        val rNameʹ          = rName.flatMap(_.toResult("Target name is required on creation."))
+        val rSourceProfileʹ = rSourceProfile.flatMap(_.toResult("Source Profile is required on creation."))
+        val rSubtypeInfo    =
+          (rSidereal, rNonsidereal, rOpportunity).parFlatMapN: (s, n, o) =>
+            oneOrFail[SiderealInput.Create | NonsiderealInput.Create | OpportunityInput.Create](
+              s -> "sidereal",
+              n -> "nonsidereal",
+              o -> "opportunity"
+            )
+        (rNameʹ, rSubtypeInfo, rSourceProfileʹ, rExistence).parMapN: (name, subtypeInfo, sourceProfile, existence) =>
+          Create(name, subtypeInfo, sourceProfile, existence.getOrElse(Existence.Default))
     }
 }

@@ -26,7 +26,7 @@ object CloneTargetInput {
         TargetPropertiesInput.EditBinding.Option("SET", rSET),
         ObservationIdBinding.List.Option("REPLACE_IN", rREPLACE_IN)
       ) =>
-        (rTargetId, rSET, rREPLACE_IN.map(_.flatMap(_.toNel))).mapN(CloneTargetInput.apply)
+        (rTargetId, rSET, rREPLACE_IN.map(_.flatMap(_.toNel))).parMapN(CloneTargetInput.apply)
     }
 
 }

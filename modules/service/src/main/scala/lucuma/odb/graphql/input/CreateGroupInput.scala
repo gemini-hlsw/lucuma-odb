@@ -29,7 +29,7 @@ object CreateGroupInput {
         ProgramReferenceBinding.Option("programReference", rProg),
         GroupPropertiesInput.CreateBinding.Option("SET", rInput),
         GroupElementInput.Binding.List.Option("initialContents", rInitialContents),
-      ) => (rPid, rProp, rProg, rInput, rInitialContents).mapN { (pid, prop, prog, oset, initialContents) =>
+      ) => (rPid, rProp, rProg, rInput, rInitialContents).parMapN { (pid, prop, prog, oset, initialContents) =>
         CreateGroupInput(pid, prop, prog, oset.getOrElse(GroupPropertiesInput.Empty), initialContents.foldMap(_.map(_.value)))
       }
     }

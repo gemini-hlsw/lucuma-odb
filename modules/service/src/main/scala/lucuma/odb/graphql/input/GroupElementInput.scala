@@ -4,7 +4,6 @@
 package lucuma.odb.graphql.input
 
 import cats.syntax.all.*
-import grackle.Result
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.odb.graphql.binding.GroupIdBinding
@@ -19,7 +18,8 @@ object GroupElementInput:
       GroupIdBinding.Option("groupId", rGroupId),
       ObservationIdBinding.Option("observationId", rObservationId),
     ) =>
-      (rGroupId, rObservationId).parTupled.flatMap:
-        case (Some(g), None) => Result.Success(GroupElementInput(Left(g)))
-        case (None, Some(p)) => Result.Success(GroupElementInput(Right(p)))
-        case _ => Result.failure("Exactly one of groupId and observationId must be specified.")
+      (rGroupId, rObservationId).parFlatMapN: (g, o) =>
+        oneOrFail(
+          g.map(_.asLeft[Observation.Id]) -> "groupId",
+          o.map(_.asRight[Group.Id])      -> "observationId"
+        ).map(GroupElementInput(_))

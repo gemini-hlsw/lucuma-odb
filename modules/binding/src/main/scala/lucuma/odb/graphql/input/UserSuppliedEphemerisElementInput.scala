@@ -18,5 +18,5 @@ object UserSuppliedEphemerisElementInput:
         CoordinatesInput.Create.Binding("coordinates", rCoords),
         OffsetInput.Binding("velocity", rVelocity),
       ) =>
-        (rWhen, rCoords, rVelocity).mapN: (w, c, o) =>
+        (rWhen, rCoords, rVelocity).parMapN: (w, c, o) =>
           Ephemeris.UserSupplied.Element(w.toInstant, c, o)

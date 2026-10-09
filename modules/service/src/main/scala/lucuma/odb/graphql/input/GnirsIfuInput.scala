@@ -63,7 +63,7 @@ object GnirsIfuInput:
   ): Result[NonEmptyList[TelescopeConfig]] =
     Result.fromOption(
       NonEmptyList.fromList(tcs),
-      Matcher.validationProblem("'telescopeConfigs' must not be empty")
+      "'telescopeConfigs' must not be empty"
     )
 
   object Create:

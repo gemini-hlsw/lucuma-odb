@@ -7,7 +7,6 @@ package input
 import cats.syntax.option.*
 import cats.syntax.parallel.*
 import eu.timepit.refined.types.numeric.NonNegInt
-import grackle.syntax.*
 import lucuma.core.enums.ImagingVariantType
 import lucuma.core.enums.WavelengthOrder
 import lucuma.core.math.Offset
@@ -139,8 +138,9 @@ object ImagingVariantInput:
         GroupedBinding.Option("grouped", rGrouped),
         InterleavedBinding.Option("interleaved", rInterleaved),
         PreImagingBinding.Option("preImaging", rPreImaging)
-      ) => (rGrouped, rInterleaved, rPreImaging).parTupled.flatMap:
-        case (Some(g), None, None) => g.success
-        case (None, Some(i), None) => i.success
-        case (None, None, Some(p)) => p.success
-        case _                     => Matcher.validationFailure(s"Exactly one of 'grouped', 'interleaved' or 'preImaging' is required.")
+      ) => (rGrouped, rInterleaved, rPreImaging).parTupled.flatMap: (g, i, p) =>
+        oneOrFail(
+          g -> "grouped",
+          i -> "interleaved",
+          p -> "preImaging"
+        )

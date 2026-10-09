@@ -134,7 +134,7 @@ class createObservation_GnirsIfu extends OdbSuite:
                 }) { observation { id } }
               }
             """,
-          expected = Left(List("Argument 'input.SET.observingMode.gnirsSpectroscopy' is invalid: Only one of 'slit' or 'ifu' may be provided."))
+          expected = Left(List("Argument 'input.SET.observingMode.gnirsSpectroscopy' is invalid: Expected exactly one of slit, ifu"))
         )
 
   test("GNIRS IFU default telescope configs (extended source); slit configs null"):
@@ -251,7 +251,7 @@ class createObservation_GnirsIfu extends OdbSuite:
                 }) { observation { id } }
               }
             """,
-          expected = Left(List("Argument 'input.SET.observingMode.gnirsSpectroscopy' is invalid: Only one of 'slit' or 'ifu' may be provided."))
+          expected = Left(List("Argument 'input.SET.observingMode.gnirsSpectroscopy' is invalid: Expected exactly one of slit, ifu"))
         )
 
   test("update GNIRS IFU rejects slit telescope configs when the FPU is unchanged"):

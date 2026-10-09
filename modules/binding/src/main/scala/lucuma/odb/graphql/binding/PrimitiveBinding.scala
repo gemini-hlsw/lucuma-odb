@@ -3,16 +3,14 @@
 
 package lucuma.odb.graphql.binding
 
+import grackle.Result
 import grackle.Value
 import grackle.Value.AbsentValue
 import grackle.Value.NullValue
+import grackle.syntax.*
 
 /** A primitive non-nullable binding. */
 def primitiveBinding[A](name: String)(pf: PartialFunction[Value, A]): Matcher[A] =
-  case NullValue   => Left(s"$name cannot be null")
-  case AbsentValue => Left(s"$name is not optional")
-  case other       =>
-    pf.lift(other) match {
-      case Some(value) => Right(value)
-      case None        => Left(s"expected $name, found $other")
-    }
+  case NullValue   => Result.failure(s"$name cannot be null")
+  case AbsentValue => Result.failure(s"$name is not optional")
+  case other       => pf.lift(other).toResult(s"expected $name, found $other")

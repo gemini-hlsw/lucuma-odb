@@ -216,6 +216,19 @@ Grackle validates all type references at startup during schema introspection. A 
 
 **`ObjectFieldsBinding.rmap { case List(...) }` is positional.** Field names in the pattern are just labels; Grackle matches by position in the list against the schema's field declaration order. If a new input field is added to a union input (like `ObservingModeInput`) and placed in a different position than the existing binding, the `case List(...)` will silently fail to match (runtime "unhandled case" error). Always make the `case List(...)` order match the schema field order exactly. Note this means the pattern is verified against the **schema**, not against the corresponding case class — the two orders can legally differ because the binding repacks the tuple explicitly, but keeping schema, binding, and case class in the same order avoids the trap entirely.
 
+In an `rmap` body or an `Edit.toCreate` validator, combine independent `Result`s with `parMapN`/`parTupled`. Use `parFlatMapN` when a check needs the values of more than one field. Do not use `mapN`, `tupled`, `flatMap`, or `for` for this, because they stop at the first error.
+
+A check inside `parFlatMapN` runs only when all fields are valid. Thus, put a check that uses only one field on the `Result` of that field, before the `par` combinator (see `ExposureTimeModeInput.TimeAndCount`):
+
+```scala
+val rTimeʹ = rTime.flatMap(t => if t.toNonNegMicroseconds.value > 0 then t.success else Result.failure("..."))
+(rTimeʹ, rCount, rAt).parMapN(TimeAndCountMode.apply)
+```
+
+In an input binding, use `Result.failure("...")` for a validation error. `Matcher.validate(Binding)` changes each problem into an `InvalidArgument` problem, so `Matcher.validationFailure` is not necessary there.
+
+Validation that runs outside of `validate(Binding)` gets no tag. An example is `Edit.toCreate` on the `ObservingModeServices.createViaUpdate` path. Call `.asValidation` (from `Matcher`) on that `Result` at the boundary where it leaves the input layer. `createViaUpdate` already does this.
+
 **Runtime `ValidationException` vs `MatchError`:** a duplicate/ambiguous mapping registration (see the mapping-registration note in the checklist above) also surfaces only at runtime, as a 500 on every request. The real complaint is a `🛑 Ambiguous type mappings` block buried in the server log among many long-standing (tolerated) `Field mapping is unused` notices — look for the block whose two source positions are the same line.
 
 ## JSON Codecs (`modules/schema/src/main/scala/lucuma/odb/json/`)

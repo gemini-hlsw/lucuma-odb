@@ -8,7 +8,6 @@ import cats.data.Ior
 import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
-import grackle.syntax.*
 import lucuma.core.enums.Observatory
 import lucuma.core.model.Semester
 import lucuma.core.syntax.string.*
@@ -65,11 +64,12 @@ object CallForProposalsPropertiesInput:
           val rPartnersʹ = mapDedup("partners", rPartners)(_.geminiPartner, _.tag.toScreamingSnakeCase)
 
           val rObservatoryCall: Result[DateInterval => ObservatoryCallProperties] =
-            (rGemini, rKeck, rSubaru).parTupled.flatMap:
-              case (Some(g), None, None) => ((active: DateInterval) => ObservatoryCallProperties.Gemini(g(active))).success
-              case (None, Some(k), None) => ((active: DateInterval) => ObservatoryCallProperties.Keck(k(active))).success
-              case (None, None, Some(s)) => ((active: DateInterval) => ObservatoryCallProperties.Subaru(s(active))).success
-              case _                     => Matcher.validationFailure("Exactly one of 'gemini', 'keck' or 'subaru' must be provided.")
+            (rGemini, rKeck, rSubaru).parFlatMapN: (g, k, s) =>
+              oneOrFail(
+                g.map(f => (active: DateInterval) => ObservatoryCallProperties.Gemini(f(active))) -> "gemini",
+                k.map(f => (active: DateInterval) => ObservatoryCallProperties.Keck(f(active)))   -> "keck",
+                s.map(f => (active: DateInterval) => ObservatoryCallProperties.Subaru(f(active))) -> "subaru"
+              )
 
           (
             rSemester,
@@ -133,12 +133,12 @@ object CallForProposalsPropertiesInput:
           val rPartnersʹ = mapDedup("partners", rPartners)(_.geminiPartner, _.tag.toScreamingSnakeCase)
 
           val rObservatoryCall: Result[Option[ObservatoryCallProperties]] =
-            (rGemini, rKeck, rSubaru).parTupled.flatMap:
-              case (Some(g), None, None) => ObservatoryCallProperties.Gemini(g).some.success
-              case (None, Some(k), None) => ObservatoryCallProperties.Keck(k).some.success
-              case (None, None, Some(s)) => ObservatoryCallProperties.Subaru(s).some.success
-              case (None, None, None)    => none.success
-              case _                     => Matcher.validationFailure("Only one of 'gemini', 'keck' or 'subaru' may be provided.")
+            (rGemini, rKeck, rSubaru).parFlatMapN: (g, k, s) =>
+              atMostOne(
+                g.map(ObservatoryCallProperties.Gemini(_)) -> "gemini",
+                k.map(ObservatoryCallProperties.Keck(_))   -> "keck",
+                s.map(ObservatoryCallProperties.Subaru(_)) -> "subaru"
+              )
 
           (
             rSemester,

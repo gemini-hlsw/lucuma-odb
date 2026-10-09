@@ -214,11 +214,12 @@ object GmosMosInput extends AcquisitionFilterCheck:
         ObservingModeType.GmosNorthMos
 
       val toCreate: Result[Create.North] =
-        for
-          g <- required(Site.GN, grating, "grating")
-          m <- required(Site.GN, customMask, "customMask")
-          c <- common.toCreate(Site.GN)
-        yield Create.North(g, filter.toOption, m, acquisitionType.getOrElse(GmosMosAcquisitionType.MaskIn), acquisition, c)
+        (
+          required(Site.GN, grating, "grating"),
+          required(Site.GN, customMask, "customMask"),
+          common.toCreate(Site.GN)
+        ).parMapN:
+          Create.North(_, filter.toOption, _, acquisitionType.getOrElse(GmosMosAcquisitionType.MaskIn), acquisition, _)
 
     object North:
 
@@ -240,11 +241,12 @@ object GmosMosInput extends AcquisitionFilterCheck:
         ObservingModeType.GmosSouthMos
 
       val toCreate: Result[Create.South] =
-        for
-          g <- required(Site.GS, grating, "grating")
-          m <- required(Site.GS, customMask, "customMask")
-          c <- common.toCreate(Site.GS)
-        yield Create.South(g, filter.toOption, m, acquisitionType.getOrElse(GmosMosAcquisitionType.MaskIn), acquisition, c)
+        (
+          required(Site.GS, grating, "grating"),
+          required(Site.GS, customMask, "customMask"),
+          common.toCreate(Site.GS)
+        ).parMapN:
+          Create.South(_, filter.toOption, _, acquisitionType.getOrElse(GmosMosAcquisitionType.MaskIn), acquisition, _)
 
     object South:
 
@@ -294,7 +296,7 @@ object GmosMosInput extends AcquisitionFilterCheck:
           rWavelengthDithers,
           rTelescopeConfigs.flatMap(_.traverse: cs =>
             NonEmptyList.fromList(cs).fold(
-              Matcher.validationFailure("'explicitTelescopeConfigs' must not be empty")
+              Result.failure("'explicitTelescopeConfigs' must not be empty")
             )(Result(_))
           )
         ).parMapN(Edit.Common.apply)
@@ -341,7 +343,7 @@ object GmosMosInput extends AcquisitionFilterCheck:
           rWavelengthDithers,
           rTelescopeConfigs.flatMap(_.traverse: cs =>
             NonEmptyList.fromList(cs).fold(
-              Matcher.validationFailure("'explicitTelescopeConfigs' must not be empty")
+              Result.failure("'explicitTelescopeConfigs' must not be empty")
             )(Result(_))
           )
         ).parMapN(Edit.Common.apply)
