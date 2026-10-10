@@ -10748,7 +10748,7 @@ enum TelluricTag {
   HOT
   A0V
   SOLAR
-  MANUAL
+  EXPLICIT_SPECTRAL_TYPES
   USER_DEFINED
   NO_TELLURIC
 }
@@ -10758,13 +10758,13 @@ Telluric calibration type
 """
 type TelluricType {
   tag: TelluricTag!
-  starTypes: [String!] # when tag is MANUAL
+  starTypes: [String!] # when tag is EXPLICIT_SPECTRAL_TYPES
   count: Int           # when tag is USER_DEFINED, 1 or 2
 }
 
 input TelluricTypeInput {
   tag: TelluricTag!
-  starTypes: [String!] # when tag is MANUAL
+  starTypes: [String!] # when tag is EXPLICIT_SPECTRAL_TYPES
   count: Int           # when tag is USER_DEFINED, 1 or 2
 }
 

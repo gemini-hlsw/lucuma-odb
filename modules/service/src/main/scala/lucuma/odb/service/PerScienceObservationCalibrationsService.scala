@@ -259,6 +259,11 @@ object PerScienceObservationCalibrationsService:
         gid:        Group.Id,
         count:      TelluricCount
       )(using Transaction[F], SuperUserAccess): F[(List[Observation.Id], List[Observation.Id])] =
+        // A conversion takes the science configuration one last time, as creation does.
+        def convert(tid: Observation.Id): F[Unit] =
+          telluricTargetsService.markUserDefined(tid) *>
+            syncConfiguration(pid, scienceOid, tid, CalibrationRole.Telluric)
+
         for
           tellurics    <- findGroupTellurics(gid)
           unobserved    = tellurics.filterNot(_.visited)
@@ -268,7 +273,7 @@ object PerScienceObservationCalibrationsService:
           toConvert     = keep.filterNot(_.userDefined.value).map(_.oid)
           toCreate      = required.filterNot(o => keep.exists(_.order.contains(o)))
           _            <- NonEmptyList.fromList(toDelete).traverse_(observationService.deleteCalibrationObservations)
-          _            <- toConvert.traverse_(telluricTargetsService.markUserDefined)
+          _            <- toConvert.traverse_(convert)
           created      <- createTelluricCalibrations(pid, scienceOid, gid, toCreate):
                             (tid, order) => telluricTargetsService.registerUserDefinedTelluric(pid, tid, scienceOid, order)
         yield (created, toDelete)

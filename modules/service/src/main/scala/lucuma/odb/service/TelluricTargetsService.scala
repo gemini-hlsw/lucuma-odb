@@ -107,7 +107,7 @@ trait TelluricTargetsService[F[_]]:
 
   /**
    * Turns a generated telluric into a user-defined one, keeping its current
-   * target and discarding any search in flight.
+   * star (still a calibration target) and discarding any search in flight.
    */
   def markUserDefined(
     telluricId: Observation.Id
@@ -143,12 +143,12 @@ object HminBrightnessCache extends NewType[Map[HminBrightnessKey, (Option[BigDec
   ): Option[BigDecimal] =
     val (hminHot, hminSolar) = entry
     telluricType match
-      case TelluricType.Solar      => hminSolar
-      case TelluricType.Hot        => hminHot
-      case TelluricType.A0V            => hminHot
-      case _: TelluricType.Manual      => hminHot
-      case TelluricType.UserDefined(_) => hminHot // Not in use
-      case TelluricType.NoTelluric     => hminHot // Not in use
+      case TelluricType.Solar                    => hminSolar
+      case TelluricType.Hot                      => hminHot
+      case TelluricType.A0V                      => hminHot
+      case TelluricType.ExplicitSpectralTypes(_) => hminHot
+      case TelluricType.UserDefined(_)           => hminHot // Not in use
+      case TelluricType.NoTelluric               => hminHot // Not in use
 
   private def lookupF2Key(
     m:            HminBrightnessCache,

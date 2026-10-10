@@ -21,11 +21,11 @@ object TelluricTypeBinding extends Matcher[TelluricType]:
         fieldMap.get("tag") match {
           case Some(Value.EnumValue(tag)) =>
             tag.toUpperCase match {
-              case "HOT"         => TelluricType.Hot.success
-              case "A0V"         => TelluricType.A0V.success
-              case "SOLAR"       => TelluricType.Solar.success
-              case "NO_TELLURIC" => TelluricType.NoTelluric.success
-              case "MANUAL"      =>
+              case "HOT"                     => TelluricType.Hot.success
+              case "A0V"                     => TelluricType.A0V.success
+              case "SOLAR"                   => TelluricType.Solar.success
+              case "NO_TELLURIC"             => TelluricType.NoTelluric.success
+              case "EXPLICIT_SPECTRAL_TYPES" =>
                 fieldMap.get("starTypes") match {
                   case Some(Value.ListValue(starTypes)) =>
                     starTypes.zipWithIndex.parTraverse {
@@ -35,14 +35,14 @@ object TelluricTypeBinding extends Matcher[TelluricType]:
                         Result.failure(s"Expected string in starTypes at index $n")
                     }.flatMap { typesList =>
                       NonEmptyList.fromList(typesList) match {
-                        case Some(st) => TelluricType.Manual(st).success
-                        case None     => Result.failure("starTypes must not be empty for Manual telluric type")
+                        case Some(st) => TelluricType.ExplicitSpectralTypes(st).success
+                        case None     => Result.failure("starTypes must not be empty for ExplicitSpectralTypes telluric type")
                       }
                     }
-                  case None => Result.failure("starTypes is required when tag is Manual")
+                  case None => Result.failure("starTypes is required when tag is ExplicitSpectralTypes")
                   case _    => Result.failure("starTypes must be a list")
                 }
-              case "USER_DEFINED" =>
+              case "USER_DEFINED"            =>
                 fieldMap.get("count") match {
                   case Some(Value.IntValue(count)) =>
                     TelluricCount.from(count).fold(
@@ -52,7 +52,7 @@ object TelluricTypeBinding extends Matcher[TelluricType]:
                   case None => Result.failure("count is required when tag is UserDefined")
                   case _    => Result.failure("count must be an integer")
                 }
-              case other => Result.failure(s"Unknown telluric type tag: $other")
+              case other                     => Result.failure(s"Unknown telluric type tag: $other")
             }
           case Some(_) => Result.failure("tag must be an enum value")
           case None    => Result.failure("tag field is required in telluricType")
