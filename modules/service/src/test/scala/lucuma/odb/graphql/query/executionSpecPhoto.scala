@@ -6,6 +6,7 @@ package query
 
 import cats.effect.IO
 import cats.syntax.either.*
+import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
 import io.circe.literal.*
@@ -16,6 +17,9 @@ import lucuma.core.model.Program
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.CalculationState
 import lucuma.itc.IntegrationTime
+import lucuma.itc.client.InstrumentMode
+import lucuma.itc.client.SpectroscopyInput
+import lucuma.odb.logic.Generator.SequenceAtomLimit
 
 class executionSpecPhoto extends ExecutionTestSupportForGmos {
 
@@ -24,6 +28,14 @@ class executionSpecPhoto extends ExecutionTestSupportForGmos {
       20.minTimeSpan,
       PosInt.unsafeFrom(10)
     )
+
+  // IFU requests ask for more frames than a sequence may hold.
+  override def fakeItcSpectroscopyResultFor(input: SpectroscopyInput): Option[IntegrationTime] =
+    input.mode match
+      case m: InstrumentMode.GmosNorthSpectroscopy if m.ifuAnalysis.isDefined =>
+        IntegrationTime(20.minTimeSpan, PosInt.unsafeFrom(SequenceAtomLimit + 1)).some
+      case _                                                                  =>
+        none
 
   // A spec photo in a program whose proposal has yet to be accepted.
   private val proposalStageSpecPhoto: IO[(Program.Id, Observation.Id)] =
@@ -161,6 +173,25 @@ class executionSpecPhoto extends ExecutionTestSupportForGmos {
         assertEquals(a, None, "the placeholder should not depend on an ITC result")
     }
   }
+
+  // A real sequence this long is refused, but no sequence is built for a
+  // waiting standard, so its length must not matter.
+  test("spec photo - a waiting IFU proposal ignores the sequence length limit"):
+    val setup: IO[(Program.Id, Observation.Id)] =
+      for
+        c <- createGeminiCallForProposalsAs(staff)
+        p <- createProgram
+        _ <- addQueueProposal(pi, p, c)
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthIfuObservationAs(pi, p, List(t))
+        _ <- setObservationCalibrationRole(List(o), CalibrationRole.SpectroPhotometric)
+      yield (p, o)
+
+    setup.flatMap: (pid, oid) =>
+      for {
+        _   <- runObscalcUpdate(pid, oid)
+        tot <- totalTimeEstimate(oid)
+      } yield assertEquals(tot, BigDecimal("1200.000000"))
 
   test("spec photo - accepted proposal gets a real sequence and estimate") {
     proposalStageSpecPhoto.flatMap { (pid, oid) =>
