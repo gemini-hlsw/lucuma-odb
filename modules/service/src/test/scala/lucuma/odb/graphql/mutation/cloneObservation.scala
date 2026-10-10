@@ -1570,7 +1570,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations with M
                                 observingMode: {
                                   flamingos2LongSlit: {
                                     telluricType: {
-                                      tag: MANUAL
+                                      tag: EXPLICIT_SPECTRAL_TYPES
                                       starTypes: ["A1", "A2"]
                                     }
                                   }
@@ -1640,7 +1640,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations with M
                             ]
                           },
                           "telluricType": {
-                            "tag": "MANUAL",
+                            "tag": "EXPLICIT_SPECTRAL_TYPES",
                             "starTypes": ["A1", "A2"]
                           }
                         }
@@ -1660,7 +1660,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations with M
                             ]
                           },
                           "telluricType": {
-                            "tag": "MANUAL",
+                            "tag": "EXPLICIT_SPECTRAL_TYPES",
                             "starTypes": ["A1", "A2"]
                           }
                         }
@@ -2256,7 +2256,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations with M
                                 observingMode: {
                                   igrins2LongSlit: {
                                     telluricType: {
-                                      tag: MANUAL
+                                      tag: EXPLICIT_SPECTRAL_TYPES
                                       starTypes: ["A1", "A2"]
                                     }
                                   }
@@ -2301,7 +2301,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations with M
                       "observingMode": {
                         "igrins2LongSlit": {
                           "telluricType": {
-                            "tag": "MANUAL",
+                            "tag": "EXPLICIT_SPECTRAL_TYPES",
                             "starTypes": ["A1", "A2"]
                           }
                         }
@@ -2311,7 +2311,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations with M
                       "observingMode": {
                         "igrins2LongSlit": {
                           "telluricType": {
-                            "tag": "MANUAL",
+                            "tag": "EXPLICIT_SPECTRAL_TYPES",
                             "starTypes": ["A1", "A2"]
                           }
                         }

@@ -1556,7 +1556,7 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat with que
           explicitReads = Some(Flamingos2Reads.Reads_16),
           explicitDecker = None,
           explicitReadoutMode = None,
-          telluricType = TelluricType.Manual(NonEmptyList.of("A1", "A2"))
+          telluricType = TelluricType.ExplicitSpectralTypes(NonEmptyList.of("A1", "A2"))
         )).flatMap { js =>
           val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", "flamingos2LongSlit")
 
@@ -1577,7 +1577,7 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat with que
             Some(Flamingos2Reads.Reads_16),  // Explicit reads is 16
             Flamingos2Decker.LongSlit,       // default to long slit
             Flamingos2ReadoutMode.Science,   // Science bf default
-            TelluricType.Manual(NonEmptyList.of("A1", "A2"))
+            TelluricType.ExplicitSpectralTypes(NonEmptyList.of("A1", "A2"))
           )
         )
 
@@ -2849,18 +2849,18 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat with que
     }
   }
 
-  test("[igrins2] specify igrins-2 long slit observing mode at observation creation with telluricType Manual") {
+  test("[igrins2] specify igrins-2 long slit observing mode at observation creation with telluricType ExplicitSpectralTypes") {
     createProgramAs(pi).flatMap { pid =>
       query(pi,
         createObsWithIgrins2ObservingModeAllParams(
           pid,
-          telluricType = TelluricType.Manual(NonEmptyList.of("A5V", "G2V"))
+          telluricType = TelluricType.ExplicitSpectralTypes(NonEmptyList.of("A5V", "G2V"))
         )).flatMap { js =>
           val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", "igrins2LongSlit")
 
           assertIO(
             longSlit.downIO[TelluricType]("telluricType"),
-            TelluricType.Manual(NonEmptyList.of("A5V", "G2V"))
+            TelluricType.ExplicitSpectralTypes(NonEmptyList.of("A5V", "G2V"))
           )
       }
     }

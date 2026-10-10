@@ -119,17 +119,17 @@ object HashBytes:
     HashBytes.by(_.toAngle)
 
   given HashBytes[TelluricType] =
-    case t @ TelluricType.Manual(starTypes)  =>
+    case t @ TelluricType.ExplicitSpectralTypes(starTypes) =>
       Array.concat(
         HashBytes[String].hashBytes(t.tag),
         starTypes.toList.map(HashBytes[String].hashBytes).flatten.toArray
       )
-    case t @ TelluricType.UserDefined(count) =>
+    case t @ TelluricType.UserDefined(count)               =>
       Array.concat(
         HashBytes[String].hashBytes(t.tag),
         HashBytes[Int].hashBytes(count.value.value)
       )
-    case t                                   =>
+    case t                                                 =>
       HashBytes[String].hashBytes(t.tag)
 
   given HashBytes[Offset] =

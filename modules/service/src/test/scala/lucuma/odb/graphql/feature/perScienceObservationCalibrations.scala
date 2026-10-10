@@ -10,6 +10,7 @@ import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.numeric.PosLong
 import io.circe.Decoder
 import io.circe.Json
+import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.catalog.clients.SimbadClientMock
 import lucuma.catalog.clients.TelluricTargetsClientMock
@@ -28,6 +29,7 @@ import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.SequenceCommand
+import lucuma.core.enums.TargetDisposition
 import lucuma.core.enums.TelluricCalibrationOrder
 import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.math.BoundedInterval
@@ -3970,6 +3972,16 @@ class perScienceObservationCalibrations
       }"""
     ).void
 
+  private def queryF2TelluricType(oid: Observation.Id): IO[Json] =
+    query(
+      pi,
+      s"""query {
+        observation(observationId: "$oid") {
+          observingMode { flamingos2LongSlit { telluricType { tag count } } }
+        }
+      }"""
+    ).map(_.hcursor.downFields("observation", "observingMode", "flamingos2LongSlit", "telluricType").require[Json])
+
   private def queryF2TelluricCount(oid: Observation.Id): IO[Option[Int]] =
     query(
       pi,
@@ -3982,6 +3994,16 @@ class perScienceObservationCalibrations
       json.hcursor
         .downFields("observation", "observingMode", "flamingos2LongSlit", "telluricType", "count")
         .require[Option[Int]]
+
+  private def queryTargetRole(tid: lucuma.core.model.Target.Id): IO[(Option[CalibrationRole], TargetDisposition)] =
+    query(
+      pi,
+      s"""query {
+        target(targetId: "$tid") { calibrationRole disposition }
+      }"""
+    ).map: json =>
+      val c = json.hcursor.downField("target")
+      (c.downField("calibrationRole").require[Option[CalibrationRole]], c.downField("disposition").require[TargetDisposition])
 
   private def queryUserDefinedTelluric(oid: Observation.Id): IO[Boolean] =
     query(
@@ -4078,6 +4100,8 @@ class perScienceObservationCalibrations
       flagged <- queryUserDefinedTelluric(tel)
       state   <- calculationState(tel)
       kept    <- queryObservationWithTarget(tel)
+      role    <- kept.targetId.traverse(queryTargetRole)
+      telType <- queryF2TelluricType(tel)
       // A later science change neither re-searches nor resyncs it.
       _       <- updateFlamingos2Fpu(oid, Flamingos2Fpu.LongSlit2)
       _       <- runObscalcUpdate(pid, oid)
@@ -4091,7 +4115,10 @@ class perScienceObservationCalibrations
       assertEquals(after, List(tel))
       assert(flagged)
       assertEquals(state, CalculationState.Ready)
+      // The star stays the same calibration target; the PI may edit it because the telluric is user-defined.
       assertEquals(kept.targetId, before.targetId)
+      assertEquals(role, Some((Some(CalibrationRole.Telluric), TargetDisposition.Calibration)))
+      assertEquals(telType, json"""{ "tag": "USER_DEFINED", "count": 1 }""")
       assertEquals(fpu, Flamingos2Fpu.LongSlit1.some)
       assertEquals(still.targetId, before.targetId)
       assertEquals(state2, CalculationState.Ready)
@@ -4127,3 +4154,25 @@ class perScienceObservationCalibrations
     yield
       assert(missing.exists(_.contains("target")), missing.toString)
       assertEquals(complete, Nil)
+
+  test("a converted user-defined telluric accepts PI edits"):
+    for
+      pid      <- createProgramAs(pi)
+      tid      <- createTargetWithProfileAs(pi, pid)
+      oid      <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _        <- setScienceRequirements(oid)
+      _        <- runObscalcUpdate(pid, oid)
+      _        <- recalculateCalibrations(pid, when, oid)
+      _        <- sleep >> resolveTelluricTargets
+      tel      <- selectTelluricObservationFor(oid).map(_.get)
+      _        <- setUserDefinedTellurics(oid, 1)
+      _        <- recalculateCalibrations(pid, when, oid)
+      star     <- queryObservationWithTarget(tel).map(_.targetId.get)
+      standard <- createTargetWithProfileAs(pi, pid)
+      _        <- editAsterismAs(pi, tel, List(standard), List(star))
+      swapped  <- queryObservationWithTarget(tel)
+      _        <- updateFlamingos2Fpu(tel, Flamingos2Fpu.LongSlit4)
+      fpu      <- queryObservationFpu(tel)
+    yield
+      assertEquals(swapped.targetId, Some(standard))
+      assertEquals(fpu, Flamingos2Fpu.LongSlit4.some)
