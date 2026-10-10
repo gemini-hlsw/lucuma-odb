@@ -122,7 +122,7 @@ object TelluricTargetsDaemon:
       runStart(0)
 
     for {
-      _ <- info"Resetting 'calculating' entries to 'pending'"
+      _ <- info"Requeueing 'calculating' entries"
       _ <- T.rootSpan("telluric.startup.reset").surround:
              services.useTransactionally:
                Services.asSuperUser:
