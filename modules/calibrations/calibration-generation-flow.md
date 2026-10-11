@@ -200,6 +200,10 @@ flowchart TD
 
 Spent tellurics are never deleted or counted: the next visit gets its own set, so an observation can accumulate more tellurics than one visit needs. The unobserved ones are replaced as a set rather than reused one by one, so every telluric of a visit shares one recorded duration.
 
+### User-Defined Tellurics
+
+A science telluric type of `USER_DEFINED` (`TelluricType.UserDefined(count)`, count 1 or 2) hands the tellurics to the user. `syncUserDefinedTellurics` reconciles the unobserved set by order against the count, instead of the duration-driven rebuild above: a generated telluric of a required order is converted in place (`TelluricTargetsService.markUserDefined`: `t_observation.c_is_user_defined_telluric` set, its resolution row bumped so a search in flight is discarded: the search links its star and marks the row ready in one transaction guarded by the invalidation it read, rolling the link back on a mismatch, and the daemon's startup reset sends a user-defined `calculating` row to `ready` rather than `pending`) and keeps its star, still a calibration target the PI may now edit; a missing order is cloned, star and configuration included, from the most recently observed user-defined telluric of that order, so each visit gets the PI's standard again, and starts empty when none was observed yet; an extra one is deleted. The planned-time estimate predicts tellurics per span of remaining science time as for generated ones. User-defined tellurics are never resynced from the science observation, never searched for (`LoadPending` and `invalidate_telluric_resolution` skip them), and are editable like science observations: `AccessControl.writableOids` admits them for `updateObservations` and `updateAsterisms`, and the workflow runs the science validators and the ITC on them (`v_generator_params.c_is_user_defined_telluric`), so an empty one reports a missing target. Switching back to a generated type rebuilds the unobserved set.
+
 ### Telluric Observation Details
 
 - Telluric observations are placed in a **group with the science observation**

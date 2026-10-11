@@ -50,7 +50,7 @@ object ObservationValidator:
     itcFor: Observation.Id => Option[Itc]
   )(using Services[F]): ResultT[F, Map[Observation.Id, ObservationValidationMap]] = {
 
-    val (cals, other)         = infos.partition(_._2.calibrationRole.isDefined)
+    val (cals, other)         = infos.partition((_, info) => info.calibrationRole.isDefined && !info.isUserDefinedTelluric.value)
     val (nonScience, science) = other.partition(!_._2.tpe.hasProposal)
 
     // Here are our simple validators

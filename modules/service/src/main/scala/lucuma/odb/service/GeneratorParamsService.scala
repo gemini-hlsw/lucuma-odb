@@ -37,6 +37,7 @@ import lucuma.core.enums.TrackType
 import lucuma.core.math.RadialVelocity
 import lucuma.core.model.ConstraintSet
 import lucuma.core.model.ExposureTimeMode
+import lucuma.core.model.IsUserDefinedTelluric
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.SourceProfile
@@ -271,17 +272,19 @@ object GeneratorParamsService {
                 params.map(p => byObs.get(p.observationId).fold(p)(t => p.copy(tellurics = t)))
 
       private def observingMode(
-        params:          NonEmptyList[TargetParams],
-        config:          Option[ObservingMode],
-        calibrationRole: Option[CalibrationRole]
+        params:                NonEmptyList[TargetParams],
+        config:                Option[ObservingMode],
+        calibrationRole:       Option[CalibrationRole],
+        isUserDefinedTelluric: IsUserDefinedTelluric
       ): Either[Error, ObservingMode] =
         // A daytime pinhole flat is an internal GCAL calibration with no target.
         // It needs no asterism (and no ITC), so skip the target requirement; its
         // sequence is a single smart day flat that ignores target information.
         // A telluric has no target until resolved (never, for an unresolved ToO);
-        // let it through so the generator can charge a placeholder time.
+        // let it through so the generator can charge a placeholder time.  A
+        // user-defined one is the user's to complete, so it is checked as science.
         val targetCheck =
-          if calibrationRole.exists(r => r === CalibrationRole.DaytimePinhole || r === CalibrationRole.Telluric) then
+          if !isUserDefinedTelluric.value && calibrationRole.exists(r => r === CalibrationRole.DaytimePinhole || r === CalibrationRole.Telluric) then
             ().asRight[NonEmptyList[MissingParam]]
           else
             params
@@ -403,7 +406,7 @@ object GeneratorParamsService {
             case ExposureTimeMode.TimeAndCountMode(time = time) =>
               c.explicitReadMode.getOrElse(Flamingos2ReadMode.forExposureTime(time))
 
-        observingMode(obsParams.targets, config, obsParams.calibrationRole).flatMap:
+        observingMode(obsParams.targets, config, obsParams.calibrationRole, obsParams.isUserDefinedTelluric).flatMap:
 
           // Exchange Modes (no ITC, like visitors)
           case exc: exchange.Config =>
@@ -846,6 +849,7 @@ object GeneratorParamsService {
     altair:                Option[AltairConfiguration],
     explicitGuideProbe:    Option[GuideProbe],
     isNonsidereal:         Boolean,
+    isUserDefinedTelluric: IsUserDefinedTelluric,
     customSedTimestamp:    Option[Timestamp] = none,
     tellurics:             CalibrationGroupTellurics = CalibrationGroupTellurics.Empty
   )
@@ -874,7 +878,8 @@ object GeneratorParamsService {
     schedulingMode:        SchedulingMode,
     altair:                Option[AltairConfiguration],
     guideProbe:            Option[GuideProbe],
-    tellurics:             CalibrationGroupTellurics
+    tellurics:             CalibrationGroupTellurics,
+    isUserDefinedTelluric: IsUserDefinedTelluric
   )
 
   object ObsParams {
@@ -907,7 +912,8 @@ object GeneratorParamsService {
           oParams.head.schedulingMode,
           oParams.head.altair,
           guideProbe,
-          oParams.head.tellurics
+          oParams.head.tellurics,
+          oParams.head.isUserDefinedTelluric
         )
       .toMap
   }
@@ -985,13 +991,14 @@ object GeneratorParamsService {
        cass_rotator.opt        *:
        altair_nd_filter.opt    *:
        guide_probe.opt         *:
-       bool
-      ).map( (oid, role, ps, cs, etm, om, sb, btid, brv, bsp, tid, rv, sp, snt, dc, es, sc, req, am, fl, cr, nd, gp, nsid) =>
+       bool                    *:
+       is_user_defined_telluric
+      ).map( (oid, role, ps, cs, etm, om, sb, btid, brv, bsp, tid, rv, sp, snt, dc, es, sc, req, am, fl, cr, nd, gp, nsid, udt) =>
         // All-or-nothing (field lens aside) is a DB CHECK; the fallbacks here are unreachable in
         // practice, not a second source of truth for them.
         val altair: Option[AltairConfiguration] =
           am.map(AltairConfiguration(_, fl, cr.getOrElse(CassRotator.Following), nd.getOrElse(AltairNdFilter.Out)))
-        ParamsRow(oid, role, ps, cs, etm, om, sb, btid, brv, bsp, tid, rv, sp, snt, dc, es, sc, req, altair, gp, nsid, None))
+        ParamsRow(oid, role, ps, cs, etm, om, sb, btid, brv, bsp, tid, rv, sp, snt, dc, es, sc, req, altair, gp, nsid, udt, None))
 
     // v_generator_params knows nothing about proposals.
     private def ProposalJoin(tab: String): String =
@@ -1036,7 +1043,8 @@ object GeneratorParamsService {
         $tab.c_altair_cass_rotator,
         $tab.c_altair_nd_filter,
         $tab.c_explicit_guide_probe,
-        $tab.c_is_nonsidereal
+        $tab.c_is_nonsidereal,
+        $tab.c_is_user_defined_telluric
       """
 
     def selectManyParams(

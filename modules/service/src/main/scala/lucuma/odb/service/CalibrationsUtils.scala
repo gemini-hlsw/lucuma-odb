@@ -29,6 +29,7 @@ import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
+import lucuma.core.model.TelluricCount
 import lucuma.core.model.TelluricType
 import lucuma.core.model.sequence.CalibrationDigest
 import lucuma.core.model.sequence.CalibrationEstimate
@@ -75,24 +76,35 @@ import java.time.LocalDateTime
 import java.time.LocalTime
 
 case class ObsExtract[A](
-  id:               Observation.Id,
-  itc:              Option[ItcInput],
-  band:             Option[ScienceBand],
-  role:             Option[CalibrationRole],
-  data:             A,
-  requiresTelluric: Boolean = true
+  id:           Observation.Id,
+  itc:          Option[ItcInput],
+  band:         Option[ScienceBand],
+  role:         Option[CalibrationRole],
+  data:         A,
+  telluricType: Option[TelluricType]
 ):
   def map[B](f: A => B): ObsExtract[B] =
     copy(data = f(data))
 
+  def requiresTelluric: Boolean =
+    telluricType.forall(_ =!= TelluricType.NoTelluric)
+
+  /** The telluric count when the user supplies the targets. */
+  def isUserDefinedTellurics: Option[TelluricCount] =
+    telluricType.collect:
+      case TelluricType.UserDefined(count) => count
+
 object ObsExtract:
-  def modeRequiresTelluric(mode: ObservingMode): Boolean =
+  def modeTelluricType(mode: ObservingMode): Option[TelluricType] =
     mode match
-      case c: Flamingos2Config        => c.telluricType =!= TelluricType.NoTelluric
-      case c: Flamingos2MosConfig     => c.telluricType =!= TelluricType.NoTelluric
-      case c: Igrins2Config           => c.telluricType =!= TelluricType.NoTelluric
-      case c: GnirsSpectroscopyConfig => c.telluricType =!= TelluricType.NoTelluric
-      case _                          => true
+      case c: Flamingos2Config        => c.telluricType.some
+      case c: Flamingos2MosConfig     => c.telluricType.some
+      case c: Igrins2Config           => c.telluricType.some
+      case c: GnirsSpectroscopyConfig => c.telluricType.some
+      case _                          => none
+
+  def modeRequiresTelluric(mode: ObservingMode): Boolean =
+    modeTelluricType(mode).forall(_ =!= TelluricType.NoTelluric)
 
   /** Modes whose science observations are accompanied by tellurics. */
   def modeTakesTelluric(modeType: ObservingModeType): Boolean =

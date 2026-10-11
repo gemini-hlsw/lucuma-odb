@@ -4147,7 +4147,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
                               }
                             }
                             telluricType: {
-                              tag: MANUAL
+                              tag: EXPLICIT_SPECTRAL_TYPES
                               starTypes: ["A5V", "G2V", "K0III"]
                             }
                           }
@@ -4178,7 +4178,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
                           "observingMode": {
                             "flamingos2LongSlit": {
                               "telluricType": {
-                                "tag": "MANUAL",
+                                "tag": "EXPLICIT_SPECTRAL_TYPES",
                                 "starTypes": ["A5V", "G2V", "K0III"]
                               }
                             }
@@ -4307,7 +4307,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
                               }
                             }
                             telluricType: {
-                              tag: MANUAL
+                              tag: EXPLICIT_SPECTRAL_TYPES
                               starTypes: ["A5V", "G2V", "K0III"]
                             }
                           }
@@ -4338,7 +4338,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
                           "observingMode": {
                             "igrins2LongSlit": {
                               "telluricType": {
-                                "tag": "MANUAL",
+                                "tag": "EXPLICIT_SPECTRAL_TYPES",
                                 "starTypes": ["A5V", "G2V", "K0III"]
                               }
                             }
