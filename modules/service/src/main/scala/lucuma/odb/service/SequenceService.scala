@@ -297,6 +297,18 @@ trait SequenceService[F[_]]:
   )(using Transaction[F]): F[Result[Unit]]
 
   /**
+   * Restarts a customized acquisition from a fresh copy of its edited steps:
+   * ongoing steps are abandoned, pending ones deleted and the latest batch of
+   * atoms re-inserted as pending steps.  Executed steps remain as history.
+   *
+   * @return `true` if the acquisition was customized and reset, `false` if it
+   *         is not customized (nothing is changed)
+   */
+  def resetCustomizedAcquisition(
+    observationId: Observation.Id
+  )(using Transaction[F], Services.ServiceAccess): F[Result[Boolean]]
+
+  /**
    * Copies the materialized `sequenceTypes` sequences of `source` into `clone`,
    * as pending steps, according to `mode`.  A sequence type that is not
    * materialized, or that has nothing to copy, is left to be generated.
@@ -1062,6 +1074,57 @@ object SequenceService:
           doDelete.map(Result.success)
         )
 
+      /**
+       * Reads the atoms that `query` selects for `source` fully into memory
+       * and, if there are any, hands them to `replace`. Reading completes
+       * before `replace` writes, so `source` may be the observation being
+       * replaced.
+       */
+      private def copySequence[D](
+        instrument:   Instrument,
+        source:       Observation.Id,
+        sequenceType: SequenceType,
+        query:        Query[(Instrument, Observation.Id, SequenceType), (Atom.Id, Option[String], Step.Id, ProtoStep[D])],
+        replace:      List[ProtoAtom[ProtoStep[D]]] => F[Result[Stream[Pure, Atom[D]]]]
+      ): F[Result[Unit]] =
+        session
+          .stream(query)((instrument, source, sequenceType), BatchSize)
+          .map((aid, desc, _, step) => (aid, desc, step))
+          .through(groupByAtom((_, desc, steps) => ProtoAtom(desc, steps)))
+          .compile
+          .toList
+          .flatMap:
+            case Nil   => Result.unit.pure[F]
+            case atoms => replace(atoms).map(_.void)
+
+      override def resetCustomizedAcquisition(
+        observationId: Observation.Id
+      )(using Transaction[F], Services.ServiceAccess): F[Result[Boolean]] =
+
+        val acquisition: SequenceType = SequenceType.Acquisition
+
+        def reset[D](
+          instrument: Instrument,
+          table:      Statements.DynamicTable[D],
+          replace:    List[ProtoAtom[ProtoStep[D]]] => F[Result[Stream[Pure, Atom[D]]]]
+        ): F[Result[Boolean]] =
+          copySequence(instrument, observationId, acquisition, Statements.selectLatestSequence(table), replace)
+            .map(_.as(true))
+
+        def resetInstrument(instrument: Instrument): F[Result[Boolean]] =
+          instrument match
+            case Instrument.Flamingos2 => reset(instrument, Statements.Flamingos2Table, replaceFlamingos2Sequence(observationId, acquisition, _, customized = true))
+            case Instrument.Ghost      => reset(instrument, Statements.GhostTable,      replaceGhostSequence(observationId, acquisition, _, customized = true))
+            case Instrument.GmosNorth  => reset(instrument, Statements.GmosNorthTable,  replaceGmosNorthSequence(observationId, acquisition, _, customized = true))
+            case Instrument.GmosSouth  => reset(instrument, Statements.GmosSouthTable,  replaceGmosSouthSequence(observationId, acquisition, _, customized = true))
+            case Instrument.Igrins2    => reset(instrument, Statements.Igrins2Table,    replaceIgrins2Sequence(observationId, acquisition, _, customized = true))
+            case Instrument.Gnirs      => reset(instrument, Statements.GnirsTable,      replaceGnirsSequence(observationId, acquisition, _, customized = true))
+            case _                     => Result.success(false).pure[F]
+
+        session.option(Statements.SelectIsCustomized)(observationId, acquisition).flatMap:
+          case Some(true) => observationService.selectInstrument(observationId).flatMap(_.fold(Result.success(false).pure[F])(resetInstrument))
+          case _          => Result.success(false).pure[F]
+
       override def cloneSequence(
         source:        Observation.Id,
         clone:         Observation.Id,
@@ -1076,15 +1139,7 @@ object SequenceService:
           pendingOnly:  Boolean,
           replace:      List[ProtoAtom[ProtoStep[D]]] => F[Result[Stream[Pure, Atom[D]]]]
         ): F[Result[Unit]] =
-          session
-            .stream(Statements.selectSequenceForClone(table, pendingOnly))((instrument, source, sequenceType), BatchSize)
-            .map((aid, desc, _, step) => (aid, desc, step))
-            .through(groupByAtom((_, desc, steps) => ProtoAtom(desc, steps)))
-            .compile
-            .toList
-            .flatMap:
-              case Nil   => Result.unit.pure[F]
-              case atoms => replace(atoms).map(_.void)
+          copySequence(instrument, source, sequenceType, Statements.selectSequenceForClone(table, pendingOnly), replace)
 
         // The clone inherits the source's customization: a copy of hand-edited
         // steps is customized, a copy of generated steps is not.
@@ -1414,10 +1469,24 @@ object SequenceService:
       )
 
     /**
-     * Selects a sequence to copy into a clone.  Atoms are ordered by their
-     * first executed step, then by atom index, and steps by execution order,
-     * then by step index, so unexecuted atoms and steps follow executed ones.
+     * Atoms ordered by their first executed step, then by atom index, and
+     * steps by execution order, then by step index, so unexecuted atoms and
+     * steps follow executed ones.
      */
+    private val ExecutionOrder: String =
+      """
+        (
+          SELECT MIN(ae.c_execution_order)
+          FROM t_step ast
+          JOIN t_step_execution ae ON ae.c_step_id = ast.c_step_id
+          WHERE ast.c_atom_id = a.c_atom_id
+        ) NULLS LAST,
+        a.c_atom_index,
+        se.c_execution_order NULLS LAST,
+        s.c_step_index
+      """
+
+    /** Selects a sequence to copy into a clone. */
     def selectSequenceForClone[D](
       table:       DynamicTable[D],
       pendingOnly: Boolean
@@ -1425,17 +1494,27 @@ object SequenceService:
       selectSequence(
         table,
         if pendingOnly then "AND (se.c_step_id IS NULL OR se.c_execution_state = 'not_started')" else "",
+        ExecutionOrder
+      )
+
+    /**
+     * Selects the most recently inserted batch of atoms, executed or not.
+     * Atoms inserted together share `c_created` (see V1346).
+     */
+    def selectLatestSequence[D](
+      table: DynamicTable[D]
+    ): Query[(Instrument, Observation.Id, SequenceType), (Atom.Id, Option[String], Step.Id, ProtoStep[D])] =
+      selectSequence(
+        table,
         """
-          (
-            SELECT MIN(ae.c_execution_order)
-            FROM t_step ast
-            JOIN t_step_execution ae ON ae.c_step_id = ast.c_step_id
-            WHERE ast.c_atom_id = a.c_atom_id
-          ) NULLS LAST,
-          a.c_atom_index,
-          se.c_execution_order NULLS LAST,
-          s.c_step_index
-        """
+          AND a.c_created = (
+            SELECT MAX(l.c_created)
+            FROM t_atom l
+            WHERE l.c_observation_id = a.c_observation_id
+              AND l.c_sequence_type  = a.c_sequence_type
+          )
+        """,
+        ExecutionOrder
       )
 
     val SelectFlamingos2Sequence: Query[(Instrument, Observation.Id, SequenceType), (Atom.Id, Option[String], Step.Id, ProtoStep[Flamingos2DynamicConfig])] =

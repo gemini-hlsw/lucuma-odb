@@ -109,8 +109,15 @@ sealed trait Generator[F[_]]:
     futureLimit:   FutureLimit = FutureLimit.Default
   )(using NoTransaction[F]): F[Either[OdbError, InstrumentExecutionConfig]]
 
+  /**
+   * Restarts the acquisition from its first step.  A customized acquisition
+   * is restarted from a copy of its edited steps unless `regenerate` is set,
+   * in which case it is regenerated from the observing mode and the
+   * customization cleared.
+   */
   def resetAcquisition(
-    observationId: Observation.Id
+    observationId: Observation.Id,
+    regenerate:    Boolean
   )(using NoTransaction[F], Services.ServiceAccess): F[Either[OdbError, Unit]]
 
   def materialize(
@@ -595,7 +602,8 @@ object Generator:
           instrumentExecutionConfig(ctx).flatMap(c => EitherT.fromEither[F](altairChecked(ctx, c)))
 
       override def resetAcquisition(
-        observationId: Observation.Id
+        observationId: Observation.Id,
+        regenerate:    Boolean
       )(using NoTransaction[F], Services.ServiceAccess): F[Either[OdbError, Unit]] =
 
         def go[S, D](
@@ -674,11 +682,27 @@ object Generator:
         // The context comes first so that the acquisition is re-derived from the parameters the
         // science side generates with -- behind Altair those carry the resolved guide star, which
         // the database alone does not yield.
-        (for
-          ctx      <- EitherT(GeneratorContext.lookup(observationId, commitHash))
-          freshAcq <- EitherT(itcService.callRemoteAcquisition(observationId, ctx.params))
-          _        <- transactionallyEitherT(reset(ctx, freshAcq))
-        yield ()).value
+        val regenerateAcquisition: EitherT[F, OdbError, Unit] =
+          for
+            ctx      <- EitherT(GeneratorContext.lookup(observationId, commitHash))
+            freshAcq <- EitherT(itcService.callRemoteAcquisition(observationId, ctx.params))
+            _        <- transactionallyEitherT(reset(ctx, freshAcq))
+          yield ()
+
+        // The edited steps do not depend on the ITC, so no remote call is made
+        // and the ITC snapshot is left alone.
+        val restartCustomizedAcquisition: EitherT[F, OdbError, Boolean] =
+          transactionallyEitherT:
+            EitherT:
+              sequenceService.resetCustomizedAcquisition(observationId).map:
+                _.toEither.leftMap: failure =>
+                  GeneratorError.sequenceUnavailable(
+                    observationId,
+                    failure.fold(t => Option(t.getMessage).getOrElse(t.toString), _.toChain.toList.map(_.message).mkString("; "))
+                  )
+
+        if regenerate then regenerateAcquisition.value
+        else restartCustomizedAcquisition.ifM(EitherT.pure(()), regenerateAcquisition).value
 
       override def calculateDigest(
         ctx: GeneratorContext

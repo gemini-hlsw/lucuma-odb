@@ -407,7 +407,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] with UserEnv {
               checked.foldWithId(OdbError.InvalidArgument().asFailureF): (_, oid) =>
                 Services.asSuperUser:
                   generator
-                    .resetAcquisition(oid)
+                    .resetAcquisition(oid, input.regenerate)
                     .map(_.fold(_.asFailure, _ => oid.success))
                     .nestMap: oid =>
                       Filter(Predicates.resetAcquisitionResult.observation.id.eql(oid), child)
@@ -968,7 +968,8 @@ trait MutationMapping[F[_]] extends AccessControl[F] with UserEnv {
         services
           .useNonTransactionally:
             Services.asSuperUser:
-              ids.traverse(id => generator.resetAcquisition(id)).void
+              // An edited acquisition stays the source of truth over the observing mode.
+              ids.traverse(id => generator.resetAcquisition(id, regenerate = false)).void
           .whenA(updatesAcquisition)
 
       // Put it all together

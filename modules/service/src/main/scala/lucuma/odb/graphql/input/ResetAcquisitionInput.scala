@@ -6,6 +6,7 @@ package lucuma.odb.graphql.input
 import cats.syntax.all.*
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationReference
+import lucuma.odb.graphql.binding.BooleanBinding
 import lucuma.odb.graphql.binding.Matcher
 import lucuma.odb.graphql.binding.ObjectFieldsBinding
 import lucuma.odb.graphql.binding.ObservationIdBinding
@@ -13,7 +14,8 @@ import lucuma.odb.graphql.binding.ObservationReferenceBinding
 
 final case class ResetAcquisitionInput(
   observationId:  Option[Observation.Id],
-  observationRef: Option[ObservationReference]
+  observationRef: Option[ObservationReference],
+  regenerate:     Boolean
 )
 
 object ResetAcquisitionInput:
@@ -22,6 +24,7 @@ object ResetAcquisitionInput:
     ObjectFieldsBinding.rmap:
       case List(
         ObservationIdBinding.Option("observationId", rObservationId),
-        ObservationReferenceBinding.Option("observationReference", rObservationRef)
+        ObservationReferenceBinding.Option("observationReference", rObservationRef),
+        BooleanBinding.Option("regenerate", rRegenerate)
       ) =>
-        (rObservationId, rObservationRef).parMapN(ResetAcquisitionInput.apply)
+        (rObservationId, rObservationRef, rRegenerate.map(_.getOrElse(false))).parMapN(ResetAcquisitionInput.apply)
