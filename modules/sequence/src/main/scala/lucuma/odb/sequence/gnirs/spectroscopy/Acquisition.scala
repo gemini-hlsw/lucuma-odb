@@ -141,9 +141,9 @@ object Acquisition:
       // The FPU image (first step) uses a single coadd and the fixed filter/exposure from
       // firstStepFilterAndExposure; its read mode follows from that fixed exposure time.
       // Every subsequent step (field and through-slit) uses the selected filter, the ITC
-      // exposure and the resolved coadds (the ITC exposure count in S/N mode, else the
-      // explicit acquisition coadds). Sky frames are generated only for Faint, at its sky
-      // offset.
+      // exposure and the resolved coadds (the ITC exposure count raised towards the 5s
+      // integration target in S/N mode, else the explicit acquisition coadds). Sky frames are
+      // generated only for Faint, at its sky offset.
       val fpuStepReadMode: GnirsReadMode = GnirsReadMode.forExposureTime(fpuStepExposureTime)
       val acqCoadds: PosInt              = config.acquisition.resolvedCoadds(time)
 
