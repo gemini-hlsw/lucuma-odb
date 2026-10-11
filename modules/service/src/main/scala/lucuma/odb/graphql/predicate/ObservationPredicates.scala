@@ -15,4 +15,5 @@ class ObservationPredicates(path: Path):
   lazy val program           = new ProgramPredicates(path / "program")
   lazy val referenceLabel    = LeafPredicates[ObservationReference](path / "reference" / "label")
   lazy val calibrationRole   = LeafPredicates[Option[CalibrationRole]](path / "calibrationRole")
+  lazy val isUserDefinedTelluric = LeafPredicates[Boolean](path / "isUserDefinedTelluric")
   lazy val observingModeType = LeafPredicates[ObservingModeType](path / "observingMode" / "mode")

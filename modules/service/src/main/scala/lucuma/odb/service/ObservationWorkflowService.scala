@@ -318,7 +318,7 @@ object ObservationWorkflowService {
         ): List[(Program.Id, Observation.Id, GeneratorParams)] =
           infos.values.toList.flatMap: info =>
             info.generatorParams.flatMap(_.toOption).collect:
-              case ps if info.calibrationRole.isEmpty && info.tpe.hasProposal &&
+              case ps if (info.calibrationRole.isEmpty || info.isUserDefinedTelluric.value) && info.tpe.hasProposal &&
                          !info.isVisitor && !info.isExchange && !itcRes.contains(info.oid) =>
                 (info.pid, info.oid, ps)
 

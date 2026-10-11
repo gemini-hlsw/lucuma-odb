@@ -949,7 +949,7 @@ class observations extends OdbSuite with ObservingModeSetupOperations {
               )
     } yield ()
 
-  test("query Flamingos2 long slit observations with Manual telluricType"):
+  test("query Flamingos2 long slit observations with ExplicitSpectralTypes telluricType"):
     for {
       pid <- createProgramAs(pi)
       tid <- createTargetAs(pi, pid)
@@ -972,7 +972,7 @@ class observations extends OdbSuite with ObservingModeSetupOperations {
                               }
                             }
                             telluricType: {
-                              tag: MANUAL
+                              tag: EXPLICIT_SPECTRAL_TYPES
                               starTypes: ["A5V", "G2V", "K0III"]
                             }
                           }
@@ -1029,7 +1029,7 @@ class observations extends OdbSuite with ObservingModeSetupOperations {
                             "observingMode": {
                               "flamingos2LongSlit": {
                                 "telluricType": {
-                                  "tag": "MANUAL",
+                                  "tag": "EXPLICIT_SPECTRAL_TYPES",
                                   "starTypes": ["A5V", "G2V", "K0III"]
                                 }
                               }

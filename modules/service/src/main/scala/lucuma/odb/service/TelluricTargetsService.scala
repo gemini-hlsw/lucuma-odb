@@ -59,11 +59,13 @@ import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import java.time.Instant
 import scala.concurrent.duration.*
+import scala.util.control.NoStackTrace
 
 trait TelluricTargetsService[F[_]]:
 
   /**
-   * Marks all 'calculating' entries as 'pending' on startup.
+   * Requeues all 'calculating' entries on startup: 'pending' for generated
+   * tellurics, 'ready' for user-defined ones, which are never searched for.
    * Called by the daemon to clean up state after restart.
    */
   def reset(using ServiceAccess, Transaction[F]): F[Unit]
@@ -92,6 +94,25 @@ trait TelluricTargetsService[F[_]]:
     scienceId:       Observation.Id,
     scienceDuration: TimeSpan,
     order:           TelluricCalibrationOrder
+  )(using ServiceAccess, Transaction[F]): F[Unit]
+
+  /**
+   * Records a user-defined telluric: its resolution row keeps the order but is
+   * never searched for.
+   */
+  def registerUserDefinedTelluric(
+    pid:        Program.Id,
+    telluricId: Observation.Id,
+    scienceId:  Observation.Id,
+    order:      TelluricCalibrationOrder
+  )(using ServiceAccess, Transaction[F]): F[Unit]
+
+  /**
+   * Turns a generated telluric into a user-defined one, keeping its current
+   * star (still a calibration target) and discarding any search in flight.
+   */
+  def markUserDefined(
+    telluricId: Observation.Id
   )(using ServiceAccess, Transaction[F]): F[Unit]
 
   /**
@@ -124,11 +145,12 @@ object HminBrightnessCache extends NewType[Map[HminBrightnessKey, (Option[BigDec
   ): Option[BigDecimal] =
     val (hminHot, hminSolar) = entry
     telluricType match
-      case TelluricType.Solar      => hminSolar
-      case TelluricType.Hot        => hminHot
-      case TelluricType.A0V        => hminHot
-      case _: TelluricType.Manual  => hminHot
-      case TelluricType.NoTelluric => hminHot // Not in use
+      case TelluricType.Solar                    => hminSolar
+      case TelluricType.Hot                      => hminHot
+      case TelluricType.A0V                      => hminHot
+      case TelluricType.ExplicitSpectralTypes(_) => hminHot
+      case TelluricType.UserDefined(_)           => hminHot // Not in use
+      case TelluricType.NoTelluric               => hminHot // Not in use
 
   private def lookupF2Key(
     m:            HminBrightnessCache,
@@ -168,6 +190,10 @@ case class TelluricSearchParams(
 )
 
 object TelluricTargetsService:
+
+  // Raised inside the link transaction to roll it back when the resolution was
+  // invalidated while the search ran.
+  private case object StaleResolution extends RuntimeException with NoStackTrace
 
   /** Science durations above this threshold request two tellurics (Before + After). */
   val MultiTelluricThreshold: TimeSpan = 90.minTimeSpan
@@ -361,6 +387,21 @@ object TelluricTargetsService:
       )(using ServiceAccess, Transaction[F]): F[Unit] =
         session.execute(Statements.InsertResolutionRequest)(telluricId, pid, scienceId, scienceDuration, order).void
 
+      override def registerUserDefinedTelluric(
+        pid:        Program.Id,
+        telluricId: Observation.Id,
+        scienceId:  Observation.Id,
+        order:      TelluricCalibrationOrder
+      )(using ServiceAccess, Transaction[F]): F[Unit] =
+        session.execute(Statements.InsertUserDefinedResolution)(telluricId, pid, scienceId, order) *>
+          session.execute(Statements.MarkUserDefinedTelluric)(telluricId).void
+
+      override def markUserDefined(
+        telluricId: Observation.Id
+      )(using ServiceAccess, Transaction[F]): F[Unit] =
+        session.execute(Statements.MarkUserDefinedTelluric)(telluricId) *>
+          session.execute(Statements.SupersedeResolution)(telluricId).void
+
       override def updateScienceDuration(
         telluricId:      Observation.Id,
         scienceDuration: TimeSpan
@@ -420,7 +461,10 @@ object TelluricTargetsService:
           fetchSearchParams(pending.scienceObservationId)
             .map(_.toRight(s"Missing coordinates or instrument config for science observation ${pending.scienceObservationId}"))
 
-        def createAndLinkTarget(sidereal: Target.Sidereal): F[Option[Target.Id]] =
+        // Linking the star and marking the row ready happen in one transaction guarded by the
+        // invalidation the search read, so a conversion or science edit that landed meanwhile
+        // rolls the link back instead of overwriting the asterism with a stale result.
+        def linkTargetAndReady(sidereal: Target.Sidereal, paramsHash: Md5Hash): F[Option[TelluricTargets.Meta]] =
           S.transactionally:
             Services.asSuperUser:
               val catalog = sidereal.catalogInfo.map: ci =>
@@ -440,7 +484,7 @@ object TelluricTargetsService:
                 existence = Existence.Present
               )
 
-              for {
+              for
                 targetId     <- targetService.createTarget(
                                   AccessControl.unchecked(target, pending.programId, program_id),
                                   disposition = TargetDisposition.Calibration,
@@ -459,12 +503,18 @@ object TelluricTargetsService:
                                     session.execute(Statements.InsertTelluricObservationTarget)(
                                       (pending.programId, pending.observationId, targetId)
                                     )
-              } yield targetId.some
-          .recover:
-            case SqlState.ForeignKeyViolation(_) =>
+                meta         <- session
+                                  .prepareR(Statements.RequestReady)
+                                  .use(_.option((targetId.some, none, paramsHash.some, pending.observationId, pending.lastInvalidation)))
+                _            <- meta.fold(StaleResolution.raiseError[F, Unit])(_ => ().pure[F])
+              yield meta
+          .recoverWith:
+            case StaleResolution                 =>
+              info"Telluric resolution for ${pending.observationId} was invalidated while searching, discarding the result".as(none)
+            case SqlState.ForeignKeyViolation(e) =>
               // Observation could be deleted during resolution, this is not common but it is legal
-              // we see it on the logs
-              none
+              warn"Telluric observation ${pending.observationId} went away while searching: ${e.getMessage}".as(none)
+          .flatMap(requeueIfSuperseded)
 
         extension (target: Target.Sidereal)
           def sedFromTelluricType(star: TelluricStar, telluricType: TelluricType): Target.Sidereal =
@@ -476,7 +526,7 @@ object TelluricTargetsService:
             val sed = star.sed.orElse(Target.Sidereal.unnormalizedSED.getOption(target).flatten).orElse(derivedSed.some)
             Target.Sidereal.unnormalizedSED.replace(sed)(target)
 
-        def searchAndResolve(params: TelluricSearchParams): F[Option[(Either[String, Target.Id], Md5Hash)]] =
+        def searchAndResolve(params: TelluricSearchParams): F[Option[TelluricTargets.Meta]] =
           val searchInput = mkSearchInput(params, pending.scienceDuration.min(MaxTelluricDuration))
           val paramsHash =
             TelluricTargetsService.searchParamsHash(searchInput, pending.scienceDuration, params.site, params.obsTime)
@@ -486,14 +536,14 @@ object TelluricTargetsService:
               .use(_.option(pending.observationId))
               .map(_.isDefined)
 
-          def doSearch: F[Option[(Either[String, Target.Id], Md5Hash)]] =
+          def doSearch: F[Option[TelluricTargets.Meta]] =
             observationExists.ifM(
               telluricClient.searchTarget(searchInput).attempt.flatMap {
                 // We need to capture search failures or the daemon will stop.
                 case Left(e)        =>
                   val msg = s"Telluric search failed: ${e.getMessage}"
-                  Logger[F].error(e)(s"Telluric search failed for ${pending.observationId}")
-                    .as((msg.asLeft[Target.Id], paramsHash).some)
+                  Logger[F].error(e)(s"Telluric search failed for ${pending.observationId}") *>
+                    handleFailure(msg, paramsHash.some)
                 case Right(results) =>
                   // For multi-telluric (duration > 1.5h) match the requested order.
                   // For single-telluric (duration <= 1.5h) apply the RA vs. twilight LST rule.
@@ -513,12 +563,10 @@ object TelluricTargetsService:
                         catalogResult.map(_.target).getOrElse(star.asSiderealTarget).sedFromTelluricType(star, params.telluricType)
 
                       info"Found telluric star ID ${star.id} with type `${params.telluricType}` and order: ${star.order} for ${pending.calibrationOrder} observation ${pending.observationId}" *>
-                        createAndLinkTarget(sidereal).map:
-                          case Some(tid) => (tid.asRight[String], paramsHash).some
-                          case _         => none
+                        linkTargetAndReady(sidereal, paramsHash)
                     case None =>
                       val msg = s"No telluric stars found for observation ${pending.observationId}"
-                      Logger[F].warn(msg).as((msg.asLeft[Target.Id], paramsHash).some)
+                      Logger[F].warn(msg) *> handleFailure(msg, paramsHash.some)
               },
               // Observation was deleted before resolving the target
               warn"Observation ${pending.observationId} deleted, skip resolution".as(none)
@@ -528,6 +576,10 @@ object TelluricTargetsService:
             // Don't try to call the backend for no-tellurics
             case TelluricType.NoTelluric =>
               info"Science observation ${pending.scienceObservationId} requests no telluric standard, skipping search for ${pending.observationId}" *>
+                resetToReady.as(none)
+            // Never loaded as pending; a race with the science edit could still get here.
+            case TelluricType.UserDefined(_) =>
+              info"Science observation ${pending.scienceObservationId} defines its own telluric standards, skipping search for ${pending.observationId}" *>
                 resetToReady.as(none)
             case _ =>
               pending.paramsHash match
@@ -540,38 +592,19 @@ object TelluricTargetsService:
                 case None =>
                   doSearch
 
-        def handleResult(result: Either[String, Target.Id], paramsHash: Md5Hash): F[Option[TelluricTargets.Meta]] =
-          result match
-            case Right(targetId)                            =>
-              requestReady(targetId.some, none, paramsHash.some)
+        def handleFailure(errorMsg: String, paramsHash: Option[Md5Hash]): F[Option[TelluricTargets.Meta]] =
+          if pending.failureCount < 5 then
+            warn"Telluric target resolution failed (attempt ${pending.failureCount + 1}), will retry: $errorMsg" *>
+              retryRequest(pending.failureCount, errorMsg)
+          else
+            error"Telluric target resolution permanently failed after ${pending.failureCount} attempts: $errorMsg" *>
+              requestReady(none, errorMsg.some, paramsHash)
 
-            case Left(errorMsg) if pending.failureCount < 5 =>
-              warn"Telluric target resolution failed (attempt ${pending.failureCount + 1}), will retry: $errorMsg" *>
-                retryRequest(pending.failureCount, errorMsg)
-
-            case Left(errorMsg)                             =>
-              error"Telluric target resolution permanently failed after ${pending.failureCount} attempts: $errorMsg" *>
-                requestReady(none, errorMsg.some, paramsHash.some)
-
-        def handleMissingParams(msg: String): F[Option[TelluricTargets.Meta]] =
-          warn"$msg" *>
-            (if pending.failureCount < 5 then
-              retryRequest(pending.failureCount, msg)
-            else
-              requestReady(none, msg.some, none))
-
-        for {
+        for
           _          <- info"Resolving telluric target for observation ${pending.observationId}"
           searchData <- queryParams
-          resultOpt  <- searchData.fold(
-                          _ => none[(Either[String, Target.Id], Md5Hash)].pure[F],
-                          searchAndResolve
-                        )
-          meta       <- (searchData, resultOpt) match
-                          case (Left(msg), _)               => handleMissingParams(msg)
-                          case (_, None)                    => none[TelluricTargets.Meta].pure[F]
-                          case (_, Some((result, hash)))    => handleResult(result, hash)
-        } yield meta
+          meta       <- searchData.fold(handleFailure(_, none), searchAndResolve)
+        yield meta
       }
 
       object Statements:
@@ -593,13 +626,24 @@ object TelluricTargetsService:
              c_last_invalidation, c_last_update, c_retry_at, c_failure_count,
              c_resolved_target_id, c_error_message, c_science_duration, c_calibration_order"""
 
+        // A user-defined telluric's row is never searched for.
+        private val notUserDefined: String =
+          """NOT EXISTS (
+               SELECT 1
+               FROM   t_observation o
+               WHERE  o.c_observation_id = r.c_observation_id
+                 AND  o.c_is_user_defined_telluric
+             )"""
+
+        // A row converted to user-defined while calculating would never be loaded again.
         val ResetCalculating: Command[Void] =
           sql"""
-            UPDATE t_telluric_resolution
-            SET    c_state = 'pending',
+            UPDATE t_telluric_resolution r
+            SET    c_state = CASE WHEN #$notUserDefined THEN 'pending'::e_calculation_state
+                                  ELSE 'ready'::e_calculation_state END,
                    c_retry_at = NULL,
                    c_failure_count = 0
-            WHERE  c_state = 'calculating'
+            WHERE  r.c_state = 'calculating'
           """.command
 
         val LoadPending: Query[Int, TelluricTargets.Pending] =
@@ -607,11 +651,12 @@ object TelluricTargetsService:
             UPDATE t_telluric_resolution
             SET    c_state = 'calculating'
             WHERE  c_observation_id IN (
-              SELECT c_observation_id
-              FROM   t_telluric_resolution
-              WHERE  c_state IN ('pending', 'retry')
-                AND  (c_retry_at IS NULL OR c_retry_at <= now())
-              ORDER BY c_last_invalidation
+              SELECT r.c_observation_id
+              FROM   t_telluric_resolution r
+              WHERE  r.c_state IN ('pending', 'retry')
+                AND  (r.c_retry_at IS NULL OR r.c_retry_at <= now())
+                AND  #$notUserDefined
+              ORDER BY r.c_last_invalidation
               LIMIT  $int4
               FOR UPDATE SKIP LOCKED
             )
@@ -620,11 +665,12 @@ object TelluricTargetsService:
 
         val LoadPendingObs: Query[Observation.Id, TelluricTargets.Pending] =
           sql"""
-            UPDATE t_telluric_resolution
+            UPDATE t_telluric_resolution r
             SET    c_state = 'calculating'
-            WHERE  c_observation_id = $observation_id
-              AND  c_state IN ('pending', 'retry')
-              AND  (c_retry_at IS NULL OR c_retry_at <= now())
+            WHERE  r.c_observation_id = $observation_id
+              AND  r.c_state IN ('pending', 'retry')
+              AND  (r.c_retry_at IS NULL OR r.c_retry_at <= now())
+              AND  #$notUserDefined
             RETURNING #$pendingColumns
           """.query(pending)
 
@@ -659,12 +705,54 @@ object TelluricTargetsService:
 
         val RequeueSuperseded: Command[Observation.Id] =
           sql"""
-            UPDATE t_telluric_resolution
-            SET    c_state = 'pending',
+            UPDATE t_telluric_resolution r
+            SET    c_state = CASE WHEN #$notUserDefined THEN 'pending'::e_calculation_state
+                                  ELSE 'ready'::e_calculation_state END,
                    c_retry_at = NULL,
                    c_failure_count = 0
+            WHERE  r.c_observation_id = $observation_id
+              AND  r.c_state = 'calculating'
+          """.command
+
+        val InsertUserDefinedResolution: Command[(Observation.Id, Program.Id, Observation.Id, TelluricCalibrationOrder)] =
+          sql"""
+            INSERT INTO t_telluric_resolution (
+              c_observation_id,
+              c_program_id,
+              c_science_observation_id,
+              c_science_duration,
+              c_calibration_order,
+              c_state,
+              c_last_invalidation
+            ) VALUES (
+              $observation_id,
+              $program_id,
+              $observation_id,
+              '0 seconds'::interval,
+              $telluric_calibration_order,
+              'ready',
+              now()
+            )
+          """.command
+
+        val MarkUserDefinedTelluric: Command[Observation.Id] =
+          sql"""
+            UPDATE t_observation
+            SET    c_is_user_defined_telluric = true
             WHERE  c_observation_id = $observation_id
-              AND  c_state = 'calculating'
+          """.command
+
+        // A search in flight writes its result only against the invalidation it
+        // read, so bumping it discards that result.
+        val SupersedeResolution: Command[Observation.Id] =
+          sql"""
+            UPDATE t_telluric_resolution
+            SET    c_last_invalidation = now(),
+                   c_retry_at          = NULL,
+                   c_failure_count     = 0,
+                   c_state             = CASE WHEN c_state = 'calculating' THEN c_state
+                                              ELSE 'ready'::e_calculation_state END
+            WHERE  c_observation_id = $observation_id
           """.command
 
         val ResetToReady: Query[(Observation.Id, Timestamp), TelluricTargets.Meta] =

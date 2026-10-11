@@ -10,6 +10,7 @@ import io.circe.DecodingFailure
 import io.circe.Encoder
 import io.circe.Json
 import io.circe.syntax.*
+import lucuma.core.model.TelluricCount
 import lucuma.core.model.TelluricType
 
 object tellurictype:
@@ -18,51 +19,63 @@ object tellurictype:
     given Decoder[TelluricType] = Decoder.instance: cursor =>
       cursor.downField("tag").as[String].flatMap: tag =>
         tag.toUpperCase match
-          case "HOT"         => TelluricType.Hot.asRight
-          case "A0V"         => TelluricType.A0V.asRight
-          case "SOLAR"       => TelluricType.Solar.asRight
-          case "NO_TELLURIC" => TelluricType.NoTelluric.asRight
-          case "MANUAL"      =>
+          case "HOT"                     => TelluricType.Hot.asRight
+          case "A0V"                     => TelluricType.A0V.asRight
+          case "SOLAR"                   => TelluricType.Solar.asRight
+          case "NO_TELLURIC"             => TelluricType.NoTelluric.asRight
+          case "EXPLICIT_SPECTRAL_TYPES" =>
             cursor.downField("starTypes").as[Option[List[String]]].flatMap:
               case Some(types) =>
                 NonEmptyList.fromList(types) match {
-                  case Some(nel) => TelluricType.Manual(nel).asRight
-                  case None      => DecodingFailure("starTypes must be non-empty for Manual", cursor.history).asLeft
+                  case Some(nel) => TelluricType.ExplicitSpectralTypes(nel).asRight
+                  case None      => DecodingFailure("starTypes must be non-empty for ExplicitSpectralTypes", cursor.history).asLeft
                 }
               case None        =>
-                DecodingFailure("starTypes is required for Manual", cursor.history).asLeft
-          case _        => DecodingFailure(s"Unknown TelluricType tag: $tag", cursor.history).asLeft
+                DecodingFailure("starTypes is required for ExplicitSpectralTypes", cursor.history).asLeft
+          case "USER_DEFINED"            =>
+            cursor.downField("count").as[Option[Int]].flatMap:
+              case Some(count) =>
+                TelluricCount.from(count)
+                  .leftMap(_ => DecodingFailure("count must be 1 or 2 for UserDefined", cursor.history))
+                  .map(TelluricType.UserDefined(_))
+              case None        =>
+                DecodingFailure("count is required for UserDefined", cursor.history).asLeft
+          case _                         => DecodingFailure(s"Unknown TelluricType tag: $tag", cursor.history).asLeft
 
   object decoder extends DecoderTelluricType
 
   trait QueryCodec extends DecoderTelluricType:
     given Encoder_TelluricType: Encoder[TelluricType] =
       Encoder.instance:
-        case TelluricType.Hot               =>
-          Json.obj("tag" -> Json.fromString("HOT"), "starTypes" -> Json.Null)
-        case TelluricType.A0V               =>
-          Json.obj("tag" -> Json.fromString("A0V"), "starTypes" -> Json.Null)
-        case TelluricType.Solar             =>
-          Json.obj("tag" -> Json.fromString("SOLAR"), "starTypes" -> Json.Null)
-        case TelluricType.NoTelluric        =>
-          Json.obj("tag" -> Json.fromString("NO_TELLURIC"), "starTypes" -> Json.Null)
-        case TelluricType.Manual(starTypes) =>
-          Json.obj("tag" -> Json.fromString("MANUAL"), "starTypes" -> starTypes.asJson)
+        case TelluricType.Hot                              =>
+          Json.obj("tag" -> Json.fromString("HOT"), "starTypes" -> Json.Null, "count" -> Json.Null)
+        case TelluricType.A0V                              =>
+          Json.obj("tag" -> Json.fromString("A0V"), "starTypes" -> Json.Null, "count" -> Json.Null)
+        case TelluricType.Solar                            =>
+          Json.obj("tag" -> Json.fromString("SOLAR"), "starTypes" -> Json.Null, "count" -> Json.Null)
+        case TelluricType.NoTelluric                       =>
+          Json.obj("tag" -> Json.fromString("NO_TELLURIC"), "starTypes" -> Json.Null, "count" -> Json.Null)
+        case TelluricType.ExplicitSpectralTypes(starTypes) =>
+          Json.obj("tag" -> Json.fromString("EXPLICIT_SPECTRAL_TYPES"), "starTypes" -> starTypes.asJson, "count" -> Json.Null)
+        case TelluricType.UserDefined(count)               =>
+          Json.obj("tag" -> Json.fromString("USER_DEFINED"), "starTypes" -> Json.Null, "count" -> Json.fromInt(count.value.value))
 
   object query extends QueryCodec
 
   trait TransportCodec extends DecoderTelluricType:
     given Encoder_TelluricType: Encoder[TelluricType] =
       Encoder.instance:
-        case TelluricType.Hot        =>
+        case TelluricType.Hot                              =>
           Json.obj("tag" -> Json.fromString("HOT"))
-        case TelluricType.A0V        =>
+        case TelluricType.A0V                              =>
           Json.obj("tag" -> Json.fromString("A0V"))
-        case TelluricType.Solar      =>
+        case TelluricType.Solar                            =>
           Json.obj("tag" -> Json.fromString("SOLAR"))
-        case TelluricType.NoTelluric =>
+        case TelluricType.NoTelluric                       =>
           Json.obj("tag" -> Json.fromString("NO_TELLURIC"))
-        case TelluricType.Manual(starTypes) =>
-          Json.obj("tag" -> Json.fromString("MANUAL"), "starTypes" -> starTypes.asJson)
+        case TelluricType.ExplicitSpectralTypes(starTypes) =>
+          Json.obj("tag" -> Json.fromString("EXPLICIT_SPECTRAL_TYPES"), "starTypes" -> starTypes.asJson)
+        case TelluricType.UserDefined(count)               =>
+          Json.obj("tag" -> Json.fromString("USER_DEFINED"), "count" -> Json.fromInt(count.value.value))
 
   object transport extends TransportCodec
