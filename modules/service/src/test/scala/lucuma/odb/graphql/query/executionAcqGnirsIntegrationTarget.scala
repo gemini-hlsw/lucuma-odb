@@ -19,11 +19,11 @@ import lucuma.itc.client.InstrumentMode
 import lucuma.odb.sequence.gnirs.AcquisitionClassificationSignalToNoise
 
 /**
- * S/N-mode acquisition steps after the FPU image integrate for at least 5s: the ITC
- * exposure count is raised to round(5s / exposure). See
+ * S/N-mode acquisition steps after the FPU image are brought towards a 5s integration:
+ * the ITC exposure count is raised to round(5s / exposure). See
  * https://app.shortcut.com/lucuma/story/10747/augment-gnirs-coadding-in-acquisitions.
  */
-class executionAcqGnirsIntegrationFloor extends ExecutionTestSupportForGnirs:
+class executionAcqGnirsIntegrationTarget extends ExecutionTestSupportForGnirs:
 
   // The classification pass (fixed S/N) answers 0.3s x 1, so every target here is Very
   // Bright (H2). The real pass answers the user's S/N read as milliseconds, with a single

@@ -14,7 +14,7 @@ class AcquisitionConfigSuite extends FunSuite:
 
   // The table from https://app.shortcut.com/lucuma/story/10747: exposure seconds, ITC
   // coadds, step coadds.  round(5 / exposure) is the specified rule, so 3.4s x 1 stays
-  // below the floor.
+  // short of the 5s target.
   List(
     (0.2, 1, 25),
     (0.3, 1, 17),
@@ -25,11 +25,11 @@ class AcquisitionConfigSuite extends FunSuite:
     (5.0, 1,  1),
     (0.3, 2, 17)
   ).foreach: (exposure, coadds, expected) =>
-    test(s"${coadds} x ${exposure}s integrates for at least 5s with $expected coadds"):
+    test(s"${coadds} x ${exposure}s is brought towards the 5s target with $expected coadds"):
       assertEquals(
-        AcquisitionConfig.withMinimumIntegration(seconds(exposure), PosInt.unsafeFrom(coadds)).value,
+        AcquisitionConfig.coaddsForIntegrationTarget(seconds(exposure), PosInt.unsafeFrom(coadds)).value,
         expected
       )
 
   test("a zero exposure keeps its coadds"):
-    assertEquals(AcquisitionConfig.withMinimumIntegration(TimeSpan.Zero, PosInt.unsafeFrom(2)).value, 2)
+    assertEquals(AcquisitionConfig.coaddsForIntegrationTarget(TimeSpan.Zero, PosInt.unsafeFrom(2)).value, 2)

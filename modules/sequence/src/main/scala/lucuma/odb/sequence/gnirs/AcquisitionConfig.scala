@@ -105,9 +105,9 @@ case class AcquisitionConfig(
   /**
    * The exposure count the brightness classification sees: in S/N mode every single
    * exposure the ITC asked for (its frames times its coadds), in time-and-count mode the
-   * explicit coadds. Unlike `resolvedCoadds` this is not raised to the integration floor,
-   * which would otherwise hide a Very Bright target (0.3s x 1 is Very Bright, 0.3s x 17 is
-   * not).
+   * explicit coadds. Unlike `resolvedCoadds` this is not raised towards the integration
+   * target, which would otherwise hide a Very Bright target (0.3s x 1 is Very Bright, 0.3s x
+   * 17 is not).
    */
   def classificationCoadds(time: IntegrationTime): PosInt =
     exposureTimeMode match
@@ -119,8 +119,8 @@ case class AcquisitionConfig(
    * the ITC asked for (its frames times its coadds) is folded into the coadds of one frame,
    * so the acquisition takes a single step (see
    * https://app.shortcut.com/lucuma/story/9189/gnirs-acquisition-coadds), and the count is
-   * then raised if needed so that the step integrates for at least
-   * `AcquisitionConfig.MinimumStepIntegration` (see
+   * then raised if needed so that the step integrates for about
+   * `AcquisitionConfig.StepIntegrationTarget` (see
    * https://app.shortcut.com/lucuma/story/10747/augment-gnirs-coadding-in-acquisitions).
    * In time-and-count mode the user controls the acquisition directly, so the explicit
    * coadds are used as is.
@@ -128,7 +128,7 @@ case class AcquisitionConfig(
   def resolvedCoadds(time: IntegrationTime): PosInt =
     exposureTimeMode match
       case ExposureTimeMode.SignalToNoiseMode(_, _)   =>
-        AcquisitionConfig.withMinimumIntegration(time.exposureTime, time.totalExposureCount)
+        AcquisitionConfig.coaddsForIntegrationTarget(time.exposureTime, time.totalExposureCount)
       case ExposureTimeMode.TimeAndCountMode(_, _, _) =>
         coadds
 
@@ -153,24 +153,26 @@ case class AcquisitionConfig(
 object AcquisitionConfig:
 
   /**
-   * The least an acquisition step after the FPU image integrates for (coadds times
-   * exposure), so that it averages over the image motion caused by atmospheric turbulence.
+   * The integration (coadds times exposure) an acquisition step after the FPU image is
+   * brought up towards, so that it averages over the image motion caused by atmospheric
+   * turbulence. It is a target, not a floor: see `coaddsForIntegrationTarget`.
    */
-  val MinimumStepIntegration: TimeSpan = 5.secTimeSpan
+  val StepIntegrationTarget: TimeSpan = 5.secTimeSpan
 
   /**
-   * Raises the coadds of a step with the given exposure to `round(MinimumStepIntegration /
-   * exposure)` when the step would integrate for less than `MinimumStepIntegration`. Rounding
-   * (rather than ceiling) is the specified behavior: 3.3s x 1 becomes 2 x 3.3s while 3.4s x 1
-   * stays 1 x 3.4s. The rounded quotient cannot fall below the given coadds, which the floor
-   * check already found short of it.
+   * Raises the coadds of a step with the given exposure to `round(StepIntegrationTarget /
+   * exposure)` when the step would integrate for less than `StepIntegrationTarget`. Rounding
+   * to the nearest count is the specified behavior, so a step may still end up to half an
+   * exposure short of the target: 3.3s x 1 becomes 2 x 3.3s while 3.4s x 1 stays 1 x 3.4s.
+   * The rounded quotient cannot fall below the given coadds, which the check already found
+   * short of the target.
    */
-  def withMinimumIntegration(exposure: TimeSpan, coadds: PosInt): PosInt =
+  def coaddsForIntegrationTarget(exposure: TimeSpan, coadds: PosInt): PosInt =
     val exposureµs: Long = exposure.toMicroseconds
-    val floorµs: Long    = MinimumStepIntegration.toMicroseconds
-    if exposureµs <= 0 || exposureµs * coadds.value >= floorµs then coadds
+    val targetµs: Long   = StepIntegrationTarget.toMicroseconds
+    if exposureµs <= 0 || exposureµs * coadds.value >= targetµs then coadds
     else
-      val rounded: Int = (BigDecimal(floorµs) / exposureµs).setScale(0, RoundingMode.HALF_UP).toInt
+      val rounded: Int = (BigDecimal(targetµs) / exposureµs).setScale(0, RoundingMode.HALF_UP).toInt
       PosInt.from(rounded).getOrElse(coadds)
 
   /**
