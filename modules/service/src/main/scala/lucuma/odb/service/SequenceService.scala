@@ -450,11 +450,11 @@ object SequenceService:
         insertInstConfig: (rows: List[(Step.Id, D)]) => Command[rows.type]
       ): F[Unit] =
 
-        val atom: Pipe[F, Atom[D], Nothing] = atomStream =>
+        def atom(batch: Int): Pipe[F, Atom[D], Nothing] = atomStream =>
           atomStream
             .zipWithIndex
             .map { case (atom, idx) =>
-              (atom.id, observationId, sequenceType, instrument, idx.toInt, atom.description.map(_.value))
+              (atom.id, observationId, sequenceType, instrument, idx.toInt, atom.description.map(_.value), batch)
             }
             .chunkN(BatchSize)
             .evalMap { c =>
@@ -507,10 +507,14 @@ object SequenceService:
             }
             .drain
 
-        sequence
-          .broadcastThrough(atom, step, gcal, instrumentConfig)
-          .compile
-          .drain
+        // Every caller has already locked the t_sequence_materialization row
+        // (markMaterializedOrUpdate / markMaterializedOrDoNothing), so this
+        // statement sees the batches of any concurrent writer that committed.
+        session.unique(Statements.SelectNextAtomBatch)(observationId, sequenceType).flatMap: batch =>
+          sequence
+            .broadcastThrough(atom(batch), step, gcal, instrumentConfig)
+            .compile
+            .drain
 
       extension [D](p: ProtoStep[D])
         def toStep(sid: Step.Id, estimate: StepEstimate): Step[D] =
@@ -1121,7 +1125,9 @@ object SequenceService:
             case Instrument.Gnirs      => reset(instrument, Statements.GnirsTable,      replaceGnirsSequence(observationId, acquisition, _, customized = true))
             case _                     => Result.success(false).pure[F]
 
-        session.option(Statements.SelectIsCustomized)(observationId, acquisition).flatMap:
+        // Locking the materialization row keeps a concurrent replace from
+        // landing between reading the current batch and overwriting it.
+        session.option(Statements.SelectIsCustomizedForUpdate)(observationId, acquisition).flatMap:
           case Some(true) => observationService.selectInstrument(observationId).flatMap(_.fold(Result.success(false).pure[F])(resetInstrument))
           case _          => Result.success(false).pure[F]
 
@@ -1183,9 +1189,10 @@ object SequenceService:
       SequenceType,
       Instrument,
       Int,
-      Option[String]
+      Option[String],
+      Int
     )] =
-      atom_id *: observation_id *: sequence_type *: instrument *: int4 *: text.opt
+      atom_id *: observation_id *: sequence_type *: instrument *: int4 *: text.opt *: int4
 
     def insertAtoms(rows: List[(
       Atom.Id,
@@ -1193,7 +1200,8 @@ object SequenceService:
       SequenceType,
       Instrument,
       Int,
-      Option[String]
+      Option[String],
+      Int
     )]): Command[rows.type] =
       val enc = atom_row.values.list(rows)
       sql"""
@@ -1203,9 +1211,18 @@ object SequenceService:
           c_sequence_type,
           c_instrument,
           c_atom_index,
-          c_description
+          c_description,
+          c_batch
         ) VALUES $enc
       """.command
+
+    val SelectNextAtomBatch: Query[(Observation.Id, SequenceType), Int] =
+      sql"""
+        SELECT COALESCE(MAX(c_batch), 0) + 1
+        FROM   t_atom
+        WHERE  c_observation_id = $observation_id
+          AND  c_sequence_type  = $sequence_type
+      """.query(int4)
 
     private val step_row: Codec[(
       Step.Id,
@@ -1498,8 +1515,8 @@ object SequenceService:
       )
 
     /**
-     * Selects the most recently inserted batch of atoms, executed or not.
-     * Atoms inserted together share `c_created` (see V1346).
+     * Selects the most recently inserted batch of atoms, executed or not
+     * (see V1347 for `c_batch`).
      */
     def selectLatestSequence[D](
       table: DynamicTable[D]
@@ -1507,8 +1524,8 @@ object SequenceService:
       selectSequence(
         table,
         """
-          AND a.c_created = (
-            SELECT MAX(l.c_created)
+          AND a.c_batch = (
+            SELECT MAX(l.c_batch)
             FROM t_atom l
             WHERE l.c_observation_id = a.c_observation_id
               AND l.c_sequence_type  = a.c_sequence_type
@@ -1552,6 +1569,16 @@ object SequenceService:
         FROM   t_sequence_materialization
         WHERE  c_observation_id = $observation_id
           AND  c_sequence_type  = $sequence_type
+      """.query(bool)
+
+    /** `SelectIsCustomized`, holding the row lock that every sequence writer takes. */
+    val SelectIsCustomizedForUpdate: Query[(Observation.Id, SequenceType), Boolean] =
+      sql"""
+        SELECT c_customized
+        FROM   t_sequence_materialization
+        WHERE  c_observation_id = $observation_id
+          AND  c_sequence_type  = $sequence_type
+        FOR NO KEY UPDATE
       """.query(bool)
 
     val MarkMaterializedOrDoNothing: Query[(Observation.Id, SequenceType), Boolean] =
