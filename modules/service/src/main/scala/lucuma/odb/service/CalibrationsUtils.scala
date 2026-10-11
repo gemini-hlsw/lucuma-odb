@@ -160,13 +160,9 @@ object ObsExtract:
     tellurics:   CalibrationGroupTellurics
   ): CalibrationDigest =
     if role.isDefined || !modeRequiresTelluric(mode) then CalibrationDigest.Zero
-    else predictedTellurics(mode, scienceTime).fold(CalibrationDigest.Zero)(telluricEstimate(_, tellurics))
-
-  /** Tellurics over the science's lifetime: the user-defined count, else one set per scienceSpan. */
-  def predictedTellurics(mode: ObservingMode, scienceTime: TimeSpan): Option[NonNegInt] =
-    ObsExtract.modeTelluricType(mode) match
-      case Some(TelluricType.UserDefined(count)) => NonNegInt.unsafeFrom(count.value.value).some
-      case _                                     => telluricPerScience(mode).map(calibrationSets(_, scienceTime))
+    else
+      telluricPerScience(mode).fold(CalibrationDigest.Zero): scienceSpan =>
+        telluricEstimate(calibrationSets(scienceSpan, scienceTime), tellurics)
 
   /**
    * The science's telluric estimate, given the tellurics `count` predicted for

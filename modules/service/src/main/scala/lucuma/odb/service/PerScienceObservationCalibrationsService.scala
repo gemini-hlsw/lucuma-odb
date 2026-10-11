@@ -25,6 +25,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.TelluricCount
 import lucuma.core.util.TimeSpan
+import lucuma.core.util.Timestamp
 import lucuma.odb.data.AltairConfiguration
 import lucuma.odb.data.BlindOffsetType
 import lucuma.odb.data.Existence
@@ -69,9 +70,11 @@ object PerScienceObservationCalibrationsService:
     oid:         Observation.Id,
     order:       Option[TelluricCalibrationOrder],
     duration:    Option[TimeSpan],
-    visited:     Boolean,
+    lastVisit:   Option[Timestamp],
     userDefined: IsUserDefinedTelluric
-  )
+  ):
+    def visited: Boolean =
+      lastVisit.isDefined
 
   def instantiate[F[_]: {Concurrent as F, Tracer as T, Logger, Services as S}]: PerScienceObservationCalibrationsService[F] =
     new PerScienceObservationCalibrationsService[F] with CalibrationObservations with WorkflowStateQueries[F]:
@@ -194,22 +197,21 @@ object PerScienceObservationCalibrationsService:
             calibrationRole = CalibrationRole.Telluric.some
           ).orError
 
-      // `register` records the telluric's resolution row: a search request, or
-      // a user-defined placeholder.
       private def createTelluricObs(
         pid:           Program.Id,
         scienceOid:    Observation.Id,
         groupId:       Group.Id,
         telluricIndex: NonNegShort,
         order:         TelluricCalibrationOrder,
-        register:      (Observation.Id, TelluricCalibrationOrder) => F[Unit]
+        register:      (Observation.Id, TelluricCalibrationOrder) => F[Unit],
+        configure:     (Observation.Id, TelluricCalibrationOrder) => F[Unit]
       )(using Transaction[F], SuperUserAccess): F[Observation.Id] =
-        for {
+        for
           altair     <- selectAltair(scienceOid)
           telluricId <- insertTelluricObservation(pid, groupId, telluricIndex, altair.map(AltairConfiguration.forTelluric))
           _          <- register(telluricId, order)
-          _          <- syncConfiguration(pid, scienceOid, telluricId, CalibrationRole.Telluric)
-        } yield telluricId
+          _          <- configure(telluricId, order)
+        yield telluricId
 
       private def ordersFor(count: Int): List[TelluricCalibrationOrder] =
         if count > 1 then List(TelluricCalibrationOrder.Before, TelluricCalibrationOrder.After)
@@ -218,13 +220,16 @@ object PerScienceObservationCalibrationsService:
       private def requiredOrders(duration: TimeSpan): List[TelluricCalibrationOrder] =
         ordersFor(ObsExtract.telluricsForVisit(duration).value)
 
+      // `register` records the telluric's resolution row and `configure` fills
+      // in the observation once it exists.
       private def createTelluricCalibrations(
         pid:        Program.Id,
         scienceOid: Observation.Id,
         groupId:    Group.Id,
         orders:     List[TelluricCalibrationOrder]
       )(
-        register:   (Observation.Id, TelluricCalibrationOrder) => F[Unit]
+        register:   (Observation.Id, TelluricCalibrationOrder) => F[Unit],
+        configure:  (Observation.Id, TelluricCalibrationOrder) => F[Unit]
       )(using Transaction[F], SuperUserAccess): F[List[Observation.Id]] =
         def obsGroupIndex(scienceOid: Observation.Id): F[NonNegShort] =
           session
@@ -237,7 +242,7 @@ object PerScienceObservationCalibrationsService:
               case TelluricCalibrationOrder.Before => sciIdx
               case TelluricCalibrationOrder.After  =>
                 NonNegShort.unsafeFrom((sciIdx.value + 1).toShort)
-            createTelluricObs(pid, scienceOid, groupId, idx, order, register).map(created :+ _)
+            createTelluricObs(pid, scienceOid, groupId, idx, order, register, configure).map(created :+ _)
 
       private def createGeneratedTellurics(
         pid:        Program.Id,
@@ -245,13 +250,18 @@ object PerScienceObservationCalibrationsService:
         groupId:    Group.Id,
         duration:   TimeSpan
       )(using Transaction[F], SuperUserAccess): F[List[Observation.Id]] =
-        createTelluricCalibrations(pid, scienceOid, groupId, requiredOrders(duration)):
-          (tid, order) => telluricTargetsService.requestTelluricTarget(pid, tid, scienceOid, duration, order)
+        createTelluricCalibrations(pid, scienceOid, groupId, requiredOrders(duration))(
+          (tid, order) => telluricTargetsService.requestTelluricTarget(pid, tid, scienceOid, duration, order),
+          (tid, _)     => syncConfiguration(pid, scienceOid, tid, CalibrationRole.Telluric)
+        )
 
       /**
        * The user's tellurics are never resynced or searched for: the set is only
        * reconciled by order, converting generated ones in place so they keep
-       * their star, and adding empty ones for the orders still missing.
+       * their star, and adding the orders still missing. A missing order is
+       * cloned from the most recently observed user-defined telluric of that
+       * order, star and configuration included, so every visit gets the PI's
+       * standard again; with none observed yet it starts empty.
        */
       private def syncUserDefinedTellurics(
         pid:        Program.Id,
@@ -264,9 +274,19 @@ object PerScienceObservationCalibrationsService:
           telluricTargetsService.markUserDefined(tid) *>
             syncConfiguration(pid, scienceOid, tid, CalibrationRole.Telluric)
 
+        def register(tid: Observation.Id, order: TelluricCalibrationOrder): F[Unit] =
+          telluricTargetsService.registerUserDefinedTelluric(pid, tid, scienceOid, order)
+
+        def configure(spent: List[GroupTelluric])(tid: Observation.Id, order: TelluricCalibrationOrder): F[Unit] =
+          spent
+            .filter(_.order.contains(order))
+            .maximumByOption(_.lastVisit)
+            .fold(syncConfiguration(pid, scienceOid, tid, CalibrationRole.Telluric))(s => cloneUserDefinedTelluric(s.oid, tid))
+
         for
           tellurics    <- findGroupTellurics(gid)
           unobserved    = tellurics.filterNot(_.visited)
+          spent         = tellurics.filter(t => t.visited && t.userDefined.value)
           required      = ordersFor(count.value.value)
           (keep, drop)  = unobserved.partition(_.order.exists(required.contains))
           toDelete      = drop.map(_.oid)
@@ -274,9 +294,29 @@ object PerScienceObservationCalibrationsService:
           toCreate      = required.filterNot(o => keep.exists(_.order.contains(o)))
           _            <- NonEmptyList.fromList(toDelete).traverse_(observationService.deleteCalibrationObservations)
           _            <- toConvert.traverse_(convert)
-          created      <- createTelluricCalibrations(pid, scienceOid, gid, toCreate):
-                            (tid, order) => telluricTargetsService.registerUserDefinedTelluric(pid, tid, scienceOid, order)
+          created      <- createTelluricCalibrations(pid, scienceOid, gid, toCreate)(register, configure(spent))
         yield (created, toDelete)
+
+      // The clone is the spent telluric as the PI left it: observation properties,
+      // observing mode with its exposure time modes, and asterism.
+      private def cloneUserDefinedTelluric(
+        sourceOid: Observation.Id,
+        targetOid: Observation.Id
+      )(using Transaction[F], SuperUserAccess): F[Unit] =
+        val modeQuery = Statements.selectObservingModeTypes(NonEmptyList.one(sourceOid))
+        for
+          mode   <- session
+                      .prepareR(modeQuery.fragment.query(observation_id *: observing_mode_type.opt))
+                      .use(_.unique(modeQuery.argument))
+                      .map(_._2)
+          altair <- selectAltair(sourceOid)
+          _      <- session.executeCommand(Statements.syncObservationConfiguration(sourceOid, targetOid))
+          _      <- session.execute(Statements.updateAltair)(altair, targetOid)
+          _      <- mode.traverse_ : m =>
+                      session.execute(Statements.updateObservingModeType)(m.some, m.instrumentOption, targetOid) *>
+                        observingModeServices.clone(m, sourceOid, targetOid)
+          _      <- asterismService.cloneAsterism(sourceOid, targetOid)
+        yield ()
 
       private def readObsCalibrationGroup(
         pid:  Program.Id,
@@ -978,7 +1018,7 @@ object PerScienceObservationCalibrationsService:
             SELECT o.c_observation_id,
                    r.c_calibration_order,
                    r.c_science_duration,
-                   EXISTS (SELECT 1 FROM t_visit v WHERE v.c_observation_id = o.c_observation_id),
+                   (SELECT max(v.c_effective_time) FROM t_visit v WHERE v.c_observation_id = o.c_observation_id),
                    o.c_is_user_defined_telluric
             FROM   t_observation o
             LEFT JOIN t_telluric_resolution r ON r.c_observation_id = o.c_observation_id
@@ -986,7 +1026,7 @@ object PerScienceObservationCalibrationsService:
               AND  o.c_calibration_role = $calibration_role
             ORDER BY o.c_group_index
           """.query(
-            observation_id *: telluric_calibration_order.opt *: time_span.opt *: skunk.codec.boolean.bool *: is_user_defined_telluric
+            observation_id *: telluric_calibration_order.opt *: time_span.opt *: core_timestamp.opt *: is_user_defined_telluric
           ).to[GroupTelluric]
 
         val selectScienceObservationIndex: Query[Observation.Id, NonNegShort] =
