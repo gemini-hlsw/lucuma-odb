@@ -4177,7 +4177,7 @@ class perScienceObservationCalibrations
       assertEquals(swapped.targetId, Some(standard))
       assertEquals(fpu, Flamingos2Fpu.LongSlit4.some)
 
-  test("a spent user-defined telluric is replaced by a clone of itself"):
+  test("the next visit gets a clone of the spent user-defined telluric"):
     for
       pid       <- createProgramAs(pi)
       tid       <- createTargetWithProfileAs(pi, pid)
