@@ -91,27 +91,31 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
 
     case (ExecutionType, "atomRecords", List(
       PosIntBinding.Option("OFFSET", rOFFSET),
+      BooleanBinding("OFFSET_INCLUDE", rOFFSET_INCLUDE),
       NonNegIntBinding.Option("LIMIT", rLIMIT)
     )) =>
-      selectWithOffsetAndLimit(rOFFSET, rLIMIT, AtomRecordType, "index", Predicates.atomRecord.index, Predicates.atomRecord.observation.program)
+      selectWithOffsetAndLimit(rOFFSET, rOFFSET_INCLUDE, rLIMIT, AtomRecordType, "index", Predicates.atomRecord.index, Predicates.atomRecord.observation.program)
 
     case (ExecutionType, "datasets", List(
       DatasetIdBinding.Option("OFFSET", rOFFSET),
+      BooleanBinding("OFFSET_INCLUDE", rOFFSET_INCLUDE),
       NonNegIntBinding.Option("LIMIT", rLIMIT)
     )) =>
-      selectWithOffsetAndLimit(rOFFSET, rLIMIT, DatasetType, "id", Predicates.dataset.id, Predicates.dataset.observation.program)
+      selectWithOffsetAndLimit(rOFFSET, rOFFSET_INCLUDE, rLIMIT, DatasetType, "id", Predicates.dataset.id, Predicates.dataset.observation.program)
 
     case (ExecutionType, "events", List(
       ExecutionEventIdBinding.Option("OFFSET", rOFFSET),
+      BooleanBinding("OFFSET_INCLUDE", rOFFSET_INCLUDE),
       NonNegIntBinding.Option("LIMIT", rLIMIT)
     )) =>
-      selectWithOffsetAndLimit(rOFFSET, rLIMIT, ExecutionEventType, "id", Predicates.executionEvent.id, Predicates.executionEvent.observation.program)
+      selectWithOffsetAndLimit(rOFFSET, rOFFSET_INCLUDE, rLIMIT, ExecutionEventType, "id", Predicates.executionEvent.id, Predicates.executionEvent.observation.program)
 
     case (ExecutionType, "visits", List(
       VisitIdBinding.Option("OFFSET", rOFFSET),
+      BooleanBinding("OFFSET_INCLUDE", rOFFSET_INCLUDE),
       NonNegIntBinding.Option("LIMIT", rLIMIT)
     )) =>
-      selectWithOffsetAndLimit(rOFFSET, rLIMIT, VisitType, "id", Predicates.visit.id, Predicates.visit.observation.program)
+      selectWithOffsetAndLimit(rOFFSET, rOFFSET_INCLUDE, rLIMIT, VisitType, "id", Predicates.visit.id, Predicates.visit.observation.program)
 
   }
 

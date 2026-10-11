@@ -6,6 +6,7 @@ package query
 
 import cats.effect.IO
 import cats.syntax.all.*
+import io.circe.ACursor
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
@@ -102,6 +103,83 @@ class targets extends OdbSuite {
         )
       }
     }
+  }
+
+  test("target selection with offset excluded") {
+    createProgramAs(pi).flatMap { pid =>
+      createTargetAs(pi, pid).replicateA(10).flatMap { tids =>
+        expect(
+          user = pi,
+          query = s"""
+            query {
+              targets(
+                WHERE: {
+                  program: {
+                    id: { EQ: "$pid" }
+                  }
+                }
+                OFFSET: ${tids(3).asJson}
+                OFFSET_INCLUDE: false
+                LIMIT: 3
+              ) {
+                hasMore
+                matches {
+                  id
+                }
+              }
+            }
+          """,
+          expected =
+            Right(Json.obj(
+              "targets" -> Json.obj(
+                "hasMore" -> Json.True,
+                "matches" -> Json.fromValues(
+                    tids.drop(4).take(3).map { id =>
+                      Json.obj("id" -> id.asJson)
+                    }
+                )
+              )
+            )
+          )
+        )
+      }
+    }
+  }
+
+  test("target paging one at a time with offset excluded") {
+    def page(pid: Program.Id, offset: Option[Target.Id]): IO[(List[Target.Id], Boolean)] =
+      query(
+        user  = pi,
+        query = s"""
+          query {
+            targets(
+              WHERE: { program: { id: { EQ: "$pid" } } }
+              ${offset.fold("")(o => s"OFFSET: ${o.asJson}")}
+              OFFSET_INCLUDE: false
+              LIMIT: 1
+            ) {
+              hasMore
+              matches { id }
+            }
+          }
+        """
+      ).map: json =>
+        val c: ACursor = json.hcursor.downField("targets")
+        (
+          c.downField("matches").values.toList.flatten.flatMap(_.hcursor.downField("id").as[Target.Id].toOption),
+          c.downField("hasMore").as[Boolean].getOrElse(false)
+        )
+
+    def drain(pid: Program.Id, offset: Option[Target.Id], acc: List[Target.Id]): IO[List[Target.Id]] =
+      page(pid, offset).flatMap:
+        case (ids, true)  => drain(pid, ids.lastOption, acc ++ ids)
+        case (ids, false) => IO.pure(acc ++ ids)
+
+    for
+      pid  <- createProgramAs(pi)
+      tids <- createTargetAs(pi, pid).replicateA(4)
+      all  <- drain(pid, None, Nil)
+    yield assertEquals(all, tids)
   }
 
   test("target selection with offset and limit") {

@@ -150,16 +150,17 @@ trait ProgramMapping[F[_]]
     case (ProgramType, "observations", List(
       BooleanBinding("includeDeleted", rIncludeDeleted),
       ObservationIdBinding.Option("OFFSET", rOFFSET),
+      BooleanBinding("OFFSET_INCLUDE", rOFFSET_INCLUDE),
       NonNegIntBinding.Option("LIMIT", rLIMIT),
     )) =>
       Elab.transformChild { child =>
-        (rIncludeDeleted, rOFFSET, rLIMIT).parTupled.flatMap { (includeDeleted, OFFSET, lim) =>
+        (rIncludeDeleted, rOFFSET, rOFFSET_INCLUDE, rLIMIT).parTupled.flatMap { (includeDeleted, OFFSET, OFFSET_INCLUDE, lim) =>
           val limit = lim.fold(ResultMapping.MaxLimit)(_.value)
           ResultMapping.selectResult(child, limit) { q =>
             FilterOrderByOffsetLimit(
               pred = Some(and(List(
                 Predicates.observation.existence.includeDeleted(includeDeleted),
-                OFFSET.fold[Predicate](True)(Predicates.observation.id.gtEql)
+                Predicates.observation.id.offset(OFFSET, OFFSET_INCLUDE)
               ))),
               oss = Some(List(OrderSelection[Observation.Id](ObservationType / "id", true, true))),
               offset = None,
@@ -172,15 +173,16 @@ trait ProgramMapping[F[_]]
 
     case (ProgramType, "configurationRequests", List(
       ConfigurationRequestIdBinding.Option("OFFSET", rOFFSET),
+      BooleanBinding("OFFSET_INCLUDE", rOFFSET_INCLUDE),
       NonNegIntBinding.Option("LIMIT", rLIMIT),
     )) =>
       Elab.transformChild { child =>
-        (rOFFSET, rLIMIT).parTupled.flatMap { (OFFSET, lim) =>
+        (rOFFSET, rOFFSET_INCLUDE, rLIMIT).parTupled.flatMap { (OFFSET, OFFSET_INCLUDE, lim) =>
           val limit = lim.fold(ResultMapping.MaxLimit)(_.value)
           ResultMapping.selectResult(child, limit) { q =>
             FilterOrderByOffsetLimit(
               pred = Some(
-                OFFSET.fold[Predicate](True)(Predicates.configurationRequest.id.gtEql)
+                Predicates.configurationRequest.id.offset(OFFSET, OFFSET_INCLUDE)
               ),
               oss = Some(List(OrderSelection[ConfigurationRequest.Id](ConfigurationRequestType / "id", true, true))),
               offset = None,

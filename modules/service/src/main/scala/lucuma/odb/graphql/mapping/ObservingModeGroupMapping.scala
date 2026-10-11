@@ -6,8 +6,6 @@ package mapping
 
 import cats.syntax.option.*
 import cats.syntax.parallel.*
-import grackle.Predicate
-import grackle.Predicate.True
 import grackle.Predicate.and
 import grackle.Query.*
 import grackle.QueryCompiler.Elab
@@ -39,16 +37,17 @@ trait ObservingModeGroupMapping[F[_]]
     case (ObservingModeGroupType, "observations", List(
       BooleanBinding("includeDeleted", rIncludeDeleted),
       ObservationIdBinding.Option("OFFSET", rOFFSET),
+      BooleanBinding("OFFSET_INCLUDE", rOFFSET_INCLUDE),
       NonNegIntBinding.Option("LIMIT", rLIMIT)
     )) =>
       Elab.transformChild: child =>
-        (rIncludeDeleted, rOFFSET, rLIMIT).parTupled.flatMap: (includeDeleted, OFFSET, lim) =>
+        (rIncludeDeleted, rOFFSET, rOFFSET_INCLUDE, rLIMIT).parTupled.flatMap: (includeDeleted, OFFSET, OFFSET_INCLUDE, lim) =>
           val limit = lim.fold(ResultMapping.MaxLimit)(_.value)
           ResultMapping.selectResult(child, limit): q =>
             FilterOrderByOffsetLimit(
               pred = and(List(
                 Predicates.observation.existence.includeDeleted(includeDeleted),
-                OFFSET.fold[Predicate](True)(Predicates.observation.id.gtEql)
+                Predicates.observation.id.offset(OFFSET, OFFSET_INCLUDE)
               )).some,
               oss    = List(OrderSelection[Observation.Id](ObservationType / "id", true, true)).some,
               offset = none,

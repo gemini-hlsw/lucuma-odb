@@ -333,9 +333,12 @@ type AtomRecord {
   "Recorded steps associated with this atom, ordered by execution order."
   steps(
     """
-    Starts the result set at this index.
+    Starts the result set at this index. Indices are unique within the observation.
     """
     OFFSET: PosInt
+
+    "Whether the result set includes the `OFFSET` value itself."
+    OFFSET_INCLUDE: Boolean! = true
 
     "Limits the result to at most this number of matches (but never more than 1000)."
     LIMIT: NonNegInt
@@ -7860,9 +7863,12 @@ type AsterismGroup {
     includeDeleted: Boolean! = false
 
     """
-    Starts the result set at (or after if not existent) the given observation id.
+    Starts the result set at (or after if not existent) the given observation id. The id is unique.
     """
     OFFSET: ObservationId
+
+    "Whether the result set includes the `OFFSET` value itself."
+    OFFSET_INCLUDE: Boolean! = true
 
     """
     Limits the result to at most this number of matches (but never more than 1000).
@@ -8794,9 +8800,12 @@ type ConstraintSetGroup {
     includeDeleted: Boolean! = false
 
     """
-    Starts the result set at (or after if not existent) the given observation id.
+    Starts the result set at (or after if not existent) the given observation id. The id is unique.
     """
     OFFSET: ObservationId
+
+    "Whether the result set includes the `OFFSET` value itself."
+    OFFSET_INCLUDE: Boolean! = true
 
     """
     Limits the result to at most this number of matches (but never more than 1000).
@@ -8941,8 +8950,11 @@ type Dataset {
 
   "Events associated with the dataset."
   events(
-    "Starts the result set at (or after if not existent) the given execution event id."
+    "Starts the result set at (or after if not existent) the given execution event id. The id is unique."
     OFFSET: ExecutionEventId
+
+    "Whether the result set includes the `OFFSET` value itself."
+    OFFSET_INCLUDE: Boolean! = true
 
     "Limits the result to at most this number of matches (but never more than 1000)."
     LIMIT: NonNegInt
@@ -9412,9 +9424,12 @@ type Execution {
   atomRecords(
     """
     Starts the result set at the given step (execution) index -- atom indices
-    are the index of the first contained step.
+    are the index of the first contained step. Indices are unique within the observation.
     """
     OFFSET: PosInt
+
+    "Whether the result set includes the `OFFSET` value itself."
+    OFFSET_INCLUDE: Boolean! = true
 
     "Limits the result to at most this number of matches (but never more than 1000)."
     LIMIT: NonNegInt
@@ -9422,8 +9437,11 @@ type Execution {
 
   "Datasets associated with the observation, across all visits."
   datasets(
-    "Starts the result set at (or after if not existent) the given dataset id."
+    "Starts the result set at (or after if not existent) the given dataset id. The id is unique."
     OFFSET: DatasetId
+
+    "Whether the result set includes the `OFFSET` value itself."
+    OFFSET_INCLUDE: Boolean! = true
 
     "Limits the result to at most this number of matches (but never more than 1000)."
     LIMIT: NonNegInt
@@ -9431,8 +9449,11 @@ type Execution {
 
   "Events associated with the observation, across all visits."
   events(
-    "Starts the result set at (or after if not existent) the given execution event id."
+    "Starts the result set at (or after if not existent) the given execution event id. The id is unique."
     OFFSET: ExecutionEventId
+
+    "Whether the result set includes the `OFFSET` value itself."
+    OFFSET_INCLUDE: Boolean! = true
 
     "Limits the result to at most this number of matches (but never more than 1000)."
     LIMIT: NonNegInt
@@ -9440,8 +9461,11 @@ type Execution {
 
   "Visits associated with the observation."
   visits(
-    "Starts the result set at (or after if not existent) the given visit id."
+    "Starts the result set at (or after if not existent) the given visit id. The id is unique."
     OFFSET: VisitId
+
+    "Whether the result set includes the `OFFSET` value itself."
+    OFFSET_INCLUDE: Boolean! = true
 
     "Limits the result to at most this number of matches (but never more than 1000)."
     LIMIT: NonNegInt
@@ -18100,9 +18124,12 @@ type Program {
     includeDeleted: Boolean! = false
 
     """
-    Starts the result set at (or after if not existent) the given observation id.
+    Starts the result set at (or after if not existent) the given observation id. The id is unique.
     """
     OFFSET: ObservationId
+
+    "Whether the result set includes the `OFFSET` value itself."
+    OFFSET_INCLUDE: Boolean! = true
 
     """
     Limits the result to at most this number of matches (but never more than 1000).
@@ -18115,9 +18142,12 @@ type Program {
   """
   configurationRequests(
     """
-    Starts the result set at (or after if not existent) the given configuration request id.
+    Starts the result set at (or after if not existent) the given configuration request id. The id is unique.
     """
     OFFSET: ConfigurationRequestId
+
+    "Whether the result set includes the `OFFSET` value itself."
+    OFFSET_INCLUDE: Boolean! = true
 
     """
     Limits the result to at most this number of matches (but never more than 1000).
@@ -18631,8 +18661,11 @@ type Query {
     "Filters the selection of calls for proposals."
     WHERE: WhereCallForProposals
 
-    "Starts the result set at (or after if not existent) the given id."
+    "Starts the result set at (or after if not existent) the given id. The id is unique."
     OFFSET: CallForProposalsId
+
+    "Whether the result set includes the `OFFSET` value itself."
+    OFFSET_INCLUDE: Boolean! = true
 
     "Limits the result to at most this number of matches (but never more than 1000)."
     LIMIT: NonNegInt
@@ -18696,9 +18729,12 @@ type Query {
     WHERE: WhereDataset
 
     """
-    Starts the result set at (or after if not existent) the given dataset id.
+    Starts the result set at (or after if not existent) the given dataset id. The id is unique.
     """
     OFFSET: DatasetId
+
+    "Whether the result set includes the `OFFSET` value itself."
+    OFFSET_INCLUDE: Boolean! = true
 
     """
     Limits the result to at most this number of matches (but never more than 1000).
@@ -18718,9 +18754,12 @@ type Query {
     WHERE: WhereDatasetChronicleEntry
 
     """
-    Starts the result set at (or after if not existent) the given id.
+    Starts the result set at (or after if not existent) the given id. The id is unique.
     """
     OFFSET: ChronicleId
+
+    "Whether the result set includes the `OFFSET` value itself."
+    OFFSET_INCLUDE: Boolean! = true
 
     """
     Limits the result to at most this number of matches (but never more than 1000).
@@ -18738,9 +18777,12 @@ type Query {
     WHERE: WhereExecutionEvent
 
     """
-    Starts the result set at (or after if not existent) the given execution event id.
+    Starts the result set at (or after if not existent) the given execution event id. The id is unique.
     """
     OFFSET: ExecutionEventId
+
+    "Whether the result set includes the `OFFSET` value itself."
+    OFFSET_INCLUDE: Boolean! = true
 
     """
     Limits the result to at most this number of matches (but never more than 1000).
@@ -18809,9 +18851,12 @@ type Query {
     WHERE: WhereObservation
 
     """
-    Starts the result set at (or after if not existent) the given observation id.
+    Starts the result set at (or after if not existent) the given observation id. The id is unique.
     """
     OFFSET: ObservationId
+
+    "Whether the result set includes the `OFFSET` value itself."
+    OFFSET_INCLUDE: Boolean! = true
 
     """
     Limits the result to at most this number of matches (but never more than 1000).
@@ -18834,9 +18879,12 @@ type Query {
     WHERE: WhereConfigurationRequest
 
     """
-    Starts the result set at (or after if not existent) the given observation id.
+    Starts the result set at (or after if not existent) the given observation id. The id is unique.
     """
     OFFSET: ConfigurationRequestId
+
+    "Whether the result set includes the `OFFSET` value itself."
+    OFFSET_INCLUDE: Boolean! = true
 
     """
     Limits the result to at most this number of matches (but never more than 1000).
@@ -18903,9 +18951,12 @@ type Query {
     WHERE: WhereProgram
 
     """
-    Starts the result set at (or after if not existent) the given program id.
+    Starts the result set at (or after if not existent) the given program id. The id is unique.
     """
     OFFSET: ProgramId
+
+    "Whether the result set includes the `OFFSET` value itself."
+    OFFSET_INCLUDE: Boolean! = true
 
     """
     Limits the result to at most this number of matches (but never more than 1000).
@@ -18929,8 +18980,11 @@ type Query {
     "Filters the select of program notes."
     WHERE: WhereProgramNote
 
-    "Starts the result set at (or after if no existent) the given note id."
+    "Starts the result set at (or after if no existent) the given note id. The id is unique."
     OFFSET: ProgramNoteId
+
+    "Whether the result set includes the `OFFSET` value itself."
+    OFFSET_INCLUDE: Boolean! = true
 
     "Limits the result to at most this number of matches (but never more than 1000)."
     LIMIT: NonNegInt
@@ -18947,8 +19001,11 @@ type Query {
     "Filters the selected triggers."
     WHERE: WhereTooTrigger
 
-    "Starts the result set at (or after, if no exact match) the given trigger id."
+    "Starts the result set at (or after, if no exact match) the given trigger id. The id is unique."
     OFFSET: TooTriggerId
+
+    "Whether the result set includes the `OFFSET` value itself."
+    OFFSET_INCLUDE: Boolean! = true
 
     "Limits the result to at most this number of matches (but never more than 1000)."
     LIMIT: NonNegInt
@@ -18959,8 +19016,11 @@ type Query {
     "Filters the selection of chronicle entries."
     WHERE: WhereTooTriggerChronicleEntry
 
-    "Starts the result set at (or after, if not existent) the given id."
+    "Starts the result set at (or after, if not existent) the given id. The id is unique."
     OFFSET: ChronicleId
+
+    "Whether the result set includes the `OFFSET` value itself."
+    OFFSET_INCLUDE: Boolean! = true
 
     "Limits the result to at most this number of matches (but never more than 1000)."
     LIMIT: NonNegInt
@@ -18974,8 +19034,17 @@ type Query {
     "Filters the selection of program users."
     WHERE: WhereProgramUser
 
-    "Starts the result set at (or after if not existent) the given user id."
+    """
+    Starts the result set at (or after if not existent) the given user id. User
+    ids are not unique here, since a user has one entry per program: with
+    `OFFSET_INCLUDE: false` the remaining entries of that user are skipped, and
+    with `OFFSET_INCLUDE: true` all of them are repeated. Entries without a user
+    are never returned when `OFFSET` is set.
+    """
     OFFSET: UserId
+
+    "Whether the result set includes the `OFFSET` value itself."
+    OFFSET_INCLUDE: Boolean! = true
 
     """
     Limits the result to at most this number of matches (but never more than
@@ -19070,9 +19139,12 @@ type Query {
     WHERE: WhereTarget
 
     """
-    Starts the result set at (or after if not existent) the given target id.
+    Starts the result set at (or after if not existent) the given target id. The id is unique.
     """
     OFFSET: TargetId
+
+    "Whether the result set includes the `OFFSET` value itself."
+    OFFSET_INCLUDE: Boolean! = true
 
     """
     Limits the result to at most this number of matches (but never more than 1000).
@@ -19244,9 +19316,12 @@ type ObservingModeGroup {
     includeDeleted: Boolean! = false
 
     """
-    Starts the result set at (or after if not existent) the given observation id.
+    Starts the result set at (or after if not existent) the given observation id. The id is unique.
     """
     OFFSET: ObservationId
+
+    "Whether the result set includes the `OFFSET` value itself."
+    OFFSET_INCLUDE: Boolean! = true
 
     """
     Limits the result to at most this number of matches (but never more than 1000).
@@ -19368,9 +19443,12 @@ type ScienceRequirementsGroup {
     includeDeleted: Boolean! = false
 
     """
-    Starts the result set at (or after if not existent) the given observation id.
+    Starts the result set at (or after if not existent) the given observation id. The id is unique.
     """
     OFFSET: ObservationId
+
+    "Whether the result set includes the `OFFSET` value itself."
+    OFFSET_INCLUDE: Boolean! = true
 
     """
     Limits the result to at most this number of matches (but never more than 1000).
@@ -20965,8 +21043,11 @@ type StepRecord {
 
   "Datasets associated with this step."
   datasets(
-    "Starts the result set at (or after if not existent) the given dataset id."
+    "Starts the result set at (or after if not existent) the given dataset id. The id is unique."
     OFFSET: DatasetId
+
+    "Whether the result set includes the `OFFSET` value itself."
+    OFFSET_INCLUDE: Boolean! = true
 
     "Limits the result to at most this number of matches (but never more than 1000)."
     LIMIT: NonNegInt
@@ -20974,8 +21055,11 @@ type StepRecord {
 
   "Execution events associated with this step."
   events(
-    "Starts the result set at (or after if not existent) the given execution event id."
+    "Starts the result set at (or after if not existent) the given execution event id. The id is unique."
     OFFSET: ExecutionEventId
+
+    "Whether the result set includes the `OFFSET` value itself."
+    OFFSET_INCLUDE: Boolean! = true
 
     "Limits the result to at most this number of matches (but never more than 1000)."
     LIMIT: NonNegInt
@@ -21469,9 +21553,12 @@ type TargetGroup {
     includeDeleted: Boolean! = false
 
     """
-    Starts the result set at (or after if not existent) the given observation id.
+    Starts the result set at (or after if not existent) the given observation id. The id is unique.
     """
     OFFSET: ObservationId
+
+    "Whether the result set includes the `OFFSET` value itself."
+    OFFSET_INCLUDE: Boolean! = true
 
     """
     Limits the result to at most this number of matches (but never more than 1000).
@@ -21912,9 +21999,12 @@ type Visit {
   atomRecords(
     """
     Starts the result set at the given step index.  The atom record index is the
-    index of its first contained step.
+    index of its first contained step. Indices are unique within the observation.
     """
     OFFSET: PosInt
+
+    "Whether the result set includes the `OFFSET` value itself."
+    OFFSET_INCLUDE: Boolean! = true
 
     "Limits the result to at most this number of matches (but never more than 1000)."
     LIMIT: NonNegInt
@@ -21922,8 +22012,11 @@ type Visit {
 
   "Datasets associated with this visit."
   datasets(
-    "Starts the result set at (or after if not existent) the given dataset id."
+    "Starts the result set at (or after if not existent) the given dataset id. The id is unique."
     OFFSET: DatasetId
+
+    "Whether the result set includes the `OFFSET` value itself."
+    OFFSET_INCLUDE: Boolean! = true
 
     "Limits the result to at most this number of matches (but never more than 1000)."
     LIMIT: NonNegInt
@@ -21931,8 +22024,11 @@ type Visit {
 
   "Execution events associated with this visit."
   events(
-    "Starts the result set at (or after if not existent) the given execution event id."
+    "Starts the result set at (or after if not existent) the given execution event id. The id is unique."
     OFFSET: ExecutionEventId
+
+    "Whether the result set includes the `OFFSET` value itself."
+    OFFSET_INCLUDE: Boolean! = true
 
     "Limits the result to at most this number of matches (but never more than 1000)."
     LIMIT: NonNegInt
