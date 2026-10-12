@@ -370,7 +370,7 @@ class reference extends OdbSuite with query.ExecutionTestSupportForGmos {
       pid  <- createProgramWithUsPi(pi)
       _    <- addExchangeProposal(pid, cid, s"keck: { $exchangeSplits }")
       _    <- addCoisAs(pi, pid)
-      _    <- addDefinedObservationAs(pi, pid)
+      _    <- addDefinedExchangeObservationAs(pi, pid, "keckInstrument: HIRES, totalRequestTime: { hours: 1 }")
       refP <- submitProposal(pi, pid)
       refG <- acceptProposal(staff, pid)
       _    <- expect(pi, s"""
@@ -408,7 +408,7 @@ class reference extends OdbSuite with query.ExecutionTestSupportForGmos {
       pid  <- createProgramWithUsPi(pi)
       _    <- addExchangeProposal(pid, cid, s"subaru: { $exchangeSplits }")
       _    <- addCoisAs(pi, pid)
-      _    <- addDefinedObservationAs(pi, pid)
+      _    <- addDefinedExchangeObservationAs(pi, pid, "subaruInstrument: HSC, totalRequestTime: { hours: 1 }")
       refP <- submitProposal(pi, pid)
       refG <- acceptProposal(staff, pid)
       _    <- expect(pi, s"""
@@ -445,7 +445,7 @@ class reference extends OdbSuite with query.ExecutionTestSupportForGmos {
       pid  <- createProgramWithUsPi(pi)
       _    <- addExchangeProposal(pid, cid, s"subaru: { $exchangeSplits }")
       _    <- addCoisAs(pi, pid)
-      _    <- addDefinedObservationAs(pi, pid)
+      _    <- addDefinedExchangeObservationAs(pi, pid, "subaruInstrument: HSC, totalRequestTime: { hours: 1 }")
       refP <- submitProposal(pi, pid)
       refG <- acceptProposal(staff, pid)
     } yield assertEquals(refG.map(_.label), s"${refP.label}-U".some)

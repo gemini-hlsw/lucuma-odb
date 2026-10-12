@@ -6,9 +6,14 @@ package validator
 
 import cats.syntax.all.*
 import lucuma.core.enums.Instrument
+import lucuma.core.enums.Observatory
 import lucuma.core.model.ObservationValidation
 import lucuma.odb.data.ObservationValidationMap
 
+// A Gemini call with no instruments listed places no restriction on them.  An
+// exchange (Keck/Subaru) call offers no Gemini instruments at all, so any Gemini
+// instrument in a proposal for one is invalid.  Exchange observations have no
+// Gemini instrument and are checked by ExchangeValidator instead.
 object CfpInstrumentValidator extends ObservationValidator:
 
   def invalidInstrument(instr: Instrument): String =
@@ -16,7 +21,7 @@ object CfpInstrumentValidator extends ObservationValidator:
 
   def apply(info: ObservationValidationInfo): ObservationValidationMap =
     info.cfpInfo.foldMap: cfp =>
-      if cfp.instruments.isEmpty then ObservationValidationMap.empty // weird but original logic does this
+      if cfp.observatory === Observatory.Gemini && cfp.instruments.isEmpty then ObservationValidationMap.empty
       else info.instrument.foldMap: inst =>
         if cfp.instruments.contains(inst) then ObservationValidationMap.empty
         else ObservationValidationMap.singleton(ObservationValidation.callForProposalsError(invalidInstrument(inst)))

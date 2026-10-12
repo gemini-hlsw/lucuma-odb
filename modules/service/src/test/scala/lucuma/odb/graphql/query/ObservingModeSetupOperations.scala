@@ -36,6 +36,18 @@ trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =
       _   <- computeItcResultAs(user, oid)
     yield (tid, oid)
 
+  /**
+   * As `addDefinedObservationAs`, but an exchange observation for a Keck or
+   * Subaru proposal, which may not contain Gemini instruments.  `exchange` is the
+   * body of the `exchange` observing mode input, for example
+   * `keckInstrument: HIRES, totalRequestTime: { hours: 1 }`.
+   */
+  def addDefinedExchangeObservationAs(user: User, pid: Program.Id, exchange: String): IO[(Target.Id, Observation.Id)] =
+    for
+      tid <- createTargetWithProfileAs(user, pid)
+      oid <- createObservationWithModeAs(user, pid, List(tid), s"exchange: { $exchange }")
+    yield (tid, oid)
+
   private def formatExplicitTelescopeConfigsInput(arcsecs: List[Int]): String =
     arcsecs
       .map(a => s"{ q: { arcseconds: $a }, guiding: ENABLED }")

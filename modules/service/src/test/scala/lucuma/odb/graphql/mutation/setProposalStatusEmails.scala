@@ -163,7 +163,7 @@ class setProposalStatusEmails extends OdbSuite with query.ObservingModeSetupOper
       // A US PI, since a Subaru call has no deadline for a non-partner.
       pid <- createProgramWithUsPi(pi)
       _   <- createSubaruProposal(pid, cid)
-      _   <- addDefinedObservationAs(pi, pid)
+      _   <- addDefinedExchangeObservationAs(pi, pid, "subaruInstrument: HSC, totalRequestTime: { hours: 1 }")
       _   <- submitProposal(pi, pid)
       _   <- assertRecipients(pid, List(piAddress))
     } yield ()
