@@ -1157,7 +1157,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                 }) {
                   observation {
                     observingMode {
-                      gnirsSpectroscopy { telluricType { tag starTypes } }
+                      gnirsSpectroscopy { telluricType { tag starTypes count } }
                     }
                   }
                 }
@@ -1169,7 +1169,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                 "observation": {
                   "observingMode": {
                     "gnirsSpectroscopy": {
-                      "telluricType": { "tag": "HOT", "starTypes": null }
+                      "telluricType": { "tag": "HOT", "starTypes": null, "count": null }
                     }
                   }
                 }
