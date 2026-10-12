@@ -25,6 +25,7 @@ import lucuma.odb.data.AltairConfiguration
 import lucuma.odb.data.Md5Hash
 import lucuma.odb.data.arb.ArbMd5Hash
 import lucuma.odb.service.GuideService.ObservationInfo
+import lucuma.odb.service.GuideService.SearchTargets
 import munit.ScalaCheckSuite
 import org.scalacheck.Prop.*
 
@@ -39,6 +40,8 @@ class GuideServiceGuideStarHash extends ScalaCheckSuite {
   import ArbTimeSpan.given
   import ArbTimestamp.given
 
+  val NoTargets: SearchTargets = SearchTargets(Nil, None)
+
   test("hashes equal for info equal with different Observation.Id") {
     forAll { (
       obsId1:        Observation.Id,
@@ -51,15 +54,15 @@ class GuideServiceGuideStarHash extends ScalaCheckSuite {
       od:            Option[TimeSpan],
       gs:            Option[GuideStarName],
       gsHash:        Option[Md5Hash],
-      genHash:       Md5Hash,
+      settings:      Md5Hash,
     ) =>
-      val obsInfo1 = ObservationInfo(obsId1, pid, cs, pac, oc, ot, od, gs, gsHash, None, None, None)
-      val obsInfo2 = ObservationInfo(obsId2, pid, cs, pac, oc, ot, od, gs, gsHash, None, None, None)
-      assertEquals(obsInfo1.newGuideStarHash(genHash), obsInfo2.newGuideStarHash(genHash), "hashes should be equal")
+      val obsInfo1 = ObservationInfo(obsId1, pid, cs, pac, oc, ot, od, gs, gsHash, None, None)
+      val obsInfo2 = ObservationInfo(obsId2, pid, cs, pac, oc, ot, od, gs, gsHash, None, None)
+      assertEquals(obsInfo1.overrideHash(settings, NoTargets), obsInfo2.overrideHash(settings, NoTargets), "hashes should be equal")
     }
   }
 
-  test("hashes different for different generator hashes") {
+  test("hashes different for different search settings") {
     forAll { (
       obsId:         Observation.Id,
       pid:           Program.Id,
@@ -70,13 +73,13 @@ class GuideServiceGuideStarHash extends ScalaCheckSuite {
       od:            Option[TimeSpan],
       gs:            Option[GuideStarName],
       gsHash:        Option[Md5Hash],
-      genHash1:      Md5Hash,
-      genHash2:      Md5Hash,
+      settings1:     Md5Hash,
+      settings2:     Md5Hash,
     ) =>
-      val hash1 = ObservationInfo(obsId, pid, cs, pac, oc, ot, od, gs, gsHash, None, None, None).newGuideStarHash(genHash1)
-      val hash2 = ObservationInfo(obsId, pid, cs, pac, oc, ot, od, gs, gsHash, None, None, None).newGuideStarHash(genHash2)
+      val hash1 = ObservationInfo(obsId, pid, cs, pac, oc, ot, od, gs, gsHash, None, None).overrideHash(settings1, NoTargets)
+      val hash2 = ObservationInfo(obsId, pid, cs, pac, oc, ot, od, gs, gsHash, None, None).overrideHash(settings2, NoTargets)
 
-      if (genHash1 === genHash2)
+      if (settings1 === settings2)
         assertEquals(hash1, hash2)
       else
         assertNotEquals(hash1, hash2)
@@ -95,10 +98,10 @@ class GuideServiceGuideStarHash extends ScalaCheckSuite {
       od:            Option[TimeSpan],
       gs:            Option[GuideStarName],
       gsHash:        Option[Md5Hash],
-      genHash:       Md5Hash,
+      settings:      Md5Hash,
     ) =>
-      val hash1 = ObservationInfo(obsId, pid, cs1, pac, oc, ot, od, gs, gsHash, None, None, None).newGuideStarHash(genHash)
-      val hash2 = ObservationInfo(obsId, pid, cs2, pac, oc, ot, od, gs, gsHash, None, None, None).newGuideStarHash(genHash)
+      val hash1 = ObservationInfo(obsId, pid, cs1, pac, oc, ot, od, gs, gsHash, None, None).overrideHash(settings, NoTargets)
+      val hash2 = ObservationInfo(obsId, pid, cs2, pac, oc, ot, od, gs, gsHash, None, None).overrideHash(settings, NoTargets)
 
       if (cs1 === cs2)
         assertEquals(hash1, hash2)
@@ -119,13 +122,13 @@ class GuideServiceGuideStarHash extends ScalaCheckSuite {
       od:            Option[TimeSpan],
       gs:            Option[GuideStarName],
       gsHash:        Option[Md5Hash],
-      genHash:       Md5Hash,
+      settings:      Md5Hash,
     ) =>
-      val obsInfo1 = ObservationInfo(obsId, pid, cs, pac1, oc, ot, od, gs, gsHash, None, None, None)
-      val obsInfo2 = ObservationInfo(obsId, pid, cs, pac2, oc, ot, od, gs, gsHash, None, None, None)
+      val obsInfo1 = ObservationInfo(obsId, pid, cs, pac1, oc, ot, od, gs, gsHash, None, None)
+      val obsInfo2 = ObservationInfo(obsId, pid, cs, pac2, oc, ot, od, gs, gsHash, None, None)
 
-      val hash1 = obsInfo1.newGuideStarHash(genHash)
-      val hash2 = obsInfo2.newGuideStarHash(genHash)
+      val hash1 = obsInfo1.overrideHash(settings, NoTargets)
+      val hash2 = obsInfo2.overrideHash(settings, NoTargets)
 
       if (pac1 === pac2)
         assertEquals(hash1, hash2)
@@ -146,10 +149,10 @@ class GuideServiceGuideStarHash extends ScalaCheckSuite {
       od:            Option[TimeSpan],
       gs:            Option[GuideStarName],
       gsHash:        Option[Md5Hash],
-      genHash:       Md5Hash,
+      settings:      Md5Hash,
     ) =>
-      val hash1 = ObservationInfo(obsId, pid, cs, pac, oc1, ot, od, gs, gsHash, None, None, None).newGuideStarHash(genHash)
-      val hash2 = ObservationInfo(obsId, pid, cs, pac, oc2, ot, od, gs, gsHash, None, None, None).newGuideStarHash(genHash)
+      val hash1 = ObservationInfo(obsId, pid, cs, pac, oc1, ot, od, gs, gsHash, None, None).overrideHash(settings, NoTargets)
+      val hash2 = ObservationInfo(obsId, pid, cs, pac, oc2, ot, od, gs, gsHash, None, None).overrideHash(settings, NoTargets)
 
       if (oc1 === oc2)
         assertEquals(hash1, hash2)
@@ -170,10 +173,10 @@ class GuideServiceGuideStarHash extends ScalaCheckSuite {
       od:            Option[TimeSpan],
       gs:            Option[GuideStarName],
       gsHash:        Option[Md5Hash],
-      genHash:       Md5Hash,
+      settings:      Md5Hash,
     ) =>
-      val hash1 = ObservationInfo(obsId, pid, cs, pac, oc, ot1, od, gs, gsHash, None, None, None).newGuideStarHash(genHash)
-      val hash2 = ObservationInfo(obsId, pid, cs, pac, oc, ot2, od, gs, gsHash, None, None, None).newGuideStarHash(genHash)
+      val hash1 = ObservationInfo(obsId, pid, cs, pac, oc, ot1, od, gs, gsHash, None, None).overrideHash(settings, NoTargets)
+      val hash2 = ObservationInfo(obsId, pid, cs, pac, oc, ot2, od, gs, gsHash, None, None).overrideHash(settings, NoTargets)
 
       if (ot1 === ot2)
         assertEquals(hash1, hash2)
@@ -195,10 +198,10 @@ class GuideServiceGuideStarHash extends ScalaCheckSuite {
       gsHash:        Option[Md5Hash],
       gp1:           Option[GuideProbe],
       gp2:           Option[GuideProbe],
-      genHash:       Md5Hash,
+      settings:      Md5Hash,
     ) =>
-      val hash1 = ObservationInfo(obsId, pid, cs, pac, oc, ot, od, gs, gsHash, None, gp1, None).newGuideStarHash(genHash)
-      val hash2 = ObservationInfo(obsId, pid, cs, pac, oc, ot, od, gs, gsHash, None, gp2, None).newGuideStarHash(genHash)
+      val hash1 = ObservationInfo(obsId, pid, cs, pac, oc, ot, od, gs, gsHash, gp1, None).overrideHash(settings, NoTargets)
+      val hash2 = ObservationInfo(obsId, pid, cs, pac, oc, ot, od, gs, gsHash, gp2, None).overrideHash(settings, NoTargets)
 
       if (gp1 === gp2)
         assertEquals(hash1, hash2)
@@ -219,10 +222,10 @@ class GuideServiceGuideStarHash extends ScalaCheckSuite {
       od2:           Option[TimeSpan],
       gs:            Option[GuideStarName],
       gsHash:        Option[Md5Hash],
-      genHash:       Md5Hash,
+      settings:      Md5Hash,
     ) =>
-      val hash1 = ObservationInfo(obsId, pid, cs, pac, oc, ot, od1, gs, gsHash, None, None, None).newGuideStarHash(genHash)
-      val hash2 = ObservationInfo(obsId, pid, cs, pac, oc, ot, od2, gs, gsHash, None, None, None).newGuideStarHash(genHash)
+      val hash1 = ObservationInfo(obsId, pid, cs, pac, oc, ot, od1, gs, gsHash, None, None).overrideHash(settings, NoTargets)
+      val hash2 = ObservationInfo(obsId, pid, cs, pac, oc, ot, od2, gs, gsHash, None, None).overrideHash(settings, NoTargets)
 
       if (od1 === od2)
         assertEquals(hash1, hash2)
@@ -242,10 +245,10 @@ class GuideServiceGuideStarHash extends ScalaCheckSuite {
       od:            Option[TimeSpan],
       gs:            Option[GuideStarName],
       gsHash:        Option[Md5Hash],
-      genHash:       Md5Hash,
+      settings:      Md5Hash,
     ) =>
       def hashFor(altair: Option[AltairConfiguration]): Md5Hash =
-        ObservationInfo(obsId, pid, cs, pac, oc, ot, od, gs, gsHash, None, None, altair).newGuideStarHash(genHash)
+        ObservationInfo(obsId, pid, cs, pac, oc, ot, od, gs, gsHash, None, altair).overrideHash(settings, NoTargets)
 
       val ngs: AltairConfiguration =
         AltairConfiguration(AltairMode.Ngs, none, CassRotator.Following, AltairNdFilter.Out)
@@ -278,11 +281,11 @@ class GuideServiceGuideStarHash extends ScalaCheckSuite {
       gs2:           Option[GuideStarName],
       gsHash1:       Option[Md5Hash],
       gsHash2:       Option[Md5Hash],
-      genHash:       Md5Hash,
+      settings:      Md5Hash,
     ) =>
-      val obsInfo1 = ObservationInfo(obsId, pid1, cs, pac, oc, ot, od, gs1, gsHash1, None, None, None)
-      val obsInfo2 = ObservationInfo(obsId, pid2, cs, pac, oc, ot, od, gs2, gsHash2, None, None, None)
-      assertEquals(obsInfo1.newGuideStarHash(genHash), obsInfo2.newGuideStarHash(genHash), "hashes should be equal")
+      val obsInfo1 = ObservationInfo(obsId, pid1, cs, pac, oc, ot, od, gs1, gsHash1, None, None)
+      val obsInfo2 = ObservationInfo(obsId, pid2, cs, pac, oc, ot, od, gs2, gsHash2, None, None)
+      assertEquals(obsInfo1.overrideHash(settings, NoTargets), obsInfo2.overrideHash(settings, NoTargets), "hashes should be equal")
     }
   }
 

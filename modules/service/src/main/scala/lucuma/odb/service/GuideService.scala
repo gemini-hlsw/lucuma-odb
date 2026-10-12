@@ -76,7 +76,7 @@ import lucuma.odb.graphql.input.SetGuideTargetNameInput
 import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.json.all.query.given
 import lucuma.odb.json.target
-import lucuma.odb.logic.GeneratorContext
+import lucuma.odb.logic.GeneratorError
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.exchange
 import lucuma.odb.sequence.flamingos2
@@ -154,10 +154,6 @@ trait GuideService[F[_]] {
    * As `resolveGuideStar`, but from the observation's parameters alone, before any sequence has
    * been generated. Behind Altair the sequence is sized from the star, so this is the only
    * resolution available until one has been picked.
-   *
-   * Altair is also the only caller: the hash it can compute without a sequence is the one only
-   * Altair observations key on (see `GeneratorContext.guideStarHash`), so this must not be used
-   * for anything else.
    */
   def resolveGuideStar(oid: Observation.Id, params: GeneratorParams)(using
     NoTransaction[F], SuperUserAccess
@@ -304,7 +300,6 @@ object GuideService {
     optObsDuration:      Option[TimeSpan],
     guideStarName:       Option[GuideStarName],
     guideStarHash:       Option[Md5Hash],
-    blindOffsetTargetId: Option[Target.Id],
     explicitGuideProbe:  Option[GuideProbe],
     altair:              Option[AltairConfiguration]
   ) {
@@ -314,21 +309,8 @@ object GuideService {
     def obsDuration: Result[TimeSpan] =
       optObsDuration.toResult(generalError(s"Observation duration not set for observation $id.").asProblem)
 
-    def validGuideStarName(generatorHash:Md5Hash): Option[GuideStarName] =
-      guideStarHash.flatMap { hash =>
-        val newHash = newGuideStarHash(generatorHash)
-        if (hash === newHash) guideStarName
-        else none
-       }
-
-    /**
-     * As `validGuideStarName`, but a name stored without a hash counts as valid. Only
-     * `setGuideTargetName` leaves one that way: it stores the name before running the generator,
-     * precisely so that run resolves the star just chosen, and records the hash the run produced
-     * afterwards. Until then the selection is pending, not stale.
-     */
-    def pendingOrValidGuideStarName(generatorHash: Md5Hash): Option[GuideStarName] =
-      guideStarHash.fold(guideStarName)(_ => validGuideStarName(generatorHash))
+    def validGuideStarName(overrideHash: Md5Hash): Option[GuideStarName] =
+      guideStarName.filter(_ => guideStarHash.exists(_ === overrideHash))
 
     private val AllAngles =
       NonEmptyList.fromListUnsafe(
@@ -352,75 +334,79 @@ object GuideService {
       md5.update(altair.map(_.ndFilter.tag).hashBytes)
     }
 
-    def availabilityHash(generatorHash: Md5Hash): Md5Hash = {
-      val md5 = MessageDigest.getInstance("MD5")
-
-      md5.update(generatorHash.toByteArray)
+    // Settings only: never the generated sequence, which shrinks as steps execute, nor the ITC.
+    private def updateWithSearchInputs(md5: MessageDigest, settings: Md5Hash, targets: SearchTargets): Unit = {
+      md5.update(settings.toByteArray)
+      md5.update(explicitGuideProbe.map(_.tag).hashBytes)
+      updateWithAltair(md5)
+      targets.update(md5)
 
       given HashBytes[ItcConstraintsInput] = HashBytes.forJsonEncoder
       md5.update(constraints.toInput.hashBytes)
+
+      given Encoder[Coordinates] = deriveEncoder
+      md5.update(HashBytes.forJsonEncoder[Option[Coordinates]].hashBytes(explicitBase))
+    }
+
+    /** No time or duration, as availability spans a period; the code version, as it caches results. */
+    def availabilityHash(settings: Md5Hash, targets: SearchTargets, commitHash: CommitHash): Md5Hash = {
+      val md5 = MessageDigest.getInstance("MD5")
+
+      updateWithSearchInputs(md5, settings, targets)
 
       // For our purposes, we don't care about the actual PosAngleConstraint, just what
       // angles we need to check.
       given HashBytes[NonEmptyList[Angle]] = HashBytes.forJsonEncoder
       md5.update(availabilityAngles.hashBytes)
 
-      given Encoder[Coordinates] = deriveEncoder
-      md5.update(HashBytes.forJsonEncoder[Option[Coordinates]].hashBytes(explicitBase))
-
-      given Encoder[Target.Id] = deriveEncoder
-      md5.update(HashBytes.forJsonEncoder[Option[Target.Id]].hashBytes(blindOffsetTargetId))
-
-      md5.update(explicitGuideProbe.map(_.tag).hashBytes)
-
-      updateWithAltair(md5)
+      md5.update(commitHash.hashBytes)
 
       Md5Hash.unsafeFromByteArray(md5.digest())
     }
 
-    def newGuideStarHash(generatorHash:Md5Hash): Md5Hash = {
+    /** No code version: an override is checked whenever it is used, so a deploy need not drop it. */
+    def overrideHash(settings: Md5Hash, targets: SearchTargets): Md5Hash = {
       val md5 = MessageDigest.getInstance("MD5")
 
-      md5.update(generatorHash.toByteArray)
-
-      given HashBytes[ItcConstraintsInput] = HashBytes.forJsonEncoder
-      md5.update(constraints.toInput.hashBytes)
+      updateWithSearchInputs(md5, settings, targets)
 
       given Encoder[PosAngleConstraint] = deriveEncoder
       given HashBytes[PosAngleConstraint] = HashBytes.forJsonEncoder
       md5.update(posAngleConstraint.hashBytes)
-
-      given Encoder[Coordinates] = deriveEncoder
-      md5.update(HashBytes.forJsonEncoder[Option[Coordinates]].hashBytes(explicitBase))
 
       // changing time or duration doesn't necessarily invalidate the guide star, but
       // we're not tracking what the "original" values are, so we can't say for sure...
       md5.update(optObsTime.hashBytes)
       md5.update(optObsDuration.hashBytes)
 
-      md5.update(explicitGuideProbe.map(_.tag).hashBytes)
-
-      updateWithAltair(md5)
-
       Md5Hash.unsafeFromByteArray(md5.digest())
     }
   }
 
-  /**
-   * What the guide star calculations need of an observation: its parameters, the hash guide star
-   * validity and the availability cache key on (see `GeneratorContext.guideStarHash`), and
-   * whatever a generated sequence adds. Behind Altair the star is picked before any sequence
-   * exists, so the sequence-derived parts have neutral values there; see `fromParams`.
-   */
-  case class GeneratorInfo(
-    params:                GeneratorParams,
-    hash:                  Md5Hash,
-    setupTime:             TimeSpan,
-    defaultObsDuration:    TimeSpan,
-    acqOffsets:            Option[AcquisitionOffsets],
-    sciOffsets:            Option[ScienceOffsets],
-    extraSciencePositions: List[Coordinates]
+  /** The targets the guide star search places the field around, as they are defined. */
+  case class SearchTargets(
+    asterism:    List[Target],
+    blindOffset: Option[SiderealTracking]
   ) {
+    def trackType: TrackType =
+      trackTypeOf(asterism.exists(_.isInstanceOf[Target.Nonsidereal]))
+
+    // Positions only, in a fixed order: which target holds them does not move the field.
+    def update(md5: MessageDigest): Unit = {
+      asterism.map(t => Json.obj(target.transport.siderealOrNonJson(t)).noSpaces).sorted.foreach: json =>
+        md5.update(json.hashBytes)
+      md5.update(blindOffset.map(target.transport.siderealTrackingEncoder(_).noSpaces).hashBytes)
+    }
+  }
+
+  def trackTypeOf(hasNonsidereal: Boolean): TrackType =
+    if hasNonsidereal then TrackType.Nonsidereal else TrackType.Sidereal
+
+  // AgsParams are case classes of enumerations and angles, so their rendering identifies them.
+  private given HashBytes[AgsParams] = HashBytes.by(_.toString)
+
+  /** What the guide star search reads of the observing mode, so what an override is keyed on. */
+  case class SearchSettings(params: GeneratorParams) {
     val (site: Site, observingModeType: ObservingModeType, agsWavelength: Wavelength) =
       params.observingMode match
         case c: exchange.Config                               =>
@@ -464,6 +450,34 @@ object GuideService {
         case visitor.Config(mode, wavelength, _, _, _, _)        =>
           (mode.instrument.site, mode, wavelength)
 
+    def hash(obsInfo: ObservationInfo, targets: SearchTargets): Md5Hash = {
+      val md5 = MessageDigest.getInstance("MD5")
+      md5.update(agsParamsFor(targets.trackType, obsInfo.explicitGuideProbe, obsInfo.altair).hashBytes)
+      md5.update(agsWavelength.hashBytes)
+      md5.update(offsetDefinition)
+      Md5Hash.unsafeFromByteArray(md5.digest())
+    }
+
+    // The offsets as defined, not as generated: imaging positions follow the exposure count.
+    private def offsetDefinition: Array[Byte] =
+      params.observingMode match
+        case _: exchange.Config                => Array.emptyByteArray
+        case c: flamingos2.imaging.Config      => c.variant.hashBytes
+        case c: flamingos2.longslit.Config     => c.telescopeConfigs.hashBytes
+        case c: flamingos2.mos.Config          => c.telescopeConfigs.hashBytes
+        case c: ghost.ifu.Config               => c.skyPosition.hashBytes
+        case c: gmos.imaging.Config.GmosNorth  => c.variant.hashBytes
+        case c: gmos.imaging.Config.GmosSouth  => c.variant.hashBytes
+        case c: gmos.longslit.Config.GmosNorth => c.telescopeConfigs.hashBytes
+        case c: gmos.longslit.Config.GmosSouth => c.telescopeConfigs.hashBytes
+        case c: gmos.mos.Config.GmosNorth      => c.telescopeConfigs.hashBytes
+        case c: gmos.mos.Config.GmosSouth      => c.telescopeConfigs.hashBytes
+        case c: gmos.ifu.Config.GmosNorth      => c.telescopeConfigs.hashBytes
+        case c: gmos.ifu.Config.GmosSouth      => c.telescopeConfigs.hashBytes
+        case c: gnirs.imaging.Config           => c.variant.hashBytes
+        case c: gnirs.spectroscopy.Config      => c.telescopeConfigs.hashBytes
+        case c: igrins2.longslit.Config        => c.steps.hashBytes
+        case _: visitor.Config                 => Array.emptyByteArray
 
     // The AOWFS guides only behind Altair; every other probe and mode combination is decided by
     // core's `guidedBy`, shared with Explore.
@@ -563,6 +577,23 @@ object GuideService {
               AgsParams.Visitor(c.agsDiameter, c.scienceFovDiameter, PortDisposition.Bottom).withPWFS1.some
             case _                                                                                              =>
               none
+  }
+
+  /**
+   * What the guide star calculations need of an observation: its parameters and whatever a
+   * generated sequence adds. Behind Altair the star is picked before any sequence exists, so the
+   * sequence-derived parts have neutral values there; see `fromParams`.
+   */
+  case class GeneratorInfo(
+    params:                GeneratorParams,
+    setupTime:             TimeSpan,
+    defaultObsDuration:    TimeSpan,
+    acqOffsets:            Option[AcquisitionOffsets],
+    sciOffsets:            Option[ScienceOffsets],
+    extraSciencePositions: List[Coordinates]
+  ) {
+    val search: SearchSettings = SearchSettings(params)
+    export search.{site, observingModeType, agsWavelength, agsParamsFor}
 
     def getScienceStartTime(obsTime: Timestamp): Timestamp = obsTime +| setupTime
     def getScienceDuration(obsDuration: TimeSpan, obsId: Observation.Id): Result[TimeSpan] =
@@ -585,10 +616,9 @@ object GuideService {
         case _                   => Nil
 
     /** Of an observation whose sequence the caller has generated. */
-    def fromDigest(digest: ExecutionDigest, params: GeneratorParams, hash: Md5Hash): GeneratorInfo =
+    def fromDigest(digest: ExecutionDigest, params: GeneratorParams): GeneratorInfo =
       GeneratorInfo(
         params                = params,
-        hash                  = hash,
         setupTime             = digest.setup.full,
         defaultObsDuration    = digest.fullTimeEstimate.sum,
         acqOffsets            = NonEmptySet.fromSet(digest.acquisition.telescopeConfigs).flatMap(_.asAcqOffsets),
@@ -600,10 +630,9 @@ object GuideService {
      * Of an observation with no sequence yet, which is how the Altair guide star is picked: the
      * sequence it feeds cannot be generated until the star is known.
      */
-    def fromParams(params: GeneratorParams, hash: Md5Hash): GeneratorInfo =
+    def fromParams(params: GeneratorParams): GeneratorInfo =
       GeneratorInfo(
         params                = params,
-        hash                  = hash,
         setupTime             = TimeSpan.Zero,
         defaultObsDuration    = NominalAltairVisitDuration,
         acqOffsets            = none,
@@ -654,7 +683,7 @@ object GuideService {
             .use(_.stream(af.argument, chunkSize = 1024).compile.toList)
             .map: rows =>
               rows.map: (oid, mode, explicit, altair, hasTargets, hasNonsidereal) =>
-                val trackType: TrackType        = if hasNonsidereal then TrackType.Nonsidereal else TrackType.Sidereal
+                val trackType: TrackType        = trackTypeOf(hasNonsidereal)
                 val default: Option[GuideProbe] = mode.filter(_ => hasTargets).flatMap(probes.defaultGuideProbe(_, trackType, altair))
                 oid -> GuideService.GuideProbeSelection(default, explicit)
               .toMap
@@ -909,10 +938,28 @@ object GuideService {
       ): F[Result[GeneratorInfo]] =
         Services.asSuperUser:
           generator
-            .digestWithParamsAndHash(oid)
+            .digestWithParams(oid)
             .map:
-              case Right((d, p, h)) => GeneratorInfo.fromDigest(d, p, h).success
-              case Left(ge)         => generatorError(ge).asFailure
+              case Right((d, p)) => GeneratorInfo.fromDigest(d, p).success
+              case Left(ge)      => generatorError(ge).asFailure
+
+      def getParams(obsInfo: ObservationInfo): F[Result[GeneratorParams]] =
+        services
+          .transactionally(generatorParamsService.selectOne(obsInfo.programId, obsInfo.id))
+          .map(_.fold(e => generatorError(GeneratorError.sequenceUnavailable(obsInfo.id, e.format)).asFailure, _.success))
+
+      // One transaction, so the asterism and the blind offset are read as of the same moment.
+      def getSearchTargets(oid: Observation.Id)(using SuperUserAccess): F[SearchTargets] =
+        val blindOffset = Statements.getBlindOffsetTracking(oid)
+        services.transactionally:
+          (
+            asterismService.getAsterism(oid).map(_.map(_._2)),
+            session.prepareR(blindOffset.fragment.query(siderealTrackingDecoder)).use(_.option(blindOffset.argument))
+          ).mapN(SearchTargets.apply)
+
+      def overrideHash(obsInfo: ObservationInfo, params: GeneratorParams)(using SuperUserAccess): F[Md5Hash] =
+        getSearchTargets(obsInfo.id).map: targets =>
+          obsInfo.overrideHash(SearchSettings(params).hash(obsInfo, targets), targets)
 
       def chooseBestGuideStar(
         obsInfo:       ObservationInfo,
@@ -1242,7 +1289,8 @@ object GuideService {
             genInfo         <- ResultT(getGeneratorInfo(oid))
             scienceDuration <- ResultT.fromResult(genInfo.getScienceDuration(obsDuration, oid))
             scienceStart     = genInfo.getScienceStartTime(obsTime)
-            oGSName          = obsInfo.validGuideStarName(genInfo.hash)
+            oHash           <- ResultT.liftF(overrideHash(obsInfo, genInfo.params))
+            oGSName          = obsInfo.validGuideStarName(oHash)
             // Twilight and daytime pinhole calibrations have no guide stars, so skip AGS
             // entirely and return an empty guide environment.
             result          <- if (genInfo.params.calibrationRole.exists(GuideEnvironment.CalRolesWithoutGuiding.contains))
@@ -1264,13 +1312,9 @@ object GuideService {
       ): F[Result[Option[NonEmptyString]]] =
         (for {
           obsInfo    <- ResultT(getObservationInfo(oid))
-          genInfo    <- ResultT.liftF(getGeneratorInfo(oid)).map(_.toOption)
-          oGSName    <- ResultT.pure(
-                          genInfo.flatMap{ gi =>
-                            obsInfo.validGuideStarName(gi.hash)
-                          }
-                        )
-        } yield oGSName.map(_.toNonEmptyString)).value
+          params     <- ResultT.liftF(getParams(obsInfo)).map(_.toOption)
+          oHash      <- ResultT.liftF(params.traverse(overrideHash(obsInfo, _)))
+        } yield oHash.flatMap(obsInfo.validGuideStarName).map(_.toNonEmptyString)).value
 
       override def resolveGuideStar(oid: Observation.Id)(
         using NoTransaction[F], SuperUserAccess
@@ -1294,7 +1338,8 @@ object GuideService {
             obsDuration      = obsInfo.optObsDuration.getOrElse(generatorInfo.defaultObsDuration)
             scienceDuration <- ResultT.fromResult(generatorInfo.getScienceDuration(obsDuration, oid))
             scienceStart     = generatorInfo.getScienceStartTime(obsTime)
-            oGSName          = obsInfo.pendingOrValidGuideStarName(generatorInfo.hash)
+            oHash           <- ResultT.liftF(overrideHash(obsInfo, generatorInfo.params))
+            oGSName          = obsInfo.validGuideStarName(oHash)
             // A calibration that does not guide never has a star; that is not an error.
             resolution      <- if (generatorInfo.params.calibrationRole.exists(GuideEnvironment.CalRolesWithoutGuiding.contains))
                                  ResultT.pure(GuideStarResolution.NotGuided)
@@ -1311,7 +1356,7 @@ object GuideService {
       override def resolveGuideStar(oid: Observation.Id, params: GeneratorParams)(
         using NoTransaction[F], SuperUserAccess
       ): F[Result[GuideStarResolution]] =
-        resolveGuideStar(oid, GeneratorInfo.fromParams(params, GeneratorContext.guideStarHash(params, commitHash)))
+        resolveGuideStar(oid, GeneratorInfo.fromParams(params))
 
       override def getGuideAvailability(pid: Program.Id, oid: Observation.Id, period: TimestampInterval)(
         using NoTransaction[F], SuperUserAccess
@@ -1327,7 +1372,8 @@ object GuideService {
             obsInfo       <- ResultT(getObservationInfo(oid))
             genInfo       <- ResultT(getGeneratorInfo(oid))
             blindOffset   <- ResultT.liftF(getBlindOffsetCoordinates(oid, period.start.toInstant))
-            newHash        = obsInfo.availabilityHash(genInfo.hash)
+            targets       <- ResultT.liftF(getSearchTargets(oid))
+            newHash        = obsInfo.availabilityHash(genInfo.search.hash(obsInfo, targets), targets, commitHash)
             currentAvail  <- ResultT.liftF(getFromCacheOrEmpty(pid, oid, newHash))
             missingPeriods = currentAvail.findMissingIntervals(period)
             // only happens if we have disjoint periods too far apart. If so, we'll just replace the existing
@@ -1342,15 +1388,10 @@ object GuideService {
           } yield availability).value
 
       /**
-       * The order matters. Behind Altair the sequence is sized from the guide star, so the name is
-       * stored before the generator runs -- that run then resolves the star just chosen -- and the
-       * hash is recorded only afterwards. The cached ITC result needs no eviction: the Altair
-       * parameters are keyed apart, so a result computed for another star is simply not reused.
-       *
-       * The generator reaches Gaia and the ITC, so it cannot run inside the transaction that would
-       * otherwise make the two writes atomic; the previous name and hash are put back by hand
-       * instead. Left alone, a failed set would store the new name with no hash, which reads as a
-       * selection still waiting for its generation and so never goes stale.
+       * Behind Altair, generating is what rejects an unusable star, except in LGS+P1, where the
+       * problem is recorded against the sequence and reported when it is asked for. Generating
+       * calls Gaia and the ITC, so it runs outside the write's transaction and the previous override
+       * is restored by hand.
        */
       def setGuideTargetNameImpl(obsInfo: ObservationInfo, targetName: Option[NonEmptyString]): F[Result[Observation.Id]] =
         targetName.fold(
@@ -1359,20 +1400,22 @@ object GuideService {
           val restore: F[Unit] =
             updateGuideTargetName(obsInfo.programId, obsInfo.id, obsInfo.guideStarName, obsInfo.guideStarHash).void
 
-          val set: F[Result[Observation.Id]] =
-            (for {
-              gsn      <- ResultT.fromResult(
-                            GuideStarName.from(name.value).toOption.toResult(guideStarNameError(name.value).asProblem)
-                          )
-              _        <- ResultT(updateGuideTargetName(obsInfo.programId, obsInfo.id, gsn.some, none))
-              genInfo  <- ResultT(getGeneratorInfo(obsInfo.id))
-              hash      = obsInfo.newGuideStarHash(genInfo.hash)
-              result   <- ResultT(updateGuideTargetName(obsInfo.programId, obsInfo.id, gsn.some, hash.some))
-            } yield result).value
+          def checkAltair(params: GeneratorParams): F[Result[Unit]] =
+            if params.altair.isEmpty then Result.unit.pure[F]
+            else
+              getGeneratorInfo(obsInfo.id)
+                .onError(_ => restore)
+                .flatMap(r => if r.hasValue then Result.unit.pure[F] else restore.as(r.void))
 
-          set
-            .onError(_ => restore)
-            .flatMap(result => if result.hasValue then result.pure[F] else restore.as(result))
+          (for {
+            gsn    <- ResultT.fromResult(
+                        GuideStarName.from(name.value).toOption.toResult(guideStarNameError(name.value).asProblem)
+                      )
+            params <- ResultT(getParams(obsInfo))
+            hash   <- ResultT.liftF(Services.asSuperUser(overrideHash(obsInfo, params)))
+            result <- ResultT(updateGuideTargetName(obsInfo.programId, obsInfo.id, gsn.some, hash.some))
+            _      <- ResultT(checkAltair(params))
+          } yield result).value
         }
 
       override def setGuideTargetName(checked: AccessControl.CheckedWithId[SetGuideTargetNameInput, Observation.Id])(
@@ -1414,7 +1457,6 @@ object GuideService {
           c_observation_duration,
           c_guide_target_name,
           c_guide_target_hash,
-          c_blind_offset_target_id,
           c_explicit_guide_probe,
           c_altair_mode,
           c_altair_field_lens,
@@ -1565,13 +1607,12 @@ object GuideService {
         time_span.opt              *:
         guide_target_name.opt      *:
         md5_hash.opt               *:
-        target_id.opt              *:
         guide_probe.opt            *:
         altair_mode.opt            *:
         field_lens.opt             *:
         cass_rotator.opt           *:
         altair_nd_filter.opt).emap {
-        case (id, pid, cloud, image, sky, water, amMin, amMax, haMin, haMax, mode, angle, ra, dec, time, duration, guidestarName, guidestarHash, blindOffsetTargetId, explicitGuideProbe, altairMode, altairFieldLens, altairCassRotator, altairNdFilter) =>
+        case (id, pid, cloud, image, sky, water, amMin, amMax, haMin, haMax, mode, angle, ra, dec, time, duration, guidestarName, guidestarHash, explicitGuideProbe, altairMode, altairFieldLens, altairCassRotator, altairNdFilter) =>
           val paConstraint: PosAngleConstraint = mode match
             case PosAngleConstraintMode.Unbounded           => PosAngleConstraint.Unbounded
             case PosAngleConstraintMode.Fixed               => PosAngleConstraint.Fixed(angle)
@@ -1608,7 +1649,7 @@ object GuideService {
               AltairConfiguration(mode, altairFieldLens, cassRotator, ndFilter)
 
           elevRange.map(elev =>
-            ObservationInfo(id, pid, ConstraintSet(image, cloud, sky, water, elev), paConstraint, explicitBase, time, duration, guidestarName, guidestarHash, blindOffsetTargetId, explicitGuideProbe, altair)
+            ObservationInfo(id, pid, ConstraintSet(image, cloud, sky, water, elev), paConstraint, explicitBase, time, duration, guidestarName, guidestarHash, explicitGuideProbe, altair)
           )
       }
 
