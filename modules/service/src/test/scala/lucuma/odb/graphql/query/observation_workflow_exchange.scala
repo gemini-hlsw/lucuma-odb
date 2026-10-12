@@ -8,6 +8,7 @@ package query
 import cats.effect.IO
 import cats.syntax.all.*
 import io.circe.syntax.*
+import lucuma.core.enums.Instrument
 import lucuma.core.enums.KeckInstrument
 import lucuma.core.enums.Observatory
 import lucuma.core.model.CallForProposals
@@ -15,9 +16,10 @@ import lucuma.core.model.Observation
 import lucuma.core.model.ObservationValidation
 import lucuma.core.model.Program
 import lucuma.core.model.User
+import lucuma.odb.service.workflow.validator.CfpInstrumentValidator
 import lucuma.odb.service.workflow.validator.ExchangeValidator
 
-class observation_workflow_exchange extends OdbSuite with DatabaseOperations:
+class observation_workflow_exchange extends OdbSuite with ObservingModeSetupOperations:
 
   val pi: User          = TestUsers.Standard.pi(1, 30)
   val serviceUser       = TestUsers.service(3)
@@ -118,3 +120,24 @@ class observation_workflow_exchange extends OdbSuite with DatabaseOperations:
                s"Expected no exchange call-for-proposals validation, got: $ves"
              ))
     yield ()
+
+  private def assertGeminiInstrumentRejected(cid: CallForProposals.Id, set: String): IO[Unit] =
+    for
+      pid <- createProgramWithProposal(cid, set)
+      tid <- createTargetAs(pi, pid)
+      oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      _   <- runObscalcUpdateAs(serviceUser, pid, oid)
+      ves <- validationErrors(oid)
+      _   <- IO(assert(
+               ves.contains_(ObservationValidation.callForProposalsError(CfpInstrumentValidator.invalidInstrument(Instrument.GmosNorth))),
+               s"Expected invalid-instrument validation, got: $ves"
+             ))
+    yield ()
+
+  test("a Gemini observation in a Keck proposal is reported as a workflow validation"):
+    createKeckCallForProposalsAs(staff).flatMap: cid =>
+      assertGeminiInstrumentRejected(cid, """keck: { partnerSplits: [{ partner: US, percent: 100 }] }""")
+
+  test("a Gemini observation in a Subaru proposal is reported as a workflow validation"):
+    createSubaruCallForProposalsAs(staff).flatMap: cid =>
+      assertGeminiInstrumentRejected(cid, """subaru: { partnerSplits: [{ partner: US, percent: 100 }] }""")
