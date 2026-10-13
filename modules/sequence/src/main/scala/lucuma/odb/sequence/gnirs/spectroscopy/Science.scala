@@ -68,12 +68,6 @@ object Science:
 
   private object SeqState extends gnirs.GnirsSequenceState
 
-  // The read mode of a calibration step is determined by its exposure time,
-  // which comes from the SmartGcal lookup (and so may differ from the science
-  // read mode, explicit or not).
-  private def adjustCalibrationReadMode(s: ProtoStep[GnirsDynamicConfig]): ProtoStep[GnirsDynamicConfig] =
-    s.copy(value = s.value.copy(readMode = GnirsReadMode.forExposureTime(s.value.exposure)))
-
   /** `cals` holds the flat, the arc or both; empty for telluric sequences. */
   case class StepDefinition(
     wavelength:   CentralWavelengthConfig,
@@ -108,7 +102,7 @@ object Science:
         cals.fold(EitherT.pure(StepDefinition(wavelength, scienceSteps, none))): (flat, arc) =>
           // 111/LXD, for instance, has arcs but no slit flat.
           EitherT(expander.expandFlatAndOrArc(static, flat, arc))
-            .map(cs => StepDefinition(wavelength, scienceSteps, cs.map(adjustCalibrationReadMode).some))
+            .map(cs => StepDefinition(wavelength, scienceSteps, cs.some))
 
     object PreDef:
 
@@ -331,7 +325,7 @@ object Science:
       .traverse: (sw, suffix) =>
         EitherT(expander.expandStep(static, flat(sw)))
           .map: steps =>
-            ProtoAtom(atomTitle(DaytimePinholeTitle, suffix).some, steps.map(adjustCalibrationReadMode))
+            ProtoAtom(atomTitle(DaytimePinholeTitle, suffix).some, steps)
       .bimap(
         m => definitionError(observationId, m),
         atoms =>

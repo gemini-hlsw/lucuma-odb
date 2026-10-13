@@ -62,9 +62,6 @@ sealed trait Config[G: Enumerated, L: Enumerated, U] extends spectroscopy.Config
    */
   def equivalentFpu: U
 
-  override def gcalFpu: U =
-    equivalentFpu
-
   def hashBytes: Array[Byte] =
     val bao: ByteArrayOutputStream = new ByteArrayOutputStream(256)
     val out: DataOutputStream      = new DataOutputStream(bao)

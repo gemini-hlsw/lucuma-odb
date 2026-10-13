@@ -71,10 +71,6 @@ object Acquisition:
       case GnirsFpu.Spectroscopy.Slit(_) => GnirsAcquisitionMode.Faint.DefaultSlitSkyOffset
       case GnirsFpu.Spectroscopy.Ifu(_)  => GnirsAcquisitionMode.Faint.DefaultIfuSkyOffset
 
-  /** A calibration step's read mode is determined by its (SmartGcal-provided) exposure time. */
-  private def adjustReadMode(s: ProtoStep[GnirsDynamicConfig]): ProtoStep[GnirsDynamicConfig] =
-    s.copy(value = s.value.copy(readMode = GnirsReadMode.forExposureTime(s.value.exposure)))
-
   case class Steps(
     slitImage:      ProtoStep[GnirsDynamicConfig],
     field:          ProtoStep[GnirsDynamicConfig],
@@ -362,7 +358,7 @@ object Acquisition:
             case GnirsFpuIfu.LowResolution  => EitherT.pure(List.empty)
             case GnirsFpuIfu.HighResolution =>
               EitherT(expander.expandStep(static, StepComputer.ifuAlignmentFlat(config)))
-                .bimap(sequenceError, _.toList.map(adjustReadMode))
+                .bimap(sequenceError, _.toList)
 
         (for
           (t, mode, selFilter) <- EitherT.fromEither[F](checked)
