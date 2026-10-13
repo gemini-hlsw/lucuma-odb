@@ -1,0 +1,57 @@
+{
+  "uid": "lucuma-db-connections-high",
+  "title": "Database connections near limit",
+  "folderUID": "lucuma-health",
+  "ruleGroup": "lucuma-health-readiness",
+  "condition": "C",
+  "for": "10m",
+  "noDataState": "Alerting",
+  "execErrState": "Error",
+  "labels": {
+    "severity": "warning",
+    "team": "gpp"
+  },
+  "annotations": {
+    "summary": "{{ $labels.deployment_environment_name }} database is using over 80% of max_connections",
+    "description": "The odb web dyno samples pg_stat_activity every minute into lucuma_db_connections_used (by application_name) and lucuma_db_connections_max. Once the limit is reached new connections are refused. Check which application_name grew on the GPP Service Status dashboard, and the *_MAX_CONNECTIONS config vars times dyno counts. No data means the sample itself failed, possibly because the database is already full: check the web dyno log for 'Database connection sample failed'.",
+    "runbook_url": "https://github.com/gemini-hlsw/lucuma-odb/blob/main/grafana/README.md"
+  },
+  "data": [
+    {
+      "refId": "A",
+      "relativeTimeRange": {
+        "from": 600,
+        "to": 0
+      },
+      "datasourceUid": "grafanacloud-prom",
+      "model": {
+        "refId": "A",
+        "instant": true,
+        "expr": "sum by (deployment_environment_name) (lucuma_db_connections_used) / max by (deployment_environment_name) (lucuma_db_connections_max)"
+      }
+    },
+    {
+      "refId": "C",
+      "relativeTimeRange": {
+        "from": 0,
+        "to": 0
+      },
+      "datasourceUid": "__expr__",
+      "model": {
+        "refId": "C",
+        "type": "threshold",
+        "expression": "A",
+        "conditions": [
+          {
+            "evaluator": {
+              "type": "gt",
+              "params": [
+                0.8
+              ]
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

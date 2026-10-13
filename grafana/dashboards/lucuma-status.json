@@ -455,6 +455,107 @@
      },
      "overrides": []
     }
+   },
+   {
+    "id": 8,
+    "type": "timeseries",
+    "title": "Database connections",
+    "description": "Open client connections by application_name, stacked, against the server max_connections (dashed). Sampled every minute by the odb web dyno.",
+    "gridPos": {
+     "x": 0,
+     "y": 27,
+     "w": 24,
+     "h": 8
+    },
+    "datasource": {
+     "type": "prometheus",
+     "uid": "grafanacloud-prom"
+    },
+    "targets": [
+     {
+      "refId": "A",
+      "datasource": {
+       "type": "prometheus",
+       "uid": "grafanacloud-prom"
+      },
+      "legendFormat": "{{deployment_environment_name}} {{application_name}}",
+      "expr": "max by (deployment_environment_name, application_name) (lucuma_db_connections_used)"
+     },
+     {
+      "refId": "B",
+      "datasource": {
+       "type": "prometheus",
+       "uid": "grafanacloud-prom"
+      },
+      "legendFormat": "{{deployment_environment_name}} max_connections",
+      "expr": "max by (deployment_environment_name) (lucuma_db_connections_max)"
+     }
+    ],
+    "options": {
+     "legend": {
+      "displayMode": "list",
+      "placement": "bottom",
+      "showLegend": true
+     },
+     "tooltip": {
+      "mode": "multi",
+      "sort": "desc"
+     }
+    },
+    "fieldConfig": {
+     "defaults": {
+      "unit": "short",
+      "decimals": 0,
+      "min": 0,
+      "custom": {
+       "lineWidth": 1,
+       "fillOpacity": 30,
+       "showPoints": "never",
+       "stacking": {
+        "mode": "normal",
+        "group": "A"
+       }
+      }
+     },
+     "overrides": [
+      {
+       "matcher": {
+        "id": "byFrameRefID",
+        "options": "B"
+       },
+       "properties": [
+        {
+         "id": "custom.stacking",
+         "value": {
+          "mode": "none",
+          "group": "A"
+         }
+        },
+        {
+         "id": "custom.fillOpacity",
+         "value": 0
+        },
+        {
+         "id": "custom.lineStyle",
+         "value": {
+          "fill": "dash",
+          "dash": [
+           10,
+           10
+          ]
+         }
+        },
+        {
+         "id": "color",
+         "value": {
+          "mode": "fixed",
+          "fixedColor": "red"
+         }
+        }
+       ]
+      }
+     ]
+    }
    }
   ]
  }
