@@ -460,7 +460,7 @@
     "id": 8,
     "type": "timeseries",
     "title": "Database connections",
-    "description": "Open client connections by application_name, stacked, against the server max_connections (dashed). Sampled every minute by the odb web dyno.",
+    "description": "Open client connections by application_name, stacked, against the usable limit, max_connections less reserved slots (dashed). Sampled every minute by the odb web dyno.",
     "gridPos": {
      "x": 0,
      "y": 27,
@@ -487,7 +487,7 @@
        "type": "prometheus",
        "uid": "grafanacloud-prom"
       },
-      "legendFormat": "{{deployment_environment_name}} max_connections",
+      "legendFormat": "{{deployment_environment_name}} usable limit",
       "expr": "max by (deployment_environment_name) (lucuma_db_connections_max)"
      }
     ],

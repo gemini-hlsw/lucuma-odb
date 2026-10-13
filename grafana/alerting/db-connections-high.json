@@ -12,7 +12,7 @@
     "team": "gpp"
   },
   "annotations": {
-    "summary": "{{ $labels.deployment_environment_name }} database is using over 80% of max_connections",
+    "summary": "{{ $labels.deployment_environment_name }} database is using over 80% of its usable connections",
     "description": "The odb web dyno samples pg_stat_activity every minute into lucuma_db_connections_used (by application_name) and lucuma_db_connections_max. Once the limit is reached new connections are refused. Check which application_name grew on the GPP Service Status dashboard, and the *_MAX_CONNECTIONS config vars times dyno counts. No data means the sample itself failed, possibly because the database is already full: check the web dyno log for 'Database connection sample failed'.",
     "runbook_url": "https://github.com/gemini-hlsw/lucuma-odb/blob/main/grafana/README.md"
   },
