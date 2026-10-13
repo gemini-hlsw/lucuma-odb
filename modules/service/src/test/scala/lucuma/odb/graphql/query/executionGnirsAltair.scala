@@ -350,8 +350,8 @@ class executionGnirsAltair extends AltairItcRecording:
       }
     """
 
-  // The guide star hash folds in the generator hash, which leaves the ITC result out precisely so
-  // that it does not depend on the star being checked; see GeneratorContext.guideStarHash.
+  // The override hash keys on the guide star search inputs alone, so the ITC result, which behind
+  // Altair is computed from the very star being checked, cannot invalidate it.
   test("the stored guide star stays valid once set"):
     observationWithAltair("{ mode: NGS }", aowfsStarName.some).flatMap: (_, oid) =>
       expect(

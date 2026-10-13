@@ -109,18 +109,6 @@ case class GeneratorContext(
 
     Md5Hash.unsafeFromByteArray(md5.digest())
 
-  /**
-   * The hash that guide star validity and availability caching key on.
-   *
-   * Behind Altair the ITC result is computed from the very guide star whose validity is being
-   * checked, so folding it in would be circular; the parameters and the code version stand in for
-   * it (see [[GeneratorContext.guideStarHash]]). Every other observation keeps the full generator
-   * hash it has always used, so that guide stars already stored against it stay valid.
-   */
-  def guideStarHash: Md5Hash =
-    if params.altair.isDefined then GeneratorContext.guideStarHash(params, commitHash)
-    else hash
-
 object GeneratorContext:
 
   /**
@@ -129,22 +117,6 @@ object GeneratorContext:
    * it with the star the previous pass resolved.
    */
   val MaxAltairGuideStarPasses: Int = 3
-
-  /**
-   * The hash an Altair observation's guide star validity and availability cache key on: the
-   * generator parameters, which hold every user-editable input, and the code version. The ITC
-   * result is deliberately left out. Behind Altair it is computed from the very guide star whose
-   * validity is being checked, so folding it in would be circular, and the parameters already move
-   * whenever an input the ITC reads moves. The price is that redeploying the ITC alone no longer
-   * invalidates a stored guide star.
-   *
-   * Only Altair observations key on this, so no stored hash predates it.
-   */
-  def guideStarHash(params: GeneratorParams, commitHash: CommitHash): Md5Hash =
-    val md5 = MessageDigest.getInstance("MD5")
-    md5.update(params.hashBytes)
-    md5.update(commitHash.hashBytes)
-    Md5Hash.unsafeFromByteArray(md5.digest())
 
   private def noUsableStar(oid: Observation.Id): OdbError =
     GeneratorError.sequenceUnavailable(oid, "Altair needs a guide star but none is usable.")
@@ -285,7 +257,7 @@ object GeneratorContext:
       digest: ExecutionDigest
     ): F[Either[OdbError, GuideService.GuideStarResolution]] =
       resolution:
-        guideService.resolveGuideStar(oid, GuideService.GeneratorInfo.fromDigest(digest, ctx.params, ctx.guideStarHash))
+        guideService.resolveGuideStar(oid, GuideService.GeneratorInfo.fromDigest(digest, ctx.params))
 
     def generate(star: Option[GuideService.ResolvedGuideStar]): EitherT[F, OdbError, GeneratorContext] =
       EitherT(contextFor(pid, oid, withAltairGuideStar(params, star), constraints, commitHash))

@@ -95,7 +95,8 @@ trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =
     tids:           List[Target.Id],
     resolutionMode: String         = "STANDARD",
     redReadMode:    Option[String] = None,
-    ifu1Agitator:   Option[String] = None
+    ifu1Agitator:   Option[String] = None,
+    stepCount:      Int            = 1
   ): IO[Observation.Id] =
     createObservationWithModeAs(
       user,
@@ -103,7 +104,7 @@ trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =
       tids,
       s"""
         ghostIfu: {
-          stepCount: 1
+          stepCount: $stepCount
           resolutionMode: $resolutionMode
           red: {
             exposureTimeMode: {
