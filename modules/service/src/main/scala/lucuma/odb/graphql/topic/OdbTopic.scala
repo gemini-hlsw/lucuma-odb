@@ -22,7 +22,9 @@ import skunk.Session
 import skunk.data.Identifier
 import skunk.implicits.*
 
+import scala.compiletime.constValue
 import scala.concurrent.duration.*
+import scala.deriving.Mirror
 
 trait OdbTopic[E]:
 
@@ -44,6 +46,16 @@ object OdbTopic:
    * notifications deadlocks silently. Lookups go to `lookup`.
    */
   final case class Sessions[F[_]](listen: Session[F], lookup: Session[F])
+
+  object Sessions:
+    private inline def arity[A](using m: Mirror.ProductOf[A]): Int =
+      constValue[Tuple.Size[m.MirroredElemTypes]]
+
+    /**
+     * Pooled sessions `runFeeds` pins for the life of the process, one per
+     * field, so it cannot drift from the case class.
+     */
+    val Count: Int = arity[Sessions[Option]]
 
   private val InitialRetryDelay: FiniteDuration = 1.second
   private val MaxRetryDelay: FiniteDuration     = 1.minute

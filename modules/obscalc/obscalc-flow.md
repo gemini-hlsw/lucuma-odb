@@ -136,7 +136,7 @@ flowchart TD
 ```
 
 - Pickup uses `SELECT ... FOR UPDATE SKIP LOCKED` (`ObscalcService.scala:524`, `:542`) so multiple daemon instances / workers don't contend.
-- Parallelism is bounded by `Config.Database.obscalcWorkers` (`OBSCALC_MAX_CONNECTIONS` less the session `topic` pins for LISTEN/NOTIFY); each worker holds one DB connection during its calculation.
+- Parallelism is bounded by `Config.Database.obscalcWorkers` (`OBSCALC_MAX_CONNECTIONS` less the `Config.Database.ReservedSessions` pair `OdbTopic.runFeeds` pins for LISTEN/NOTIFY); each worker holds one DB connection during its calculation.
 
 ## `ObscalcService.calculateAndUpdate`
 

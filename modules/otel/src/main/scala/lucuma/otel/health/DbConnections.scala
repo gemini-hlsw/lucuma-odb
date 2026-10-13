@@ -29,8 +29,14 @@ object DbConnections:
 
   private final case class Snapshot(max: Int, byApplication: List[(String, Long)])
 
+  // Non-superusers are refused once only the reserved slots remain, so that is
+  // the real ceiling. `reserved_connections` only exists from Postgres 16.
   private val SelectMax =
-    sql"SELECT current_setting('max_connections')::int4".query(int4)
+    sql"""
+      SELECT current_setting('max_connections')::int4
+           - current_setting('superuser_reserved_connections')::int4
+           - COALESCE(current_setting('reserved_connections', true)::int4, 0)
+    """.query(int4)
 
   // Not `backend_type`: it reads null for other roles' sessions without
   // pg_read_all_stats. `datid` is always visible and excludes background processes.
@@ -65,7 +71,7 @@ object DbConnections:
                   }))
       _    <- M.observableGauge[Long](MaxMetricName)
                .withUnit("{connection}")
-               .withDescription("The database server's max_connections")
+               .withDescription("Connections available to non-superusers: max_connections less the reserved slots")
                .createWithCallback: cb =>
                   last.get.flatMap(_.traverse_(s => cb.record(s.max.toLong)))
       sample = session.use(snapshot[F]).timeout(timeout).attempt.flatMap:

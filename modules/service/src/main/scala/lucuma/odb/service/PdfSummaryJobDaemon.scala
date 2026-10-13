@@ -34,6 +34,9 @@ object PdfSummaryJobDaemon:
 
   val WaitToRestart = 5.seconds
 
+  // The LISTEN session `run` pins for the life of the process.
+  val ReservedSessions: Int = 1
+
   def run[F[_]: {Async, Files, LoggerFactory as LF, Tracer as T}](
     pollPeriod: FiniteDuration,
     session:    Resource[F, Session[F]],

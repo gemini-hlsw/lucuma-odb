@@ -316,8 +316,9 @@ object FMain extends MainParams {
     }
 
   private def dbSessionBuilder[F[_]: Temporal: Console: Network: TracerProvider: MeterProvider](
-    config: Config.Database,
-    database: Option[String] = None
+    config:          Config.Database,
+    database:        Option[String] = None,
+    applicationName: String         = "odb-web"
   ) =
     Session.Builder[F]
       .withHost(config.host)
@@ -330,16 +331,17 @@ object FMain extends MainParams {
       // Tag connections so they can be attributed per service in
       // pg_stat_activity; see also the pool sizes in Config.Database.
       .withConnectionParameters(
-        Session.DefaultConnectionParameters + ("application_name" -> "odb-web")
+        Session.DefaultConnectionParameters + ("application_name" -> applicationName)
       )
 
   def singleSession[F[_]: Temporal: Console: Network](
-    config:   Config.Database,
-    database: Option[String] = None
+    config:          Config.Database,
+    database:        Option[String] = None,
+    applicationName: String         = "odb-web"
   ): Resource[F, Session[F]] =
     given TracerProvider[F] = TracerProvider.noop
     given MeterProvider[F]  = MeterProvider.noop
-    dbSessionBuilder(config, database).single
+    dbSessionBuilder(config, database, applicationName).single
 
   def resetDatabase[F[_]: Async : Console : Network](config: Config.Database): F[Unit] = {
 
@@ -388,7 +390,7 @@ object FMain extends MainParams {
       given MeterProvider[F]  = ot.meterProvider
       ap <- routesResource(c).map(_.map(_.orNotFound))
       _  <- Resource.eval(ItcService.pollVersionsForever(c.itcClient, singleSession(c.database), c.itc.pollPeriod))
-      _  <- DbConnections.resource(singleSession(c.database), 1.minute)
+      _  <- DbConnections.resource(singleSession(c.database, applicationName = "odb-web-monitor"), 1.minute)
       _  <- serverResource(c.port, ap)
     } yield ExitCode.Success
 

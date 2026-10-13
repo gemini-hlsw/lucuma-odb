@@ -30,7 +30,9 @@ import lucuma.core.model.User
 import lucuma.core.util.Gid
 import lucuma.horizons.HorizonsClient
 import lucuma.itc.client.ItcClient
+import lucuma.odb.graphql.topic.OdbTopic
 import lucuma.odb.sequence.util.CommitHash
+import lucuma.odb.service.PdfSummaryJobDaemon
 import lucuma.otel.OtelConfig
 import lucuma.sso.client.SsoClient
 import lucuma.sso.client.SsoJwtReader
@@ -207,19 +209,18 @@ object Config:
 
   object Database:
 
-    /**
-     * Pooled sessions each service pins for the life of the process: the
-     * LISTEN and lookup pair of `OdbTopic.Sessions`. Must match `runFeeds`.
-     */
-    val ReservedSessions = 2
+    /** Pooled sessions each topic-feeding service pins for the life of the process. */
+    val ReservedSessions: Int = OdbTopic.Sessions.Count
 
     // A pool no larger than the pinned sessions hangs the first query forever.
-    private def poolSize(name: String, default: Int): ConfigValue[Effect, Int] =
-      envOrProp(name).as[Int].default(default).flatMap: n =>
-        if n > ReservedSessions then ConfigValue.loaded(ConfigKey(name), n)
+    // Only the env value is checked: the defaults are always large enough.
+    private def poolSize(name: String, default: Int, reserved: Int): ConfigValue[Effect, Int] =
+      envOrProp(name).as[Int].flatMap: n =>
+        if n > reserved then ConfigValue.loaded(ConfigKey(name), n)
         else ConfigValue.failed(ConfigError(
-          s"$name is $n but must be greater than $ReservedSessions, the sessions pinned for LISTEN/NOTIFY"
+          s"$name is $n but must be greater than $reserved, the sessions pinned for LISTEN/NOTIFY"
         ))
+      .default(default)
 
     object Default:
       val MaxConnections        = Runtime.getRuntime.availableProcessors * 2 + 1
@@ -260,11 +261,11 @@ object Config:
       ConfigDecoder[(Int, Int, Int, Int, URI)].mapOption("Database")(Database.fromHerokuUri)
 
     lazy val fromCiris: ConfigValue[Effect, Database] = (
-      poolSize("ODB_MAX_CONNECTIONS", Default.MaxConnections),
-      poolSize("CALIBRATIONS_MAX_CONNECTIONS", Default.MaxConnections),
-      poolSize("OBSCALC_MAX_CONNECTIONS", Default.MaxConnections),
+      poolSize("ODB_MAX_CONNECTIONS", Default.MaxConnections, ReservedSessions),
+      poolSize("CALIBRATIONS_MAX_CONNECTIONS", Default.MaxConnections, ReservedSessions),
+      poolSize("OBSCALC_MAX_CONNECTIONS", Default.MaxConnections, ReservedSessions),
       // The pdf-summary dyno renders serially and holds no connection while doing so.
-      envOrProp("PDF_SUMMARY_MAX_CONNECTIONS").as[Int].default(Default.PdfSummaryConnections),
+      poolSize("PDF_SUMMARY_MAX_CONNECTIONS", Default.PdfSummaryConnections, PdfSummaryJobDaemon.ReservedSessions),
       envOrProp("DATABASE_URL").as[URI] // passed by Heroku
     ).parTupled.as[Database]
 
