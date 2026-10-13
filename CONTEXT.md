@@ -265,3 +265,9 @@ _Avoid_: edited sequence (not a separate state), manual sequence, stored sequenc
 **Sequence Clone Mode**:
 What a cloned observation takes from its source's Materialized Sequences: `NONE` (nothing, the clone generates its own), `ALL_STEPS` (every step, executed or not and whatever state it ended in, all as pending) or `PENDING_STEPS` (only steps that have not run). Applied to the acquisition and science sequences independently; a sequence type with nothing to copy is simply generated.
 _Avoid_: copy sequence flag, duplicate sequence, regenerate.
+
+### Guide Stars
+
+**Guide Star Override**:
+A guide star a user named for an observation, used in place of the one the automatic search would choose. It holds until the user clears it or an input that decides which stars can guide the observation changes; executing the observation is not such a change.
+_Avoid_: manually selected guide star, selected guide star, guide target name, pick, selection.

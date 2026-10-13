@@ -42,7 +42,6 @@ import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.Itc
 import lucuma.odb.data.ItcAcquisition
-import lucuma.odb.data.Md5Hash
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.ObservingMode.Syntax.*
 import lucuma.odb.sequence.SetupTimeEstimateCalculator
@@ -77,14 +76,12 @@ sealed trait Generator[F[_]]:
   )(using NoTransaction[F]): F[Either[OdbError, ExecutionDigest]]
 
   /**
-   * The same is `digest`, but it also returns the GeneratorParms and a hash of the inputs the
-   * digest was calculated from. This is useful in things like the guide star availability
-   * calculations which depend on the digest and are also cached. The hash is the guide star one,
-   * which leaves the ITC result out; see `GeneratorContext.guideStarHash`.
+   * The same as `digest`, but it also returns the GeneratorParams the digest was calculated
+   * from, for the guide star calculations.
    */
-  def digestWithParamsAndHash(
+  def digestWithParams(
     observationId: Observation.Id
-  )(using NoTransaction[F]): F[Either[OdbError, (ExecutionDigest, GeneratorParams, Md5Hash)]]
+  )(using NoTransaction[F]): F[Either[OdbError, (ExecutionDigest, GeneratorParams)]]
 
   /**
    * Calculates the ExecutionDigest and AtomDigests (for the obscalc service),
@@ -208,7 +205,7 @@ object Generator:
           .value
 
       // An Altair sequence generated without the guide star the observation will actually use is
-      // not the sequence it will execute, so everything but `digestWithParamsAndHash` -- which the
+      // not the sequence it will execute, so everything but `digestWithParams` -- which the
       // guide star calculations use to pick that star in the first place -- reports the problem.
       private def altairChecked[A](ctx: GeneratorContext, a: A): Either[OdbError, A] =
         ctx.altairProblem.toLeft(a)
@@ -223,14 +220,14 @@ object Generator:
             d  <- EitherT.fromEither[F](altairChecked(ctx, d1))
           yield d
 
-      override def digestWithParamsAndHash(
+      override def digestWithParams(
         oid: Observation.Id
-      )(using NoTransaction[F]): F[Either[OdbError, (ExecutionDigest, GeneratorParams, Md5Hash)]] =
+      )(using NoTransaction[F]): F[Either[OdbError, (ExecutionDigest, GeneratorParams)]] =
         transactionallyWithContext(oid, commitHash): ctx =>
           for
             d0  <- ExecutionDigestCache.lookupOne(ctx)
             d1  <- d0.fold(calcDigestThenCache(ctx))(d => EitherT.pure(d))
-          yield (d1, ctx.params, ctx.guideStarHash)
+          yield (d1, ctx.params)
 
       private def calcDigestThenCache(
         ctx: GeneratorContext
