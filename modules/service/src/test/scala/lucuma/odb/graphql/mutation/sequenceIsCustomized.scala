@@ -127,11 +127,11 @@ class sequenceIsCustomized extends query.ExecutionTestSupportForGmos with Replac
       _   <- expectSequenceFlags(oid, acqMat = false, sciMat = false, acqCustom = false, sciCustom = false)
     yield ()
 
-  test("resetting the acquisition clears acquisition customization only"):
+  test("resetting the acquisition keeps acquisition customization"):
     for
       oid <- setup
       _   <- replaceSequence(oid, SequenceType.Acquisition)
       _   <- replaceSequence(oid, SequenceType.Science)
       _   <- resetAcquisitionAs(serviceUser, oid)
-      _   <- expectSequenceFlags(oid, acqMat = true, sciMat = true, acqCustom = false, sciCustom = true)
+      _   <- expectSequenceFlags(oid, acqMat = true, sciMat = true, acqCustom = true, sciCustom = true)
     yield ()
