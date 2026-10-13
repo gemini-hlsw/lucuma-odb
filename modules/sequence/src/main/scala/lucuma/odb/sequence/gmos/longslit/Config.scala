@@ -45,9 +45,6 @@ sealed trait Config[G: Enumerated, L: Enumerated, U: Enumerated] extends spectro
   override def fpuMask: GmosFpuMask[U] =
     GmosFpuMask.Builtin(fpu)
 
-  override def gcalFpu: U =
-    fpu
-
   def acquisition: AcquisitionConfig[L]
 
   def hashBytes: Array[Byte] =

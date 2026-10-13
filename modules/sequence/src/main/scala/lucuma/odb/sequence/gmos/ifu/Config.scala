@@ -54,9 +54,6 @@ sealed trait Config[G: Enumerated, L: Enumerated, U: Enumerated] extends spectro
   override def fpuMask: GmosFpuMask[U] =
     GmosFpuMask.Builtin(builtinFpu)
 
-  override def gcalFpu: U =
-    builtinFpu
-
   def ifuAnalysis: GmosIfuAnalysis =
     explicitIfuAnalysis.getOrElse(defaultIfuAnalysis)
 

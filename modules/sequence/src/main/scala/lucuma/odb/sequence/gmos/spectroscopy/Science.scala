@@ -40,7 +40,6 @@ import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
-import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.core.model.sequence.gmos.StaticConfig
 import lucuma.core.optics.syntax.lens.*
 import lucuma.core.optics.syntax.optional.*
@@ -246,17 +245,12 @@ object Science:
 
     sealed trait Computer[D, G, L, U] extends GmosSequenceState[D, G, L, U]:
 
-      /**
-       * Steps are built carrying the config's `gcalFpu`, since the smart gcal
-       * tables are keyed on builtin FPUs and would not match a custom mask.
-       * The real aperture is put back by `applyFpuMask` once expansion is done.
-       */
       def setup(config: Config[G, L, U], time: TimeSpan): State[D, Unit] =
         for {
           _ <- optics.exposure    := time
           _ <- optics.grating     := (config.grating, GmosGratingOrder.One, config.centralWavelength).some
           _ <- optics.filter      := config.filter
-          _ <- optics.fpu         := GmosFpuMask.builtin.reverseGet(config.gcalFpu).some
+          _ <- optics.fpu         := config.fpuMask.some
 
           _ <- optics.xBin        := config.xBin
           _ <- optics.yBin        := config.yBin
@@ -279,10 +273,6 @@ object Science:
        * @param calRole   calibration role, which determines whether arcs and/or
        *                  flats are needed
        */
-      // Replaces the FPU used for the smart gcal lookup with custom width requested.
-      private def applyFpuMask(mask: GmosFpuMask[U])(step: ProtoStep[D]): ProtoStep[D] =
-        (ProtoStep.value[D] andThen optics.fpu).replace(mask.some)(step)
-
       def compute[F[_]: Monad, S](
         oid:        Observation.Id,
         static:     S,
@@ -313,12 +303,10 @@ object Science:
                 s <- scienceStep(TelescopeConfig(Offset.Zero, sciGuiding), sciClass)
               yield (a, f, s)
 
-          val fpu = applyFpuMask(config.fpuMask)
-
           val defn = for
             fs <- if includeFlats then EitherT(expander.expandStep(static, smartFlat)).map(_.toList) else EitherT.pure(List.empty)
             as <- if includeArcs then EitherT(expander.expandStep(static, smartArc)).map(_.toList) else EitherT.pure(List.empty)
-          yield StepDefinition(g, as.toList.map(fpu), fs.map(fpu), fpu(science))
+          yield StepDefinition(g, as, fs, science)
 
           defn.leftMap(s => OdbError.SequenceUnavailable(oid, s"Could not generate a sequence for $oid: $s".some))
 

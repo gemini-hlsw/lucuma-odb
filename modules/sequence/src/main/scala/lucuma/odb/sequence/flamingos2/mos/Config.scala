@@ -25,6 +25,11 @@ import java.io.DataOutputStream
  * Configuration for Flamingos 2 MOS science mode.
  *
  * This is Flamingos 2 long slit with the builtin FPU replaced by a custom mask.
+ *
+ * @param equivalentFpu the builtin long slit FPU whose aperture matches the
+ *                      custom mask's slit width.  Every accepted
+ *                      `Flamingos2CustomSlitWidth` has one, which is what lets
+ *                      a MOS observation be calibrated as a long slit.
  */
 case class Config private (
   disperser:     Flamingos2Disperser,
@@ -37,14 +42,6 @@ case class Config private (
 
   override def fpuMask: Flamingos2FpuMask =
     customMask
-
-  /**
-   * The builtin long slit FPU whose aperture matches the custom mask's slit
-   * width.  Every accepted `Flamingos2CustomSlitWidth` has one, which is what
-   * lets a MOS observation be calibrated as a long slit.
-   */
-  override def gcalFpu: Flamingos2Fpu =
-    equivalentFpu
 
   def hashBytes: Array[Byte] =
     val bao: ByteArrayOutputStream = new ByteArrayOutputStream(256)

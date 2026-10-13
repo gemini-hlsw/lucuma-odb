@@ -7,7 +7,6 @@ package gmos.mos
 import cats.Eq
 import cats.data.NonEmptyList
 import cats.derived.*
-import lucuma.core.enums.GmosCustomSlitWidth
 import lucuma.core.enums.GmosMosAcquisitionType
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu
@@ -62,9 +61,6 @@ sealed trait Config[G: Enumerated, L: Enumerated, U] extends spectroscopy.Config
    */
   def equivalentFpu: U
 
-  override def gcalFpu: U =
-    equivalentFpu
-
   def hashBytes: Array[Byte] =
     val bao: ByteArrayOutputStream = new ByteArrayOutputStream(256)
     val out: DataOutputStream      = new DataOutputStream(bao)
@@ -110,7 +106,7 @@ object Config:
       grating.simultaneousCoverage
 
     override def equivalentFpu: GmosNorthFpu =
-      Config.northFpu(customMask.slitWidth)
+      customMask.slitWidth.northFpu
 
     override def defaultWavelengthDithers: List[WavelengthDither] =
       LongSlitConfig.defaultWavelengthDithersNorth(this.grating)
@@ -135,7 +131,7 @@ object Config:
       grating.simultaneousCoverage
 
     override def equivalentFpu: GmosSouthFpu =
-      Config.southFpu(customMask.slitWidth)
+      customMask.slitWidth.southFpu
 
     override def defaultWavelengthDithers: List[WavelengthDither] =
       LongSlitConfig.defaultWavelengthDithersSouth(this.grating)
@@ -145,23 +141,3 @@ object Config:
 
     override def withTelescopeConfigs(tcs: NonEmptyList[TelescopeConfig]): GmosSouth =
       copy(telescopeConfigs = tcs)
-
-  def northFpu(slitWidth: GmosCustomSlitWidth): GmosNorthFpu =
-    slitWidth match
-      case GmosCustomSlitWidth.CustomWidth_0_25 => GmosNorthFpu.LongSlit_0_25
-      case GmosCustomSlitWidth.CustomWidth_0_50 => GmosNorthFpu.LongSlit_0_50
-      case GmosCustomSlitWidth.CustomWidth_0_75 => GmosNorthFpu.LongSlit_0_75
-      case GmosCustomSlitWidth.CustomWidth_1_00 => GmosNorthFpu.LongSlit_1_00
-      case GmosCustomSlitWidth.CustomWidth_1_50 => GmosNorthFpu.LongSlit_1_50
-      case GmosCustomSlitWidth.CustomWidth_2_00 => GmosNorthFpu.LongSlit_2_00
-      case GmosCustomSlitWidth.CustomWidth_5_00 => GmosNorthFpu.LongSlit_5_00
-
-  def southFpu(slitWidth: GmosCustomSlitWidth): GmosSouthFpu =
-    slitWidth match
-      case GmosCustomSlitWidth.CustomWidth_0_25 => GmosSouthFpu.LongSlit_0_25
-      case GmosCustomSlitWidth.CustomWidth_0_50 => GmosSouthFpu.LongSlit_0_50
-      case GmosCustomSlitWidth.CustomWidth_0_75 => GmosSouthFpu.LongSlit_0_75
-      case GmosCustomSlitWidth.CustomWidth_1_00 => GmosSouthFpu.LongSlit_1_00
-      case GmosCustomSlitWidth.CustomWidth_1_50 => GmosSouthFpu.LongSlit_1_50
-      case GmosCustomSlitWidth.CustomWidth_2_00 => GmosSouthFpu.LongSlit_2_00
-      case GmosCustomSlitWidth.CustomWidth_5_00 => GmosSouthFpu.LongSlit_5_00

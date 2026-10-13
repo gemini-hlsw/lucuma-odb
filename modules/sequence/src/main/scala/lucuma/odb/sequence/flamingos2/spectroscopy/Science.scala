@@ -27,7 +27,6 @@ import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig as F2
-import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
 import lucuma.core.optics.syntax.lens.*
 import lucuma.core.util.TimeSpan
@@ -84,10 +83,6 @@ object Science:
     def f2ScienceStep(tc: TelescopeConfig, obsClass: ObserveClass): State[F2, ProtoStep[F2]] =
       scienceStep(tc, obsClass)
 
-    /** Replaces the FPU used for the smart gcal lookup with the real aperture. */
-    private def applyFpuMask(mask: Flamingos2FpuMask)(step: ProtoStep[F2]): ProtoStep[F2] =
-      (ProtoStep.value[F2] andThen F2.fpu).replace(mask)(step)
-
     // PreDef is a StepDefinition before SmartGcal expansion.
     case class PreDef(
       a0:   ProtoStep[F2],
@@ -99,21 +94,13 @@ object Science:
     ):
       def expand[F[_]: Monad](
         static:   Flamingos2StaticConfig,
-        expander: SmartGcalExpander[F, Flamingos2StaticConfig, F2],
-        mask:     Flamingos2FpuMask
+        expander: SmartGcalExpander[F, Flamingos2StaticConfig, F2]
       ): EitherT[F, String, StepDefinition] =
-
-        val fpu = applyFpuMask(mask)
-
         EitherT(expander.expandFlatAndOrArc(static, flat, arc))
-          .map(cs => StepDefinition(a0, b0, b1, a1, cs.map(adjustReadMode.andThen(fpu))))
+          .map(cs => StepDefinition(a0, b0, b1, a1, cs))
 
     object PreDef:
 
-      /**
-       * The flat and arc are built carrying the config's `gcalFpu`, since the smart
-       * gcal tables are keyed on builtin FPUs and would not match a custom mask.
-       */
       def apply(
          config:  Config,
          time:    IntegrationTime,
@@ -147,7 +134,6 @@ object Science:
             b0 <- f2ScienceStep(b0Off, sciClass)
             b1 <- f2ScienceStep(b1Off, sciClass)
             a1 <- f2ScienceStep(a1Off, sciClass)
-            _  <- F2.fpu         := Flamingos2FpuMask.builtin(config.gcalFpu)
             // Taken at a0 since the set opens the sequence, so no offset precedes the first cycle.
             f  <- flatStep(a0.telescopeConfig.copy(guiding = Disabled), ObserveClass.NightCal)
             r  <- arcStep(a0.telescopeConfig.copy(guiding = Disabled), ObserveClass.NightCal)
@@ -168,7 +154,7 @@ object Science:
                  // This case should be caught when validating arguments to the mode
                  // construction / update.  Nevertheless, we'll guarantee it here.
                  case _                    => s"Exactly 4 offset positions are needed for $modeName (${config.telescopeConfigs.size} provided).".asLeft
-        d <- p.expand(static, expander, config.fpuMask)
+        d <- p.expand(static, expander)
       yield d
 
   end StepDefinition

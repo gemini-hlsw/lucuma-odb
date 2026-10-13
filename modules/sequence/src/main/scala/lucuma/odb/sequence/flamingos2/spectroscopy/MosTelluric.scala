@@ -80,7 +80,7 @@ object MosTelluric:
           .explicitReadMode
           .getOrElse(Flamingos2ReadMode.forExposureTime(time.exposureTime))
 
-      val mask = Flamingos2FpuMask.builtin(config.gcalFpu)
+      val mask = Flamingos2FpuMask.builtin(config.equivalentFpu)
 
       eval:
         for
@@ -104,7 +104,7 @@ object MosTelluric:
     arc:      ProtoStep[F2]
   ): EitherT[F, String, StepDefinition] =
     EitherT(expander.expandStep(static, arc))
-      .map(as => StepDefinition(science, as.map(adjustReadMode)))
+      .map(as => StepDefinition(science, as))
 
   private case class Generator(
     steps:      StepDefinition,

@@ -25,9 +25,10 @@ import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
  * MOS a custom mask.  Everything a Flamingos 2 spectroscopy sequence reads that
  * does not depend on the aperture is declared here.
  *
- * `gcalFpu` is the builtin FPU the smart gcal tables are keyed on.  For long
- * slit it is the aperture itself; for MOS it is the builtin long slit FPU whose
- * width matches the custom mask's slit width.
+ * `equivalentFpu` is the builtin FPU that stands in for the aperture where a
+ * custom mask cannot be used.  For long slit it is the aperture itself; for MOS
+ * it is the builtin long slit FPU whose width matches the custom mask's slit
+ * width.
  */
 trait Config extends Product with Serializable:
 
@@ -42,8 +43,8 @@ trait Config extends Product with Serializable:
   /** The aperture the generated steps carry. */
   def fpuMask: Flamingos2FpuMask
 
-  /** The builtin FPU used to key the smart gcal search. */
-  def gcalFpu: Flamingos2Fpu
+  /** The builtin FPU equivalent to the aperture. */
+  def equivalentFpu: Flamingos2Fpu
 
   def exposureTimeMode: ExposureTimeMode =
     common.exposureTimeMode

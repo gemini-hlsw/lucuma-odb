@@ -28,6 +28,7 @@ import lucuma.odb.sequence.SmartGcalExpander
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.service.SmartGcalService
+import lucuma.odb.smartgcal.SmartGcalRules
 import lucuma.odb.smartgcal.data.Flamingos2
 import lucuma.odb.smartgcal.data.Ghost
 import lucuma.odb.smartgcal.data.Gmos
@@ -46,7 +47,12 @@ object SmartGcalImplementation {
   ): ForInstrument[F] =
     new ForInstrument[F](service)
 
+  // The instrument's rules are applied here so that they hold for every
+  // expansion: the lookup is keyed on `rules.lookupConfig` of the step (or
+  // fails with its error), and the configuration of each resulting step is
+  // completed by `rules.calibrationConfig`.
   private class Expander[F[_]: Concurrent, K, S, D](
+    rules:     SmartGcalRules[D],
     toKey:     (S, D) => K,
     formatKey: K => String,
     select:    (K, SmartGcalType) => F[List[(D => D, Gcal)]]
@@ -69,25 +75,32 @@ object SmartGcalImplementation {
     ): F[(Cache[K, D], Either[String, NonEmptyList[ProtoStep[D]]])] =
       step match {
         case ProtoStep(d, StepConfig.SmartGcal(sgt), t, o, b) =>
-          val key = toKey(static, d)
 
           def toStep(tup: (D => D, Gcal)): ProtoStep[D] = {
             val (update, gcal) = tup
-            ProtoStep(update(d), gcal, t, o, b)
+            ProtoStep(rules.calibrationConfig(update(d)), gcal, t, o, b)
           }
 
-          cache.get((key, sgt)).fold(
-            select(key, sgt).map {
-              case Nil    =>
-                val error = s"missing Smart GCAL mapping: ${formatKey(key)}"
-                (cache.updated((key, sgt), error.asLeft), error.asLeft)
-              case h :: t =>
-               (
-                 cache.updated((key, sgt), NonEmptyList(h, t).asRight),
-                 NonEmptyList(toStep(h), t.map(toStep)).asRight
-               )
-            }
-          ) { e => (cache, e.map(_.map(toStep))).pure[F] }
+          def lookup(key: K): F[(Cache[K, D], Either[String, NonEmptyList[ProtoStep[D]]])] =
+            cache.get((key, sgt)).fold(
+              select(key, sgt).map {
+                case Nil    =>
+                  val error = s"missing Smart GCAL mapping: ${formatKey(key)}"
+                  (cache.updated((key, sgt), error.asLeft), error.asLeft)
+                case h :: t =>
+                 (
+                   cache.updated((key, sgt), NonEmptyList(h, t).asRight),
+                   NonEmptyList(toStep(h), t.map(toStep)).asRight
+                 )
+              }
+            ) { e => (cache, e.map(_.map(toStep))).pure[F] }
+
+          rules
+            .lookupConfig(d)
+            .fold(
+              error => (cache, error.asLeft[NonEmptyList[ProtoStep[D]]]).pure[F],
+              c     => lookup(toKey(static, c))
+            )
 
         case ps@ProtoStep(_, _, _, _, _) =>
           (cache, NonEmptyList.one(ps).asRight).pure[F]
@@ -111,6 +124,7 @@ object SmartGcalImplementation {
 
     val flamingos2: SmartGcalExpander[F, Flamingos2StaticConfig, Flamingos2DynamicConfig] =
       new Expander[F, Flamingos2.TableKey, Flamingos2StaticConfig, Flamingos2DynamicConfig](
+        SmartGcalRules.flamingos2,
         (_, d) => Flamingos2.TableKey.fromDynamicConfig(d),
         _.format,
         service.selectFlamingos2
@@ -118,6 +132,7 @@ object SmartGcalImplementation {
 
     val ghost: SmartGcalExpander[F, GhostStaticConfig, GhostDynamicConfig] =
       new Expander[F, Ghost.SearchKey, GhostStaticConfig, GhostDynamicConfig](
+        SmartGcalRules.ghost,
         (s, d) => Ghost.SearchKey.forConfig(s, d),
         _.format,
         service.selectGhost
@@ -125,6 +140,7 @@ object SmartGcalImplementation {
 
     val gmosNorth: SmartGcalExpander[F, GmosNorthStaticConfig, GmosNorthDynamicConfig] =
       new Expander[F, Gmos.SearchKey.North, GmosNorthStaticConfig, GmosNorthDynamicConfig](
+        SmartGcalRules.gmosNorth,
         (_, d) => Gmos.SearchKey.North.fromDynamicConfig(d),
         _.format,
         service.selectGmosNorth
@@ -132,6 +148,7 @@ object SmartGcalImplementation {
 
     val gmosSouth: SmartGcalExpander[F, GmosSouthStaticConfig, GmosSouthDynamicConfig] =
       new Expander[F, Gmos.SearchKey.South, GmosSouthStaticConfig, GmosSouthDynamicConfig](
+        SmartGcalRules.gmosSouth,
         (_, d) => Gmos.SearchKey.South.fromDynamicConfig(d),
         _.format,
         service.selectGmosSouth
@@ -139,6 +156,7 @@ object SmartGcalImplementation {
 
     val igrins2: SmartGcalExpander[F, Igrins2StaticConfig, Igrins2DynamicConfig] =
       new Expander[F, Igrins2.TableKey.type, Igrins2StaticConfig, Igrins2DynamicConfig](
+        SmartGcalRules.igrins2,
         (_, _) => Igrins2.TableKey,
         _.format,
         service.selectIgrins2
@@ -146,6 +164,7 @@ object SmartGcalImplementation {
 
     val gnirs: SmartGcalExpander[F, GnirsStaticConfig, GnirsDynamicConfig] =
       new Expander[F, Gnirs.SearchKey, GnirsStaticConfig, GnirsDynamicConfig](
+        SmartGcalRules.gnirs,
         (s, d) => Gnirs.SearchKey.fromConfig(s, d),
         _.format,
         service.selectGnirs

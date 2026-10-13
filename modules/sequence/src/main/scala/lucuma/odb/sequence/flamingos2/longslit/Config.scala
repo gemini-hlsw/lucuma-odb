@@ -43,7 +43,7 @@ case class Config(
   override def fpuMask: Flamingos2FpuMask =
     Flamingos2FpuMask.Builtin(fpu)
 
-  override def gcalFpu: Flamingos2Fpu =
+  override def equivalentFpu: Flamingos2Fpu =
     fpu
 
   def hashBytes: Array[Byte] =
