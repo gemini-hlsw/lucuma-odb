@@ -391,6 +391,9 @@ object GuideService {
     def trackType: TrackType =
       trackTypeOf(asterism.exists(Target.nonsidereal.getOption(_).isDefined))
 
+    def blindOffsetAt(instant: Instant): Option[Coordinates] =
+      blindOffset.flatMap(_.at(instant))
+
     // Positions only, in a fixed order: neither the target that holds them nor its catalog link
     // moves the field.
     def update(md5: MessageDigest): Unit = {
@@ -686,19 +689,6 @@ object GuideService {
   ): GuideService[F] =
     new GuideService[F] {
 
-      def getAsterism(oid: Observation.Id)(using
-        NoTransaction[F], SuperUserAccess
-      ): F[Result[NonEmptyList[Target]]] =
-        asterismService
-          .getAsterism(oid)
-          .map(l =>
-            NonEmptyList
-              .fromList(
-                l.map(_._2)
-              )
-              .toResult(generalError(s"No targets have been defined for observation $oid.").asProblem)
-          )
-
       def getObservationInfo(oid: Observation.Id)(using
         NoTransaction[F]
       ): F[Result[ObservationInfo]] = {
@@ -987,6 +977,10 @@ object GuideService {
           .transactionally(generatorParamsService.selectOne(obsInfo.programId, obsInfo.id))
           .map(_.fold(e => generatorError(GeneratorError.sequenceUnavailable(obsInfo.id, e.format)).asFailure, _.success))
 
+      def nonEmpty(oid: Observation.Id, targets: SearchTargets): Result[SearchTargets] =
+        if targets.asterism.nonEmpty then targets.success
+        else generalError(s"No targets have been defined for observation $oid.").asFailure
+
       // One transaction, so the asterism and the blind offset are read as of the same moment.
       def getSearchTargets(oid: Observation.Id)(using SuperUserAccess): F[SearchTargets] =
         val blindOffset = Statements.getBlindOffsetTracking(oid)
@@ -996,9 +990,8 @@ object GuideService {
             session.prepareR(blindOffset.fragment.query(siderealTrackingDecoder)).use(_.option(blindOffset.argument))
           ).mapN(SearchTargets.apply)
 
-      def overrideHash(obsInfo: ObservationInfo, params: GeneratorParams)(using SuperUserAccess): F[Md5Hash] =
-        getSearchTargets(obsInfo.id).map: targets =>
-          obsInfo.overrideHash(SearchSettings(params).hash(obsInfo, targets), targets)
+      def overrideHash(obsInfo: ObservationInfo, params: GeneratorParams, targets: SearchTargets): Md5Hash =
+        obsInfo.overrideHash(SearchSettings(params).hash(obsInfo, targets), targets)
 
       def chooseBestGuideStar(
         obsInfo:       ObservationInfo,
@@ -1215,17 +1208,6 @@ object GuideService {
       def guideStarIdFromName(name: GuideStarName): Result[Long] =
         name.toGaiaSourceId.toResult(generalError(s"Invalid guide star name `$name`").asProblem)
 
-      def getBlindOffsetCoordinates(
-        oid:     Observation.Id,
-        instant: Instant
-      ): F[Option[Coordinates]] =
-          T.span("getBlindOffsetCoordinates").surround:
-            val trackingStmt = Statements.getBlindOffsetTracking(oid)
-            session.prepareR(
-              trackingStmt.fragment.query(siderealTrackingDecoder)
-            ).use(_.option(trackingStmt.argument)).map: tracking =>
-              tracking.flatMap(_.at(instant))
-
       def trackingSnapshotAt(oid: Observation.Id, time: Timestamp): F[Result[TrackingService.Snapshot[Tracking]]] =
         trackingService.getTrackingSnapshot(oid, TimestampInterval.empty(time), false)
 
@@ -1252,6 +1234,7 @@ object GuideService {
         oGuideStarName:         Option[GuideStarName],
         obsInfo:                ObservationInfo,
         genInfo:                GeneratorInfo,
+        targets:                SearchTargets,
         obsTime:                Timestamp,
         obsDuration:            TimeSpan,
         scienceTime:            Timestamp,
@@ -1307,7 +1290,7 @@ object GuideService {
                               .anglesToTestAt(genInfo.site, baseTracking, scienceTime.toInstant, scienceDuration.toDuration)
                               .toResult(generalError(s"Cannot compute the average parallactic angle for observation $oid: the target is not observable at the observation time, or its position is unknown then.").asProblem)
                            )
-          blindOffsetOpt <- ResultT.liftF(getBlindOffsetCoordinates(oid, obsTime.toInstant))
+          blindOffsetOpt  = targets.blindOffsetAt(obsTime.toInstant)
           optUsable      <- ResultT.liftF(chooseBestGuideStar(obsInfo, genInfo.agsWavelength, genInfo, baseCoords, scienceCoords, blindOffsetOpt, angles, candidates, trackType))
           tgts           = original.map(x => (x._2.id, x._1)).toList.toMap
           selection      = optUsable.flatMap: usable =>
@@ -1324,18 +1307,17 @@ object GuideService {
             obsInfo         <- ResultT(getObservationInfo(oid))
             obsTime         <- ResultT.fromResult(obsInfo.obsTime)
             obsDuration     <- ResultT.fromResult(obsInfo.obsDuration)
-            asterism        <- ResultT(getAsterism(oid))
+            targets         <- ResultT(getSearchTargets(oid).map(nonEmpty(oid, _)))
             genInfo         <- ResultT(getGeneratorInfo(oid))
             scienceDuration <- ResultT.fromResult(genInfo.getScienceDuration(obsDuration, oid))
             scienceStart     = genInfo.getScienceStartTime(obsTime)
-            oHash           <- ResultT.liftF(overrideHash(obsInfo, genInfo.params))
-            oGSName          = obsInfo.validGuideStarName(oHash)
+            oGSName          = obsInfo.validGuideStarName(overrideHash(obsInfo, genInfo.params, targets))
             // Twilight and daytime pinhole calibrations have no guide stars, so skip AGS
             // entirely and return an empty guide environment.
             result          <- if (genInfo.params.calibrationRole.exists(GuideEnvironment.CalRolesWithoutGuiding.contains))
                                   ResultT.pure(GuideEnvironment(obsInfo.availabilityAngles.head, Nil))
                                 else
-                                  ResultT(lookupGuideStar(oid, oGSName, obsInfo, genInfo, obsTime, obsDuration, scienceStart, scienceDuration))
+                                  ResultT(lookupGuideStar(oid, oGSName, obsInfo, genInfo, targets, obsTime, obsDuration, scienceStart, scienceDuration))
                                     .flatMap: selection =>
                                       ResultT.fromResult:
                                         selection.map(_.environment).toResult(
@@ -1352,8 +1334,8 @@ object GuideService {
         (for {
           obsInfo    <- ResultT(getObservationInfo(oid))
           params     <- ResultT.liftF(getParams(obsInfo)).map(_.toOption)
-          oHash      <- ResultT.liftF(params.traverse(overrideHash(obsInfo, _)))
-        } yield oHash.flatMap(obsInfo.validGuideStarName).map(_.toNonEmptyString)).value
+          targets    <- ResultT.liftF(getSearchTargets(oid))
+        } yield params.flatMap(p => obsInfo.validGuideStarName(overrideHash(obsInfo, p, targets))).map(_.toNonEmptyString)).value
 
       override def resolveGuideStar(oid: Observation.Id)(
         using NoTransaction[F], SuperUserAccess
@@ -1377,13 +1359,13 @@ object GuideService {
             obsDuration      = obsInfo.optObsDuration.getOrElse(generatorInfo.defaultObsDuration)
             scienceDuration <- ResultT.fromResult(generatorInfo.getScienceDuration(obsDuration, oid))
             scienceStart     = generatorInfo.getScienceStartTime(obsTime)
-            oHash           <- ResultT.liftF(overrideHash(obsInfo, generatorInfo.params))
-            oGSName          = obsInfo.validGuideStarName(oHash)
+            targets         <- ResultT.liftF(getSearchTargets(oid))
+            oGSName          = obsInfo.validGuideStarName(overrideHash(obsInfo, generatorInfo.params, targets))
             // A calibration that does not guide never has a star; that is not an error.
             resolution      <- if (generatorInfo.params.calibrationRole.exists(GuideEnvironment.CalRolesWithoutGuiding.contains))
                                  ResultT.pure(GuideStarResolution.NotGuided)
                                else
-                                 ResultT(lookupGuideStar(oid, oGSName, obsInfo, generatorInfo, obsTime, obsDuration, scienceStart, scienceDuration))
+                                 ResultT(lookupGuideStar(oid, oGSName, obsInfo, generatorInfo, targets, obsTime, obsDuration, scienceStart, scienceDuration))
                                    .map: selection =>
                                      // A stored star is looked up by id, so no selection means that
                                      // star itself is no longer usable.
@@ -1410,8 +1392,8 @@ object GuideService {
                             )
             obsInfo       <- ResultT(getObservationInfo(oid))
             genInfo       <- ResultT(getGeneratorInfo(oid))
-            blindOffset   <- ResultT.liftF(getBlindOffsetCoordinates(oid, period.start.toInstant))
             targets       <- ResultT.liftF(getSearchTargets(oid))
+            blindOffset    = targets.blindOffsetAt(period.start.toInstant)
             newHash        = obsInfo.availabilityHash(genInfo.search.hash(obsInfo, targets), targets, commitHash)
             currentAvail  <- ResultT.liftF(getFromCacheOrEmpty(pid, oid, newHash))
             missingPeriods = currentAvail.findMissingIntervals(period)
@@ -1451,7 +1433,7 @@ object GuideService {
                         GuideStarName.from(name.value).toOption.toResult(guideStarNameError(name.value).asProblem)
                       )
             params <- ResultT(getParams(obsInfo))
-            hash   <- ResultT.liftF(Services.asSuperUser(overrideHash(obsInfo, params)))
+            hash   <- ResultT.liftF(Services.asSuperUser(getSearchTargets(obsInfo.id))).map(overrideHash(obsInfo, params, _))
             result <- ResultT(updateGuideTargetName(obsInfo.programId, obsInfo.id, gsn.some, hash.some))
             _      <- ResultT(checkAltair(params))
           } yield result).value
