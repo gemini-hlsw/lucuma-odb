@@ -3,7 +3,6 @@
 
 package lucuma.resource.test
 
-import cats.data.OptionT
 import cats.effect.IO
 import cats.syntax.all.*
 import io.circe.Json
@@ -51,14 +50,15 @@ object TestSso:
 
   def ssoClient: SsoClient[IO, User] =
     new SsoClient.AbstractSsoClient[IO, User]:
-      def find(req: Request[IO]): IO[Option[User]]            =
-        OptionT.fromOption[IO](req.headers.get[Authorization]).flatMapF(get).value
-      def get(authorization: Authorization): IO[Option[User]] =
+      def get(authorization: Authorization): IO[Either[String, User]] =
         authorization match
           case Authorization(Credentials.Token(Bearer, jwt)) =>
-            reader.decodeClaim(jwt).map(_.getUser.toOption).attempt.map(_.toOption.flatten)
+            reader
+              .decodeUser(jwt)
+              .attempt
+              .map(_.leftMap(SsoClient.denialMessage))
           case _                                             =>
-            none.pure[IO]
+            SsoClient.AccessDenied.asLeft[User].pure[IO]
 
   /** A garden-variety authenticated user. */
   val pi: User =

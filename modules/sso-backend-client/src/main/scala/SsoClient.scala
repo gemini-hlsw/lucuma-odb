@@ -4,6 +4,7 @@
 package lucuma.sso.client
 
 import cats.Monad
+import cats.data.EitherT
 import cats.data.OptionT
 import cats.effect.Clock
 import cats.effect.Concurrent
@@ -13,10 +14,13 @@ import lucuma.core.model.User
 import org.http4s.*
 import org.http4s.Credentials.Token
 import org.http4s.client.Client
+import org.http4s.client.UnexpectedStatus
 import org.http4s.dsl.Http4sDsl
 import org.http4s.headers.Authorization
 import org.typelevel.ci.CIString
 import org.typelevel.log4cats.Logger
+import pdi.jwt.exceptions.JwtException
+import pdi.jwt.exceptions.JwtLengthException
 
 import scala.collection.immutable.TreeMap
 import scala.concurrent.duration.*
@@ -24,11 +28,17 @@ import scala.concurrent.duration.*
 /** An SSO client that extracts user information of type `A` from API keys and JWTs. */
 trait SsoClient[F[_], A] {
 
-  /** Find authorization information in the specified request, if present and valid. */
-  def find(req: Request[F]): F[Option[A]]
+  /**
+   * Find authorization information in the specified request, if present and valid. Otherwise
+   * return a message that tells why access is denied.
+   */
+  def find(req: Request[F]): F[Either[String, A]]
 
-  /** Get authorization information from the specified Authorization header, if valid. */
-  def get(authorization: Authorization): F[Option[A]]
+  /**
+   * Get authorization information from the specified Authorization header, if valid. Otherwise
+   * return a message that tells why access is denied.
+   */
+  def get(authorization: Authorization): F[Either[String, A]]
 
   /**
    * Find authorization information and pass it to the specified response handler, responding with
@@ -72,6 +82,29 @@ trait SsoClient[F[_], A] {
 
 
 object SsoClient {
+
+  /** The message for a denied request, when no more specific message is available. */
+  val AccessDenied: String = "Access denied"
+
+  /** The message for a denied API key, which the SSO server refused to exchange. */
+  val InvalidApiKey: String = s"$AccessDenied: invalid API key"
+
+  /**
+   * The message of `t`, safe to send to the client and to write to the log. The message of a
+   * `JwtLengthException` contains the whole token, so we replace it.
+   */
+  private def safeMessage(t: Throwable): String =
+    t match {
+      case _: JwtLengthException => "Expected token to be composed of 2 or 3 parts separated by dots."
+      case _                     => Option(t.getMessage).getOrElse(t.getClass.getName)
+    }
+
+  /** The message for a denied request: the `JwtException` message with a prefix, else `AccessDenied`. */
+  def denialMessage(t: Throwable): String =
+    t match {
+      case e: JwtException => s"$AccessDenied: ${safeMessage(e)}"
+      case _               => AccessDenied
+    }
 
   /**
    * Complete set of user information, as retrieved from an HTTP request.
@@ -124,41 +157,40 @@ object SsoClient {
           _     <- ref.update(m => m + (apiKey -> info))
         } yield info
 
-      def getOrFetchApiInfo(apiKey: ApiKey): F[UserInfo] =
-        OptionT(getCachedApiInfo(apiKey)).getOrElseF(fetchApiInfo(apiKey))
+      def getOrFetchApiInfo(apiKey: ApiKey): F[Either[String, UserInfo]] =
+        OptionT(getCachedApiInfo(apiKey))
+          .getOrElseF(fetchApiInfo(apiKey))
+          .map(_.asRight[String])
+          .recoverWith {
+            case UnexpectedStatus(Status.Forbidden, _, _) =>
+              Logger[F].warn(s"SSO refused to exchange API key ${apiKey.id}").as(InvalidApiKey.asLeft[UserInfo])
+            // Any other status is a server error. Remove the request URI, which contains the key.
+            case UnexpectedStatus(status, method, uri) =>
+              UnexpectedStatus(status, method, uri.removeQueryParam("key")).raiseError[F, Either[String, UserInfo]]
+          }
 
       def getApiKey(bearerAuthorization: String): Option[ApiKey] =
         ApiKey.fromString.getOption(bearerAuthorization)
 
-      def getApiInfo(bearerAuthorization: String): F[Option[UserInfo]] =
-        getApiKey(bearerAuthorization).traverse(getOrFetchApiInfo)
-
-      def getJwtInfo(bearerAuthorization: String): F[Option[UserInfo]] = {
+      def getJwtInfo(bearerAuthorization: String): F[Either[String, UserInfo]] = {
         for {
           claim <- jwtReader.decodeClaim(bearerAuthorization)
           user  <- claim.getUser.liftTo[F]
-          info   = UserInfo(user, claim, authorization(bearerAuthorization))
-        } yield info
-      } .attempt.flatMap {
-        case Right(ui) => Some(ui).pure[F]
-        case Left(ex)  => Logger[F].warn(ex)(s"JWT validation failed for $bearerAuthorization").as(None)
-      }
+        } yield UserInfo(user, claim, authorization(bearerAuthorization))
+      } .attempt.flatMap(_.leftTraverse { ex =>
+        // Log neither the token nor the exception: the message of some exceptions contains the token.
+        Logger[F].warn(s"JWT validation failed: ${safeMessage(ex)}").as(denialMessage(ex))
+      })
 
-      def getUserInfo(bearerAuthorization: String): F[Option[UserInfo]] =
-        (OptionT(getApiInfo(bearerAuthorization)) <+> OptionT(getJwtInfo(bearerAuthorization))).value
+      def getUserInfo(bearerAuthorization: String): F[Either[String, UserInfo]] =
+        getApiKey(bearerAuthorization).fold(getJwtInfo(bearerAuthorization))(getOrFetchApiInfo)
 
       new AbstractSsoClient[F, UserInfo] {
 
-        def get(authorization: Authorization): F[Option[UserInfo]] =
+        def get(authorization: Authorization): F[Either[String, UserInfo]] =
           authorization.credentials match {
             case Token(Bearer, ba) => getUserInfo(ba)
-            case _                 => none.pure[F]
-          }
-
-        def find(req: Request[F]): F[Option[UserInfo]] =
-          req.headers.get[Authorization] match {
-            case Some(a) => get(a)
-            case None    => none.pure[F]
+            case _                 => AccessDenied.asLeft[UserInfo].pure[F]
           }
 
       }
@@ -170,18 +202,22 @@ object SsoClient {
     object FDsl extends Http4sDsl[F]
     import FDsl._
 
-    final def require(req: Request[F])(f: A => F[Response[F]]): F[Response[F]] =
-      OptionT(find(req)).cataF(Forbidden(), f)
+    /** Delegates to `get` if the request has an Authorization header, else denies access. */
+    def find(req: Request[F]): F[Either[String, A]] =
+      req.headers.get[Authorization].fold(AccessDenied.asLeft[A].pure[F])(get)
 
-    private def transform[B](f: Option[A] => Option[B]): SsoClient[F, B] =
+    final def require(req: Request[F])(f: A => F[Response[F]]): F[Response[F]] =
+      EitherT(find(req)).foldF(Forbidden(_), f)
+
+    private def transform[B](f: Either[String, A] => Either[String, B]): SsoClient[F, B] =
       new AbstractSsoClient[F, B] {
-        def find(req: Request[F]) = outer.find(req).map(f)
+        override def find(req: Request[F]) = outer.find(req).map(f)
         def get(authorization: Authorization) = outer.get(authorization).map(f)
       }
 
     final def map[B](f: A => B): SsoClient[F, B] = transform(_ map f)
-    final def filter(f: A => Boolean): SsoClient[F, A] = transform(_ filter f)
-    final def collect[B](f: PartialFunction[A, B]): SsoClient[F, B] = transform(_ collect f)
+    final def filter(f: A => Boolean): SsoClient[F, A] = transform(_.filterOrElse(f, AccessDenied))
+    final def collect[B](f: PartialFunction[A, B]): SsoClient[F, B] = transform(_.flatMap(a => f.lift(a).toRight(AccessDenied)))
 
   }
 

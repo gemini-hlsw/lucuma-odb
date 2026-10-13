@@ -3,7 +3,6 @@
 
 package lucuma.odb.graphql
 
-import cats.data.OptionT
 import cats.effect.IO
 import cats.syntax.all.*
 import io.circe.Json
@@ -38,18 +37,14 @@ trait TestSsoClient:
 
   def ssoClient: SsoClient[IO, User] =
     new SsoClient.AbstractSsoClient[IO, User]:
-      def find(req: Request[IO]): IO[Option[User]] =
-        OptionT.fromOption[IO](req.headers.get[Authorization]).flatMapF(get).value
-      def get(authorization: Authorization): IO[Option[User]] =
+      def get(authorization: Authorization): IO[Either[String, User]] =
         authorization match
           case Authorization(Credentials.Token(Bearer, jwt)) =>
             reader
-              .decodeClaim(jwt)
-              .map(_.getUser)
-              .flatMap:
-                case Left(t) => IO.raiseError(t)
-                case Right(u) => validUsers.find(_ === u).pure[IO]
-          case _ => none.pure[IO]
+              .decodeUser(jwt)
+              .attempt
+              .map(_.leftMap(SsoClient.denialMessage).flatMap(u => validUsers.find(_ === u).toRight(SsoClient.AccessDenied)))
+          case _ => SsoClient.AccessDenied.asLeft[User].pure[IO]
 
 private object TestSsoClient:
 

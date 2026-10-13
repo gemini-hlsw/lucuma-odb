@@ -35,8 +35,8 @@ object SsoMiddleware {
   def apply[F[_]: MonadCancelThrow: Tracer](ssoClient: SsoClient[F, User])(routes: HttpRoutes[F]): HttpRoutes[F] =
     Kleisli { req =>
       for {
-        ou  <- OptionT.liftF(ssoClient.find(req))
-        _   <- OptionT.liftF(ou.traverse_(traceUser[F](_)))
+        eu  <- OptionT.liftF(ssoClient.find(req))
+        _   <- OptionT.liftF(eu.traverse_(traceUser[F](_)))
         res <- routes.run(req)
       } yield res
     }

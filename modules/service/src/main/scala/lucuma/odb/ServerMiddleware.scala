@@ -7,6 +7,7 @@ import cats.*
 import cats.data.Kleisli
 import cats.data.OptionT
 import cats.effect.*
+import cats.effect.std.MapRef
 import cats.implicits.*
 import lucuma.common.middleware.CorsMiddleware
 import lucuma.common.middleware.ErrorReportingMiddleware
@@ -29,8 +30,6 @@ import org.typelevel.otel4s.metrics.MeterProvider
 import org.typelevel.otel4s.trace.Tracer
 import org.typelevel.otel4s.trace.TracerProvider
 
-import scala.collection.immutable.TreeMap
-
 /** A module of all the middlewares we apply to the server routes. */
 object ServerMiddleware {
 
@@ -40,22 +39,22 @@ object ServerMiddleware {
    * A middleware that updates the user table when it sees a user it hasn't seen before, or when
    * a known user has changed.
    */
-  def userCache[F[_]: Monad: Ref.Make](
+  def userCache[F[_]: Concurrent](
     client: SsoClient[F, User],
     userService: UserService[F],
   ): F[Middleware[F]] =
-    Ref[F].of(TreeMap.empty[User.Id, User]).map { ref => routes =>
+    MapRef[F, User.Id, User].map { cache => routes =>
       Kleisli { req =>
-        OptionT.liftF(client.find(req)).flatMap {
-          case None       => routes(req) // no user, nothing to do
-          case Some(user) =>
-            OptionT.liftF(ref.modify { cache =>
+        val updateUser: F[Unit] =
+          client.find(req).flatMap(_.traverse_ { user =>
+            cache(user.id).flatModify { cached =>
               // Update the user if not present in the cache, or if it has changed since the last time we saw it.
               // The cache will grow in an unbounded fashion, which is fine. Not all that many users.
-              val update = Services.asSuperUser(userService.canonicalizeUser(user).whenA(cache.get(user.id).forall(_ =!= user)))
-              (cache + (user.id -> user), OptionT.liftF(update) *> routes(req))
-            }).flatten
-        }
+              val update = Services.asSuperUser(userService.canonicalizeUser(user).whenA(cached.forall(_ =!= user)))
+              (user.some, update)
+            }
+          })
+        OptionT.liftF(updateUser) *> routes(req)
       }
     }
 

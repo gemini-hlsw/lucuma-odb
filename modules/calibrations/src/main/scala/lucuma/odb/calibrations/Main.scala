@@ -124,7 +124,7 @@ object CMain extends MainParams {
       )
       .pooled(max = config.maxCalibrationConnections)
 
-  def serviceUser[F[_]: Async: Network: Logger: TracerProvider](c: Config): F[Option[User]] =
+  def serviceUser[F[_]: Async: Network: Logger: TracerProvider](c: Config): F[Either[String, User]] =
     c.ssoClient.use: sso =>
       sso.get(Authorization(Credentials.Token(CIString("Bearer"), c.serviceJwt)))
 
@@ -178,7 +178,7 @@ object CMain extends MainParams {
         )
 
   def services[F[_]: Async: Parallel: UUIDGen: Tracer: Logger: LoggerFactory](
-    user: Option[User],
+    user: Either[String, User],
     emailConfig: Config.Email,
     commitHash: CommitHash,
     calculator: TimeEstimateCalculatorImplementation.ForInstrumentMode,
@@ -190,7 +190,7 @@ object CMain extends MainParams {
     hminCache: HminBrightnessCache,
   )(pool: Session[F]): F[Services[F]] =
     user match {
-      case Some(u) if u.role.access === Access.Service =>
+      case Right(u) if u.role.access === Access.Service =>
         Services.forUser(
           u,
           None,
@@ -206,11 +206,11 @@ object CMain extends MainParams {
           GoaClient.noop[F],
           hminCache
         )(pool).pure
-      case Some(u) =>
+      case Right(u) =>
         Logger[F].error(s"User $u is not allowed to execute this service") *>
           MonadThrow[F].raiseError(new RuntimeException(s"User $u doesn't have permission to execute"))
-      case None    =>
-        Logger[F].error("Failed to get service user") *>
+      case Left(msg) =>
+        Logger[F].error(s"Failed to get service user: $msg") *>
           MonadThrow[F].raiseError(new RuntimeException("Failed to get service user"))
     }
 

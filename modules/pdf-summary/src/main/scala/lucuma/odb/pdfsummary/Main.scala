@@ -113,12 +113,12 @@ object PMain extends MainParams:
       )
       .pooled(max = max)
 
-  def serviceUser[F[_]: Async: Network: Logger: TracerProvider](c: Config): F[Option[User]] =
+  def serviceUser[F[_]: Async: Network: Logger: TracerProvider](c: Config): F[Either[String, User]] =
     c.ssoClient.use: sso =>
       sso.get(Authorization(Credentials.Token(CIString("Bearer"), c.serviceJwt)))
 
   def services[F[_]: Async: Parallel: UUIDGen: Tracer: Logger: LoggerFactory](
-    user:           Option[User],
+    user:           Either[String, User],
     emailConfig:    Config.Email,
     commitHash:     CommitHash,
     calculator:     TimeEstimateCalculatorImplementation.ForInstrumentMode,
@@ -130,7 +130,7 @@ object PMain extends MainParams:
     mapping:        Session[F] => Mapping[F]
   )(pool: Session[F]): F[Services[F]] =
     user match
-      case Some(u) if u.role.access === Access.Service =>
+      case Right(u) if u.role.access === Access.Service =>
         Services.forUser(
           u,
           mapping.some,
@@ -145,11 +145,11 @@ object PMain extends MainParams:
           TelluricTargetsClient.noop[F],
           GoaClient.noop[F]
         )(pool).pure
-      case Some(u) =>
+      case Right(u) =>
         error"User $u is not allowed to execute this service" *>
           MonadThrow[F].raiseError(new RuntimeException(s"User $u doesn't have permission to execute"))
-      case None    =>
-        error"Failed to get service user" *>
+      case Left(msg) =>
+        error"Failed to get service user: $msg" *>
           MonadThrow[F].raiseError(new RuntimeException("Failed to get service user"))
 
   def server[F[_]: Async: Compression: Files: Processes: Parallel: Logger: LoggerFactory: Tracer: TracerProvider: Meter: MeterProvider: Console: Network: SecureRandom]: Resource[F, ExitCode] =
