@@ -409,8 +409,40 @@ object GuideService {
   def trackTypeOf(hasNonsidereal: Boolean): TrackType =
     if hasNonsidereal then TrackType.Nonsidereal else TrackType.Sidereal
 
-  // AgsParams are case classes of enumerations and angles, so their rendering identifies them.
-  private given HashBytes[AgsParams] = HashBytes.by(_.toString)
+  // Field by field, so the stored hash depends on this encoding alone and not on how lucuma-ags
+  // renders its case classes. A new AgsParams field must be added here.
+  private given HashBytes[AgsParams] with
+    def hashBytes(a: AgsParams): Array[Byte] =
+      def tag(s: String): Array[Byte] = s.hashBytes
+      def either[A: HashBytes, B: HashBytes](e: Either[A, B]): Array[Byte] =
+        e.fold(l => Array.concat(tag("L"), l.hashBytes), r => Array.concat(tag("R"), r.hashBytes))
+      def f2Mask(m: Flamingos2FpuMask): Array[Byte] =
+        m match
+          case Flamingos2FpuMask.Imaging       => tag("imaging")
+          case Flamingos2FpuMask.Builtin(fpu)  => Array.concat(tag("builtin"), fpu.hashBytes)
+          case Flamingos2FpuMask.Custom(md, w) =>
+            val mask = md match
+              case lucuma.core.model.ToBeDefined => tag("tbd")
+              case lucuma.core.model.Defined(id) => id.hashBytes
+            Array.concat(tag("custom"), mask, w.hashBytes)
+      val common = Array.concat(a.probe.hashBytes, a.altair.hashBytes)
+      val fields = a match
+        case AgsParams.GmosImaging(port, _)                          => Array.concat(tag("gmosImaging"), port.hashBytes)
+        case AgsParams.GmosIfu(fpu, port, _)                         => Array.concat(tag("gmosIfu"), either(fpu), port.hashBytes)
+        case AgsParams.GmosLongSlit(fpu, port, _)                    => Array.concat(tag("gmosLongSlit"), either(fpu), port.hashBytes)
+        case AgsParams.GmosMos(site, port, _)                        => Array.concat(tag("gmosMos"), site.hashBytes, port.hashBytes)
+        case AgsParams.Flamingos2LongSlit(lyot, fpu, port, _)        => Array.concat(tag("f2LongSlit"), lyot.hashBytes, f2Mask(fpu), port.hashBytes)
+        case AgsParams.Flamingos2Imaging(lyot, port, _)              => Array.concat(tag("f2Imaging"), lyot.hashBytes, port.hashBytes)
+        case AgsParams.Flamingos2Mos(lyot, port, _)                  => Array.concat(tag("f2Mos"), lyot.hashBytes, port.hashBytes)
+        case AgsParams.Igrins2LongSlit(port, _)                      => Array.concat(tag("igrins2LongSlit"), port.hashBytes)
+        case AgsParams.ScorpioLongSlit(fpu, port, _)                 => Array.concat(tag("scorpioLongSlit"), fpu.hashBytes, port.hashBytes)
+        case AgsParams.ScorpioImaging(port, _)                       => Array.concat(tag("scorpioImaging"), port.hashBytes)
+        case AgsParams.GnirsLongSlit(fpu, camera, prism, port, _, _) => Array.concat(tag("gnirsLongSlit"), fpu.hashBytes, camera.hashBytes, prism.hashBytes, port.hashBytes)
+        case AgsParams.GnirsImaging(camera, filter, port, _, _)      => Array.concat(tag("gnirsImaging"), camera.hashBytes, filter.hashBytes, port.hashBytes)
+        case AgsParams.GnirsIfu(ifu, port, _, _)                     => Array.concat(tag("gnirsIfu"), ifu.hashBytes, port.hashBytes)
+        case AgsParams.GhostIfu(port, _)                             => Array.concat(tag("ghostIfu"), port.hashBytes)
+        case AgsParams.Visitor(ags, fov, port, _)                    => Array.concat(tag("visitor"), ags.hashBytes, fov.hashBytes, port.hashBytes)
+      Array.concat(fields, common)
 
   /** What the guide star search reads of the observing mode, so what an override is keyed on. */
   case class SearchSettings(params: GeneratorParams) {
