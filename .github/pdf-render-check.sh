@@ -4,7 +4,7 @@
 set -eu
 
 image=${1:-noirlab/pdf-summary-service}
-itc=${2:-https://itc-dev.lucuma.xyz/itc}
+itc=${2:-https://itc-dev-4fbd2c8a3171.herokuapp.com/itc}
 payload=modules/service/src/test/resources/lucuma/odb/summary/payload-v1.json
 styles="gemini-standard gemini-darp gemini-no-investigators gemini-investigators-at-end noirlab-darp chile"
 
