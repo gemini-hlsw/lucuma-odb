@@ -71,9 +71,10 @@ flowchart TD
     F --> G[write name and hash]
     G --> H{Altair?}
     H -- no --> I[done]
-    H -- yes --> J[run the generator]
+    H -- yes --> J[run the generator: digestWithParams]
     J -- star usable --> I
-    J -- unusable or failure --> K[restore previous name and hash, report]
+    J -- LGS+P1: problem recorded on the sequence, star kept --> I
+    J -- NGS, LGS: unusable or failure --> K[restore previous name and hash, report]
 ```
 
 What the hash covers, via `ObservationInfo.overrideHash` and `SearchSettings.hash`: the `AgsParams`, AGS wavelength, offsets as defined on the observing mode (not as generated), Altair settings, explicit probe, constraints, explicit base, target and blind offset positions, the position angle constraint, and observation time and duration. It leaves out the generated sequence, the ITC result and the code version, so executing steps and deploying do not drop an override. The availability cache adds the code version, since it stores results rather than a choice.
@@ -145,6 +146,3 @@ flowchart TD
 | `modules/service/.../logic/Generator.scala` | `digestWithParams` versus `digest` and `altairChecked` |
 | `modules/service/.../graphql/mapping/TargetEnvironmentMapping.scala` | GraphQL field handlers |
 | `modules/service/.../service/GeneratorParamsService.scala` | Mirrors the default probe rule for the generator's inputs |
-| `docs/adr/0019-explicit-guide-probe.md` | Why the probe is overridable |
-| `docs/adr/0030-guide-star-override-keyed-on-search-inputs.md` | Why the override hash leaves the generator out |
-| `docs/guide-target-name-bottleneck.md` | Why reading `guideTargetName` in bulk is costly |
