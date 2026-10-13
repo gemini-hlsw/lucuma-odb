@@ -1,7 +1,7 @@
 // Copyright (c) 2016-2026 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
-package lucuma.odb.sequence
+package lucuma.odb.smartgcal
 
 import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.GnirsReadMode
@@ -15,9 +15,9 @@ import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig
 
 /**
  * What a smart GCAL expansion must know about an instrument beyond its lookup
- * table.  A `SmartGcalExpander` applies these rules to every step it expands,
- * so that callers supply the configuration of the step being calibrated and
- * receive correctly configured GCAL steps, wherever the expansion happens.
+ * table.  The rules are applied to every step that is expanded, so that
+ * callers supply the configuration of the step being calibrated and receive
+ * correctly configured GCAL steps, wherever the expansion happens.
  *
  * @tparam D dynamic instrument configuration
  */
@@ -70,7 +70,7 @@ object SmartGcalRules:
     new SmartGcalRules[DynamicConfig.GmosNorth]:
       def lookupConfig(d: DynamicConfig.GmosNorth): DynamicConfig.GmosNorth =
         d.copy(fpu = d.fpu.map:
-          case GmosFpuMask.Custom(_, w) => GmosFpuMask.Builtin(gmos.mos.Config.northFpu(w))
+          case GmosFpuMask.Custom(_, w) => GmosFpuMask.Builtin(w.northFpu)
           case builtin                  => builtin
         )
 
@@ -82,7 +82,7 @@ object SmartGcalRules:
     new SmartGcalRules[DynamicConfig.GmosSouth]:
       def lookupConfig(d: DynamicConfig.GmosSouth): DynamicConfig.GmosSouth =
         d.copy(fpu = d.fpu.map:
-          case GmosFpuMask.Custom(_, w) => GmosFpuMask.Builtin(gmos.mos.Config.southFpu(w))
+          case GmosFpuMask.Custom(_, w) => GmosFpuMask.Builtin(w.southFpu)
           case builtin                  => builtin
         )
 

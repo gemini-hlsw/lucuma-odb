@@ -1,7 +1,7 @@
 // Copyright (c) 2016-2026 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
-package lucuma.odb.sequence
+package lucuma.odb.smartgcal
 
 import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.GnirsReadMode
@@ -21,7 +21,7 @@ class SmartGcalRulesSuite extends ScalaCheckSuite:
   property("GMOS North: a custom mask is looked up as the builtin long slit of its width"):
     forAll: (d: DynamicConfig.GmosNorth) =>
       val expected = d.fpu.map:
-        case GmosFpuMask.Custom(_, w) => GmosFpuMask.Builtin(gmos.mos.Config.northFpu(w))
+        case GmosFpuMask.Custom(_, w) => GmosFpuMask.Builtin(w.northFpu)
         case b                        => b
       val lookup   = SmartGcalRules.gmosNorth.lookupConfig(d)
       assertEquals(lookup, d.copy(fpu = expected))
@@ -30,7 +30,7 @@ class SmartGcalRulesSuite extends ScalaCheckSuite:
   property("GMOS South: a custom mask is looked up as the builtin long slit of its width"):
     forAll: (d: DynamicConfig.GmosSouth) =>
       val expected = d.fpu.map:
-        case GmosFpuMask.Custom(_, w) => GmosFpuMask.Builtin(gmos.mos.Config.southFpu(w))
+        case GmosFpuMask.Custom(_, w) => GmosFpuMask.Builtin(w.southFpu)
         case b                        => b
       val lookup   = SmartGcalRules.gmosSouth.lookupConfig(d)
       assertEquals(lookup, d.copy(fpu = expected))

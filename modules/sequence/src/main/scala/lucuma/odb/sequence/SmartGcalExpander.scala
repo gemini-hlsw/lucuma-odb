@@ -20,9 +20,10 @@ import lucuma.odb.sequence.data.ProtoStep
 /**
  * Expands `SmartGcal` steps into a (non-empty) list of fully specified `Gcal`
  * steps.  A smart gcal step carries the instrument configuration of the step
- * it calibrates.  Implementations apply the instrument's `SmartGcalRules`, so
- * callers neither adapt that configuration for the lookup nor adjust the
- * configuration of the steps they get back.
+ * it calibrates.  Implementations apply the instrument's smart gcal rules
+ * (`lucuma.odb.smartgcal.SmartGcalRules`), so callers neither adapt that
+ * configuration for the lookup nor adjust the configuration of the steps they
+ * get back.
  *
  * @tparam S static instrument configuration
  * @tparam D dynamic instrument configuration

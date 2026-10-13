@@ -25,10 +25,10 @@ import lucuma.core.model.sequence.gnirs.GnirsStaticConfig
 import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig
 import lucuma.core.model.sequence.igrins2.Igrins2StaticConfig
 import lucuma.odb.sequence.SmartGcalExpander
-import lucuma.odb.sequence.SmartGcalRules
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.service.SmartGcalService
+import lucuma.odb.smartgcal.SmartGcalRules
 import lucuma.odb.smartgcal.data.Flamingos2
 import lucuma.odb.smartgcal.data.Ghost
 import lucuma.odb.smartgcal.data.Gmos
