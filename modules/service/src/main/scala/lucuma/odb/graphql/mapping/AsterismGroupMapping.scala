@@ -4,11 +4,14 @@
 package lucuma.odb.graphql
 package mapping
 
-import grackle.Query.Binding
-import grackle.Query.Filter
+import cats.syntax.all.*
+import grackle.Predicate.and
+import grackle.Query.*
 import grackle.QueryCompiler.Elab
 import grackle.TypeRef
+import lucuma.core.model.Observation
 import lucuma.odb.data.Existence
+import lucuma.odb.graphql.binding.*
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.*
 
@@ -34,8 +37,8 @@ trait AsterismGroupMapping[F[_]]
 
     )
 
-  // Make sure the asterism is filtered by existence
   lazy val AsterismGroupElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
+    // Make sure the asterism is filtered by existence
     case (AsterismGroupType, "asterism", Nil) =>
       Elab.transformChild { child =>
         Filter(
@@ -43,5 +46,26 @@ trait AsterismGroupMapping[F[_]]
           child
         )
       }
+
+    case (AsterismGroupType, "observations", List(
+      BooleanBinding("includeDeleted", rIncludeDeleted),
+      ObservationIdBinding.Option("OFFSET", rOFFSET),
+      BooleanBinding("OFFSET_INCLUDE", rOFFSET_INCLUDE),
+      NonNegIntBinding.Option("LIMIT", rLIMIT),
+    )) =>
+      Elab.transformChild: child =>
+        (rIncludeDeleted, rOFFSET, rOFFSET_INCLUDE, rLIMIT).parTupled.flatMap: (includeDeleted, OFFSET, OFFSET_INCLUDE, lim) =>
+          val limit: Int = lim.fold(ResultMapping.MaxLimit)(_.value)
+          ResultMapping.selectResult(child, limit): q =>
+            FilterOrderByOffsetLimit(
+              pred = Some(and(List(
+                Predicates.observation.existence.includeDeleted(includeDeleted),
+                Predicates.observation.id.offset(OFFSET, OFFSET_INCLUDE)
+              ))),
+              oss = Some(List(OrderSelection[Observation.Id](ObservationType / "id", true, true))),
+              offset = None,
+              limit = Some(limit + 1),
+              q
+            )
 
 }

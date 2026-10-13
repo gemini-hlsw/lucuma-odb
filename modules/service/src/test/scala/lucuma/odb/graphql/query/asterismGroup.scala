@@ -130,6 +130,55 @@ class asterismGroup extends OdbSuite with query.ObservingModeSetupOperations {
     }
   }
 
+  test("asterism group observations with OFFSET_INCLUDE false and LIMIT") {
+    for {
+      pid  <- createProgramAs(pi)
+      tid  <- createTargetAs(pi, pid)
+      oids <- createObservationAs(pi, pid, tid).replicateA(4)
+      _    <- expect(
+        user = pi,
+        query =
+          s"""
+            query {
+              asterismGroup(programId: ${pid.asJson}) {
+                matches {
+                  observations(OFFSET: ${oids(0).asJson}, OFFSET_INCLUDE: false, LIMIT: 2) {
+                    hasMore
+                    matches {
+                      id
+                    }
+                  }
+                }
+              }
+            }
+          """,
+        expected = Right(
+          json"""
+            {
+              "asterismGroup" : {
+                "matches" : [
+                  {
+                    "observations" : {
+                      "hasMore" : true,
+                      "matches" : [
+                        {
+                          "id" : ${oids(1)}
+                        },
+                        {
+                          "id" : ${oids(2)}
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          """
+        )
+      )
+    } yield ()
+  }
+
   test("asterisms should be correctly filtered") {
     List(pi).traverse { user =>
       for {
