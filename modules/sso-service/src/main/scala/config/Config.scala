@@ -91,12 +91,12 @@ object Config {
       keyPair.getPublic,
       keyPair.getPrivate,
       Port.fromInt(8080).getOrElse(sys.error("unpossible: invalid port")),
-      "local.lucuma.xyz",
+      "local.gemini.edu",
       Uri.Scheme.http,
-      "local.lucuma.xyz",
+      "local.gemini.edu",
       None,
       otel,
-      "local.lucuma.xyz"
+      "local.gemini.edu"
     )
 
   }

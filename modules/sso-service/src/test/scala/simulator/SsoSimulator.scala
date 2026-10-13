@@ -147,8 +147,8 @@ trait SsoSimulator extends TestContainerForAll { self: Suite =>
           jwtReader = config.ssoJwtReader,
           jwtWriter = config.ssoJwtWriter,
           publicUri = config.publicUri,
-          cookies   = CookieService[F]("lucuma.xyz", true),
-          cookieDomain = "lucuma.xyz",
+          cookies   = CookieService[F]("gemini.edu", true),
+          cookieDomain = "gemini.edu",
         ) <+> GraphQLRoutes(
           LocalSsoClient(config.ssoJwtReader, dbPool).collect { case su: StandardUser => su },
           service,

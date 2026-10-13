@@ -141,7 +141,7 @@ need to be set as we are not receiving mail or trying to track user opens and cl
 
 You will need to change the `MAILGUN_DOMAIN` config variable to point to the new domain. Like:
 
-`MAILGUN_DOMAIN=mail.odb-dev.lucuma.xyz`
+`MAILGUN_DOMAIN=mail.odb-dev.gemini.edu`
 
 In order to receive the webhook events that track the status of the email (Accepted, Delivered, Permanent Failure, Temporary Failure), do the following:
 
@@ -151,8 +151,8 @@ In order to receive the webhook events that track the status of the email (Accep
 
 Two more config variables are required:
 
-- INVITATION_SENDER_EMAIL - this should be some user in the MAILGUN_DOMAIN. For example `explore@mail.odb-dev.lucuma.xyz`. This will be the sender of the invitation emails.
-- EXPLORE_URL - The url of the Explore instance for this version of the ODB. For example `https://explore-dev.lucuma.xyz`. This is used to put a link to explore in the invitation emails.
+- INVITATION_SENDER_EMAIL - this should be some user in the MAILGUN_DOMAIN. For example `explore@mail.odb-dev.gemini.edu`. This will be the sender of the invitation emails.
+- EXPLORE_URL - The url of the Explore instance for this version of the ODB. For example `https://explore-dev.gemini.edu`. This is used to put a link to explore in the invitation emails.
 
 ### Proposal notification emails
 
@@ -172,10 +172,10 @@ To run the odb locally, the environment variables in this section must be set or
 loading the configuration. Here is the complete list with some example values.
 
 - MAILGUN_API_KEY=<Any string> (A valid key can be obtained from the heroku app if you want to be able to send email)
-- MAILGUN_DOMAIN=mail.odb-dev.lucuma.xyz
+- MAILGUN_DOMAIN=mail.odb-dev.gemini.edu
 - MAILGUN_WEBHOOK_SIGNING_KEY=<Any string> (Can be anything, since webhooks won't be received locally)
-- INVITATION_SENDER_EMAIL=explore@mail.odb-dev.lucuma.xyz
-- EXPLORE_URL=https://explore-dev.lucuma.xyz
+- INVITATION_SENDER_EMAIL=explore@mail.odb-dev.gemini.edu
+- EXPLORE_URL=https://explore-dev.gemini.edu
 - PROPOSAL_EMAIL_DEFAULT=noreply@gemini.edu (The per-type variables are all optional)
 
 Mailgun sets other variables in the Heroku app, but they are for things we are not using.
