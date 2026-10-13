@@ -48,9 +48,9 @@ object SmartGcalImplementation {
     new ForInstrument[F](service)
 
   // The instrument's rules are applied here so that they hold for every
-  // expansion: the lookup is keyed on `rules.lookupConfig` of the step, and the
-  // configuration of each resulting step is completed by
-  // `rules.calibrationConfig`.
+  // expansion: the lookup is keyed on `rules.lookupConfig` of the step (or
+  // fails with its error), and the configuration of each resulting step is
+  // completed by `rules.calibrationConfig`.
   private class Expander[F[_]: Concurrent, K, S, D](
     rules:     SmartGcalRules[D],
     toKey:     (S, D) => K,
@@ -75,25 +75,32 @@ object SmartGcalImplementation {
     ): F[(Cache[K, D], Either[String, NonEmptyList[ProtoStep[D]]])] =
       step match {
         case ProtoStep(d, StepConfig.SmartGcal(sgt), t, o, b) =>
-          val key = toKey(static, rules.lookupConfig(d))
 
           def toStep(tup: (D => D, Gcal)): ProtoStep[D] = {
             val (update, gcal) = tup
             ProtoStep(rules.calibrationConfig(update(d)), gcal, t, o, b)
           }
 
-          cache.get((key, sgt)).fold(
-            select(key, sgt).map {
-              case Nil    =>
-                val error = s"missing Smart GCAL mapping: ${formatKey(key)}"
-                (cache.updated((key, sgt), error.asLeft), error.asLeft)
-              case h :: t =>
-               (
-                 cache.updated((key, sgt), NonEmptyList(h, t).asRight),
-                 NonEmptyList(toStep(h), t.map(toStep)).asRight
-               )
-            }
-          ) { e => (cache, e.map(_.map(toStep))).pure[F] }
+          def lookup(key: K): F[(Cache[K, D], Either[String, NonEmptyList[ProtoStep[D]]])] =
+            cache.get((key, sgt)).fold(
+              select(key, sgt).map {
+                case Nil    =>
+                  val error = s"missing Smart GCAL mapping: ${formatKey(key)}"
+                  (cache.updated((key, sgt), error.asLeft), error.asLeft)
+                case h :: t =>
+                 (
+                   cache.updated((key, sgt), NonEmptyList(h, t).asRight),
+                   NonEmptyList(toStep(h), t.map(toStep)).asRight
+                 )
+              }
+            ) { e => (cache, e.map(_.map(toStep))).pure[F] }
+
+          rules
+            .lookupConfig(d)
+            .fold(
+              error => (cache, error.asLeft[NonEmptyList[ProtoStep[D]]]).pure[F],
+              c     => lookup(toKey(static, c))
+            )
 
         case ps@ProtoStep(_, _, _, _, _) =>
           (cache, NonEmptyList.one(ps).asRight).pure[F]

@@ -3,6 +3,7 @@
 
 package lucuma.odb.smartgcal
 
+import cats.syntax.either.*
 import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.GnirsReadMode
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
@@ -25,9 +26,11 @@ trait SmartGcalRules[D]:
 
   /**
    * The configuration with which to search the smart GCAL table for a step
-   * configured as `d`, when it isn't `d` itself.
+   * configured as `d`, which is `d` itself unless the instrument requires
+   * otherwise.  An error message is produced instead if no search can be
+   * made on behalf of `d`.
    */
-  def lookupConfig(d: D): D
+  def lookupConfig(d: D): Either[String, D]
 
   /**
    * Completes the configuration of an expanded GCAL step, `d`, which already
@@ -39,21 +42,27 @@ object SmartGcalRules:
 
   private def identityRules[D]: SmartGcalRules[D] =
     new SmartGcalRules[D]:
-      def lookupConfig(d: D): D      = d
-      def calibrationConfig(d: D): D = d
+      def lookupConfig(d: D): Either[String, D] = d.asRight
+      def calibrationConfig(d: D): D            = d
 
   /**
    * The smart GCAL tables are keyed on builtin FPUs, so a custom mask is
-   * calibrated as the builtin long slit of the same width.  A calibration
-   * step's exposure time comes from the lookup, so its read mode is recomputed
-   * rather than inherited from the step being calibrated.
+   * calibrated as the builtin long slit of the same width.  A custom slit
+   * width without one cannot be calibrated.  Searching with the custom mask
+   * itself would match the entries for configurations without an FPU.  A
+   * calibration step's exposure time comes from the lookup, so its read mode is
+   * recomputed rather than inherited from the step being calibrated.
    */
   val flamingos2: SmartGcalRules[Flamingos2DynamicConfig] =
     new SmartGcalRules[Flamingos2DynamicConfig]:
-      def lookupConfig(d: Flamingos2DynamicConfig): Flamingos2DynamicConfig =
+      def lookupConfig(d: Flamingos2DynamicConfig): Either[String, Flamingos2DynamicConfig] =
         d.fpu match
-          case Flamingos2FpuMask.Custom(_, w) => w.fpu.fold(d)(f => d.copy(fpu = Flamingos2FpuMask.builtin(f)))
-          case _                              => d
+          case Flamingos2FpuMask.Custom(_, w) =>
+            w.fpu
+             .toRight(s"Flamingos 2 has no builtin FPU equivalent to the '${w.longName}' custom slit width")
+             .map(f => d.copy(fpu = Flamingos2FpuMask.builtin(f)))
+          case _                              =>
+            d.asRight
 
       def calibrationConfig(d: Flamingos2DynamicConfig): Flamingos2DynamicConfig =
         val mode = Flamingos2ReadMode.forExposureTime(d.exposure)
@@ -68,11 +77,11 @@ object SmartGcalRules:
    */
   val gmosNorth: SmartGcalRules[DynamicConfig.GmosNorth] =
     new SmartGcalRules[DynamicConfig.GmosNorth]:
-      def lookupConfig(d: DynamicConfig.GmosNorth): DynamicConfig.GmosNorth =
+      def lookupConfig(d: DynamicConfig.GmosNorth): Either[String, DynamicConfig.GmosNorth] =
         d.copy(fpu = d.fpu.map:
           case GmosFpuMask.Custom(_, w) => GmosFpuMask.Builtin(w.northFpu)
           case builtin                  => builtin
-        )
+        ).asRight
 
       def calibrationConfig(d: DynamicConfig.GmosNorth): DynamicConfig.GmosNorth =
         d
@@ -80,11 +89,11 @@ object SmartGcalRules:
   /** @see [[gmosNorth]] */
   val gmosSouth: SmartGcalRules[DynamicConfig.GmosSouth] =
     new SmartGcalRules[DynamicConfig.GmosSouth]:
-      def lookupConfig(d: DynamicConfig.GmosSouth): DynamicConfig.GmosSouth =
+      def lookupConfig(d: DynamicConfig.GmosSouth): Either[String, DynamicConfig.GmosSouth] =
         d.copy(fpu = d.fpu.map:
           case GmosFpuMask.Custom(_, w) => GmosFpuMask.Builtin(w.southFpu)
           case builtin                  => builtin
-        )
+        ).asRight
 
       def calibrationConfig(d: DynamicConfig.GmosSouth): DynamicConfig.GmosSouth =
         d
@@ -95,8 +104,8 @@ object SmartGcalRules:
    */
   val gnirs: SmartGcalRules[GnirsDynamicConfig] =
     new SmartGcalRules[GnirsDynamicConfig]:
-      def lookupConfig(d: GnirsDynamicConfig): GnirsDynamicConfig =
-        d
+      def lookupConfig(d: GnirsDynamicConfig): Either[String, GnirsDynamicConfig] =
+        d.asRight
 
       def calibrationConfig(d: GnirsDynamicConfig): GnirsDynamicConfig =
         d.copy(readMode = GnirsReadMode.forExposureTime(d.exposure))
