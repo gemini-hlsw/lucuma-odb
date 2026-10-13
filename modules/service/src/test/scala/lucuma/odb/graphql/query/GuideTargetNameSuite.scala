@@ -254,6 +254,34 @@ trait GuideTargetNameSuite extends ExecutionTestSupport {
         guideTargetNameQuery(oid),
         expected = guideTargetNameResult(none))
 
+  test("re-linking the catalog entry keeps name"):
+    val setup: IO[Observation.Id] =
+      for {
+        p <- createProgramAs(pi)
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createObservationAs(pi, p, List(t))
+        _ <- setObservationTimeAndDuration(pi, o, ObsTime.some, none)
+        _ <- setGuideTargetName(pi, o, targetName1.some)
+        _ <- query(
+               pi,
+               s"""
+                 mutation {
+                   updateTargets(input: {
+                     SET: { sidereal: { catalogInfo: { name: GAIA, id: "4091" } } }
+                     WHERE: { id: { EQ: "$t" } }
+                   }) {
+                     targets { id }
+                   }
+                 }
+               """
+             )
+      } yield o
+    setup.flatMap: oid =>
+      expect(
+        pi,
+        guideTargetNameQuery(oid),
+        expected = guideTargetNameResult(targetName1.some))
+
   test("recording a visit keeps name"):
     val setup: IO[Observation.Id] =
       for {

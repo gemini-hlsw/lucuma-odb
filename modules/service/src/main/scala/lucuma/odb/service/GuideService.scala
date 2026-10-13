@@ -391,12 +391,19 @@ object GuideService {
     def trackType: TrackType =
       trackTypeOf(asterism.exists(_.isInstanceOf[Target.Nonsidereal]))
 
-    // Positions only, in a fixed order: which target holds them does not move the field.
+    // Positions only, in a fixed order: neither the target that holds them nor its catalog link
+    // moves the field.
     def update(md5: MessageDigest): Unit = {
-      asterism.map(t => Json.obj(target.transport.siderealOrNonJson(t)).noSpaces).sorted.foreach: json =>
-        md5.update(json.hashBytes)
+      asterism.map(position(_).noSpaces).sorted.foreach(json => md5.update(json.hashBytes))
       md5.update(blindOffset.map(target.transport.siderealTrackingEncoder(_).noSpaces).hashBytes)
     }
+
+    private def position(t: Target): Json =
+      import lucuma.odb.json.region.transport.given
+      t match
+        case s: Target.Sidereal    => target.transport.siderealTrackingEncoder(s.tracking)
+        case n: Target.Nonsidereal => target.transport.nonsiderealDefinitionEncoder(n)
+        case o: Target.Opportunity => o.region.asJson
   }
 
   def trackTypeOf(hasNonsidereal: Boolean): TrackType =
