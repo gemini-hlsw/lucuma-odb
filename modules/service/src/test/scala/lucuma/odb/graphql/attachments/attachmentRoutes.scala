@@ -16,7 +16,9 @@ import lucuma.odb.service.AttachmentFileService
 import lucuma.odb.service.AttachmentFileService.AttachmentException
 import lucuma.odb.service.NoTransaction
 import lucuma.refined.*
+import lucuma.sso.client.SsoClient
 import org.http4s.*
+import org.http4s.headers.Authorization
 import org.http4s.implicits.*
 
 class attachmentRoutes extends AttachmentRoutesSuite {
@@ -62,31 +64,31 @@ class attachmentRoutes extends AttachmentRoutesSuite {
 
   test("GET requires authorization") {
     val request = Request[IO](method = Method.GET, uri = uri"attachment/a-1")
-    routes.run(request).assertResponse(Status.Forbidden, none)
+    routes.run(request).assertResponse(Status.Forbidden, SsoClient.AccessDenied.some)
   }
 
   test("GETurl requires authorization") {
     val request = Request[IO](method = Method.GET, uri = uri"attachment/url/a-1")
-    routes.run(request).assertResponse(Status.Forbidden, none)
+    routes.run(request).assertResponse(Status.Forbidden, SsoClient.AccessDenied.some)
   }
 
   test("POST requires authorization") {
     val request = Request[IO](method = Method.POST,
                               uri = uri"attachment?programId=p-1&fileName=/file.txt/&attachmentType=finder"
     )
-    routes.run(request).assertResponse(Status.Forbidden, none)
+    routes.run(request).assertResponse(Status.Forbidden, SsoClient.AccessDenied.some)
   }
 
   test("PUT requires authorization") {
     val request = Request[IO](method = Method.PUT,
                               uri = uri"attachment/a-1?fileName=/file.txt"
     )
-    routes.run(request).assertResponse(Status.Forbidden, none)
+    routes.run(request).assertResponse(Status.Forbidden, SsoClient.AccessDenied.some)
   }
 
   test("DELETE requires authorization") {
     val request = Request[IO](method = Method.DELETE, uri = uri"attachment/a-1")
-    routes.run(request).assertResponse(Status.Forbidden, none)
+    routes.run(request).assertResponse(Status.Forbidden, SsoClient.AccessDenied.some)
   }
 
   test("GET requires valid user") {
@@ -94,7 +96,7 @@ class attachmentRoutes extends AttachmentRoutesSuite {
                               uri = uri"attachment/a-1",
                               headers = Headers(invalidAuthHeader)
     )
-    routes.run(request).assertResponse(Status.Forbidden, none)
+    routes.run(request).assertResponse(Status.Forbidden, SsoClient.AccessDenied.some)
   }
 
   test("GETurl requires valid user") {
@@ -102,7 +104,7 @@ class attachmentRoutes extends AttachmentRoutesSuite {
                               uri = uri"attachment/url/a-1",
                               headers = Headers(invalidAuthHeader)
     )
-    routes.run(request).assertResponse(Status.Forbidden, none)
+    routes.run(request).assertResponse(Status.Forbidden, SsoClient.AccessDenied.some)
   }
 
   test("POST requires valid user") {
@@ -110,7 +112,7 @@ class attachmentRoutes extends AttachmentRoutesSuite {
                               uri = uri"attachment?programId=p-1&fileName=/file.txt/&attachmentType=finder",
                               headers = Headers(invalidAuthHeader)
     )
-    routes.run(request).assertResponse(Status.Forbidden, none)
+    routes.run(request).assertResponse(Status.Forbidden, SsoClient.AccessDenied.some)
   }
 
   test("PUT requires valid user") {
@@ -118,7 +120,7 @@ class attachmentRoutes extends AttachmentRoutesSuite {
                               uri = uri"attachment/a-1?fileName=/file.txt",
                               headers = Headers(invalidAuthHeader)
     )
-    routes.run(request).assertResponse(Status.Forbidden, none)
+    routes.run(request).assertResponse(Status.Forbidden, SsoClient.AccessDenied.some)
   }
 
   test("DELETE requires valid user") {
@@ -126,7 +128,18 @@ class attachmentRoutes extends AttachmentRoutesSuite {
                               uri = uri"attachment/a-1",
                               headers = Headers(invalidAuthHeader)
     )
-    routes.run(request).assertResponse(Status.Forbidden, none)
+    routes.run(request).assertResponse(Status.Forbidden, SsoClient.AccessDenied.some)
+  }
+
+  test("GET with a malformed token gives the reason, without the token") {
+    val request = Request[IO](method = Method.GET,
+                              uri = uri"attachment/a-1",
+                              headers = Headers(Authorization(Credentials.Token(AuthScheme.Bearer, "not-a-real-jwt")))
+    )
+    routes.run(request).assertResponse(
+      Status.Forbidden,
+      "Access denied: Expected token to be composed of 2 or 3 parts separated by dots.".some
+    )
   }
 
   test("valid GET returns file contents") {

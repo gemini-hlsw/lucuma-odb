@@ -7,21 +7,7 @@ import cats.*
 import cats.implicits.*
 import pdi.jwt.Jwt
 import pdi.jwt.JwtClaim
-import pdi.jwt.exceptions.JwtEmptyAlgorithmException
-import pdi.jwt.exceptions.JwtEmptySignatureException
 import pdi.jwt.exceptions.JwtException
-import pdi.jwt.exceptions.JwtExpirationException
-import pdi.jwt.exceptions.JwtLengthException
-import pdi.jwt.exceptions.JwtNonEmptyAlgorithmException
-import pdi.jwt.exceptions.JwtNonEmptySignatureException
-import pdi.jwt.exceptions.JwtNonNumberException
-import pdi.jwt.exceptions.JwtNonStringException
-import pdi.jwt.exceptions.JwtNonStringSetOrStringException
-import pdi.jwt.exceptions.JwtNonSupportedAlgorithm
-import pdi.jwt.exceptions.JwtNonSupportedCurve
-import pdi.jwt.exceptions.JwtNotBeforeException
-import pdi.jwt.exceptions.JwtSignatureFormatException
-import pdi.jwt.exceptions.JwtValidationException
 
 import java.security.PublicKey
 import scala.util.Failure
@@ -63,27 +49,7 @@ object JwtDecoder {
         attemptDecode(token).map(_.toOption)
 
       def decode(token: String): F[JwtClaim] =
-        attemptDecode(token).flatMap {
-          case Right(c) => c.pure[F]
-          case Left(e)  =>
-            e match {
-              // N.B. JwtException does not extend Throwable but all its cases do :-\
-              case e: JwtLengthException               => ev.raiseError(e)
-              case e: JwtValidationException           => ev.raiseError(e)
-              case e: JwtSignatureFormatException      => ev.raiseError(e)
-              case e: JwtEmptySignatureException       => ev.raiseError(e)
-              case e: JwtNonEmptySignatureException    => ev.raiseError(e)
-              case e: JwtEmptyAlgorithmException       => ev.raiseError(e)
-              case e: JwtNonEmptyAlgorithmException    => ev.raiseError(e)
-              case e: JwtExpirationException           => ev.raiseError(e)
-              case e: JwtNotBeforeException            => ev.raiseError(e)
-              case e: JwtNonSupportedAlgorithm         => ev.raiseError(e)
-              case e: JwtNonSupportedCurve             => ev.raiseError(e)
-              case e: JwtNonStringException            => ev.raiseError(e)
-              case e: JwtNonStringSetOrStringException => ev.raiseError(e)
-              case e: JwtNonNumberException            => ev.raiseError(e)
-            }
-        }
+        attemptDecode(token).flatMap(_.liftTo[F])
 
     }
 

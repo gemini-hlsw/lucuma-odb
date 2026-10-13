@@ -41,11 +41,8 @@ object TracingMiddleware:
   ): Middleware[F] = routes =>
     Kleisli { req =>
       val putFields: F[Unit] =
-        ssoClient.find(req).flatMap {
-          case None    => Monad[F].unit
-          case Some(u) =>
-            Tracer[F].withCurrentSpanOrNoop:
-              _.addAttributes(Attributes.from(u))
-        }
+        ssoClient.find(req).flatMap(_.traverse_ (u =>
+          Tracer[F].withCurrentSpanOrNoop(_.addAttributes(Attributes.from(u)))
+        ))
       OptionT(putFields >> routes(req).value)
     }

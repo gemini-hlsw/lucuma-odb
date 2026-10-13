@@ -130,13 +130,13 @@ object CalcMain extends MainParams:
      .use: sso =>
        sso.get(Authorization(Credentials.Token(CIString("Bearer"), c.serviceJwt)))
      .flatMap:
-       case Some(u) if u.role.access === Access.Service =>
+       case Right(u) if u.role.access === Access.Service =>
          u.pure[F]
-       case Some(u) =>
+       case Right(u) =>
          Logger[F].error(s"User $u is not allowed to execute this service") *>
            MonadThrow[F].raiseError(new RuntimeException(s"User $u doesn't have permission to execute"))
-       case None    =>
-         Logger[F].error("Failed to get service user") *>
+       case Left(msg) =>
+         Logger[F].error(s"Failed to get service user: $msg") *>
            MonadThrow[F].raiseError(new RuntimeException("Failed to get service user"))
 
   def topic[F[_]: Temporal: Logger: Tracer](

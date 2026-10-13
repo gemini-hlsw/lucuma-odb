@@ -4,7 +4,7 @@
 package lucuma.common.middleware
 
 import cats.Monad
-import cats.data.OptionT
+import cats.data.EitherT
 import cats.syntax.all.*
 import grackle.Env
 import lucuma.common.middleware.UserAttributes.given
@@ -24,8 +24,6 @@ object UserContext:
   def env(user: User): Env =
     Env(EnvKey -> user)
 
-  val AccessDenied: String = "Access denied."
-
   /** Authenticates each request with `client`. */
   def authenticator[F[_]: Monad, U <: User](client: SsoClient[F, U]): Authenticator[F] =
     authenticator(client, _ => Monad[F].unit)
@@ -35,6 +33,6 @@ object UserContext:
     Authenticator:
       case None    => Auth.Anonymous.pure[F]
       case Some(a) =>
-        OptionT(client.get(a))
+        EitherT(client.get(a))
           .semiflatTap(onUser)
-          .fold(Auth.Denied(AccessDenied))(u => Auth(env(u), Attributes.from(u: User)))
+          .fold(Auth.Denied(_), u => Auth(env(u), Attributes.from(u: User)))

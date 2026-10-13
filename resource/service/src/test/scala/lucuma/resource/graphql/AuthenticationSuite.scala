@@ -44,7 +44,9 @@ class AuthenticationSuite extends ResourceGraphQLSuite:
   test("A data query with a malformed bearer token is denied"):
     expect(
       dataQuery,
-      Left(List("Access denied.")),
+      Left(
+        List("Access denied: Expected token to be composed of 2 or 3 parts separated by dots.")
+      ),
       authorization =
         rawAuthorization(Authorization(Credentials.Token(AuthScheme.Bearer, "not-a-real-jwt")))
     )
@@ -52,6 +54,6 @@ class AuthenticationSuite extends ResourceGraphQLSuite:
   test("A data query with an unsupported Authorization scheme is denied"):
     expect(
       dataQuery,
-      Left(List("Access denied.")),
+      Left(List("Access denied")),
       authorization = rawAuthorization(Authorization(BasicCredentials("user", "password")))
     )
