@@ -4,7 +4,7 @@ metadata:
   name: sso-dev-ready
 spec:
   job: sso-dev-ready
-  target: https://sso-dev.gpp.lucuma.xyz/health/ready
+  target: https://sso-dev.gpp.gemini.edu/health/ready
   frequency: 900000
   timeout: 10000
   enabled: true

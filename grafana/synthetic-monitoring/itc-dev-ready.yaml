@@ -4,7 +4,7 @@ metadata:
   name: itc-dev-ready
 spec:
   job: itc-dev-ready
-  target: https://itc-dev.lucuma.xyz/health/ready
+  target: https://itc-dev.gpp.gemini.edu/health/ready
   frequency: 900000
   timeout: 10000
   enabled: true

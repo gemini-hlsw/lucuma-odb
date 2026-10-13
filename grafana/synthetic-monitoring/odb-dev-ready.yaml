@@ -4,7 +4,7 @@ metadata:
   name: odb-dev-ready
 spec:
   job: odb-dev-ready
-  target: https://lucuma-postgres-odb-dev.herokuapp.com/health/ready
+  target: https://odb-dev.gpp.gemini.edu/health/ready
   frequency: 900000
   timeout: 10000
   enabled: true
