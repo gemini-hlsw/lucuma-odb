@@ -159,10 +159,10 @@ It is possible to implement authentication as a middleware, but this makes compo
 ## Local Development QuickStart
 
 - Step 1 is `chmod 0600 test-cert/*`
-- Edit `/etc/hosts` to add `local.lucuma.xyz` as an alias of localhost.
+- Edit `/etc/hosts` to add `local.gemini.edu` as an alias of localhost.
 
 ```
-127.0.0.1       localhost local.lucuma.xyz
+127.0.0.1       localhost local.gemini.edu
 ```
 
 Use `docker-compose` to wrangle a dev database. It's way easier than dealing with a real installation.
@@ -184,7 +184,7 @@ psql -h localhost -d postgres -U jimmy -c 'create database "lucuma-sso"'
 
 Docker-compose also starts up a local nginx server that serves an example client application at:
 
-- http://local.lucuma.xyz:8081/playground.html
+- http://local.gemini.edu:8081/playground.html
 
 ### Using reStart
 

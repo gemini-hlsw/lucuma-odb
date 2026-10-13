@@ -40,7 +40,7 @@ Secrets are injected via environment variables.
 | `GRAFANA_OTLP_ENDPOINT` | Full URL, e.g. `https://otlp-gateway-prod-us-east-3.grafana.net/otlp` |
 | `GRAFANA_OTLP_TOKEN` | Base64-encoded `instanceID:token` from Grafana Cloud |
 | `OTLP_HTPASSWD` | htpasswd entry for receiver auth, e.g. `otlp:$2y$05$...`. Generate with: `htpasswd -nbB otlp <password>` |
-| `OTLP_ALLOWED_ORIGINS` | Comma-separated browser origins that skip auth and get CORS headers, e.g. `https://explore.gemini.edu,https://local.lucuma.xyz:8080` |
+| `OTLP_ALLOWED_ORIGINS` | Comma-separated browser origins that skip auth and get CORS headers, e.g. `https://explore.gemini.edu,https://local.gemini.edu:8080` |
 
 ### Browser origin allowlist
 
@@ -54,7 +54,7 @@ dyno restart, no rebuild:
 
 ```bash
 heroku config:set -a lucuma-otel-collector \
-  OTLP_ALLOWED_ORIGINS=https://explore.gemini.edu,https://explore-test.gemini.edu,https://explore-dev.lucuma.xyz,https://local.lucuma.xyz:8080,https://local.lucuma.xyz:8081,https://local.gemini.edu:8080,https://observe-test.hi.gemini.edu
+  OTLP_ALLOWED_ORIGINS=https://explore.gemini.edu,https://explore-test.gemini.edu,https://explore-dev.gemini.edu,https://local.gemini.edu:8080,https://local.gemini.edu:8081,https://observe-test.hi.gemini.edu
 ```
 
 If the var is unset, no origin is allowlisted and every request requires auth.

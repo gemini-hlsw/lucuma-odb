@@ -61,11 +61,11 @@
           env = [
             {
               name = "ODB_ITC_ROOT";
-              value = "https://itc-dev.lucuma.xyz/itc";
+              value = "https://itc-dev.gpp.gemini.edu/itc";
             }
             {
               name = "ODB_SSO_ROOT";
-              value = "https://sso-dev.gpp.lucuma.xyz";
+              value = "https://sso-dev.gpp.gemini.edu";
             }
             {
               # For odb-dev
@@ -106,7 +106,7 @@ yMvjw3Rl9GQnMoTGYsNsunNy4Q==
             }
             {
               name = "ODB_DOMAIN";
-              value = "lucuma.xyz, gemini.edu";
+              value = "gemini.edu";
             }
             {
               name = "CLOUDCUBE_URL";
@@ -122,11 +122,11 @@ yMvjw3Rl9GQnMoTGYsNsunNy4Q==
             }
             {
               name = "EXPLORE_URL";
-              value = "https://explore-dev.lucuma.xyz";
+              value = "https://explore-dev.gemini.edu";
             }
             {
               name = "MAILGUN_DOMAIN";
-              value = "odb-dev.lucuma.xyz";
+              value = "odb-dev.gpp.gemini.edu";
             }
             {
               name = "DATABASE_URL";

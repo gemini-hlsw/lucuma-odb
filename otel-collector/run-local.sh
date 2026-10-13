@@ -10,7 +10,7 @@
 #
 # Optional overrides (defaults shown):
 #   PORT=8888 OTLP_USER=otlp OTLP_PASSWORD=banana ./run-local.sh
-#   OTLP_ALLOWED_ORIGINS=https://local.lucuma.xyz:8080,https://local.lucuma.xyz:8081
+#   OTLP_ALLOWED_ORIGINS=https://local.gemini.edu:8080,https://local.gemini.edu:8081
 #
 # Then point ODB at it:
 #   export ODB_OTEL_ENDPOINT=http://localhost:8888
@@ -25,7 +25,7 @@ CONTAINER="${CONTAINER:-otel-local}"
 PORT="${PORT:-8888}"
 OTLP_USER="${OTLP_USER:-otlp}"
 OTLP_PASSWORD="${OTLP_PASSWORD:-banana}"
-OTLP_ALLOWED_ORIGINS="${OTLP_ALLOWED_ORIGINS:-https://local.lucuma.xyz:8080,https://local.lucuma.xyz:8081,https://local.gemini.edu:8080}"
+OTLP_ALLOWED_ORIGINS="${OTLP_ALLOWED_ORIGINS:-https://local.gemini.edu:8080,https://local.gemini.edu:8081}"
 
 require() {
   local name="$1"
