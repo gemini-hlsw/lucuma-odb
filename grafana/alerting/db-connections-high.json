@@ -27,7 +27,7 @@
       "model": {
         "refId": "A",
         "instant": true,
-        "expr": "sum by (deployment_environment_name) (lucuma_db_connections_used) / max by (deployment_environment_name) (lucuma_db_connections_max)"
+        "expr": "sum by (deployment_environment_name) (max by (deployment_environment_name, application_name) (lucuma_db_connections_used)) / max by (deployment_environment_name) (lucuma_db_connections_max)"
       }
     },
     {
