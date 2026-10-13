@@ -9,6 +9,7 @@ import cats.syntax.all.*
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.SequenceType
+import lucuma.core.enums.StepStage
 import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.core.model.sequence.Step
@@ -48,10 +49,10 @@ class resetAcquisitionCustomized
       }
     """
 
-  def replaceAcquisition(oid: Observation.Id, seconds: Int*): IO[Unit] =
+  def replaceAcquisition(user: User, oid: Observation.Id, seconds: Int*): IO[Unit] =
     val inputString = input(oid, SequenceType.Acquisition, atomInput("Edited", seconds.map(acquisitionStepInput)*))
     query(
-      pi,
+      user,
       s"""
         mutation {
           replaceGmosNorthSequence(input: $inputString) {
@@ -135,7 +136,7 @@ class resetAcquisitionCustomized
       p <- createProgramAs(pi)
       t <- createTargetWithProfileAs(pi, p)
       o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-      _ <- replaceAcquisition(o, EditedExposures*)
+      _ <- replaceAcquisition(pi, o, EditedExposures*)
     yield o
 
   test("reset keeps an edited acquisition, with fresh step ids"):
@@ -171,6 +172,38 @@ class resetAcquisitionCustomized
       _     <- stepIds(copy).traverse_(addEndStepEvent(_, v))
       _     <- resetAcquisitionAs(serviceUser, oid)
       _     <- expectEdited(oid)
+    yield ()
+
+  test("an edit after partial execution keeps the executed steps in the run"):
+    for
+      p         <- createProgramAs(pi)
+      t         <- createTargetWithProfileAs(pi, p)
+      oid       <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      v         <- recordVisitAs(serviceUser, oid)
+      generated <- acquisition(oid)
+      first      = generated.head._2.head
+      _         <- addEndStepEvent(first._1, v)
+      _         <- replaceAcquisition(serviceUser, oid, EditedExposures*)
+      run        = (generated.head._1, List(first._2)) :: EditedAcquisition
+      _         <- resetAcquisitionAs(serviceUser, oid)
+      copy      <- acquisition(oid)
+      _          = assertEquals(exposures(copy), run)
+      _         <- stepIds(copy).traverse_(addEndStepEvent(_, v))
+      _         <- resetAcquisitionAs(serviceUser, oid)
+      _         <- acquisition(oid).map(atoms => assertEquals(exposures(atoms), run))
+    yield ()
+
+  test("an edit while a step is ongoing supersedes that step"):
+    for
+      p         <- createProgramAs(pi)
+      t         <- createTargetWithProfileAs(pi, p)
+      oid       <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      v         <- recordVisitAs(serviceUser, oid)
+      generated <- acquisition(oid)
+      _         <- addStepEventAs(serviceUser, generated.head._2.head._1, v, StepStage.StartStep)
+      _         <- replaceAcquisition(serviceUser, oid, EditedExposures*)
+      _         <- resetAcquisitionAs(serviceUser, oid)
+      _         <- expectEdited(oid)
     yield ()
 
   test("deleting the sequence restores the generated acquisition"):

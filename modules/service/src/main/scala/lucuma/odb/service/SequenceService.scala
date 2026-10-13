@@ -78,6 +78,16 @@ import java.util.UUID
 
 import Services.Syntax.*
 
+/**
+ * Which batch (`t_atom.c_batch`) newly inserted atoms join. A batch is one
+ * run of a sequence: materialization and the acquisition resets open the next
+ * one, while a replacement continues the current one so that the run reads as
+ * its executed steps followed by the replacement. Resetting a customized
+ * acquisition copies the current batch.
+ */
+enum AtomBatch:
+  case Next, Current
+
 trait SequenceService[F[_]]:
 
   def insertAtomDigests(
@@ -98,6 +108,7 @@ trait SequenceService[F[_]]:
     observationId:  Observation.Id,
     sequenceType:   SequenceType,
     sequence:       List[ProtoAtom[ProtoStep[Flamingos2DynamicConfig]]],
+    batch:          AtomBatch,
     customized:     Boolean      = true,
     namespace:      Option[UUID] = None
   )(using Transaction[F]): F[Result[Stream[Pure, Atom[Flamingos2DynamicConfig]]]]
@@ -114,6 +125,7 @@ trait SequenceService[F[_]]:
     observationId:  Observation.Id,
     sequenceType:   SequenceType,
     sequence:       List[ProtoAtom[ProtoStep[GhostDynamicConfig]]],
+    batch:          AtomBatch,
     customized:     Boolean      = true,
     namespace:      Option[UUID] = None
   )(using Transaction[F]): F[Result[Stream[Pure, Atom[GhostDynamicConfig]]]]
@@ -126,6 +138,7 @@ trait SequenceService[F[_]]:
     observationId:  Observation.Id,
     sequenceType:   SequenceType,
     sequence:       List[ProtoAtom[ProtoStep[GmosNorth]]],
+    batch:          AtomBatch,
     customized:     Boolean      = true,
     namespace:      Option[UUID] = None
   )(using Transaction[F]): F[Result[Stream[Pure, Atom[GmosNorth]]]]
@@ -138,6 +151,7 @@ trait SequenceService[F[_]]:
     observationId:  Observation.Id,
     sequenceType:   SequenceType,
     sequence:       List[ProtoAtom[ProtoStep[GmosSouth]]],
+    batch:          AtomBatch,
     customized:     Boolean      = true,
     namespace:      Option[UUID] = None
   )(using Transaction[F]): F[Result[Stream[Pure, Atom[GmosSouth]]]]
@@ -238,6 +252,7 @@ trait SequenceService[F[_]]:
     observationId:  Observation.Id,
     sequenceType:   SequenceType,
     sequence:       List[ProtoAtom[ProtoStep[Igrins2DynamicConfig]]],
+    batch:          AtomBatch,
     customized:     Boolean      = true,
     namespace:      Option[UUID] = None
   )(using Transaction[F]): F[Result[Stream[Pure, Atom[Igrins2DynamicConfig]]]]
@@ -267,6 +282,7 @@ trait SequenceService[F[_]]:
     observationId:  Observation.Id,
     sequenceType:   SequenceType,
     sequence:       List[ProtoAtom[ProtoStep[GnirsDynamicConfig]]],
+    batch:          AtomBatch,
     customized:     Boolean      = true,
     namespace:      Option[UUID] = None
   )(using Transaction[F]): F[Result[Stream[Pure, Atom[GnirsDynamicConfig]]]]
@@ -374,6 +390,7 @@ object SequenceService:
           observationId,
           sequenceType,
           sequence,
+          AtomBatch.Next,
           Flamingos2SequenceService.Statements.insertDynamics
         )
 
@@ -387,6 +404,7 @@ object SequenceService:
           observationId,
           sequenceType,
           sequence,
+          AtomBatch.Next,
           GhostSequenceService.Statements.insertDynamics
         )
 
@@ -400,6 +418,7 @@ object SequenceService:
           observationId,
           sequenceType,
           sequence,
+          AtomBatch.Next,
           GmosSequenceService.Statements.insertNorthDynamics
         )
 
@@ -413,6 +432,7 @@ object SequenceService:
           observationId,
           sequenceType,
           sequence,
+          AtomBatch.Next,
           GmosSequenceService.Statements.insertSouthDynamics
         )
 
@@ -426,6 +446,7 @@ object SequenceService:
           observationId,
           sequenceType,
           sequence,
+          AtomBatch.Next,
           Igrins2SequenceService.Statements.insertDynamics
         )
 
@@ -439,6 +460,7 @@ object SequenceService:
           observationId,
           sequenceType,
           sequence,
+          AtomBatch.Next,
           GnirsSequenceService.Statements.insertDynamics
         )
 
@@ -447,6 +469,7 @@ object SequenceService:
         observationId:    Observation.Id,
         sequenceType:     SequenceType,
         sequence:         Stream[F, Atom[D]],
+        batch:            AtomBatch,
         insertInstConfig: (rows: List[(Step.Id, D)]) => Command[rows.type]
       ): F[Unit] =
 
@@ -507,12 +530,17 @@ object SequenceService:
             }
             .drain
 
+        val selectBatch: Query[(Observation.Id, SequenceType), Int] =
+          batch match
+            case AtomBatch.Next    => Statements.SelectNextAtomBatch
+            case AtomBatch.Current => Statements.SelectCurrentAtomBatch
+
         // Every caller has already locked the t_sequence_materialization row
         // (markMaterializedOrUpdate / markMaterializedOrDoNothing), so this
         // statement sees the batches of any concurrent writer that committed.
-        session.unique(Statements.SelectNextAtomBatch)(observationId, sequenceType).flatMap: batch =>
+        session.unique(selectBatch)(observationId, sequenceType).flatMap: b =>
           sequence
-            .broadcastThrough(atom(batch), step, gcal, instrumentConfig)
+            .broadcastThrough(atom(b), step, gcal, instrumentConfig)
             .compile
             .drain
 
@@ -606,6 +634,7 @@ object SequenceService:
         observationId:    Observation.Id,
         sequenceType:     SequenceType,
         sequence:         List[ProtoAtom[ProtoStep[D]]],
+        batch:            AtomBatch,
         customized:       Boolean,
         insertInstConfig: (rows: List[(Step.Id, D)]) => Command[rows.type],
         atomBuilder:      AtomBuilder[D]
@@ -640,7 +669,7 @@ object SequenceService:
           for
             _ <- markMaterializedOrUpdate(observationId, sequenceType, customized)
             _ <- abandonAndDeleteUnexecuted(observationId, sequenceType)
-            _ <- insertSequence(instrument, observationId, sequenceType, atoms.covary[F], insertInstConfig)
+            _ <- insertSequence(instrument, observationId, sequenceType, atoms.covary[F], batch, insertInstConfig)
           yield atoms
 
         checkAtomLength *> checkUnsplittable *> ResultT.liftF(doReplace)
@@ -664,6 +693,7 @@ object SequenceService:
         observationId: Observation.Id,
         sequenceType:  SequenceType,
         sequence:      List[ProtoAtom[ProtoStep[Flamingos2DynamicConfig]]],
+        batch:         AtomBatch,
         customized:    Boolean      = true,
         namespace:     Option[UUID] = None
       )(using Transaction[F]): F[Result[Stream[Pure, Atom[Flamingos2DynamicConfig]]]] =
@@ -676,6 +706,7 @@ object SequenceService:
                  observationId,
                  sequenceType,
                  sequence,
+                 batch,
                  customized,
                  Flamingos2SequenceService.Statements.insertDynamics,
                  b
@@ -689,7 +720,8 @@ object SequenceService:
           replaceFlamingos2Sequence(
             oid,
             sequenceType,
-            sequence
+            sequence,
+            AtomBatch.Current
           )
         }
 
@@ -705,6 +737,7 @@ object SequenceService:
         observationId:  Observation.Id,
         sequenceType:   SequenceType,
         sequence:       List[ProtoAtom[ProtoStep[GhostDynamicConfig]]],
+        batch:          AtomBatch,
         customized:     Boolean      = true,
         namespace:      Option[UUID] = None
       )(using Transaction[F]): F[Result[Stream[Pure, Atom[GhostDynamicConfig]]]] =
@@ -716,6 +749,7 @@ object SequenceService:
                  observationId,
                  sequenceType,
                  sequence,
+                 batch,
                  customized,
                  GhostSequenceService.Statements.insertDynamics,
                  b
@@ -729,7 +763,8 @@ object SequenceService:
           replaceGhostSequence(
             oid,
             sequenceType,
-            sequence
+            sequence,
+            AtomBatch.Current
           )
         }
 
@@ -737,6 +772,7 @@ object SequenceService:
         observationId: Observation.Id,
         sequenceType:  SequenceType,
         sequence:      List[ProtoAtom[ProtoStep[GmosNorth]]],
+        batch:         AtomBatch,
         customized:    Boolean      = true,
         namespace:     Option[UUID] = None
       )(using Transaction[F]): F[Result[Stream[Pure, Atom[GmosNorth]]]] =
@@ -748,6 +784,7 @@ object SequenceService:
                  observationId,
                  sequenceType,
                  sequence,
+                 batch,
                  customized,
                  GmosSequenceService.Statements.insertNorthDynamics,
                  b
@@ -761,7 +798,8 @@ object SequenceService:
           replaceGmosNorthSequence(
             oid,
             sequenceType,
-            sequence
+            sequence,
+            AtomBatch.Current
           )
         }
 
@@ -769,6 +807,7 @@ object SequenceService:
         observationId: Observation.Id,
         sequenceType:  SequenceType,
         sequence:      List[ProtoAtom[ProtoStep[GmosSouth]]],
+        batch:         AtomBatch,
         customized:    Boolean      = true,
         namespace:     Option[UUID] = None
       )(using Transaction[F]): F[Result[Stream[Pure, Atom[GmosSouth]]]] =
@@ -780,6 +819,7 @@ object SequenceService:
                  observationId,
                  sequenceType,
                  sequence,
+                 batch,
                  customized,
                  GmosSequenceService.Statements.insertSouthDynamics,
                  b
@@ -794,7 +834,8 @@ object SequenceService:
           replaceGmosSouthSequence(
             oid,
             sequenceType,
-            sequence
+            sequence,
+            AtomBatch.Current
           )
         }
 
@@ -802,6 +843,7 @@ object SequenceService:
         observationId: Observation.Id,
         sequenceType:  SequenceType,
         sequence:      List[ProtoAtom[ProtoStep[Igrins2DynamicConfig]]],
+        batch:         AtomBatch,
         customized:    Boolean      = true,
         namespace:     Option[UUID] = None
       )(using Transaction[F]): F[Result[Stream[Pure, Atom[Igrins2DynamicConfig]]]] =
@@ -813,6 +855,7 @@ object SequenceService:
                  observationId,
                  sequenceType,
                  sequence,
+                 batch,
                  customized,
                  Igrins2SequenceService.Statements.insertDynamics,
                  b
@@ -826,7 +869,8 @@ object SequenceService:
           replaceIgrins2Sequence(
             oid,
             sequenceType,
-            sequence
+            sequence,
+            AtomBatch.Current
           )
         }
 
@@ -834,6 +878,7 @@ object SequenceService:
         observationId: Observation.Id,
         sequenceType:  SequenceType,
         sequence:      List[ProtoAtom[ProtoStep[GnirsDynamicConfig]]],
+        batch:         AtomBatch,
         customized:    Boolean      = true,
         namespace:     Option[UUID] = None
       )(using Transaction[F]): F[Result[Stream[Pure, Atom[GnirsDynamicConfig]]]] =
@@ -845,6 +890,7 @@ object SequenceService:
                  observationId,
                  sequenceType,
                  sequence,
+                 batch,
                  customized,
                  GnirsSequenceService.Statements.insertDynamics,
                  b
@@ -858,7 +904,8 @@ object SequenceService:
           replaceGnirsSequence(
             oid,
             sequenceType,
-            sequence
+            sequence,
+            AtomBatch.Current
           )
         }
 
@@ -1117,12 +1164,12 @@ object SequenceService:
 
         def resetInstrument(instrument: Instrument): F[Result[Boolean]] =
           instrument match
-            case Instrument.Flamingos2 => reset(instrument, Statements.Flamingos2Table, replaceFlamingos2Sequence(observationId, acquisition, _, customized = true))
-            case Instrument.Ghost      => reset(instrument, Statements.GhostTable,      replaceGhostSequence(observationId, acquisition, _, customized = true))
-            case Instrument.GmosNorth  => reset(instrument, Statements.GmosNorthTable,  replaceGmosNorthSequence(observationId, acquisition, _, customized = true))
-            case Instrument.GmosSouth  => reset(instrument, Statements.GmosSouthTable,  replaceGmosSouthSequence(observationId, acquisition, _, customized = true))
-            case Instrument.Igrins2    => reset(instrument, Statements.Igrins2Table,    replaceIgrins2Sequence(observationId, acquisition, _, customized = true))
-            case Instrument.Gnirs      => reset(instrument, Statements.GnirsTable,      replaceGnirsSequence(observationId, acquisition, _, customized = true))
+            case Instrument.Flamingos2 => reset(instrument, Statements.Flamingos2Table, replaceFlamingos2Sequence(observationId, acquisition, _, AtomBatch.Next, customized = true))
+            case Instrument.Ghost      => reset(instrument, Statements.GhostTable,      replaceGhostSequence(observationId, acquisition, _, AtomBatch.Next, customized = true))
+            case Instrument.GmosNorth  => reset(instrument, Statements.GmosNorthTable,  replaceGmosNorthSequence(observationId, acquisition, _, AtomBatch.Next, customized = true))
+            case Instrument.GmosSouth  => reset(instrument, Statements.GmosSouthTable,  replaceGmosSouthSequence(observationId, acquisition, _, AtomBatch.Next, customized = true))
+            case Instrument.Igrins2    => reset(instrument, Statements.Igrins2Table,    replaceIgrins2Sequence(observationId, acquisition, _, AtomBatch.Next, customized = true))
+            case Instrument.Gnirs      => reset(instrument, Statements.GnirsTable,      replaceGnirsSequence(observationId, acquisition, _, AtomBatch.Next, customized = true))
             case _                     => Result.success(false).pure[F]
 
         // Locking the materialization row keeps a concurrent replace from
@@ -1151,12 +1198,12 @@ object SequenceService:
         // steps is customized, a copy of generated steps is not.
         def copySequenceType(instrument: Instrument, sequenceType: SequenceType, pendingOnly: Boolean, customized: Boolean): F[Result[Unit]] =
           instrument match
-            case Instrument.Flamingos2 => copy(instrument, sequenceType, Statements.Flamingos2Table, pendingOnly, replaceFlamingos2Sequence(clone, sequenceType, _, customized))
-            case Instrument.Ghost      => copy(instrument, sequenceType, Statements.GhostTable,      pendingOnly, replaceGhostSequence(clone, sequenceType, _, customized))
-            case Instrument.GmosNorth  => copy(instrument, sequenceType, Statements.GmosNorthTable,  pendingOnly, replaceGmosNorthSequence(clone, sequenceType, _, customized))
-            case Instrument.GmosSouth  => copy(instrument, sequenceType, Statements.GmosSouthTable,  pendingOnly, replaceGmosSouthSequence(clone, sequenceType, _, customized))
-            case Instrument.Igrins2    => copy(instrument, sequenceType, Statements.Igrins2Table,    pendingOnly, replaceIgrins2Sequence(clone, sequenceType, _, customized))
-            case Instrument.Gnirs      => copy(instrument, sequenceType, Statements.GnirsTable,      pendingOnly, replaceGnirsSequence(clone, sequenceType, _, customized))
+            case Instrument.Flamingos2 => copy(instrument, sequenceType, Statements.Flamingos2Table, pendingOnly, replaceFlamingos2Sequence(clone, sequenceType, _, AtomBatch.Current, customized))
+            case Instrument.Ghost      => copy(instrument, sequenceType, Statements.GhostTable,      pendingOnly, replaceGhostSequence(clone, sequenceType, _, AtomBatch.Current, customized))
+            case Instrument.GmosNorth  => copy(instrument, sequenceType, Statements.GmosNorthTable,  pendingOnly, replaceGmosNorthSequence(clone, sequenceType, _, AtomBatch.Current, customized))
+            case Instrument.GmosSouth  => copy(instrument, sequenceType, Statements.GmosSouthTable,  pendingOnly, replaceGmosSouthSequence(clone, sequenceType, _, AtomBatch.Current, customized))
+            case Instrument.Igrins2    => copy(instrument, sequenceType, Statements.Igrins2Table,    pendingOnly, replaceIgrins2Sequence(clone, sequenceType, _, AtomBatch.Current, customized))
+            case Instrument.Gnirs      => copy(instrument, sequenceType, Statements.GnirsTable,      pendingOnly, replaceGnirsSequence(clone, sequenceType, _, AtomBatch.Current, customized))
             case _                     => Result.unit.pure[F]
 
         def copyIfMaterialized(instrument: Instrument, sequenceType: SequenceType, pendingOnly: Boolean): ResultT[F, Unit] =
@@ -1219,6 +1266,14 @@ object SequenceService:
     val SelectNextAtomBatch: Query[(Observation.Id, SequenceType), Int] =
       sql"""
         SELECT COALESCE(MAX(c_batch), 0) + 1
+        FROM   t_atom
+        WHERE  c_observation_id = $observation_id
+          AND  c_sequence_type  = $sequence_type
+      """.query(int4)
+
+    val SelectCurrentAtomBatch: Query[(Observation.Id, SequenceType), Int] =
+      sql"""
+        SELECT COALESCE(MAX(c_batch), 1)
         FROM   t_atom
         WHERE  c_observation_id = $observation_id
           AND  c_sequence_type  = $sequence_type
@@ -1515,8 +1570,9 @@ object SequenceService:
       )
 
     /**
-     * Selects the most recently inserted batch of atoms, executed or not
-     * (see V1347 for `c_batch`).
+     * Selects the current batch of atoms (see V1349 for `c_batch`), executed
+     * or not. Abandoned steps are left out: a replacement in the same batch
+     * supersedes them, and a reset copies a step while it is still ongoing.
      */
     def selectLatestSequence[D](
       table: DynamicTable[D]
@@ -1530,6 +1586,7 @@ object SequenceService:
             WHERE l.c_observation_id = a.c_observation_id
               AND l.c_sequence_type  = a.c_sequence_type
           )
+          AND (se.c_step_id IS NULL OR se.c_execution_state <> 'abandoned')
         """,
         ExecutionOrder
       )

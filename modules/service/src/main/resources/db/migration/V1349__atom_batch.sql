@@ -1,8 +1,10 @@
--- Atoms are inserted in batches. Each batch gets the next number for its
--- observation and sequence type, allocated while holding the sequence's
--- t_sequence_materialization row lock. The highest batch is the current
--- sequence; lower batches are executed history. Resetting a customized
--- acquisition copies the current batch.
+-- A batch is one run of a sequence. Materialization and acquisition resets
+-- open the next batch for the observation and sequence type; a replacement
+-- joins the current one, so a run reads as its executed steps followed by the
+-- replacement. Numbers are allocated while holding the sequence's
+-- t_sequence_materialization row lock. The highest batch is the current run;
+-- lower batches are history. Resetting a customized acquisition copies the
+-- current batch.
 ALTER TABLE t_atom
   ADD COLUMN c_batch int4 NOT NULL DEFAULT 0;
 
