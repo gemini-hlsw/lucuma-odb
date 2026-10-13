@@ -37,6 +37,7 @@ import lucuma.odb.service.ItcService
 import lucuma.odb.service.S3FileService
 import lucuma.odb.service.UserService
 import lucuma.odb.util.OdbTelemetry
+import lucuma.otel.health.DbConnections
 import lucuma.otel.health.HealthCheck
 import lucuma.otel.health.HealthRoutes
 import lucuma.sso.client.SsoClient
@@ -387,6 +388,7 @@ object FMain extends MainParams {
       given MeterProvider[F]  = ot.meterProvider
       ap <- routesResource(c).map(_.map(_.orNotFound))
       _  <- Resource.eval(ItcService.pollVersionsForever(c.itcClient, singleSession(c.database), c.itc.pollPeriod))
+      _  <- DbConnections.resource(singleSession(c.database), 1.minute)
       _  <- serverResource(c.port, ap)
     } yield ExitCode.Success
 
