@@ -389,7 +389,7 @@ object GuideService {
     blindOffset: Option[SiderealTracking]
   ) {
     def trackType: TrackType =
-      trackTypeOf(asterism.exists(_.isInstanceOf[Target.Nonsidereal]))
+      trackTypeOf(asterism.exists(Target.nonsidereal.getOption(_).isDefined))
 
     // Positions only, in a fixed order: neither the target that holds them nor its catalog link
     // moves the field.
