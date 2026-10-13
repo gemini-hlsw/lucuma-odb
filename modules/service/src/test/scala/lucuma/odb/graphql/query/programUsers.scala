@@ -315,6 +315,47 @@ class programUsers extends OdbSuite:
              )
     yield ()
 
+  test("program user paging by program user id with OFFSET_AFTER"):
+    createProgramAs(pi).replicateA(3).flatMap: pids =>
+      query(
+        user  = pi,
+        query = s"""
+          query {
+            programUsers(WHERE: { program: { id: { IN: ${pids.asJson} } } }) {
+              matches { id }
+            }
+          }
+        """
+      ).flatMap: json =>
+        val ids: List[Json] =
+          json.hcursor.downFields("programUsers", "matches").values.toList.flatten.flatMap(_.hcursor.downField("id").focus)
+        assertEquals(ids.size, 3)
+        expect(
+          user = pi,
+          query = s"""
+            query {
+              programUsers(
+                WHERE: { program: { id: { IN: ${pids.asJson} } } }
+                OFFSET_AFTER: ${ids(0)}
+                LIMIT: 1
+              ) {
+                hasMore
+                matches { id }
+              }
+            }
+          """,
+          expected = Right(
+            json"""
+              {
+                "programUsers": {
+                  "hasMore": true,
+                  "matches": [ { "id": ${ids(1)} } ]
+                }
+              }
+            """
+          )
+        )
+
   test("program user selection limited by visibility"):
     createProgramAs(guest1).flatMap: _ =>
       expect(

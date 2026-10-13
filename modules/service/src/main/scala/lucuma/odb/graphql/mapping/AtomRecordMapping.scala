@@ -13,7 +13,6 @@ import io.circe.syntax.*
 import lucuma.core.model.User
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
-import lucuma.odb.graphql.binding.BooleanBinding
 import lucuma.odb.graphql.binding.NonNegIntBinding
 import lucuma.odb.graphql.binding.PosIntBinding
 import lucuma.odb.graphql.predicate.Predicates
@@ -63,9 +62,10 @@ trait AtomRecordMapping[F[_]] extends AtomRecordView[F]
 
     case (AtomRecordType, "steps", List(
       PosIntBinding.Option("OFFSET", rOFFSET),
-      BooleanBinding("OFFSET_INCLUDE", rOFFSET_INCLUDE),
+      PosIntBinding.Option("OFFSET_AT", rOFFSET_AT),
+      PosIntBinding.Option("OFFSET_AFTER", rOFFSET_AFTER),
       NonNegIntBinding.Option("LIMIT", rLIMIT)
     )) =>
-      selectWithOffsetAndLimit(rOFFSET, rOFFSET_INCLUDE, rLIMIT, StepRecordType, "index", Predicates.stepRecord.index, Predicates.stepRecord.atomRecord.observation.program)
+      selectWithOffsetAndLimit(rOFFSET, rOFFSET_AT, rOFFSET_AFTER, rLIMIT, StepRecordType, "index", Predicates.stepRecord.index, Predicates.stepRecord.atomRecord.observation.program)
 
   }

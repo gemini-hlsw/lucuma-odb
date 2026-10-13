@@ -14,6 +14,7 @@ import grackle.Predicate
 import grackle.Predicate.*
 import grackle.Query.*
 import grackle.QueryCompiler.Elab
+import grackle.Result
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
 import lucuma.core.enums.ScienceBand
@@ -150,17 +151,19 @@ trait ProgramMapping[F[_]]
     case (ProgramType, "observations", List(
       BooleanBinding("includeDeleted", rIncludeDeleted),
       ObservationIdBinding.Option("OFFSET", rOFFSET),
-      BooleanBinding("OFFSET_INCLUDE", rOFFSET_INCLUDE),
+      ObservationIdBinding.Option("OFFSET_AT", rOFFSET_AT),
+      ObservationIdBinding.Option("OFFSET_AFTER", rOFFSET_AFTER),
       NonNegIntBinding.Option("LIMIT", rLIMIT),
     )) =>
       Elab.transformChild { child =>
-        (rIncludeDeleted, rOFFSET, rOFFSET_INCLUDE, rLIMIT).parTupled.flatMap { (includeDeleted, OFFSET, OFFSET_INCLUDE, lim) =>
+        val rOffset: Result[Predicate] = PagingOffset.predicate(Predicates.observation.id, rOFFSET, rOFFSET_AT, rOFFSET_AFTER)
+        (rIncludeDeleted, rOffset, rLIMIT).parTupled.flatMap { (includeDeleted, offset, lim) =>
           val limit = lim.fold(ResultMapping.MaxLimit)(_.value)
           ResultMapping.selectResult(child, limit) { q =>
             FilterOrderByOffsetLimit(
               pred = Some(and(List(
                 Predicates.observation.existence.includeDeleted(includeDeleted),
-                Predicates.observation.id.offset(OFFSET, OFFSET_INCLUDE)
+                offset
               ))),
               oss = Some(List(OrderSelection[Observation.Id](ObservationType / "id", true, true))),
               offset = None,
@@ -173,16 +176,18 @@ trait ProgramMapping[F[_]]
 
     case (ProgramType, "configurationRequests", List(
       ConfigurationRequestIdBinding.Option("OFFSET", rOFFSET),
-      BooleanBinding("OFFSET_INCLUDE", rOFFSET_INCLUDE),
+      ConfigurationRequestIdBinding.Option("OFFSET_AT", rOFFSET_AT),
+      ConfigurationRequestIdBinding.Option("OFFSET_AFTER", rOFFSET_AFTER),
       NonNegIntBinding.Option("LIMIT", rLIMIT),
     )) =>
       Elab.transformChild { child =>
-        (rOFFSET, rOFFSET_INCLUDE, rLIMIT).parTupled.flatMap { (OFFSET, OFFSET_INCLUDE, lim) =>
+        val rOffset: Result[Predicate] = PagingOffset.predicate(Predicates.configurationRequest.id, rOFFSET, rOFFSET_AT, rOFFSET_AFTER)
+        (rOffset, rLIMIT).parTupled.flatMap { (offset, lim) =>
           val limit = lim.fold(ResultMapping.MaxLimit)(_.value)
           ResultMapping.selectResult(child, limit) { q =>
             FilterOrderByOffsetLimit(
               pred = Some(
-                Predicates.configurationRequest.id.offset(OFFSET, OFFSET_INCLUDE)
+                offset
               ),
               oss = Some(List(OrderSelection[ConfigurationRequest.Id](ConfigurationRequestType / "id", true, true))),
               offset = None,

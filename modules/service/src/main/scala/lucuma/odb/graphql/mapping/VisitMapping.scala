@@ -13,7 +13,6 @@ import grackle.TypeRef
 import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.User
 import lucuma.core.model.Visit
-import lucuma.odb.graphql.binding.BooleanBinding
 import lucuma.odb.graphql.binding.DatasetIdBinding
 import lucuma.odb.graphql.binding.ExecutionEventIdBinding
 import lucuma.odb.graphql.binding.NonNegIntBinding
@@ -72,24 +71,27 @@ trait VisitMapping[F[_]] extends VisitTable[F]
 
     case (VisitType, "atomRecords", List(
       PosIntBinding.Option("OFFSET", rOFFSET),
-      BooleanBinding("OFFSET_INCLUDE", rOFFSET_INCLUDE),
+      PosIntBinding.Option("OFFSET_AT", rOFFSET_AT),
+      PosIntBinding.Option("OFFSET_AFTER", rOFFSET_AFTER),
       NonNegIntBinding.Option("LIMIT", rLIMIT)
     )) =>
-      selectWithOffsetAndLimit(rOFFSET, rOFFSET_INCLUDE, rLIMIT, AtomRecordType, "index", Predicates.atomRecord.index, Predicates.atomRecord.observation.program)
+      selectWithOffsetAndLimit(rOFFSET, rOFFSET_AT, rOFFSET_AFTER, rLIMIT, AtomRecordType, "index", Predicates.atomRecord.index, Predicates.atomRecord.observation.program)
 
     case (VisitType, "datasets", List(
       DatasetIdBinding.Option("OFFSET", rOFFSET),
-      BooleanBinding("OFFSET_INCLUDE", rOFFSET_INCLUDE),
+      DatasetIdBinding.Option("OFFSET_AT", rOFFSET_AT),
+      DatasetIdBinding.Option("OFFSET_AFTER", rOFFSET_AFTER),
       NonNegIntBinding.Option("LIMIT", rLIMIT)
     )) =>
-      selectWithOffsetAndLimit(rOFFSET, rOFFSET_INCLUDE, rLIMIT, DatasetType, "id", Predicates.dataset.id, Predicates.dataset.observation.program)
+      selectWithOffsetAndLimit(rOFFSET, rOFFSET_AT, rOFFSET_AFTER, rLIMIT, DatasetType, "id", Predicates.dataset.id, Predicates.dataset.observation.program)
 
     case (VisitType, "events", List(
       ExecutionEventIdBinding.Option("OFFSET", rOFFSET),
-      BooleanBinding("OFFSET_INCLUDE", rOFFSET_INCLUDE),
+      ExecutionEventIdBinding.Option("OFFSET_AT", rOFFSET_AT),
+      ExecutionEventIdBinding.Option("OFFSET_AFTER", rOFFSET_AFTER),
       NonNegIntBinding.Option("LIMIT", rLIMIT)
     )) =>
-      selectWithOffsetAndLimit(rOFFSET, rOFFSET_INCLUDE, rLIMIT, ExecutionEventType, "id", Predicates.executionEvent.id, Predicates.executionEvent.observation.program)
+      selectWithOffsetAndLimit(rOFFSET, rOFFSET_AT, rOFFSET_AFTER, rLIMIT, ExecutionEventType, "id", Predicates.executionEvent.id, Predicates.executionEvent.observation.program)
   }
 
   private lazy val intervalHandler: EffectHandler[F] =

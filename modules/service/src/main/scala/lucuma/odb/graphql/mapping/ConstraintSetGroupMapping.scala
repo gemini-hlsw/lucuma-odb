@@ -6,9 +6,11 @@ package lucuma.odb.graphql
 package mapping
 
 import cats.syntax.all.*
+import grackle.Predicate
 import grackle.Predicate.*
 import grackle.Query.*
 import grackle.QueryCompiler.Elab
+import grackle.Result
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
 import lucuma.core.model.Observation
@@ -38,17 +40,19 @@ trait ConstraintSetGroupMapping[F[_]]
     case (ConstraintSetGroupType, "observations", List(
       BooleanBinding("includeDeleted", rIncludeDeleted),
       ObservationIdBinding.Option("OFFSET", rOFFSET),
-      BooleanBinding("OFFSET_INCLUDE", rOFFSET_INCLUDE),
+      ObservationIdBinding.Option("OFFSET_AT", rOFFSET_AT),
+      ObservationIdBinding.Option("OFFSET_AFTER", rOFFSET_AFTER),
       NonNegIntBinding.Option("LIMIT", rLIMIT),
     )) =>
       Elab.transformChild { child =>
-        (rIncludeDeleted, rOFFSET, rOFFSET_INCLUDE, rLIMIT).parTupled.flatMap { (includeDeleted, OFFSET, OFFSET_INCLUDE, lim) =>
+        val rOffset: Result[Predicate] = PagingOffset.predicate(Predicates.observation.id, rOFFSET, rOFFSET_AT, rOFFSET_AFTER)
+        (rIncludeDeleted, rOffset, rLIMIT).parTupled.flatMap { (includeDeleted, offset, lim) =>
           val limit = lim.fold(ResultMapping.MaxLimit)(_.value)
           ResultMapping.selectResult(child, limit) { q =>
             FilterOrderByOffsetLimit(
               pred = Some(and(List(
                 Predicates.observation.existence.includeDeleted(includeDeleted),
-                Predicates.observation.id.offset(OFFSET, OFFSET_INCLUDE)
+                offset
               ))),
               oss = Some(List(OrderSelection[Observation.Id](ObservationType / "id", true, true))),
               offset = None,

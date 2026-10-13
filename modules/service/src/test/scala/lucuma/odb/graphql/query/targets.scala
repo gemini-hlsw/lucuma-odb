@@ -105,7 +105,7 @@ class targets extends OdbSuite {
     }
   }
 
-  test("target selection with offset excluded") {
+  test("target selection with OFFSET_AFTER") {
     createProgramAs(pi).flatMap { pid =>
       createTargetAs(pi, pid).replicateA(10).flatMap { tids =>
         expect(
@@ -118,8 +118,7 @@ class targets extends OdbSuite {
                     id: { EQ: "$pid" }
                   }
                 }
-                OFFSET: ${tids(3).asJson}
-                OFFSET_INCLUDE: false
+                OFFSET_AFTER: ${tids(3).asJson}
                 LIMIT: 3
               ) {
                 hasMore
@@ -146,7 +145,7 @@ class targets extends OdbSuite {
     }
   }
 
-  test("target paging one at a time with offset excluded") {
+  test("target paging one at a time with OFFSET_AFTER") {
     def page(pid: Program.Id, offset: Option[Target.Id]): IO[(List[Target.Id], Boolean)] =
       query(
         user  = pi,
@@ -154,8 +153,7 @@ class targets extends OdbSuite {
           query {
             targets(
               WHERE: { program: { id: { EQ: "$pid" } } }
-              ${offset.fold("")(o => s"OFFSET: ${o.asJson}")}
-              OFFSET_INCLUDE: false
+              ${offset.fold("")(o => s"OFFSET_AFTER: ${o.asJson}")}
               LIMIT: 1
             ) {
               hasMore
@@ -180,6 +178,65 @@ class targets extends OdbSuite {
       tids <- createTargetAs(pi, pid).replicateA(4)
       all  <- drain(pid, None, Nil)
     yield assertEquals(all, tids)
+  }
+
+  test("target selection with OFFSET_AT") {
+    createProgramAs(pi).flatMap { pid =>
+      createTargetAs(pi, pid).replicateA(5).flatMap { tids =>
+        expect(
+          user = pi,
+          query = s"""
+            query {
+              targets(
+                WHERE: { program: { id: { EQ: "$pid" } } }
+                OFFSET_AT: ${tids(3).asJson}
+              ) {
+                hasMore
+                matches {
+                  id
+                }
+              }
+            }
+          """,
+          expected =
+            Right(Json.obj(
+              "targets" -> Json.obj(
+                "hasMore" -> Json.False,
+                "matches" -> Json.fromValues(
+                    tids.drop(3).map { id =>
+                      Json.obj("id" -> id.asJson)
+                    }
+                )
+              )
+            )
+          )
+        )
+      }
+    }
+  }
+
+  test("target selection with more than one offset argument is rejected") {
+    createProgramAs(pi).flatMap { pid =>
+      createTargetAs(pi, pid).flatMap { tid =>
+        expect(
+          user = pi,
+          query = s"""
+            query {
+              targets(
+                WHERE: { program: { id: { EQ: "$pid" } } }
+                OFFSET_AT: ${tid.asJson}
+                OFFSET_AFTER: ${tid.asJson}
+              ) {
+                matches {
+                  id
+                }
+              }
+            }
+          """,
+          expected = Left(List("Only one of `OFFSET`, `OFFSET_AT` and `OFFSET_AFTER` may be specified."))
+        )
+      }
+    }
   }
 
   test("target selection with offset and limit") {

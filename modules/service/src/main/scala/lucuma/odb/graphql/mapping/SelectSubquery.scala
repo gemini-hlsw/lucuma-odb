@@ -7,6 +7,7 @@ import cats.Order
 import cats.syntax.option.*
 import cats.syntax.parallel.*
 import eu.timepit.refined.types.numeric.NonNegInt
+import grackle.Predicate
 import grackle.Predicate.and
 import grackle.Query.FilterOrderByOffsetLimit
 import grackle.Query.OrderSelection
@@ -20,7 +21,8 @@ trait SelectSubquery {
 
   def selectWithOffsetAndLimit[A: Order](
     rOFFSET:         Result[Option[A]],
-    rOFFSET_INCLUDE: Result[Boolean],
+    rOFFSET_AT:      Result[Option[A]],
+    rOFFSET_AFTER:   Result[Option[A]],
     rLIMIT:          Result[Option[NonNegInt]],
     typeRef:         TypeRef,
     offsetField:     String,
@@ -29,12 +31,13 @@ trait SelectSubquery {
   ): Elab[Unit] =
     UserEnv.elab: user =>
       Elab.transformChild { child =>
-        (rOFFSET, rOFFSET_INCLUDE, rLIMIT).parTupled.flatMap { (OFFSET, OFFSET_INCLUDE, LIMIT) =>
+        val rOffset: Result[Predicate] = PagingOffset.predicate(offsetPredicate, rOFFSET, rOFFSET_AT, rOFFSET_AFTER)
+        (rOffset, rLIMIT).parTupled.flatMap { (offset, LIMIT) =>
           val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
           ResultMapping.selectResult(child, limit) { q =>
             FilterOrderByOffsetLimit(
               pred = and(List(
-                offsetPredicate.offset(OFFSET, OFFSET_INCLUDE),
+                offset,
                 progPredicates.isVisibleTo(user)
               )).some,
               oss    = List(OrderSelection[A](typeRef / offsetField)).some,

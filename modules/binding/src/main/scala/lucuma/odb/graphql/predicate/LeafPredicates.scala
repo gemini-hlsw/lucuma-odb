@@ -23,9 +23,6 @@ class LeafPredicates[A](path: Path) {
   def gtEql(a: A)(using Order[A]): Predicate =
     GtEql(path, Const(a))
 
-  def offset(start: Option[A], include: Boolean)(using Order[A]): Predicate =
-    start.fold(True)(a => if include then gtEql(a) else gt(a))
-
   def in(as: List[A])(using Eq[A]): Predicate =
     In(path, as)
 
