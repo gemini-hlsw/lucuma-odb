@@ -6,6 +6,7 @@ package query
 
 import cats.effect.IO
 import cats.syntax.all.*
+import io.circe.ACursor
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
@@ -99,6 +100,140 @@ class targets extends OdbSuite {
               )
             )
           )
+        )
+      }
+    }
+  }
+
+  test("target selection with OFFSET_AFTER") {
+    createProgramAs(pi).flatMap { pid =>
+      createTargetAs(pi, pid).replicateA(10).flatMap { tids =>
+        expect(
+          user = pi,
+          query = s"""
+            query {
+              targets(
+                WHERE: {
+                  program: {
+                    id: { EQ: "$pid" }
+                  }
+                }
+                OFFSET_AFTER: ${tids(3).asJson}
+                LIMIT: 3
+              ) {
+                hasMore
+                matches {
+                  id
+                }
+              }
+            }
+          """,
+          expected =
+            Right(Json.obj(
+              "targets" -> Json.obj(
+                "hasMore" -> Json.True,
+                "matches" -> Json.fromValues(
+                    tids.drop(4).take(3).map { id =>
+                      Json.obj("id" -> id.asJson)
+                    }
+                )
+              )
+            )
+          )
+        )
+      }
+    }
+  }
+
+  test("target paging one at a time with OFFSET_AFTER") {
+    def page(pid: Program.Id, offset: Option[Target.Id]): IO[(List[Target.Id], Boolean)] =
+      query(
+        user  = pi,
+        query = s"""
+          query {
+            targets(
+              WHERE: { program: { id: { EQ: "$pid" } } }
+              ${offset.fold("")(o => s"OFFSET_AFTER: ${o.asJson}")}
+              LIMIT: 1
+            ) {
+              hasMore
+              matches { id }
+            }
+          }
+        """
+      ).map: json =>
+        val c: ACursor = json.hcursor.downField("targets")
+        (
+          c.downField("matches").values.toList.flatten.flatMap(_.hcursor.downField("id").as[Target.Id].toOption),
+          c.downField("hasMore").as[Boolean].getOrElse(false)
+        )
+
+    def drain(pid: Program.Id, offset: Option[Target.Id], acc: List[Target.Id]): IO[List[Target.Id]] =
+      page(pid, offset).flatMap:
+        case (ids, true)  => drain(pid, ids.lastOption, acc ++ ids)
+        case (ids, false) => IO.pure(acc ++ ids)
+
+    for
+      pid  <- createProgramAs(pi)
+      tids <- createTargetAs(pi, pid).replicateA(4)
+      all  <- drain(pid, None, Nil)
+    yield assertEquals(all, tids)
+  }
+
+  test("target selection with OFFSET_AT") {
+    createProgramAs(pi).flatMap { pid =>
+      createTargetAs(pi, pid).replicateA(5).flatMap { tids =>
+        expect(
+          user = pi,
+          query = s"""
+            query {
+              targets(
+                WHERE: { program: { id: { EQ: "$pid" } } }
+                OFFSET_AT: ${tids(3).asJson}
+              ) {
+                hasMore
+                matches {
+                  id
+                }
+              }
+            }
+          """,
+          expected =
+            Right(Json.obj(
+              "targets" -> Json.obj(
+                "hasMore" -> Json.False,
+                "matches" -> Json.fromValues(
+                    tids.drop(3).map { id =>
+                      Json.obj("id" -> id.asJson)
+                    }
+                )
+              )
+            )
+          )
+        )
+      }
+    }
+  }
+
+  test("target selection with more than one offset argument is rejected") {
+    createProgramAs(pi).flatMap { pid =>
+      createTargetAs(pi, pid).flatMap { tid =>
+        expect(
+          user = pi,
+          query = s"""
+            query {
+              targets(
+                WHERE: { program: { id: { EQ: "$pid" } } }
+                OFFSET_AT: ${tid.asJson}
+                OFFSET_AFTER: ${tid.asJson}
+              ) {
+                matches {
+                  id
+                }
+              }
+            }
+          """,
+          expected = Left(List("Only one of `OFFSET`, `OFFSET_AT` and `OFFSET_AFTER` may be specified."))
         )
       }
     }

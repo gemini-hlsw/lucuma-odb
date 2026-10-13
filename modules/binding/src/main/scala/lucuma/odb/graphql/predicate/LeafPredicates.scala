@@ -17,6 +17,9 @@ class LeafPredicates[A](path: Path) {
   def neql(a: A)(using Eq[A]): Predicate =
     NEql(path, Const(a))
 
+  def gt(a: A)(using Order[A]): Predicate =
+    Gt(path, Const(a))
+
   def gtEql(a: A)(using Order[A]): Predicate =
     GtEql(path, Const(a))
 

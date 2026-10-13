@@ -69,9 +69,11 @@ trait DatasetMapping[F[_]] extends DatasetTable[F]
   lazy val DatasetElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
     case (DatasetType, "events", List(
       ExecutionEventIdBinding.Option("OFFSET", rOFFSET),
+      ExecutionEventIdBinding.Option("OFFSET_AT", rOFFSET_AT),
+      ExecutionEventIdBinding.Option("OFFSET_AFTER", rOFFSET_AFTER),
       NonNegIntBinding.Option("LIMIT", rLIMIT)
     )) =>
-      selectWithOffsetAndLimit(rOFFSET, rLIMIT, ExecutionEventType, "id", Predicates.executionEvent.id, Predicates.executionEvent.observation.program)
+      selectWithOffsetAndLimit(rOFFSET, rOFFSET_AT, rOFFSET_AFTER, rLIMIT, ExecutionEventType, "id", Predicates.executionEvent.id, Predicates.executionEvent.observation.program)
   }
 
 

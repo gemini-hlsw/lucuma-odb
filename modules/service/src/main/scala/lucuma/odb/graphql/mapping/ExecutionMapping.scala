@@ -91,27 +91,35 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
 
     case (ExecutionType, "atomRecords", List(
       PosIntBinding.Option("OFFSET", rOFFSET),
+      PosIntBinding.Option("OFFSET_AT", rOFFSET_AT),
+      PosIntBinding.Option("OFFSET_AFTER", rOFFSET_AFTER),
       NonNegIntBinding.Option("LIMIT", rLIMIT)
     )) =>
-      selectWithOffsetAndLimit(rOFFSET, rLIMIT, AtomRecordType, "index", Predicates.atomRecord.index, Predicates.atomRecord.observation.program)
+      selectWithOffsetAndLimit(rOFFSET, rOFFSET_AT, rOFFSET_AFTER, rLIMIT, AtomRecordType, "index", Predicates.atomRecord.index, Predicates.atomRecord.observation.program)
 
     case (ExecutionType, "datasets", List(
       DatasetIdBinding.Option("OFFSET", rOFFSET),
+      DatasetIdBinding.Option("OFFSET_AT", rOFFSET_AT),
+      DatasetIdBinding.Option("OFFSET_AFTER", rOFFSET_AFTER),
       NonNegIntBinding.Option("LIMIT", rLIMIT)
     )) =>
-      selectWithOffsetAndLimit(rOFFSET, rLIMIT, DatasetType, "id", Predicates.dataset.id, Predicates.dataset.observation.program)
+      selectWithOffsetAndLimit(rOFFSET, rOFFSET_AT, rOFFSET_AFTER, rLIMIT, DatasetType, "id", Predicates.dataset.id, Predicates.dataset.observation.program)
 
     case (ExecutionType, "events", List(
       ExecutionEventIdBinding.Option("OFFSET", rOFFSET),
+      ExecutionEventIdBinding.Option("OFFSET_AT", rOFFSET_AT),
+      ExecutionEventIdBinding.Option("OFFSET_AFTER", rOFFSET_AFTER),
       NonNegIntBinding.Option("LIMIT", rLIMIT)
     )) =>
-      selectWithOffsetAndLimit(rOFFSET, rLIMIT, ExecutionEventType, "id", Predicates.executionEvent.id, Predicates.executionEvent.observation.program)
+      selectWithOffsetAndLimit(rOFFSET, rOFFSET_AT, rOFFSET_AFTER, rLIMIT, ExecutionEventType, "id", Predicates.executionEvent.id, Predicates.executionEvent.observation.program)
 
     case (ExecutionType, "visits", List(
       VisitIdBinding.Option("OFFSET", rOFFSET),
+      VisitIdBinding.Option("OFFSET_AT", rOFFSET_AT),
+      VisitIdBinding.Option("OFFSET_AFTER", rOFFSET_AFTER),
       NonNegIntBinding.Option("LIMIT", rLIMIT)
     )) =>
-      selectWithOffsetAndLimit(rOFFSET, rLIMIT, VisitType, "id", Predicates.visit.id, Predicates.visit.observation.program)
+      selectWithOffsetAndLimit(rOFFSET, rOFFSET_AT, rOFFSET_AFTER, rLIMIT, VisitType, "id", Predicates.visit.id, Predicates.visit.observation.program)
 
   }
 

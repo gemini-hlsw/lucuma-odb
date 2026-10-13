@@ -467,4 +467,45 @@ class datasets extends OdbSuite with DatasetSetupOperations with ExecutionTestSu
         sys.error("Expected 1 step, 3 datasets.")
     }
 
+  test("execution datasets with OFFSET_AFTER") {
+    recordDatasets(mode, pi, serviceUser, 100, 2, 3).flatMap {
+      case (oid, steps) =>
+        val q = s"""
+          query {
+            observation(observationId: "$oid") {
+              execution {
+                datasets(
+                  OFFSET_AFTER: "${steps.head._2.tail.head}",
+                  LIMIT: 3
+                ) {
+                  hasMore
+                  matches {
+                    filename
+                  }
+                }
+              }
+            }
+          }
+        """
+
+        val e = Json.obj(
+          "observation" -> Json.obj(
+            "execution" -> Json.obj(
+              "datasets" -> Json.obj(
+                "hasMore" -> Json.True,
+                "matches" -> Json.fromValues(List(
+                  // "N18630101S0102.fits" is the OFFSET_AFTER value, excluded
+                  "N18630101S0103.fits",
+                  "N18630101S0104.fits",
+                  "N18630101S0105.fits"
+                ).map(f => Json.obj("filename" -> f.asJson)))
+              )
+            )
+          )
+        ).asRight
+
+        expect(pi, q, e)
+    }
+  }
+
 }

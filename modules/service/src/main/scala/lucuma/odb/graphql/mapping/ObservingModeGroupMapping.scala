@@ -7,10 +7,10 @@ package mapping
 import cats.syntax.option.*
 import cats.syntax.parallel.*
 import grackle.Predicate
-import grackle.Predicate.True
 import grackle.Predicate.and
 import grackle.Query.*
 import grackle.QueryCompiler.Elab
+import grackle.Result
 import grackle.TypeRef
 import lucuma.core.model.Observation
 import lucuma.odb.graphql.binding.BooleanBinding
@@ -39,16 +39,19 @@ trait ObservingModeGroupMapping[F[_]]
     case (ObservingModeGroupType, "observations", List(
       BooleanBinding("includeDeleted", rIncludeDeleted),
       ObservationIdBinding.Option("OFFSET", rOFFSET),
+      ObservationIdBinding.Option("OFFSET_AT", rOFFSET_AT),
+      ObservationIdBinding.Option("OFFSET_AFTER", rOFFSET_AFTER),
       NonNegIntBinding.Option("LIMIT", rLIMIT)
     )) =>
       Elab.transformChild: child =>
-        (rIncludeDeleted, rOFFSET, rLIMIT).parTupled.flatMap: (includeDeleted, OFFSET, lim) =>
+        val rOffset: Result[Predicate] = PagingOffset.predicate(Predicates.observation.id, rOFFSET, rOFFSET_AT, rOFFSET_AFTER)
+        (rIncludeDeleted, rOffset, rLIMIT).parTupled.flatMap: (includeDeleted, offset, lim) =>
           val limit = lim.fold(ResultMapping.MaxLimit)(_.value)
           ResultMapping.selectResult(child, limit): q =>
             FilterOrderByOffsetLimit(
               pred = and(List(
                 Predicates.observation.existence.includeDeleted(includeDeleted),
-                OFFSET.fold[Predicate](True)(Predicates.observation.id.gtEql)
+                offset
               )).some,
               oss    = List(OrderSelection[Observation.Id](ObservationType / "id", true, true)).some,
               offset = none,

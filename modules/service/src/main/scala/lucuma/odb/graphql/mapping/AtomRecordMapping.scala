@@ -62,8 +62,10 @@ trait AtomRecordMapping[F[_]] extends AtomRecordView[F]
 
     case (AtomRecordType, "steps", List(
       PosIntBinding.Option("OFFSET", rOFFSET),
+      PosIntBinding.Option("OFFSET_AT", rOFFSET_AT),
+      PosIntBinding.Option("OFFSET_AFTER", rOFFSET_AFTER),
       NonNegIntBinding.Option("LIMIT", rLIMIT)
     )) =>
-      selectWithOffsetAndLimit(rOFFSET, rLIMIT, StepRecordType, "index", Predicates.stepRecord.index, Predicates.stepRecord.atomRecord.observation.program)
+      selectWithOffsetAndLimit(rOFFSET, rOFFSET_AT, rOFFSET_AFTER, rLIMIT, StepRecordType, "index", Predicates.stepRecord.index, Predicates.stepRecord.atomRecord.observation.program)
 
   }

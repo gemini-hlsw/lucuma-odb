@@ -288,16 +288,19 @@ trait QueryMapping[F[_]] extends Predicates[F] with UserEnv {
       case (QueryType, "callsForProposals", List(
         WhereCallForProposalsBinding.Option("WHERE", rWHERE),
         CallForProposalsIdBinding.Option("OFFSET", rOFFSET),
+        CallForProposalsIdBinding.Option("OFFSET_AT", rOFFSET_AT),
+        CallForProposalsIdBinding.Option("OFFSET_AFTER", rOFFSET_AFTER),
         NonNegIntBinding.Option("LIMIT", rLIMIT),
         BooleanBinding("includeDeleted", rIncludeDeleted)
       )) =>
         Elab.transformChild { child =>
-          (rWHERE, rOFFSET, rLIMIT, rIncludeDeleted).parTupled.flatMap { (WHERE, OFFSET, LIMIT, includeDeleted) =>
+          val rOffset: Result[Predicate] = PagingOffset.predicate(Predicates.callForProposals.id, rOFFSET, rOFFSET_AT, rOFFSET_AFTER)
+          (rWHERE, rOffset, rLIMIT, rIncludeDeleted).parTupled.flatMap { (WHERE, offset, LIMIT, includeDeleted) =>
             val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
             ResultMapping.selectResult(child, limit) { q =>
               FilterOrderByOffsetLimit(
                 pred = Some(and(List(
-                  OFFSET.map(Predicates.callForProposals.id.gtEql).getOrElse(True),
+                  offset,
                   Predicates.callForProposals.existence.includeDeleted(includeDeleted),
                   WHERE.getOrElse(True)
                 ))),
@@ -351,16 +354,19 @@ trait QueryMapping[F[_]] extends Predicates[F] with UserEnv {
       case (QueryType, "datasets", List(
         WhereDatasetBinding.Option("WHERE", rWHERE),
         DatasetIdBinding.Option("OFFSET", rOFFSET),
+        DatasetIdBinding.Option("OFFSET_AT", rOFFSET_AT),
+        DatasetIdBinding.Option("OFFSET_AFTER", rOFFSET_AFTER),
         NonNegIntBinding.Option("LIMIT", rLIMIT)
       )) =>
         withUser:
           Elab.transformChild { child =>
-            (rWHERE, rOFFSET, rLIMIT).parTupled.flatMap { (WHERE, OFFSET, LIMIT) =>
+            val rOffset: Result[Predicate] = PagingOffset.predicate(Predicates.dataset.id, rOFFSET, rOFFSET_AT, rOFFSET_AFTER)
+            (rWHERE, rOffset, rLIMIT).parTupled.flatMap { (WHERE, offset, LIMIT) =>
               val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
               ResultMapping.selectResult(child, limit) { q =>
                 FilterOrderByOffsetLimit(
                   pred = Some(and(List(
-                    OFFSET.map(Predicates.dataset.id.gtEql).getOrElse(True),
+                    offset,
                     Predicates.dataset.observation.program.isVisibleTo(user),
                     WHERE.getOrElse(True)
                   ))),
@@ -382,6 +388,8 @@ trait QueryMapping[F[_]] extends Predicates[F] with UserEnv {
       case (QueryType, "datasetChronicleEntries", List(
         WhereDatasetChronicleEntryBinding.Option("WHERE", rWHERE),
         LongBinding.Option("OFFSET", rOFFSET),
+        LongBinding.Option("OFFSET_AT", rOFFSET_AT),
+        LongBinding.Option("OFFSET_AFTER", rOFFSET_AFTER),
         NonNegIntBinding.Option("LIMIT", rLIMIT)
       )) =>
         withUser:
@@ -392,12 +400,13 @@ trait QueryMapping[F[_]] extends Predicates[F] with UserEnv {
               case _                          => Predicate.False
 
           Elab.transformChild: child =>
-            (rWHERE, rOFFSET, rLIMIT).parTupled.flatMap { (WHERE, OFFSET, LIMIT) =>
+            val rOffset: Result[Predicate] = PagingOffset.predicate(Predicates.datasetChronicleEntry.id, rOFFSET, rOFFSET_AT, rOFFSET_AFTER)
+            (rWHERE, rOffset, rLIMIT).parTupled.flatMap { (WHERE, offset, LIMIT) =>
               val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
               ResultMapping.selectResult(child, limit) { q =>
                 FilterOrderByOffsetLimit(
                   pred = Some(and(List(
-                    OFFSET.map(Predicates.datasetChronicleEntry.id.gtEql).getOrElse(True),
+                    offset,
                     Predicate.Or(
                       GoaPredicate,
                       Predicates.datasetChronicleEntry.observation.program.isVisibleTo(user)
@@ -459,16 +468,19 @@ trait QueryMapping[F[_]] extends Predicates[F] with UserEnv {
       case (QueryType, "events", List(
         WhereExecutionEventBinding.Option("WHERE", rWHERE),
         ExecutionEventIdBinding.Option("OFFSET", rOFFSET),
+        ExecutionEventIdBinding.Option("OFFSET_AT", rOFFSET_AT),
+        ExecutionEventIdBinding.Option("OFFSET_AFTER", rOFFSET_AFTER),
         NonNegIntBinding.Option("LIMIT", rLIMIT)
       )) =>
         withUser:
           Elab.transformChild { child =>
-            (rWHERE, rOFFSET, rLIMIT).parTupled.flatMap { (WHERE, OFFSET, LIMIT) =>
+            val rOffset: Result[Predicate] = PagingOffset.predicate(Predicates.executionEvent.id, rOFFSET, rOFFSET_AT, rOFFSET_AFTER)
+            (rWHERE, rOffset, rLIMIT).parTupled.flatMap { (WHERE, offset, LIMIT) =>
               val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
               ResultMapping.selectResult(child, limit) { q =>
                 FilterOrderByOffsetLimit(
                   pred = Some(and(List(
-                    OFFSET.map(Predicates.executionEvent.id.gtEql).getOrElse(True),
+                    offset,
                     Predicates.executionEvent.observation.program.isVisibleTo(user),
                     WHERE.getOrElse(True)
                   ))),
@@ -559,17 +571,20 @@ trait QueryMapping[F[_]] extends Predicates[F] with UserEnv {
       case (QueryType, "observations", List(
         WhereObservationBinding.Option("WHERE", rWHERE),
         ObservationIdBinding.Option("OFFSET", rOFFSET),
+        ObservationIdBinding.Option("OFFSET_AT", rOFFSET_AT),
+        ObservationIdBinding.Option("OFFSET_AFTER", rOFFSET_AFTER),
         NonNegIntBinding.Option("LIMIT", rLIMIT),
         BooleanBinding("includeDeleted", rIncludeDeleted)
       )) =>
         withUser:
           Elab.transformChild { child =>
-            (rWHERE, rOFFSET, rLIMIT, rIncludeDeleted).parTupled.flatMap { (WHERE, OFFSET, LIMIT, includeDeleted) =>
+            val rOffset: Result[Predicate] = PagingOffset.predicate(Predicates.observation.id, rOFFSET, rOFFSET_AT, rOFFSET_AFTER)
+            (rWHERE, rOffset, rLIMIT, rIncludeDeleted).parTupled.flatMap { (WHERE, offset, LIMIT, includeDeleted) =>
               val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
               ResultMapping.selectResult(child, limit) { q =>
                 FilterOrderByOffsetLimit(
                   pred = Some(and(List(
-                    OFFSET.map(Predicates.observation.id.gtEql).getOrElse(True),
+                    offset,
                     Predicates.observation.existence.includeDeleted(includeDeleted),
                     Predicates.observation.program.isVisibleTo(user),
                     WHERE.getOrElse(True)
@@ -593,16 +608,19 @@ trait QueryMapping[F[_]] extends Predicates[F] with UserEnv {
       case (QueryType, "configurationRequests", List(
         WhereConfigurationRequestsBinding.Option("WHERE", rWHERE),
         ConfigurationRequestIdBinding.Option("OFFSET", rOFFSET),
+        ConfigurationRequestIdBinding.Option("OFFSET_AT", rOFFSET_AT),
+        ConfigurationRequestIdBinding.Option("OFFSET_AFTER", rOFFSET_AFTER),
         NonNegIntBinding.Option("LIMIT", rLIMIT),
       )) =>
         withUser:
           Elab.transformChild { child =>
-            (rWHERE, rOFFSET, rLIMIT).parTupled.flatMap { (WHERE, OFFSET, lim) =>
+            val rOffset: Result[Predicate] = PagingOffset.predicate(Predicates.configurationRequest.id, rOFFSET, rOFFSET_AT, rOFFSET_AFTER)
+            (rWHERE, rOffset, rLIMIT).parTupled.flatMap { (WHERE, offset, lim) =>
               val limit = lim.fold(ResultMapping.MaxLimit)(_.value)
               ResultMapping.selectResult(child, limit) { q =>
                 FilterOrderByOffsetLimit(
                   pred = Some(and(List(
-                    OFFSET.fold[Predicate](True)(Predicates.configurationRequest.id.gtEql),
+                    offset,
                     WHERE.getOrElse(True),
                     Predicates.configurationRequest.program.isVisibleTo(user),
                   ))),
@@ -685,18 +703,21 @@ trait QueryMapping[F[_]] extends Predicates[F] with UserEnv {
       case (QueryType, "programs", List(
         WhereProgramBinding.Option("WHERE", rWHERE),
         ProgramIdBinding.Option("OFFSET", rOFFSET),
+        ProgramIdBinding.Option("OFFSET_AT", rOFFSET_AT),
+        ProgramIdBinding.Option("OFFSET_AFTER", rOFFSET_AFTER),
         NonNegIntBinding.Option("LIMIT", rLIMIT),
         BooleanBinding("includeDeleted", rIncludeDeleted)
       )) =>
         withUser:
           Elab.transformChild { child =>
-            (rWHERE, rOFFSET, rLIMIT, rIncludeDeleted).parTupled.flatMap { (WHERE, OFFSET, LIMIT, includeDeleted) =>
+            val rOffset: Result[Predicate] = PagingOffset.predicate(Predicates.program.id, rOFFSET, rOFFSET_AT, rOFFSET_AFTER)
+            (rWHERE, rOffset, rLIMIT, rIncludeDeleted).parTupled.flatMap { (WHERE, offset, LIMIT, includeDeleted) =>
               val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
               ResultMapping.selectResult(child, limit) { q =>
                 FilterOrderByOffsetLimit(
                   pred = Some(
                     and(List(
-                      OFFSET.map(Predicates.program.id.gtEql).getOrElse(True),
+                      offset,
                       Predicates.program.existence.includeDeleted(includeDeleted),
                       Predicates.program.isVisibleTo(user),
                       WHERE.getOrElse(True)
@@ -733,18 +754,21 @@ trait QueryMapping[F[_]] extends Predicates[F] with UserEnv {
       case (QueryType, "programNotes", List(
         WhereProgramNoteBinding.Option("WHERE", rWHERE),
         ProgramNoteIdBinding.Option("OFFSET", rOFFSET),
+        ProgramNoteIdBinding.Option("OFFSET_AT", rOFFSET_AT),
+        ProgramNoteIdBinding.Option("OFFSET_AFTER", rOFFSET_AFTER),
         NonNegIntBinding.Option("LIMIT", rLIMIT),
         BooleanBinding("includeDeleted", rIncludeDeleted)
       )) =>
         withUser:
           Elab.transformChild: child =>
-            (rWHERE, rOFFSET, rLIMIT, rIncludeDeleted).parTupled.flatMap: (WHERE, OFFSET, LIMIT, includeDeleted) =>
+            val rOffset: Result[Predicate] = PagingOffset.predicate(Predicates.programNote.id, rOFFSET, rOFFSET_AT, rOFFSET_AFTER)
+            (rWHERE, rOffset, rLIMIT, rIncludeDeleted).parTupled.flatMap: (WHERE, offset, LIMIT, includeDeleted) =>
               val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
               ResultMapping.selectResult(child, limit): q =>
                 FilterOrderByOffsetLimit(
                   pred = Some(
                     and(List(
-                      OFFSET.map(Predicates.programNote.id.gtEql).getOrElse(True),
+                      offset,
                       Predicates.programNote.existence.includeDeleted(includeDeleted),
                       Predicates.programNote.isVisibleTo(user),
                       WHERE.getOrElse(True)
@@ -781,17 +805,20 @@ trait QueryMapping[F[_]] extends Predicates[F] with UserEnv {
       case (QueryType, "tooTriggers", List(
         WhereTooTriggerBinding.Option("WHERE", rWHERE),
         TooTriggerIdBinding.Option("OFFSET", rOFFSET),
+        TooTriggerIdBinding.Option("OFFSET_AT", rOFFSET_AT),
+        TooTriggerIdBinding.Option("OFFSET_AFTER", rOFFSET_AFTER),
         NonNegIntBinding.Option("LIMIT", rLIMIT)
       )) =>
         withUser:
           Elab.transformChild: child =>
-            (rWHERE, rOFFSET, rLIMIT).parTupled.flatMap: (WHERE, OFFSET, LIMIT) =>
+            val rOffset: Result[Predicate] = PagingOffset.predicate(Predicates.tooTrigger.id, rOFFSET, rOFFSET_AT, rOFFSET_AFTER)
+            (rWHERE, rOffset, rLIMIT).parTupled.flatMap: (WHERE, offset, LIMIT) =>
               val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
               ResultMapping.selectResult(child, limit): q =>
                 FilterOrderByOffsetLimit(
                   pred = Some(
                     and(List(
-                      OFFSET.map(Predicates.tooTrigger.id.gtEql).getOrElse(True),
+                      offset,
                       Predicates.tooTrigger.observation.program.isVisibleTo(user),
                       WHERE.getOrElse(True)
                     ))
@@ -811,16 +838,19 @@ trait QueryMapping[F[_]] extends Predicates[F] with UserEnv {
       case (QueryType, "tooTriggerChronicleEntries", List(
         WhereTooTriggerChronicleEntryBinding.Option("WHERE", rWHERE),
         LongBinding.Option("OFFSET", rOFFSET),
+        LongBinding.Option("OFFSET_AT", rOFFSET_AT),
+        LongBinding.Option("OFFSET_AFTER", rOFFSET_AFTER),
         NonNegIntBinding.Option("LIMIT", rLIMIT)
       )) =>
         withUser:
           Elab.transformChild: child =>
-            (rWHERE, rOFFSET, rLIMIT).parTupled.flatMap: (WHERE, OFFSET, LIMIT) =>
+            val rOffset: Result[Predicate] = PagingOffset.predicate(Predicates.tooTriggerChronicleEntry.id, rOFFSET, rOFFSET_AT, rOFFSET_AFTER)
+            (rWHERE, rOffset, rLIMIT).parTupled.flatMap: (WHERE, offset, LIMIT) =>
               val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
               ResultMapping.selectResult(child, limit): q =>
                 FilterOrderByOffsetLimit(
                   pred = Some(and(List(
-                    OFFSET.map(Predicates.tooTriggerChronicleEntry.id.gtEql).getOrElse(True),
+                    offset,
                     Predicates.tooTriggerChronicleEntry.tooTrigger.observation.program.isVisibleTo(user),
                     WHERE.getOrElse(True)
                   ))),
@@ -839,27 +869,43 @@ trait QueryMapping[F[_]] extends Predicates[F] with UserEnv {
       case (QueryType, "programUsers", List(
         WhereProgramUserBinding.Option("WHERE", rWHERE),
         UserIdBinding.Option("OFFSET", rOFFSET),
+        ProgramUserIdBinding.Option("OFFSET_AT", rOFFSET_AT),
+        ProgramUserIdBinding.Option("OFFSET_AFTER", rOFFSET_AFTER),
         NonNegIntBinding.Option("LIMIT", rLIMIT),
         BooleanBinding("includeDeleted", rIncludeDeleted)
       )) =>
         withUser:
           Elab.transformChild { child =>
-            (rWHERE, rOFFSET, rLIMIT, rIncludeDeleted).parTupled.flatMap { (WHERE, OFFSET, LIMIT, includeDeleted) =>
+            // The deprecated `OFFSET` pages by user id, which repeats across programs and
+            // keeps its original ordering. The program user id keys are ordered by themselves.
+            val rOffset: Result[(Predicate, List[OrderSelection[?]])] =
+              (rOFFSET, rOFFSET_AT, rOFFSET_AFTER).parTupled.flatMap:
+                case (Some(uid), None, None) =>
+                  (
+                    Predicates.programUser.userId.gtEql(uid),
+                    List(
+                      OrderSelection[Option[lucuma.core.model.User.Id]](ProgramUserType / "userId"),
+                      OrderSelection[lucuma.core.model.Program.Id](ProgramUserType / "programId")
+                    )
+                  ).success
+                case (None, at, after) =>
+                  PagingOffset.predicate(Predicates.programUser.id, None, at, after)
+                    .tupleRight(List(OrderSelection[lucuma.core.model.ProgramUser.Id](ProgramUserType / "id")))
+                case _ =>
+                  PagingOffset.MoreThanOne
+            (rWHERE, rOffset, rLIMIT, rIncludeDeleted).parTupled.flatMap { (WHERE, offset, LIMIT, includeDeleted) =>
               val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
               ResultMapping.selectResult(child, limit) { q =>
                 FilterOrderByOffsetLimit(
                   pred = Some(
                     and(List(
-                      OFFSET.map(Predicates.programUser.userId.gtEql).getOrElse(True),
+                      offset._1,
                       Predicates.programUser.program.existence.includeDeleted(includeDeleted),
                       Predicates.programUser.program.isVisibleTo(user),
                       WHERE.getOrElse(True)
                     ))
                   ),
-                  oss = Some(List(
-                    OrderSelection[Option[lucuma.core.model.User.Id]](ProgramUserType / "userId"),
-                    OrderSelection[lucuma.core.model.Program.Id](ProgramUserType / "programId")
-                  )),
+                  oss = Some(offset._2),
                   offset = None,
                   limit = Some(limit + 1), // Select one extra row here.
                   child = q
@@ -972,18 +1018,21 @@ trait QueryMapping[F[_]] extends Predicates[F] with UserEnv {
       case (QueryType, "targets", List(
         WhereTargetBinding.Option("WHERE", rWHERE),
         TargetIdBinding.Option("OFFSET", rOFFSET),
+        TargetIdBinding.Option("OFFSET_AT", rOFFSET_AT),
+        TargetIdBinding.Option("OFFSET_AFTER", rOFFSET_AFTER),
         NonNegIntBinding.Option("LIMIT", rLIMIT),
         BooleanBinding("includeDeleted", rIncludeDeleted)
       )) =>
         withUser:
           Elab.transformChild { child =>
-            (rWHERE, rOFFSET, rLIMIT, rIncludeDeleted).parTupled.flatMap { (WHERE, OFFSET, LIMIT, includeDeleted) =>
+            val rOffset: Result[Predicate] = PagingOffset.predicate(Predicates.target.id, rOFFSET, rOFFSET_AT, rOFFSET_AFTER)
+            (rWHERE, rOffset, rLIMIT, rIncludeDeleted).parTupled.flatMap { (WHERE, offset, LIMIT, includeDeleted) =>
               val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
               ResultMapping.selectResult(child, limit) { q =>
                 FilterOrderByOffsetLimit(
                   pred = Some(
                     and(List(
-                      OFFSET.map(Predicates.target.id.gtEql).getOrElse(True),
+                      offset,
                       Predicates.target.existence.includeDeleted(includeDeleted),
                       Predicates.target.program.isVisibleTo(user),
                       WHERE.getOrElse(True)
