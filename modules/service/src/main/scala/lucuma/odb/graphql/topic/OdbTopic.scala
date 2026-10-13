@@ -79,6 +79,7 @@ object OdbTopic:
     sup:   Supervisor[F],
     feeds: Sessions[F] => List[Stream[F, Unit]]
   ): F[Unit] =
+    // Pinned for the life of the process; keep `Config.Database.ReservedSessions` in step.
     val sessions: Resource[F, Sessions[F]] =
       (pool, pool).mapN(Sessions.apply)
 

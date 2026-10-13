@@ -189,9 +189,9 @@ object Config:
      *
      * The `*_MAX_CONNECTIONS` settings size the Skunk pool, which is the number
      * budgeted against the database's overall connection limit. That is not the
-     * same as the number a daemon can put to work: each service checks out one
-     * pooled session and holds it for the life of the process to serve
-     * LISTEN/NOTIFY (`CalcMain.topic`, `CMain.topics`), so worker parallelism
+     * same as the number a daemon can put to work: each service checks out
+     * `ReservedSessions` pooled sessions and holds them for the life of the
+     * process to serve LISTEN/NOTIFY (`OdbTopic.runFeeds`), so worker parallelism
      * must stay below the pool size or the surplus workers merely queue on the
      * pool -- having already claimed rows that then sit in 'calculating' while
      * they wait.
@@ -207,8 +207,19 @@ object Config:
 
   object Database:
 
-    /** Pooled sessions each service pins for the life of the process (LISTEN/NOTIFY). */
-    val ReservedSessions = 1
+    /**
+     * Pooled sessions each service pins for the life of the process: the
+     * LISTEN and lookup pair of `OdbTopic.Sessions`. Must match `runFeeds`.
+     */
+    val ReservedSessions = 2
+
+    // A pool no larger than the pinned sessions hangs the first query forever.
+    private def poolSize(name: String, default: Int): ConfigValue[Effect, Int] =
+      envOrProp(name).as[Int].default(default).flatMap: n =>
+        if n > ReservedSessions then ConfigValue.loaded(ConfigKey(name), n)
+        else ConfigValue.failed(ConfigError(
+          s"$name is $n but must be greater than $ReservedSessions, the sessions pinned for LISTEN/NOTIFY"
+        ))
 
     object Default:
       val MaxConnections        = Runtime.getRuntime.availableProcessors * 2 + 1
@@ -249,9 +260,9 @@ object Config:
       ConfigDecoder[(Int, Int, Int, Int, URI)].mapOption("Database")(Database.fromHerokuUri)
 
     lazy val fromCiris: ConfigValue[Effect, Database] = (
-      envOrProp("ODB_MAX_CONNECTIONS").as[Int].default(Default.MaxConnections),
-      envOrProp("CALIBRATIONS_MAX_CONNECTIONS").as[Int].default(Default.MaxConnections),
-      envOrProp("OBSCALC_MAX_CONNECTIONS").as[Int].default(Default.MaxConnections),
+      poolSize("ODB_MAX_CONNECTIONS", Default.MaxConnections),
+      poolSize("CALIBRATIONS_MAX_CONNECTIONS", Default.MaxConnections),
+      poolSize("OBSCALC_MAX_CONNECTIONS", Default.MaxConnections),
       // The pdf-summary dyno renders serially and holds no connection while doing so.
       envOrProp("PDF_SUMMARY_MAX_CONNECTIONS").as[Int].default(Default.PdfSummaryConnections),
       envOrProp("DATABASE_URL").as[URI] // passed by Heroku
