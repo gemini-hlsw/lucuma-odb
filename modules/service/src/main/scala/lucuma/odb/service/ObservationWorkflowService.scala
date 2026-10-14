@@ -29,6 +29,7 @@ import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.core.util.CalculationState
+import lucuma.odb.Config
 import lucuma.odb.data.EmailId
 import lucuma.odb.data.Itc
 import lucuma.odb.data.ObservationValidationMap
@@ -139,7 +140,7 @@ object ObservationWorkflowService {
       case ((ls, rs), (a, Right(c))) => (ls, rs + (a -> c))
 
   /* Construct an instance. */
-  def instantiate[F[_]: Async: Parallel](using Services[F]): ObservationWorkflowService[F] =
+  def instantiate[F[_]: Async: Parallel](emailConfig: Config.Email)(using Services[F]): ObservationWorkflowService[F] =
     new ObservationWorkflowService[F] {
 
       private def lookupCachedItcResults(
@@ -599,7 +600,7 @@ object ObservationWorkflowService {
               OdbError.EmailSendError(s"Could not send the request to ${recipient.role} ${recipient.email.value.value}: $detail".some).asFailure
 
             emailService
-              .sendToProvider(sender.email, recipient.email, subject, input.text)
+              .sendToProvider(emailConfig.invitationFrom, recipient.email, subject, input.text, replyTo = sender.email.some)
               .map:
                 case Result.Failure(ps)      => failed(ps.map(_.message).mkString_("; "))
                 case Result.InternalError(t) => failed(t.getMessage)
@@ -623,7 +624,7 @@ object ObservationWorkflowService {
                                       services.transactionally:
                                         asSuperUser:
                                           sent.traverse_ : (r, id) =>
-                                            ResultT(emailService.recordEmail(id, pid, sender.email, r.email, subject, input.text))
+                                            ResultT(emailService.recordEmail(id, pid, emailConfig.invitationFrom, r.email, subject, input.text, replyTo = sender.email.some))
                                           .value
           yield sent.map(_._2)).value
 

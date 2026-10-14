@@ -1531,6 +1531,9 @@ type Email {
   "Recipient email address"
   recipientEmail: EmailAddress!
 
+  "Address that replies should go to, if different from the sender"
+  replyToEmail: EmailAddress
+
   "Email subject"
   subject: NonEmptyString!
 
