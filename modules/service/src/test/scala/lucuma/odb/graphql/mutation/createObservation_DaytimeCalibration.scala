@@ -117,7 +117,7 @@ class createObservation_DaytimeCalibration extends OdbSuite with DatabaseOperati
                 "value": {
                   "state": "UNDEFINED",
                   "validationErrors": [
-                    { "messages": ["No sequence has been entered."] }
+                    { "messages": ["No sequence has been defined."] }
                   ]
                 }
               }

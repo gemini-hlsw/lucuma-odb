@@ -8,11 +8,11 @@ import lucuma.odb.data.ObservationValidationMap
 import lucuma.odb.service.workflow.ObservationValidationInfo
 import lucuma.odb.service.workflow.ObservationValidator
 
-// A daytime calibration is Undefined until its sequence has been entered.
+// A daytime calibration is Undefined until it has a science sequence.
 object DaytimeCalibrationValidator extends ObservationValidator:
 
   val sequenceMissing: String =
-    "No sequence has been entered."
+    "No sequence has been defined."
 
   def apply(info: ObservationValidationInfo): ObservationValidationMap =
     if info.hasScienceSteps then ObservationValidationMap.empty

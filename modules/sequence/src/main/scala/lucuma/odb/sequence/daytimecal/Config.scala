@@ -11,7 +11,7 @@ import lucuma.odb.sequence.util.HashBytes
 /**
  * Configuration for a daytime calibration: a staff-created calibration with
  * no target, ITC, guide star or acquisition.  The mode's only parameter is the
- * instrument; the sequence is entered by hand.
+ * instrument.
  */
 final case class Config(
   instrument: Instrument
@@ -21,8 +21,9 @@ final case class Config(
 
 object Config:
 
-  /** Instruments whose sequences may be entered by hand.  GHOST is excluded: its static
-    * config needs an IFU target mapping, which a daytime calibration cannot supply. */
+  /** Instruments a daytime calibration may use.  GHOST is pending: its static
+   *  config needs an IFU target mapping.
+   */
   val AllowedInstruments: Set[Instrument] =
     Set(
       Instrument.Flamingos2,

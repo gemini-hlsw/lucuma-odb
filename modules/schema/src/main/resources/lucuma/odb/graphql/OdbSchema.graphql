@@ -6239,8 +6239,8 @@ type Visitor {
 
 """
 Daytime calibration mode: a staff-created calibration with no target, ITC,
-guide star or acquisition.  The instrument is the only parameter; the sequence
-is entered by hand and every step must be a DAY_CAL with guiding disabled.
+guide star or acquisition.  The instrument is the only parameter.  Every step
+of its sequence must be a DAY_CAL with guiding disabled.
 """
 type DaytimeCalibration {
   mode: DayCalObservingModeType!

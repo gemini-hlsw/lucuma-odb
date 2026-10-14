@@ -9,7 +9,7 @@ CREATE TABLE t_daytime_calibration (
   c_observing_mode_type e_observing_mode_type NOT NULL DEFAULT 'daytime_calibration'
     CHECK (c_observing_mode_type = 'daytime_calibration'),
 
-  -- Only instruments whose sequences may be entered by hand.  GHOST needs an
+  -- Instruments a daytime calibration may use.  GHOST needs an
   -- IFU target mapping for its static config, which a daytime calibration
   -- cannot supply.
   CHECK (c_instrument IN ('Flamingos2', 'GmosNorth', 'GmosSouth', 'Gnirs', 'Igrins2')),
