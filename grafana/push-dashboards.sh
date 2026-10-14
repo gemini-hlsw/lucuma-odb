@@ -15,7 +15,8 @@ for template in "$here"/dashboard-templates/*.json; do
       | .spec.uid += "-" + $env
       | .spec.title += " (" + $env + ")"
       | .spec.tags += [$env]
-      | .spec.templating.list |= map(if .name == "env" then .query = $env else . end)
+      | .spec.templating.list |= map(select(.name != "env"))
+      | walk(if type == "string" then gsub("\\$env\\b"; $env) else . end)
     ' "$template" > "$out/$base-$env.json"
   done
 done
