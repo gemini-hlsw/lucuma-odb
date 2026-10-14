@@ -110,9 +110,11 @@ object ObservationValidator:
     val prelimV: Map[Observation.Id, ObservationValidationMap] =
       calibrationResults |+| engResults |+| scienceResults1 |+| scienceResults2
 
+    // A user-defined telluric is validated as science but, like any calibration,
+    // gets no configuration request: its science observation's approval covers it.
     val toCheck: List[ObservationValidationInfo] =
       science.values.toList.filter: info =>
-        info.isAccepted && !info.isExchange && prelimV.get(info.oid).forall(!_.hasErrors)
+        info.isAccepted && !info.isExchange && !info.isUserDefinedTelluric.value && prelimV.get(info.oid).forall(!_.hasErrors)
 
     val configValidations: ResultT[F, Map[Observation.Id, ObservationValidationMap]] =
       NonEmptyList
