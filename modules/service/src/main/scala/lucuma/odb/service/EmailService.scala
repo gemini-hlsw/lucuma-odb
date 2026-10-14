@@ -37,7 +37,8 @@ trait EmailService[F[_]] {
     to: EmailAddress,
     subject: NonEmptyString,
     textMessage: NonEmptyString,
-    htmlMessage: Option[NonEmptyString] = None
+    htmlMessage: Option[NonEmptyString] = None,
+    replyTo: Option[EmailAddress] = None
   )(using Transaction[F], SuperUserAccess): F[Result[EmailId]]
 
   /**
@@ -50,7 +51,8 @@ trait EmailService[F[_]] {
     to: EmailAddress,
     subject: NonEmptyString,
     textMessage: NonEmptyString,
-    htmlMessage: Option[NonEmptyString] = None
+    htmlMessage: Option[NonEmptyString] = None,
+    replyTo: Option[EmailAddress] = None
   ): F[Result[EmailId]]
 
   /** Record an email that has been sent via `sendToProvider`. */
@@ -61,7 +63,8 @@ trait EmailService[F[_]] {
     to: EmailAddress,
     subject: NonEmptyString,
     textMessage: NonEmptyString,
-    htmlMessage: Option[NonEmptyString] = None
+    htmlMessage: Option[NonEmptyString] = None,
+    replyTo: Option[EmailAddress] = None
   )(using Transaction[F], SuperUserAccess): F[Result[Unit]]
 }
 
@@ -83,11 +86,12 @@ object EmailService {
         to: EmailAddress,
         subject: NonEmptyString,
         textMessage: NonEmptyString,
-        htmlMessage: Option[NonEmptyString]
+        htmlMessage: Option[NonEmptyString],
+        replyTo: Option[EmailAddress]
       )(using Transaction[F], SuperUserAccess): F[Result[EmailId]] =
         (for {
-          id <- ResultT(sendToProvider(from, to, subject, textMessage, htmlMessage))
-          _  <- ResultT(recordEmail(id, programId, from, to, subject, textMessage, htmlMessage))
+          id <- ResultT(sendToProvider(from, to, subject, textMessage, htmlMessage, replyTo))
+          _  <- ResultT(recordEmail(id, programId, from, to, subject, textMessage, htmlMessage, replyTo))
         } yield id).value
 
       override def sendToProvider(
@@ -95,7 +99,8 @@ object EmailService {
         to: EmailAddress,
         subject: NonEmptyString,
         textMessage: NonEmptyString,
-        htmlMessage: Option[NonEmptyString]
+        htmlMessage: Option[NonEmptyString],
+        replyTo: Option[EmailAddress]
       ): F[Result[EmailId]] = {
         val request = Request[F](
           method = Method.POST,
@@ -108,6 +113,7 @@ object EmailService {
             "subject" -> subject.value,
             "text"    -> textMessage.value,
           ).updateFormField("html", htmlMessage.map(_.value))
+           .updateFormField("h:Reply-To", replyTo.map(_.value.value))
         )
 
         client.expect[SendResponse](request)
@@ -125,9 +131,10 @@ object EmailService {
         to: EmailAddress,
         subject: NonEmptyString,
         textMessage: NonEmptyString,
-        htmlMessage: Option[NonEmptyString]
+        htmlMessage: Option[NonEmptyString],
+        replyTo: Option[EmailAddress]
       )(using Transaction[F], SuperUserAccess): F[Result[Unit]] = {
-        val af = Statements.insertEmail(emailId, programId, from, to, subject, textMessage, htmlMessage)
+        val af = Statements.insertEmail(emailId, programId, from, to, subject, textMessage, htmlMessage, replyTo)
 
         session.prepareR(af.fragment.command).use(_.execute(af.argument).void).as(Result.unit)
       }
@@ -143,6 +150,7 @@ object EmailService {
       subject: NonEmptyString,
       textMessage: NonEmptyString,
       htmlMessage: Option[NonEmptyString],
+      replyTo: Option[EmailAddress] = None
     ): AppliedFragment = 
       sql"""
         insert into t_email (
@@ -153,6 +161,7 @@ object EmailService {
           c_subject,
           c_text_message,
           c_html_message,
+          c_reply_to_email,
           c_status
         )
         select
@@ -163,6 +172,7 @@ object EmailService {
           $text_nonempty,
           $text_nonempty,
           ${text_nonempty.opt},
+          ${email_address.opt},
           $email_status
       """.apply(
         emailId,
@@ -172,6 +182,7 @@ object EmailService {
         subject,
         textMessage,
         htmlMessage,
+        replyTo,
         EmailStatus.Queued
       )
 

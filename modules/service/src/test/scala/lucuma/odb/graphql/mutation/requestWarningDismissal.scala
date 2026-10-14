@@ -9,6 +9,7 @@ import cats.data.Ior
 import cats.effect.IO
 import cats.effect.Resource
 import cats.syntax.all.*
+import java.util.concurrent.ConcurrentHashMap
 import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Json
 import io.circe.literal.*
@@ -36,10 +37,17 @@ import org.http4s.UrlForm
 
 class requestWarningDismissal extends OdbSuite with query.ObservingModeSetupOperations:
 
+  // The address that dismissal requests are sent from, per the test email config.
+  val SystemSender = "explore@gpp.com"
+
+  // The form most recently sent to the mail provider for each recipient.
+  val sentForms: ConcurrentHashMap[String, UrlForm] = new ConcurrentHashMap
+
   // Like `invitationEmailRequestHandler`, except that the mail provider rejects
   // any message addressed to a "bounce" recipient.
   override val httpRequestHandler: Request[IO] => Resource[IO, Response[IO]] = req =>
     Resource.eval(req.as[UrlForm]).flatMap: form =>
+      form.getFirst("to").foreach(sentForms.put(_, form))
       if form.getFirst("to").exists(_.startsWith("bounce")) then Resource.pure(Response[IO](Status.BadRequest))
       else invitationEmailRequestHandler(req)
 
@@ -121,7 +129,8 @@ class requestWarningDismissal extends OdbSuite with query.ObservingModeSetupOper
       {
         "requestWarningDismissal" : [
           {
-            "senderEmail" : ${defaultPiEmail.value},
+            "senderEmail" : $SystemSender,
+            "replyToEmail" : ${defaultPiEmail.value},
             "recipientEmail" : "steve@jobs.com",
             "subject": $subj,
             "textMessage" : "Sample text."
@@ -182,12 +191,13 @@ class requestWarningDismissal extends OdbSuite with query.ObservingModeSetupOper
         _    <-
           expect(
             user = pi,
-            query = requestQuery(pid, List("senderEmail", "recipientEmail", "subject", "textMessage")),
+            query = requestQuery(pid, List("senderEmail", "replyToEmail", "recipientEmail", "subject", "textMessage")),
             expected = Right(json"""
               {
                 "requestWarningDismissal" : [
                   {
-                    "senderEmail" : "bob@dobbs.com",
+                    "senderEmail" : $SystemSender,
+                    "replyToEmail" : "bob@dobbs.com",
                     "recipientEmail" : "steve@jobs.com",
                     "subject": $subj,
                     "textMessage" : "Sample text."
@@ -208,28 +218,29 @@ class requestWarningDismissal extends OdbSuite with query.ObservingModeSetupOper
       _    <-
         expect(
           user = pi,
-          query = requestQuery(pid, List("senderEmail")),
+          query = requestQuery(pid, List("replyToEmail")),
           expected = Right(json"""
             {
               "requestWarningDismissal" : [
                 {
-                  "senderEmail" : "bob@dobbs.com"
+                  "replyToEmail" : "bob@dobbs.com"
                 },
                 {
-                  "senderEmail" : "bob@dobbs.com"
+                  "replyToEmail" : "bob@dobbs.com"
                 }
               ]
             }
           """)
         )
     yield ()
+
   test("can send request with a proposal reference"):
     for
       (pid, ref) <- submittedProgram
       _          <-
         expect(
           user = pi,
-          query = requestQuery(ref, List("senderEmail", "recipientEmail", "subject", "textMessage")),
+          query = requestQuery(ref, List("senderEmail", "replyToEmail", "recipientEmail", "subject", "textMessage")),
           expected = expectedSingleEmail(pid)
         )
     yield ()
@@ -241,7 +252,7 @@ class requestWarningDismissal extends OdbSuite with query.ObservingModeSetupOper
       _        <-
         expect(
           user = pi,
-          query = requestQuery(ref.get, List("senderEmail", "recipientEmail", "subject", "textMessage")),
+          query = requestQuery(ref.get, List("senderEmail", "replyToEmail", "recipientEmail", "subject", "textMessage")),
           expected = expectedSingleEmail(pid)
         )
     yield ()
@@ -290,12 +301,12 @@ class requestWarningDismissal extends OdbSuite with query.ObservingModeSetupOper
       _    <-
         expect(
           user = orcidPi,
-          query = requestQuery(pid, List("senderEmail", "recipientEmail")),
+          query = requestQuery(pid, List("replyToEmail", "recipientEmail")),
           expected = Right(json"""
             {
               "requestWarningDismissal" : [
                 {
-                  "senderEmail" : "orcid@pi.com",
+                  "replyToEmail" : "orcid@pi.com",
                   "recipientEmail" : "steve@jobs.com"
                 }
               ]
@@ -313,13 +324,14 @@ class requestWarningDismissal extends OdbSuite with query.ObservingModeSetupOper
       _    <-
         expect(
           user = pi,
-          query = programEmailsQuery(pid, List("senderEmail", "recipientEmail", "subject", "textMessage", "status")),
+          query = programEmailsQuery(pid, List("senderEmail", "replyToEmail", "recipientEmail", "subject", "textMessage", "status")),
           expected = Right(json"""
             {
               "program" : {
                 "emails" : [
                   {
-                    "senderEmail" : ${defaultPiEmail.value},
+                    "senderEmail" : $SystemSender,
+                    "replyToEmail" : ${defaultPiEmail.value},
                     "recipientEmail" : "steve@jobs.com",
                     "subject" : $subj,
                     "textMessage" : "Sample text.",
@@ -406,3 +418,13 @@ class requestWarningDismissal extends OdbSuite with query.ObservingModeSetupOper
           expected = Right(json"""{ "program" : { "emails" : [] } }""")
         )
     yield ()
+
+  test("sends from the system address with the PI as reply-to"):
+    for
+      pid  <- createProgramWithUsPi(pi)
+      _    <- addProgramUserAs(admin, pid, SupportPrimary, "reply-to-check@jobs.com")
+      _    <- query(pi, requestQuery(pid, List("senderEmail")))
+      form  = Option(sentForms.get("reply-to-check@jobs.com"))
+    yield
+      assertEquals(form.flatMap(_.getFirst("from")), Some(SystemSender))
+      assertEquals(form.flatMap(_.getFirst("h:Reply-To")), Some(defaultPiEmail.value))

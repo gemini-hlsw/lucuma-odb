@@ -18,6 +18,7 @@ trait EmailMapping[F[_]]
       SqlField("id", EmailTable.EmailId, key = true, hidden = true),
       SqlField("senderEmail", EmailTable.SenderEmail),
       SqlField("recipientEmail", EmailTable.RecipientEmail),
+      SqlField("replyToEmail", EmailTable.ReplyToEmail),
       SqlField("subject", EmailTable.Subject),
       SqlField("textMessage", EmailTable.TextMessage),
       SqlField("htmlMessage", EmailTable.HtmlMessage),

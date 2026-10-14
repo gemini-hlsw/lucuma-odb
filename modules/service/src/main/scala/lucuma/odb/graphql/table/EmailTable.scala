@@ -14,6 +14,7 @@ trait EmailTable[F[_]] extends BaseMapping[F]:
     val ProgramId      = col("c_program_id", program_id)
     val SenderEmail    = col("c_sender_email", email_address)
     val RecipientEmail = col("c_recipient_email", email_address)
+    val ReplyToEmail   = col("c_reply_to_email", email_address.opt)
     val Subject        = col("c_subject", text_nonempty)
     val TextMessage    = col("c_text_message", text_nonempty)
     val HtmlMessage    = col("c_html_message", text_nonempty.opt)
