@@ -4371,7 +4371,7 @@ type Mutation {
 
   """
   Sends emails from the current user (who must have write access to the referenced program) to the primary and
-  secondsy support staff, requesting review of warnings for potential dismissal.
+  secondary support staff, requesting review of warnings for potential dismissal.
   """
   requestWarningDismissal(
     input: WarningDismissalInput!

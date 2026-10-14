@@ -154,10 +154,6 @@ object AccessControl:
   def unchecked[A,B](SET: A, id: B, enc: Encoder[B])(using SuperUserAccess): CheckedWithId[A,B] =
       new Checked.NonEmptyWithId(SET, id, enc) {}
 
-  /** Construct a `CheckedWithId` (requires SuperUser access). */
-  def unchecked2[A,B](SET: A, id: B, enc: Encoder[B])(using SuperUserAccess): CheckedWithId[A,B] =
-      new Checked.NonEmptyWithId(SET, id, enc) {}
-
   /** Construct a `Checked` (requires SuperUser access). */
   def unchecked[A](SET: A, which: AppliedFragment)(using SuperUserAccess): Checked[A] =
     new Checked.NonEmpty(SET, which) {}
