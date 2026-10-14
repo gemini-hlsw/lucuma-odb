@@ -41,7 +41,14 @@
    }
   ],
   "templating": {
-   "list": []
+   "list": [
+    {
+     "name": "env",
+     "type": "constant",
+     "hide": 2,
+     "query": "dev"
+    }
+   ]
   },
   "annotations": {
    "list": []
@@ -69,8 +76,8 @@
        "type": "prometheus",
        "uid": "grafanacloud-prom"
       },
-      "expr": "max by (system, environment) (last_over_time(probe_success{kind=\"readiness\"}[40m]))",
-      "legendFormat": "{{system}} {{environment}}",
+      "expr": "max by (system) (last_over_time(probe_success{kind=\"readiness\", environment=\"$env\"}[40m]))",
+      "legendFormat": "{{system}}",
       "instant": true,
       "range": false
      }
@@ -148,8 +155,8 @@
        "type": "prometheus",
        "uid": "grafanacloud-prom"
       },
-      "expr": "avg by (system, environment) (avg_over_time(probe_success{kind=\"readiness\"}[$__range]))",
-      "legendFormat": "{{system}} {{environment}}",
+      "expr": "avg by (system) (avg_over_time(probe_success{kind=\"readiness\", environment=\"$env\"}[$__range]))",
+      "legendFormat": "{{system}}",
       "instant": true,
       "range": false
      }
@@ -217,8 +224,8 @@
        "type": "prometheus",
        "uid": "grafanacloud-prom"
       },
-      "expr": "max by (system, environment) (probe_success{kind=\"readiness\"})",
-      "legendFormat": "{{system}} {{environment}}"
+      "expr": "max by (system) (probe_success{kind=\"readiness\", environment=\"$env\"})",
+      "legendFormat": "{{system}}"
      }
     ],
     "options": {
@@ -296,8 +303,8 @@
        "type": "prometheus",
        "uid": "grafanacloud-prom"
       },
-      "expr": "avg by (system, environment) (probe_duration_seconds{kind=\"readiness\"})",
-      "legendFormat": "{{system}} {{environment}}"
+      "expr": "avg by (system) (probe_duration_seconds{kind=\"readiness\", environment=\"$env\"})",
+      "legendFormat": "{{system}}"
      }
     ],
     "options": {
@@ -350,8 +357,8 @@
       },
       "instant": true,
       "range": false,
-      "legendFormat": "{{service}} {{deployment_environment_name}}",
-      "expr": "clamp_max(floor((time() - max by (service, deployment_environment_name) (lucuma_worker_last_iteration_epoch_seconds)) / 300), 1)"
+      "legendFormat": "{{service}}",
+      "expr": "clamp_max(floor((time() - max by (service) (lucuma_worker_last_iteration_epoch_seconds{deployment_environment_name=\"$env\"})) / 300), 1)"
      }
     ],
     "options": {
@@ -427,8 +434,8 @@
        "type": "prometheus",
        "uid": "grafanacloud-prom"
       },
-      "legendFormat": "{{service}} {{deployment_environment_name}}",
-      "expr": "time() - max by (service, deployment_environment_name) (lucuma_worker_last_iteration_epoch_seconds)"
+      "legendFormat": "{{service}}",
+      "expr": "time() - max by (service) (lucuma_worker_last_iteration_epoch_seconds{deployment_environment_name=\"$env\"})"
      }
     ],
     "options": {
@@ -478,8 +485,8 @@
        "type": "prometheus",
        "uid": "grafanacloud-prom"
       },
-      "legendFormat": "{{deployment_environment_name}} {{application_name}}",
-      "expr": "max by (deployment_environment_name, application_name) (lucuma_db_connections_used)"
+      "legendFormat": "{{application_name}}",
+      "expr": "max by (application_name) (lucuma_db_connections_used{deployment_environment_name=\"$env\"})"
      },
      {
       "refId": "B",
@@ -487,8 +494,8 @@
        "type": "prometheus",
        "uid": "grafanacloud-prom"
       },
-      "legendFormat": "{{deployment_environment_name}} usable limit",
-      "expr": "max by (deployment_environment_name) (lucuma_db_connections_max)"
+      "legendFormat": "usable limit",
+      "expr": "max(lucuma_db_connections_max{deployment_environment_name=\"$env\"})"
      }
     ],
     "options": {
