@@ -1,0 +1,28 @@
+apiVersion: syntheticmonitoring.ext.grafana.app/v1alpha1
+kind: Check
+metadata:
+  name: "itc-staging-ready-8462"
+spec:
+  job: itc-staging-ready
+  target: https://itc-test.gpp.gemini.edu/health/ready
+  frequency: 900000
+  timeout: 10000
+  enabled: true
+  labels:
+    - name: environment
+      value: staging
+    - name: system
+      value: itc
+    - name: kind
+      value: readiness
+  probes:
+    - NorthVirginia
+    - SaoPaulo
+  basicMetricsOnly: true
+  settings:
+    http:
+      method: GET
+      validStatusCodes: [200]
+      failIfBodyNotMatchesRegexp:
+        - '"status":"ok"'
+      ipVersion: V4
