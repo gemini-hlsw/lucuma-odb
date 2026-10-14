@@ -1,0 +1,57 @@
+{
+  "uid": "lucuma-readiness-failing",
+  "title": "Service readiness failing",
+  "folderUID": "lucuma-health",
+  "ruleGroup": "lucuma-health-readiness",
+  "condition": "C",
+  "for": "35m",
+  "noDataState": "Alerting",
+  "execErrState": "Error",
+  "labels": {
+    "severity": "critical",
+    "team": "gpp"
+  },
+  "annotations": {
+    "summary": "{{ $labels.job }} readiness has failed from every probe for over 30 minutes",
+    "description": "GET {{ $labels.instance }} is not returning 200 with status ok. The response body names the failing check.",
+    "runbook_url": "https://github.com/gemini-hlsw/lucuma-odb/blob/main/ODB-README.md#health-endpoints"
+  },
+  "data": [
+    {
+      "refId": "A",
+      "relativeTimeRange": {
+        "from": 2400,
+        "to": 0
+      },
+      "datasourceUid": "grafanacloud-prom",
+      "model": {
+        "refId": "A",
+        "instant": true,
+        "expr": "max by (job, instance) (last_over_time(probe_success{job=~\".*-ready\"}[40m]))"
+      }
+    },
+    {
+      "refId": "C",
+      "relativeTimeRange": {
+        "from": 0,
+        "to": 0
+      },
+      "datasourceUid": "__expr__",
+      "model": {
+        "refId": "C",
+        "type": "threshold",
+        "expression": "A",
+        "conditions": [
+          {
+            "evaluator": {
+              "type": "lt",
+              "params": [
+                1
+              ]
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
