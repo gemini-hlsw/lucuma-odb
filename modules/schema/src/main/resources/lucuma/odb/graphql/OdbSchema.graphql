@@ -2996,17 +2996,17 @@ input WarningDismissalInput {
   """
   One of programId, proposalReference, and programReference must be supplied.
   """
-  proposalReference: ProposalReference
+  proposalReference: ProposalReferenceLabel
   
   """
   One of programId, proposalReference, and programReference must be supplied.
   """
-  programReference: ProgramReference
+  programReference: ProgramReferenceLabel
 
   """
   Email text to be sent. User interfaces should provide a default.
   """
-  text: NonEmptyString
+  text: NonEmptyString!
 }
 
 """
