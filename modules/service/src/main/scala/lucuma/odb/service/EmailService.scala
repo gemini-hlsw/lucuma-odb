@@ -29,6 +29,8 @@ import skunk.implicits.*
 import Services.Syntax.*
 
 trait EmailService[F[_]] {
+
+  /** Send an email via the mail provider and record it in the database. */
   def send(
     programId: Program.Id,
     from: EmailAddress,
@@ -37,6 +39,30 @@ trait EmailService[F[_]] {
     textMessage: NonEmptyString,
     htmlMessage: Option[NonEmptyString] = None
   )(using Transaction[F], SuperUserAccess): F[Result[EmailId]]
+
+  /**
+   * Send an email via the mail provider without recording it. Use this to avoid
+   * holding a transaction open during the request, then record the result
+   * with `recordEmail`.
+   */
+  def sendToProvider(
+    from: EmailAddress,
+    to: EmailAddress,
+    subject: NonEmptyString,
+    textMessage: NonEmptyString,
+    htmlMessage: Option[NonEmptyString] = None
+  ): F[Result[EmailId]]
+
+  /** Record an email that has been sent via `sendToProvider`. */
+  def recordEmail(
+    emailId: EmailId,
+    programId: Program.Id,
+    from: EmailAddress,
+    to: EmailAddress,
+    subject: NonEmptyString,
+    textMessage: NonEmptyString,
+    htmlMessage: Option[NonEmptyString] = None
+  )(using Transaction[F], SuperUserAccess): F[Result[Unit]]
 }
 
 object EmailService {
@@ -58,40 +84,52 @@ object EmailService {
         subject: NonEmptyString,
         textMessage: NonEmptyString,
         htmlMessage: Option[NonEmptyString]
-      )(using Transaction[F], SuperUserAccess): F[Result[EmailId]] = {
-
-        def insertEmail(emailId: EmailId): F[Result[Unit]] = {
-          val af = Statements.insertEmail(emailId, programId, from, to, subject, textMessage, htmlMessage)
-
-          session.prepareR(af.fragment.command).use(_.execute(af.argument).void).as(Result.unit)
-        }
-
-        def sendToProvider: F[Result[EmailId]] = {
-          val request = Request[F](
-            method = Method.POST,
-            uri = config.sendMessageUri,
-            headers = Headers(authHeader)
-          ).withEntity(
-            UrlForm(
-              "from"    -> from.value.value,
-              "to"      -> to.value.value,
-              "subject" -> subject.value,
-              "text"    -> textMessage.value,
-            ).updateFormField("html", htmlMessage.map(_.value))
-          )
-
-          client.expect[SendResponse](request)
-            .map(r => Result(r.id))
-            .recover {
-              case u @ UnexpectedStatus(status, _, _) =>
-                OdbError.EmailSendError(s"Unexpected status '${u.status}' while attempting to send email.".some).asFailure
-            }
-        }
-
+      )(using Transaction[F], SuperUserAccess): F[Result[EmailId]] =
         (for {
-          id <- ResultT(sendToProvider)
-          _  <- ResultT(insertEmail(id))
+          id <- ResultT(sendToProvider(from, to, subject, textMessage, htmlMessage))
+          _  <- ResultT(recordEmail(id, programId, from, to, subject, textMessage, htmlMessage))
         } yield id).value
+
+      override def sendToProvider(
+        from: EmailAddress,
+        to: EmailAddress,
+        subject: NonEmptyString,
+        textMessage: NonEmptyString,
+        htmlMessage: Option[NonEmptyString]
+      ): F[Result[EmailId]] = {
+        val request = Request[F](
+          method = Method.POST,
+          uri = config.sendMessageUri,
+          headers = Headers(authHeader)
+        ).withEntity(
+          UrlForm(
+            "from"    -> from.value.value,
+            "to"      -> to.value.value,
+            "subject" -> subject.value,
+            "text"    -> textMessage.value,
+          ).updateFormField("html", htmlMessage.map(_.value))
+        )
+
+        client.expect[SendResponse](request)
+          .map(r => Result(r.id))
+          .recover {
+            case u @ UnexpectedStatus(status, _, _) =>
+              OdbError.EmailSendError(s"Unexpected status '${u.status}' while attempting to send email.".some).asFailure
+          }
+      }
+
+      override def recordEmail(
+        emailId: EmailId,
+        programId: Program.Id,
+        from: EmailAddress,
+        to: EmailAddress,
+        subject: NonEmptyString,
+        textMessage: NonEmptyString,
+        htmlMessage: Option[NonEmptyString]
+      )(using Transaction[F], SuperUserAccess): F[Result[Unit]] = {
+        val af = Statements.insertEmail(emailId, programId, from, to, subject, textMessage, htmlMessage)
+
+        session.prepareR(af.fragment.command).use(_.execute(af.argument).void).as(Result.unit)
       }
     }
   }

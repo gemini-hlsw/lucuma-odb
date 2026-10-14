@@ -3,6 +3,9 @@
 
 package lucuma.odb.service
 
+import cats.Parallel
+import cats.data.NonEmptyChain
+import cats.data.NonEmptyList
 import cats.effect.Async
 import cats.implicits.*
 import eu.timepit.refined.types.string.NonEmptyString
@@ -136,7 +139,7 @@ object ObservationWorkflowService {
       case ((ls, rs), (a, Right(c))) => (ls, rs + (a -> c))
 
   /* Construct an instance. */
-  def instantiate[F[_]: Async](using Services[F]): ObservationWorkflowService[F] =
+  def instantiate[F[_]: Async: Parallel](using Services[F]): ObservationWorkflowService[F] =
     new ObservationWorkflowService[F] {
 
       private def lookupCachedItcResults(
@@ -559,41 +562,70 @@ object ObservationWorkflowService {
         input: AccessControl.CheckedWithId[WarningDismissalInput, Program.Id]
       )(using NoTransaction[F]): F[Result[List[EmailId]]] =
         input.foldWithId(OdbError.InvalidArgument().asFailureF): (input, pid) =>
-          services.transactionally:
-            session.prepareR(Statements.SelectProgramUsers).use: pq =>
-              pq.stream(pid, 1024).compile.toList.flatMap: list =>
-                  
-                // Our user info, filtered down to usable entires
-                case class Info(role: ProgramUserRole, userId: Option[User.Id], email: EmailAddress)
-                val infos: List[Info] = 
-                  list.flatMap: (role, oUid, oStr) =>
-                    oStr.flatMap: str =>
-                      EmailAddress
-                        .from(str)
-                        .toOption
-                        .map(Info(role, oUid, _))
 
-                // Pick out the current user and the support users  
-                import ProgramUserRole.*
-                val sender     = infos.find(_.userId === Some(user.id))
-                val recipients = infos.filter(i => i.role === SupportPrimary || i.role === SupportSecondary)
+          // Our user info, filtered down to usable entries
+          case class Info(role: ProgramUserRole, userId: Option[User.Id], email: EmailAddress)
 
-                // Assuming we have a sender and at least one recipient, send the emails.
-                (sender, recipients) match
-                  case (None, _)=> OdbError.EmailSendError(s"Current user ${user.id} email address is missing or invalid.".some).asFailureF
-                  case (_, Nil) => OdbError.EmailSendError(s"Both $SupportPrimary and $SupportSecondary email addresses are missing or invalid.".some).asFailureF
-                  case (Some(sender), rs) =>
-                    asSuperUser:
-                      recipients
-                        .traverse: recipient =>
-                          emailService.send(
-                            programId = pid,
-                            from = sender.email,
-                            to = recipient.email,
-                            subject = NonEmptyString.unsafeFrom(s"$pid: request to review warnings"),
-                            textMessage = input.text
-                          )
-                        .map(_.sequence)
+          import ProgramUserRole.*
+
+          // The current user is the sender and the support users are the recipients.
+          val participants: F[Result[(Info, NonEmptyList[Info])]] =
+            services.transactionally:
+              session.prepareR(Statements.SelectProgramUsers).use: pq =>
+                pq.stream(pid, 1024).compile.toList.map: list =>
+                  val infos: List[Info] =
+                    list.flatMap: (role, oUid, oStr) =>
+                      oStr.flatMap: str =>
+                        EmailAddress
+                          .from(str)
+                          .toOption
+                          .map(Info(role, oUid, _))
+
+                  val sender     = infos.find(_.userId === Some(user.id))
+                  val recipients = infos.filter(i => i.role === SupportPrimary || i.role === SupportSecondary)
+
+                  (sender, NonEmptyList.fromList(recipients)) match
+                    case (None, _)           => OdbError.EmailSendError(s"Current user ${user.id} email address is missing or invalid.".some).asFailure
+                    case (_, None)           => OdbError.EmailSendError(s"Both $SupportPrimary and $SupportSecondary email addresses are missing or invalid.".some).asFailure
+                    case (Some(s), Some(rs)) => Result((s, rs))
+
+          val subject: NonEmptyString =
+            NonEmptyString.unsafeFrom(s"$pid: request to review warnings")
+
+          // Send without holding a transaction open, turning any failure into an
+          // error that names the recipient.
+          def sendTo(sender: Info, recipient: Info): F[Result[EmailId]] =
+            def failed(detail: String): Result[EmailId] =
+              OdbError.EmailSendError(s"Could not send the request to ${recipient.role} ${recipient.email.value.value}: $detail".some).asFailure
+
+            emailService
+              .sendToProvider(sender.email, recipient.email, subject, input.text)
+              .map:
+                case Result.Failure(ps)      => failed(ps.map(_.message).mkString_("; "))
+                case Result.InternalError(t) => failed(t.getMessage)
+                case r                       => r
+              .handleError(t => failed(t.getMessage))
+
+          // Keep the emails that were sent, along with errors for any that were not.
+          def accumulate(results: NonEmptyList[(Info, Result[EmailId])]): Result[List[(Info, EmailId)]] =
+            val sent     = results.toList.flatMap((i, r) => r.toOption.tupleLeft(i))
+            val problems = results.toList.foldMap(_._2.toProblems)
+            NonEmptyChain.fromChain(problems) match
+              case None                     => Result(sent)
+              case Some(ps) if sent.isEmpty => Result.Failure(ps)
+              case Some(ps)                 => Result.Warning(ps, sent)
+
+          (for
+            (sender, recipients) <- ResultT(participants)
+            results              <- ResultT.liftF(recipients.parTraverse(r => sendTo(sender, r).tupleLeft(r)))
+            sent                 <- ResultT.fromResult(accumulate(results))
+            _                    <- ResultT:
+                                      services.transactionally:
+                                        asSuperUser:
+                                          sent.traverse_ : (r, id) =>
+                                            ResultT(emailService.recordEmail(id, pid, sender.email, r.email, subject, input.text))
+                                          .value
+          yield sent.map(_._2)).value
 
   }
 
@@ -643,9 +675,9 @@ object ObservationWorkflowService {
           SELECT
             c_role,
             c_user_id,
-            c_preferred_email
+            c_email
           FROM
-            t_program_user
+            v_program_user
           WHERE
             c_program_id = $program_id
         """.query(program_user_role *: user_id.opt *: varchar.opt)
