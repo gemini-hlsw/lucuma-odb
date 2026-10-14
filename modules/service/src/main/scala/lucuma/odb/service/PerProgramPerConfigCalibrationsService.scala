@@ -268,6 +268,7 @@ object PerProgramPerConfigCalibrationsService:
           case other =>
             sys.error(s"gmosLongSlitScienceEtmEdit: unexpected observing mode type $other")
         ObservingModeInput.Edit(
+          daytimeCalibration = none,
           exchange           = none,
           flamingos2Imaging  = none,
           flamingos2LongSlit = none,

@@ -314,6 +314,9 @@ trait Codecs extends CoreCodecs {
       Epoch.fromString.reverseGet
     )
 
+  val daycal_observing_mode_type: Codec[DayCalObservingModeType] =
+    enumerated(Type("e_observing_mode_type"))
+
   val exchange_observing_mode_type: Codec[ExchangeObservingModeType] =
     enumerated(Type("e_observing_mode_type"))
 

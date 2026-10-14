@@ -183,14 +183,21 @@ trait AccessControl[F[_]] extends Predicates[F] {
     includeUserDefinedTellurics: Boolean,
     admittedTelluricModes:       List[ObservingModeType] = Nil
   )(using Services[F]): Result[AppliedFragment] =
-    // A user-defined telluric is edited like a science observation.
+    // A user-defined telluric is edited like a science observation, as is a
+    // daytime calibration: staff create and edit those by hand.
+    val editable: Predicate =
+      Or(
+        Predicates.observation.calibrationRole.isNull(true),
+        Predicates.observation.calibrationRole.eql(CalibrationRole.DaytimeCalibration.some)
+      )
+
     val science: Predicate =
       if includeUserDefinedTellurics then
         Or(
-          Predicates.observation.calibrationRole.isNull(true),
+          editable,
           Predicates.observation.isUserDefinedTelluric.eql(true)
         )
-      else Predicates.observation.calibrationRole.isNull(true)
+      else editable
 
     val calibrations: Predicate =
       if includeCalibrations then True

@@ -112,6 +112,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F]:
       LeafMapping[EmailStatus](EmailStatusType),
       LeafMapping[EphemerisKeyType](EphemerisKeyTypeType),
       LeafMapping[Epoch](EpochStringType),
+      LeafMapping[DayCalObservingModeType](DayCalObservingModeTypeType),
       LeafMapping[ExchangeObservingModeType](ExchangeObservingModeTypeType),
       LeafMapping[ExchangePartner](ExchangePartnerType),
       LeafMapping[ExecutionEvent.Id](ExecutionEventIdType),

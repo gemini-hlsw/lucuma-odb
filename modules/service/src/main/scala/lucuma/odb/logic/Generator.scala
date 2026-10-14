@@ -19,7 +19,9 @@ import eu.timepit.refined.types.numeric.NonNegInt
 import fs2.Stream
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ChargeClass
+import lucuma.core.enums.DayCalObservingModeType
 import lucuma.core.enums.ExchangeObservingModeType
+import lucuma.core.enums.Instrument
 import lucuma.core.enums.ExecutionState
 import lucuma.core.enums.GuideProbe
 import lucuma.core.enums.ObservingModeType
@@ -255,6 +257,24 @@ object Generator:
           _ <- ExecutionDigestCache.store(ctx, d)
         yield d
 
+      private def daytimeInstrument(ctx: GeneratorContext): Instrument =
+        ctx.params.observingMode.asDaytimeCalibration.fold(Instrument.GmosNorth)(_.instrument)
+
+      private def unsupportedDaytimeInstrument(ctx: GeneratorContext, inst: Instrument): OdbError =
+        GeneratorError.sequenceUnavailable(ctx.oid, s"Daytime calibrations are not supported for ${inst.longName}")
+
+      // Dispatches on the daytime calibration's instrument, reading its stored sequence.
+      private def daytimeCalibration[A](ctx: GeneratorContext)(
+        f: [S, D] => StreamingExecutionConfig[F, S, D] => EitherT[F, OdbError, A]
+      )(using Transaction[F]): EitherT[F, OdbError, A] =
+        daytimeInstrument(ctx) match
+          case Instrument.Flamingos2 => EitherT(streaming.selectDaytimeFlamingos2(ctx)).flatMap(s => f(s))
+          case Instrument.GmosNorth  => EitherT(streaming.selectDaytimeGmosNorth(ctx)).flatMap(s => f(s))
+          case Instrument.GmosSouth  => EitherT(streaming.selectDaytimeGmosSouth(ctx)).flatMap(s => f(s))
+          case Instrument.Gnirs      => EitherT(streaming.selectDaytimeGnirs(ctx)).flatMap(s => f(s))
+          case Instrument.Igrins2    => EitherT(streaming.selectDaytimeIgrins2(ctx)).flatMap(s => f(s))
+          case other                 => EitherT.leftT(unsupportedDaytimeInstrument(ctx, other))
+
       // No target means no sequence, so charge a fixed time instead.
       private def isUnresolvedTelluric(ctx: GeneratorContext): Boolean =
         ctx.params.calibrationRole.contains(CalibrationRole.Telluric) && !ctx.params.hasTarget
@@ -387,6 +407,20 @@ object Generator:
               EitherT(streaming.selectOrGenerateGnirsSpectroscopy(ctx)).flatMap(digest(_, spectroscopySetup(gnirsSetup(calculator.gnirsIfuSetup))))
             case ObservingModeType.Igrins2LongSlit    =>
               EitherT(streaming.selectOrGenerateIgrins2LongSlit(ctx)).flatMap(digest(_, calculator.igrins2LongSlitSetup))
+            case _: DayCalObservingModeType           =>
+              // Nothing is generated: the stored sequence is digested, with no setup.  An empty
+              // sequence folds to Completed, which must not read as done before steps exist.
+              val noSetup = SetupTimeEstimateCalculator.Zero
+              val d = daytimeInstrument(ctx) match
+                case Instrument.Flamingos2 => EitherT(streaming.selectDaytimeFlamingos2(ctx)).flatMap(digest(_, noSetup))
+                case Instrument.GmosNorth  => EitherT(streaming.selectDaytimeGmosNorth(ctx)).flatMap(digest(_, noSetup))
+                case Instrument.GmosSouth  => EitherT(streaming.selectDaytimeGmosSouth(ctx)).flatMap(digest(_, noSetup))
+                case Instrument.Gnirs      => EitherT(streaming.selectDaytimeGnirs(ctx)).flatMap(digest(_, noSetup))
+                case Instrument.Igrins2    => EitherT(streaming.selectDaytimeIgrins2(ctx)).flatMap(digest(_, noSetup))
+                case other                 => EitherT.leftT[F, ExecutionDigest](unsupportedDaytimeInstrument(ctx, other))
+              d.map: d =>
+                if d.science.atomCount.value == 0 then d.copy(science = d.science.copy(executionState = ctx.params.executionState))
+                else d
             case vis: VisitorObservingModeType        =>
               // There is no sequence for visitors we calculate the digest directly
               val state = ctx.params.declaredState.getOrElse(ExecutionState.Completed)
@@ -455,6 +489,8 @@ object Generator:
             case ObservingModeType.GnirsIfu           => EitherT(streaming.selectOrGenerateGnirsSpectroscopy(ctx))
             case ObservingModeType.GnirsLongSlit      => EitherT(streaming.selectOrGenerateGnirsSpectroscopy(ctx))
             case ObservingModeType.Igrins2LongSlit    => EitherT(streaming.selectOrGenerateIgrins2LongSlit(ctx))
+            case _: DayCalObservingModeType           =>
+              daytimeCalibration(ctx)([S, D] => (s: StreamingExecutionConfig[F, S, D]) => EitherT.rightT[F, OdbError](s: StreamingExecutionConfig[F, ?, ?]))
             case _: VisitorObservingModeType          => noSequence
 
         (checkSequence *> stepCount).flatMap: sc =>
@@ -535,6 +571,31 @@ object Generator:
 
             case _: ExchangeObservingModeType =>
               EitherT.rightT(InstrumentExecutionConfig.Exchange)
+
+            case _: DayCalObservingModeType =>
+              daytimeInstrument(ctx) match
+                case Instrument.Flamingos2 =>
+                  EitherT(streaming.selectDaytimeFlamingos2(ctx))
+                    .flatMap(s => EitherT.liftF(executionConfig(s)))
+                    .map(InstrumentExecutionConfig.Flamingos2.apply)
+                case Instrument.GmosNorth =>
+                  EitherT(streaming.selectDaytimeGmosNorth(ctx))
+                    .flatMap(s => EitherT.liftF(executionConfig(s)))
+                    .map(InstrumentExecutionConfig.GmosNorth.apply)
+                case Instrument.GmosSouth =>
+                  EitherT(streaming.selectDaytimeGmosSouth(ctx))
+                    .flatMap(s => EitherT.liftF(executionConfig(s)))
+                    .map(InstrumentExecutionConfig.GmosSouth.apply)
+                case Instrument.Gnirs =>
+                  EitherT(streaming.selectDaytimeGnirs(ctx))
+                    .flatMap(s => EitherT.liftF(executionConfig(s)))
+                    .map(InstrumentExecutionConfig.Gnirs.apply)
+                case Instrument.Igrins2 =>
+                  EitherT(streaming.selectDaytimeIgrins2(ctx))
+                    .flatMap(s => EitherT.liftF(executionConfig(s)))
+                    .map(InstrumentExecutionConfig.Igrins2.apply)
+                case other =>
+                  EitherT.leftT(unsupportedDaytimeInstrument(ctx, other))
 
             case ObservingModeType.Flamingos2Imaging  =>
               EitherT(streaming.selectOrGenerateFlamingos2Imaging(ctx))
@@ -636,6 +697,9 @@ object Generator:
           val ctxʹ = ctx.copy(itcRes = ctx.itcRes.map(_.copy(acquisition = freshAcq)))
           ctxʹ.params.observingMode.modeType match
             case _: ExchangeObservingModeType =>
+              EitherT.pure(())
+
+            case _: DayCalObservingModeType =>
               EitherT.pure(())
 
             // N.B. there is no imaging acquisition, but it should not blow up.
@@ -799,6 +863,9 @@ object Generator:
               EitherT.pure(())
 
             case _: ExchangeObservingModeType         =>
+              EitherT.pure(())
+
+            case _: DayCalObservingModeType           =>
               EitherT.pure(())
 
         transactionallyWithContext(oid, commitHash): ctx =>

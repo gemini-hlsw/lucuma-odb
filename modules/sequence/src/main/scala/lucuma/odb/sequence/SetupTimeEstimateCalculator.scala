@@ -39,6 +39,18 @@ trait SetupTimeEstimateCalculator:
 
 object SetupTimeEstimateCalculator:
 
+  /** No setup at all, for calibrations taken with the dome closed. */
+  val Zero: SetupTimeEstimateCalculator =
+    new SetupTimeEstimateCalculator:
+      override def estimateSetupTime: SetupTime =
+        SetupTime.Zero
+
+      override def estimateSetupCount(scienceTime: TimeSpan): NonNegInt =
+        NonNegInt.MinValue
+
+      override def estimateReacquisitionCount(scienceTime: TimeSpan): NonNegInt =
+        NonNegInt.MinValue
+
   private val OneHour: Long  = TimeSpan.fromHours(1).get.toMicroseconds
   private val TwoHours: Long = 2 * OneHour
 

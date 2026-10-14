@@ -4,6 +4,7 @@
 package lucuma.odb.syntax
 
 import cats.syntax.option.*
+import lucuma.core.enums.DayCalObservingModeType
 import lucuma.core.enums.ExchangeObservingModeType
 import lucuma.core.enums.FacilityObservingModeType
 import lucuma.core.enums.Instrument
@@ -23,5 +24,7 @@ trait ToObservingModeTypeOps:
         case f: FacilityObservingModeType => f.instrument.some
         case v: VisitorObservingModeType  => v.instrument.some
         case _: ExchangeObservingModeType => none
+        // A daytime calibration's instrument is a parameter of its config, not of the type.
+        case _: DayCalObservingModeType   => none
 
 object observingModeType extends ToObservingModeTypeOps

@@ -17,6 +17,7 @@ import lucuma.odb.graphql.binding.*
 object ObservingModeInput:
 
   final case class Create(
+    daytimeCalibration: Option[DaytimeCalibrationInput.Create],
     exchange:           Option[ExchangeInput.Create],
     flamingos2Imaging:  Option[Flamingos2ImagingInput.Create],
     flamingos2LongSlit: Option[Flamingos2LongSlitInput.Create],
@@ -39,6 +40,7 @@ object ObservingModeInput:
     def observingModeType: Option[ObservingModeType] =
       gmosNorthLongSlit
         .map(_.observingModeType)
+        .orElse(daytimeCalibration.map(_.mode))
         .orElse(exchange.map(_.mode))
         .orElse(flamingos2Imaging.map(_.observingModeType))
         .orElse(flamingos2LongSlit.map(_.observingModeType))
@@ -58,7 +60,7 @@ object ObservingModeInput:
         .orElse(visitor.map(_.mode))
 
     def needsStaffAccess: Boolean =
-      gnirsSpectroscopy.exists(_.needsStaffAccess)
+      daytimeCalibration.isDefined || gnirsSpectroscopy.exists(_.needsStaffAccess)
 
   object Create:
 
@@ -68,6 +70,7 @@ object ObservingModeInput:
      */
     val Empty: Create =
       Create(
+        daytimeCalibration = None,
         exchange           = None,
         flamingos2Imaging  = None,
         flamingos2LongSlit = None,
@@ -89,6 +92,7 @@ object ObservingModeInput:
 
     val Binding: Matcher[Create] =
       OneOfBinding(
+        "daytimeCalibration" -> DaytimeCalibrationInput.CreateBinding.map(m => Empty.copy(daytimeCalibration = Some(m))),
         "exchange"           -> ExchangeInput.CreateBinding.map(m => Empty.copy(exchange = Some(m))),
         "flamingos2Imaging"  -> Flamingos2ImagingInput.Create.Binding.map(m => Empty.copy(flamingos2Imaging = Some(m))),
         "flamingos2LongSlit" -> Flamingos2LongSlitInput.Create.Binding.map(m => Empty.copy(flamingos2LongSlit = Some(m))),
@@ -111,6 +115,7 @@ object ObservingModeInput:
       )
 
   final case class Edit(
+    daytimeCalibration: Option[DaytimeCalibrationInput.Edit],
     exchange:           Option[ExchangeInput.Edit],
     flamingos2Imaging:  Option[Flamingos2ImagingInput.Edit],
     flamingos2LongSlit: Option[Flamingos2LongSlitInput.Edit],
@@ -138,6 +143,7 @@ object ObservingModeInput:
 
     def limitToPreExecution(access: Access): Boolean =
       access <= Access.Pi                                        ||
+        daytimeCalibration.isDefined                             ||
         flamingos2Imaging.isDefined                              ||
         flamingos2LongSlit.exists(_.limitToPreExecution(access)) ||
         flamingos2Mos.exists(_.limitToPreExecution(access))      ||
@@ -153,7 +159,7 @@ object ObservingModeInput:
         igrins2LongSlit.isDefined
 
     def needsStaffAccess: Boolean =
-      gnirsSpectroscopy.exists(_.needsStaffAccess)
+      daytimeCalibration.isDefined || gnirsSpectroscopy.exists(_.needsStaffAccess)
 
     /**
      * The observing mode types a telluric must have to accept this edit, or empty when the
@@ -175,7 +181,8 @@ object ObservingModeInput:
         case _                  => Nil
 
     def observingModeType: Option[ObservingModeType] =
-      exchange.flatMap(_.mode)
+      daytimeCalibration.flatMap(_.instrument).as(ObservingModeType.DaytimeCalibration)
+        .orElse(exchange.flatMap(_.mode))
         .orElse(flamingos2Imaging.map(_.observingModeType))
         .orElse(flamingos2LongSlit.map(_.observingModeType))
         .orElse(flamingos2Mos.map(_.observingModeType))
@@ -194,7 +201,8 @@ object ObservingModeInput:
         .orElse(visitor.flatMap(_.mode))
 
     def toCreate: Result[Create] =
-      (exchange.traverse(_.toCreate),
+      (daytimeCalibration.traverse(_.toCreate),
+       exchange.traverse(_.toCreate),
        flamingos2Imaging.traverse(_.toCreate),
        flamingos2LongSlit.traverse(_.toCreate),
        flamingos2Mos.traverse(_.toCreate),
@@ -218,6 +226,7 @@ object ObservingModeInput:
     /** No mode selected.  See `Create.Empty`. */
     val Empty: Edit =
       Edit(
+        daytimeCalibration = None,
         exchange           = None,
         flamingos2Imaging  = None,
         flamingos2LongSlit = None,
@@ -239,6 +248,7 @@ object ObservingModeInput:
 
     val Binding: Matcher[Edit] =
       OneOfBinding(
+        "daytimeCalibration" -> DaytimeCalibrationInput.EditBinding.map(m => Empty.copy(daytimeCalibration = Some(m))),
         "exchange"           -> ExchangeInput.EditBinding.map(m => Empty.copy(exchange = Some(m))),
         "flamingos2Imaging"  -> Flamingos2ImagingInput.Edit.Binding.map(m => Empty.copy(flamingos2Imaging = Some(m))),
         "flamingos2LongSlit" -> Flamingos2LongSlitInput.Edit.Binding.map(m => Empty.copy(flamingos2LongSlit = Some(m))),

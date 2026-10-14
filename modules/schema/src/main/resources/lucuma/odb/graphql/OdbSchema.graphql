@@ -6086,6 +6086,11 @@ Edit or create an observation's observing mode
 input ObservingModeInput @oneOf {
 
   """
+  Daytime calibration mode (staff only). It cannot be unset with a null value.
+  """
+  daytimeCalibration: DaytimeCalibrationInput
+
+  """
   An exchange instrument mode (Keck/Subaru). It cannot be unset with a null value.
   """
   exchange: ExchangeInput
@@ -6230,6 +6235,31 @@ type Visitor {
   Optional total requested observing time.
   """
   totalRequestTime: TimeSpan
+}
+
+"""
+Daytime calibration mode: a staff-created calibration with no target, ITC,
+guide star or acquisition.  The instrument is the only parameter; the sequence
+is entered by hand and every step must be a DAY_CAL with guiding disabled.
+"""
+type DaytimeCalibration {
+  mode: DayCalObservingModeType!
+
+  """
+  Instrument of the calibration.
+  """
+  instrument: Instrument!
+}
+
+"""
+Daytime calibration mode input.  Staff only.
+"""
+input DaytimeCalibrationInput {
+  """
+  Instrument of the calibration: FLAMINGOS2, GMOS_NORTH, GMOS_SOUTH, GNIRS
+  or IGRINS2.
+  """
+  instrument: Instrument!
 }
 
 input ExchangeInput {
@@ -8697,6 +8727,12 @@ enum ObservingModeType {
   ALOPEKE_WIDE_FIELD
 
   """
+  ObservingModeType DaytimeCalibration.  A staff-created calibration with no
+  target; the instrument is a parameter of the mode.
+  """
+  DAYTIME_CALIBRATION
+
+  """
   ObservingModeType ExchangeKeck.  Refers to an observation executed at the
   Keck observatory.
   """
@@ -8834,6 +8870,13 @@ ExchangeObservingModeType
 enum ExchangeObservingModeType {
   EXCHANGE_KECK
   EXCHANGE_SUBARU
+}
+
+"""
+DayCalObservingModeType
+"""
+enum DayCalObservingModeType {
+  DAYTIME_CALIBRATION
 }
 
 type ConstraintSet {
@@ -19340,6 +19383,11 @@ type ObservingMode {
   mode: ObservingModeType!
 
   """
+  Daytime calibration mode (staff only).
+  """
+  daytimeCalibration: DaytimeCalibration
+
+  """
   Observations executed at Keck or Subaru.
   """
   exchange: Exchange
@@ -21416,6 +21464,11 @@ enum CalibrationRole {
   CalibrationRole DaytimePinhole
   """
   DAYTIME_PINHOLE
+
+  """
+  CalibrationRole DaytimeCalibration
+  """
+  DAYTIME_CALIBRATION
 }
 
 """

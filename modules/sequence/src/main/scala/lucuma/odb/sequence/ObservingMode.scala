@@ -9,6 +9,7 @@ import cats.syntax.option.*
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.model.sequence.gnirs.GnirsFpu
+import lucuma.odb.sequence.daytimecal.Config as DaytimeCalibration
 import lucuma.odb.sequence.exchange.Config as Exchange
 import lucuma.odb.sequence.flamingos2.imaging.Config as Flamingos2Imaging
 import lucuma.odb.sequence.flamingos2.longslit.Config as Flamingos2LongSlit
@@ -33,6 +34,7 @@ import lucuma.odb.sequence.visitor.Config as Visitor
  * All observing mode options.
  */
 type ObservingMode =
+  DaytimeCalibration |
   Exchange           |
   Flamingos2Imaging  |
   Flamingos2LongSlit |
@@ -53,6 +55,7 @@ type ObservingMode =
 
 object ObservingMode:
 
+  val DaytimeCalibrationName: String = "Daytime Calibration"
   val ExchangeName: String           = "Exchange"
   val Flamingos2ImagingName: String  = "Flamingos 2 Imaging"
   val Flamingos2LongSlitName: String = "Flamingos 2 Long Slit"
@@ -74,6 +77,7 @@ object ObservingMode:
   object Instances:
     given Eq[ObservingMode] =
       Eq.instance:
+        case (a: DaytimeCalibration, b: DaytimeCalibration) => a === b
         case (a: Exchange,           b: Exchange)           => a === b
         case (a: Flamingos2LongSlit, b: Flamingos2LongSlit) => a === b
         case (a: Flamingos2Imaging,  b: Flamingos2Imaging)  => a === b
@@ -94,6 +98,7 @@ object ObservingMode:
         case _                                               => false
 
     given HashBytes[ObservingMode] =
+      case dc:  DaytimeCalibration => dc.hashBytes
       case exc: Exchange           => exc.hashBytes
       case f2:  Flamingos2LongSlit => f2.hashBytes
       case f2i: Flamingos2Imaging  => f2i.hashBytes
@@ -117,6 +122,7 @@ object ObservingMode:
       // Exchange observations are not Gemini instruments and have no `Instrument`.
       def instrument: Option[Instrument] =
         m match
+          case d: DaytimeCalibration => d.instrument.some
           case _: Exchange           => none
           case _: Flamingos2Imaging  => Instrument.Flamingos2.some
           case _: Flamingos2LongSlit => Instrument.Flamingos2.some
@@ -137,6 +143,7 @@ object ObservingMode:
 
       def name: String =
         m match
+          case _: DaytimeCalibration => DaytimeCalibrationName
           case _: Exchange           => ExchangeName
           case _: Flamingos2Imaging  => Flamingos2ImagingName
           case _: Flamingos2LongSlit => Flamingos2LongSlitName
@@ -157,6 +164,7 @@ object ObservingMode:
 
       def modeType: ObservingModeType =
         m match
+          case d: DaytimeCalibration => d.mode
           case e: Exchange           => e.mode
           case _: Flamingos2Imaging  => ObservingModeType.Flamingos2Imaging
           case _: Flamingos2LongSlit => ObservingModeType.Flamingos2LongSlit
@@ -177,6 +185,11 @@ object ObservingMode:
               case _: GnirsFpu.Spectroscopy.Ifu  => ObservingModeType.GnirsIfu
           case _: Igrins2LongSlit    => ObservingModeType.Igrins2LongSlit
           case v: Visitor            => v.mode
+
+      def asDaytimeCalibration: Option[DaytimeCalibration] =
+        m match
+          case a: DaytimeCalibration => a.some
+          case _                     => none
 
       def asExchange: Option[Exchange] =
         m match
