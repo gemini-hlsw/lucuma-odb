@@ -462,47 +462,42 @@ object Generator:
               GeneratorError.sequenceTooLong(ctx.oid)
             )
 
-        val noSequence =
-          EitherT.rightT[F, OdbError]:
-            StreamingExecutionConfig[F, Unit, Nothing]((), Stream.empty, Stream.empty)
-
-        // EitherT[F, OdbError, StreamingExecutionConfig[F, A, B] forSome { type A, type B }] but we can't write that anymore
-        val stream =
-          ctx.params.observingMode.modeType match
-            case _: ExchangeObservingModeType           => noSequence
-            case ObservingModeType.Flamingos2Imaging    => EitherT(streaming.selectOrGenerateFlamingos2Imaging(ctx))
-            case ObservingModeType.Flamingos2LongSlit   => EitherT(streaming.selectOrGenerateFlamingos2LongSlit(ctx))
-            case ObservingModeType.Flamingos2Mos        => EitherT(streaming.selectOrGenerateFlamingos2Mos(ctx))
-            case ObservingModeType.GhostIfu             => EitherT(streaming.selectOrGenerateGhost(ctx))
-            case ObservingModeType.GmosNorthImaging     => EitherT(streaming.selectOrGenerateGmosNorthImaging(ctx))
-            case ObservingModeType.GmosNorthLongSlit    => EitherT(streaming.selectOrGenerateGmosNorthLongSlit(ctx))
-            case ObservingModeType.GmosNorthMos         => EitherT(streaming.selectOrGenerateGmosNorthMos(ctx))
-            case ObservingModeType.GmosSouthImaging     => EitherT(streaming.selectOrGenerateGmosSouthImaging(ctx))
-            case ObservingModeType.GmosSouthLongSlit    => EitherT(streaming.selectOrGenerateGmosSouthLongSlit(ctx))
-            case ObservingModeType.GmosSouthMos         => EitherT(streaming.selectOrGenerateGmosSouthMos(ctx))
-            case ObservingModeType.GmosNorthIfu         => EitherT(streaming.selectOrGenerateGmosNorthIfu(ctx))
-            case ObservingModeType.GmosSouthIfu         => EitherT(streaming.selectOrGenerateGmosSouthIfu(ctx))
-            case ObservingModeType.GnirsImaging         => EitherT(streaming.selectOrGenerateGnirsImaging(ctx))
-            case ObservingModeType.GnirsIfu             => EitherT(streaming.selectOrGenerateGnirsSpectroscopy(ctx))
-            case ObservingModeType.GnirsLongSlit        => EitherT(streaming.selectOrGenerateGnirsSpectroscopy(ctx))
-            case ObservingModeType.Igrins2LongSlit      => EitherT(streaming.selectOrGenerateIgrins2LongSlit(ctx))
-            case _: DaytimeCalibrationObservingModeType =>
-              daytimeCalibration(ctx)([S, D] => (s: StreamingExecutionConfig[F, S, D]) => EitherT.rightT[F, OdbError](s: StreamingExecutionConfig[F, ?, ?]))
-            case _: VisitorObservingModeType            => noSequence
-
-        // A placeholder has no sequence, so the length limit cannot apply to it.
-        if isUnresolvedTelluric(ctx) || ctx.params.isSpecPhotoProposal then
+        val noSequence: EitherT[F, OdbError, Stream[F, AtomDigest]] =
           EitherT.rightT(Stream.empty)
-        else
+
+        def digests[S, D](
+          config: EitherT[F, OdbError, StreamingExecutionConfig[F, S, D]]
+        ): EitherT[F, OdbError, Stream[F, AtomDigest]] =
           (checkSequence *> stepCount).flatMap: sc =>
-            val base = sc.value
-            stream
-              .map: s =>
-                s.science
-                 .mapAccumulate(base): (nextStart, atom) =>
-                   val digest = AtomDigest.fromAtom(NonNegInt.unsafeFrom(nextStart))(atom)
-                   (nextStart + digest.stepCount.value, digest)
-                 .map(_._2)
+            config.map: s =>
+              s.science
+               .mapAccumulate(sc.value): (nextStart, atom) =>
+                 val digest = AtomDigest.fromAtom(NonNegInt.unsafeFrom(nextStart))(atom)
+                 (nextStart + digest.stepCount.value, digest)
+               .map(_._2)
+
+        if isUnresolvedTelluric(ctx) || ctx.params.isSpecPhotoProposal then noSequence
+        else ctx.params.observingMode.modeType match
+          case _: ExchangeObservingModeType           => noSequence
+          case ObservingModeType.Flamingos2Imaging    => digests(EitherT(streaming.selectOrGenerateFlamingos2Imaging(ctx)))
+          case ObservingModeType.Flamingos2LongSlit   => digests(EitherT(streaming.selectOrGenerateFlamingos2LongSlit(ctx)))
+          case ObservingModeType.Flamingos2Mos        => digests(EitherT(streaming.selectOrGenerateFlamingos2Mos(ctx)))
+          case ObservingModeType.GhostIfu             => digests(EitherT(streaming.selectOrGenerateGhost(ctx)))
+          case ObservingModeType.GmosNorthImaging     => digests(EitherT(streaming.selectOrGenerateGmosNorthImaging(ctx)))
+          case ObservingModeType.GmosNorthLongSlit    => digests(EitherT(streaming.selectOrGenerateGmosNorthLongSlit(ctx)))
+          case ObservingModeType.GmosNorthMos         => digests(EitherT(streaming.selectOrGenerateGmosNorthMos(ctx)))
+          case ObservingModeType.GmosSouthImaging     => digests(EitherT(streaming.selectOrGenerateGmosSouthImaging(ctx)))
+          case ObservingModeType.GmosSouthLongSlit    => digests(EitherT(streaming.selectOrGenerateGmosSouthLongSlit(ctx)))
+          case ObservingModeType.GmosSouthMos         => digests(EitherT(streaming.selectOrGenerateGmosSouthMos(ctx)))
+          case ObservingModeType.GmosNorthIfu         => digests(EitherT(streaming.selectOrGenerateGmosNorthIfu(ctx)))
+          case ObservingModeType.GmosSouthIfu         => digests(EitherT(streaming.selectOrGenerateGmosSouthIfu(ctx)))
+          case ObservingModeType.GnirsImaging         => digests(EitherT(streaming.selectOrGenerateGnirsImaging(ctx)))
+          case ObservingModeType.GnirsIfu             => digests(EitherT(streaming.selectOrGenerateGnirsSpectroscopy(ctx)))
+          case ObservingModeType.GnirsLongSlit        => digests(EitherT(streaming.selectOrGenerateGnirsSpectroscopy(ctx)))
+          case ObservingModeType.Igrins2LongSlit      => digests(EitherT(streaming.selectOrGenerateIgrins2LongSlit(ctx)))
+          case _: DaytimeCalibrationObservingModeType =>
+            daytimeCalibration(ctx)([S, D] => (s: StreamingExecutionConfig[F, S, D]) => digests(EitherT.rightT[F, OdbError](s)))
+          case _: VisitorObservingModeType            => noSequence
 
       override def obscalc(
         observationId: Observation.Id
