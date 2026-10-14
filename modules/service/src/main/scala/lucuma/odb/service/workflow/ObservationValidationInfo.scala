@@ -48,7 +48,6 @@ import lucuma.odb.data.AltairConfiguration
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.service.ObservationWorkflowService.UserState
 import lucuma.odb.syntax.instrument.*
-import lucuma.odb.syntax.observingModeType.*
 import lucuma.odb.util.Codecs.*
 import skunk.Encoder
 import skunk.Query
@@ -93,14 +92,12 @@ case class ObservationValidationInfo(
   explicitGuideProbe:     Option[GuideProbe] = None,
   altair:                 Option[AltairConfiguration],
   executionDigest:        Option[ExecutionDigest] = None,
-  hasScienceSteps:        Boolean = false  // set for daytime calibrations
+  hasScienceSteps:        Boolean = false, // set for daytime calibrations
+  instrument:             Option[Instrument] = None
 ) {
 
   def isDeclaredComplete: Boolean =
     declaredExecutionState === Some(CoreExecutionState.DeclaredComplete)
-
-  def instrument: Option[Instrument] =
-    observingMode.flatMap(_.instrumentOption)
 
   def effectiveUserState: Option[UserState] =
     // Per-observation calibrations (tellurics, daytime pinhole flats) inherit
@@ -370,6 +367,7 @@ object ObservationValidationInfo {
           p.c_program_type,
           o.c_observation_id,
           o.c_observing_mode_type,
+          o.c_instrument,
           o.c_explicit_ra,
           o.c_explicit_dec,
           o.c_calibration_role,
@@ -422,6 +420,7 @@ object ObservationValidationInfo {
         program_type                    *:
         observation_id                  *:
         observing_mode_type.opt         *:
+        instrument.opt                  *:
         right_ascension.opt             *:
         declination.opt                 *:
         calibration_role.opt            *:
@@ -450,13 +449,13 @@ object ObservationValidationInfo {
         altair_nd_filter.opt
       )
       .map:
-        case (pid, tpe, oid, mode, ra, dec, cal, isUserDefinedTelluric, state, ds, ps, too, sched, ceil, permitted, cfp, sci, state2, ce, iq, sb, wv, er, wl, ovcs, egp, altairMode, fieldLens, cassRotator, ndFilter) =>
+        case (pid, tpe, oid, mode, inst, ra, dec, cal, isUserDefinedTelluric, state, ds, ps, too, sched, ceil, permitted, cfp, sci, state2, ce, iq, sb, wv, er, wl, ovcs, egp, altairMode, fieldLens, cassRotator, ndFilter) =>
           val cs = ConstraintSet(iq, ce, sb, wv, er)
           // All-or-nothing (field lens aside) is a DB CHECK; the fallbacks here
           // are unreachable in practice, not a second source of truth for them.
           val altair = altairMode.map: m =>
             AltairConfiguration(m, fieldLens, cassRotator.getOrElse(CassRotator.Following), ndFilter.getOrElse(AltairNdFilter.Out))
-          ObservationValidationInfo(pid, tpe, oid, cs, wl, mode, None, (ra, dec).mapN(Coordinates.apply), cal, isUserDefinedTelluric, state, ds, ps, too, sched, ceil, permitted, cfp, sci, Nil, state2, ovcs, explicitGuideProbe = egp, altair = altair)
+          ObservationValidationInfo(pid, tpe, oid, cs, wl, mode, None, (ra, dec).mapN(Coordinates.apply), cal, isUserDefinedTelluric, state, ds, ps, too, sched, ceil, permitted, cfp, sci, Nil, state2, ovcs, explicitGuideProbe = egp, altair = altair, instrument = inst)
 
     def ProgramAllocations[A <: NonEmptyList[Program.Id]](enc: Encoder[A]): Query[A, (Program.Id, ScienceBand)] =
       sql"""

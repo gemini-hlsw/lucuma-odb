@@ -39,6 +39,12 @@ class createObservation_DaytimeCalibration extends OdbSuite with DatabaseOperati
                 instrument
               }
             }
+            configuration {
+              observingMode {
+                mode
+                instrument
+              }
+            }
           }
         }
       }
@@ -59,6 +65,12 @@ class createObservation_DaytimeCalibration extends OdbSuite with DatabaseOperati
                   "mode": "DAYTIME_CALIBRATION",
                   "instrument": "GMOS_NORTH",
                   "daytimeCalibration": {
+                    "mode": "DAYTIME_CALIBRATION",
+                    "instrument": "GMOS_NORTH"
+                  }
+                },
+                "configuration": {
+                  "observingMode": {
                     "mode": "DAYTIME_CALIBRATION",
                     "instrument": "GMOS_NORTH"
                   }
