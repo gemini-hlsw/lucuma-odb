@@ -75,6 +75,7 @@ import skunk.codec.text.text
 import skunk.implicits.*
 
 import java.util.UUID
+import scala.annotation.unused
 
 import Services.Syntax.*
 
@@ -593,6 +594,33 @@ object SequenceService:
         session.unique(Statements.MarkMaterializedOrDoNothing)(observationId, sequenceType)
 
       /**
+       * Locks the sequence's t_sequence_materialization row, if there is one.
+       *
+       * @return `true` if the sequence is materialized (and now locked)
+       */
+      private def lockMaterialization(
+        observationId: Observation.Id,
+        sequenceType:  SequenceType
+      )(using @unused t: Transaction[F]): F[Boolean] =
+        session.option(Statements.LockMaterialization)(observationId, sequenceType).map(_.isDefined)
+
+      /**
+       * Takes the observation's execution lock, the one that step events take
+       * before their triggers invalidate the obscalc result and delete the
+       * execution digest.  Sequence writers take it after the materialization
+       * row lock but before the first write to t_sequence_materialization,
+       * whose triggers lock the same t_obscalc and t_execution_digest rows.
+       * Taking it any later inverts the order of step events and risks a
+       * deadlock with an executing observation.  The lock order is:
+       *
+       *   t_sequence_materialization -> t_observation_execution -> t_obscalc
+       */
+      private def lockObservationExecution(
+        observationId: Observation.Id
+      )(using @unused t: Transaction[F]): F[Unit] =
+        session.unique(Statements.LockObservationExecution)(observationId).void
+
+      /**
        * Marks the sequence as materialized, or updates the timestamp of the
        * last materialization.  Either way, records whether the sequence is now
        * customized (i.e., explicitly replaced rather than generated).
@@ -666,7 +694,21 @@ object SequenceService:
         val doReplace: F[Stream[Pure, Atom[D]]] =
           val atoms = atomBuilder.buildStream(Stream.emits(sequence))
 
+          // Why take the execution lock only if the sequence is materialized?
+          //
+          // Materialized: steps may be executing, so we must take the
+          // execution lock now, before markMaterializedOrUpdate fires the
+          // triggers that lock t_obscalc.  Step events lock in that order too.
+          //
+          // Not materialized: there are no steps, so no step events to worry
+          // about.  (Observe's first visit materializes both sequences before
+          // any step runs.)  And we must not take the execution lock first:
+          // that first visit inserts the materialization row and then takes
+          // the execution lock.  If we held the execution lock while waiting
+          // to insert the same row, each would wait on the other.
           for
+            m <- lockMaterialization(observationId, sequenceType)
+            _ <- lockObservationExecution(observationId).whenA(m)
             _ <- markMaterializedOrUpdate(observationId, sequenceType, customized)
             _ <- abandonAndDeleteUnexecuted(observationId, sequenceType)
             _ <- insertSequence(instrument, observationId, sequenceType, atoms.covary[F], batch, insertInstConfig)
@@ -921,8 +963,8 @@ object SequenceService:
           _ <- insert(observationId, SequenceType.Acquisition, stream)
         yield ()
 
-        isMaterialized(observationId, SequenceType.Acquisition).ifM(
-          reset,
+        lockMaterialization(observationId, SequenceType.Acquisition).ifM(
+          lockObservationExecution(observationId) *> reset,
           Applicative[F].unit
         )
 
@@ -1113,7 +1155,12 @@ object SequenceService:
       override def deleteSequence(
         observationId: Observation.Id
       )(using Transaction[F]): F[Result[Unit]] =
+        // Both materialization rows are locked before the execution lock so that
+        // the execution lock is never held while waiting on one of them.
         def doDelete: F[Unit] = for {
+          a <- lockMaterialization(observationId, SequenceType.Acquisition)
+          s <- lockMaterialization(observationId, SequenceType.Science)
+          _ <- lockObservationExecution(observationId).whenA(a || s)
           _ <- deleteMaterializedSequence(observationId, SequenceType.Acquisition)
           _ <- deleteMaterializedSequence(observationId, SequenceType.Science)
         } yield ()
@@ -1637,6 +1684,29 @@ object SequenceService:
           AND  c_sequence_type  = $sequence_type
         FOR NO KEY UPDATE
       """.query(bool)
+
+    /**
+     * Locks the sequence's materialization row, the lock that every sequence
+     * writer holds before the execution lock and which guards the atom batch
+     * numbers.  Selects nothing if the sequence is not materialized.
+     */
+    val LockMaterialization: Query[(Observation.Id, SequenceType), Int] =
+      sql"""
+        SELECT 1
+          FROM t_sequence_materialization
+         WHERE c_observation_id = $observation_id
+           AND c_sequence_type  = $sequence_type
+        FOR NO KEY UPDATE
+      """.query(int4)
+
+    /**
+     * Takes the lock that serializes changes to an observation's execution
+     * state, such as incoming step events.
+     */
+    val LockObservationExecution: Query[Observation.Id, Int] =
+      sql"""
+        SELECT 1 FROM lock_observation_execution($observation_id)
+      """.query(int4)
 
     val MarkMaterializedOrDoNothing: Query[(Observation.Id, SequenceType), Boolean] =
       sql"""
