@@ -1409,10 +1409,9 @@ object GuideService {
           } yield availability).value
 
       /**
-       * Behind Altair, generating is what rejects an unusable star, except in LGS+P1, where the
-       * problem is recorded against the sequence and reported when it is asked for. Generating
-       * calls Gaia and the ITC, so it runs outside the write's transaction and the previous override
-       * is restored by hand.
+       * Behind Altair, generating is what rejects an unusable star. Generating calls Gaia and the
+       * ITC, so it runs outside the write's transaction and the previous override is restored by
+       * hand.
        */
       def setGuideTargetNameImpl(obsInfo: ObservationInfo, targetName: Option[NonEmptyString]): F[Result[Observation.Id]] =
         targetName.fold(
@@ -1421,12 +1420,14 @@ object GuideService {
           val restore: F[Unit] =
             updateGuideTargetName(obsInfo.programId, obsInfo.id, obsInfo.guideStarName, obsInfo.guideStarHash).void
 
+          // `digest`, not `digestWithParams`: only the former reports the LGS+P1 problem.
           def checkAltair(params: GeneratorParams): F[Result[Unit]] =
             if params.altair.isEmpty then Result.unit.pure[F]
             else
-              getGeneratorInfo(obsInfo.id)
+              Services.asSuperUser(generator.digest(obsInfo.id))
+                .map(_.fold(ge => generatorError(ge).asFailure, _ => Result.unit))
                 .onError(_ => restore)
-                .flatMap(r => if r.hasValue then Result.unit.pure[F] else restore.as(r.void))
+                .flatMap(r => if r.hasValue then r.pure[F] else restore.as(r))
 
           (for {
             gsn    <- ResultT.fromResult(
