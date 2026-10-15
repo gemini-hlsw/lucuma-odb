@@ -653,6 +653,9 @@ trait Codecs extends CoreCodecs {
   val igrins2_slit_offset_preset: Codec[Igrins2SlitOffsetPreset] =
     enumerated[Igrins2SlitOffsetPreset](Type.varchar)
 
+  val setup_kind: Codec[SetupKind] =
+    enumerated(Type("e_setup_kind"))
+
   val slew_stage: Codec[SlewStage] =
     enumerated(Type("e_slew_stage"))
 

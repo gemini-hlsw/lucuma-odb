@@ -21,6 +21,7 @@ import lucuma.core.model.User
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.Dataset
+import lucuma.core.model.sequence.SetupCharge
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
@@ -62,6 +63,7 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
       SqlObject("visits"),
       SqlObject("originalEstimate"),
       EffectField("timeCharge", timeChargeHandler, List("id", "programId")),
+      EffectField("setupCharge", setupChargeHandler, List("id", "programId")),
       SqlField("scienceSequenceIsMaterialized", ObservationView.ScienceSequenceIsMaterialized),
       SqlField("acquisitionSequenceIsMaterialized", ObservationView.AcquisitionSequenceIsMaterialized),
       SqlField("scienceSequenceIsCustomized", ObservationView.ScienceSequenceIsCustomized),
@@ -151,5 +153,12 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
         Services.asSuperUser:
           timeAccountingService.selectObservations(oids).map: times =>
             oids.map(oid => oid -> Result(times.getOrElse(oid, CategorizedTime.Zero))).toMap
+
+  private lazy val setupChargeHandler: EffectHandler[F] =
+    batchedEffectHandler: oids =>
+      services.useTransactionally:
+        Services.asSuperUser:
+          timeAccountingService.selectObservationsSetupCharge(oids).map: charges =>
+            oids.map(oid => oid -> Result(charges.getOrElse(oid, SetupCharge.Zero))).toMap
 
 }

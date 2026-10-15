@@ -230,6 +230,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F]:
       LeafMapping[Semester](SemesterType),
       LeafMapping[SequenceCommand](SequenceCommandType),
       LeafMapping[SequenceType](SequenceTypeType),
+      LeafMapping[SetupKind](SetupKindType),
       LeafMapping[SignalToNoise](SignalToNoiseType),
       LeafMapping[Site](SiteType),
       LeafMapping[SkyBackground](SkyBackgroundType),

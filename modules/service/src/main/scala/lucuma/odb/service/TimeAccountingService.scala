@@ -8,8 +8,10 @@ import cats.data.NonEmptyList
 import cats.data.StateT
 import cats.effect.Concurrent
 import cats.syntax.all.*
+import eu.timepit.refined.types.numeric.NonNegInt
 import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.ObserveClass
+import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.Site
 import lucuma.core.enums.TwilightType
 import lucuma.core.model.ExecutionEvent.*
@@ -18,9 +20,13 @@ import lucuma.core.model.ObservingNight
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.model.Visit
+import lucuma.core.model.sequence.BandedSetupCharge
 import lucuma.core.model.sequence.BandedTime
 import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.Dataset
+import lucuma.core.model.sequence.SetupCharge
+import lucuma.core.model.sequence.SetupChargeSummary
+import lucuma.core.model.sequence.SetupTimeBreakdown
 import lucuma.core.model.sequence.TimeChargeCorrection
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
@@ -30,6 +36,7 @@ import lucuma.odb.graphql.input.TimeChargeCorrectionInput
 import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.util.Codecs.*
 import skunk.*
+import skunk.codec.numeric.int4
 import skunk.codec.numeric.int8
 import skunk.codec.temporal.interval
 import skunk.codec.text.text
@@ -87,6 +94,28 @@ trait TimeAccountingService[F[_]] {
   def selectProgram(
     programId: Program.Id
   )(using Transaction[F], SuperUserAccess): F[List[BandedTime]]
+
+  /**
+   * Selects the setups recorded for a visit, in order.
+   */
+  def selectVisitSetups(
+    visitId: Visit.Id
+  )(using Transaction[F], SuperUserAccess): F[List[TimeAccounting.Setup]]
+
+  /**
+   * Sums the setups recorded for each of the given observations.  Observations
+   * with no recorded setups are absent from the resulting map.
+   */
+  def selectObservationsSetupCharge(
+    observationIds: List[Observation.Id]
+  )(using Transaction[F], SuperUserAccess): F[Map[Observation.Id, SetupCharge]]
+
+  /**
+   * Sums the setups recorded for all observations of a program, by band.
+   */
+  def selectProgramSetupCharge(
+    programId: Program.Id
+  )(using Transaction[F], SuperUserAccess): F[List[BandedSetupCharge]]
 }
 
 object TimeAccountingService {
@@ -168,7 +197,9 @@ object TimeAccountingService {
 
       case class Update(visitId: Visit.Id)(using Transaction[F]) {
         lazy val run: F[Unit] =
-          computeInvoice.flatMap(updateInvoice)
+          compute.flatMap { (inv, setups) =>
+            updateInvoice(inv) *> updateSetups(setups)
+          }
 
         private val initialState: F[TimeAccountingState] =
           for {
@@ -227,8 +258,10 @@ object TimeAccountingService {
             }
           }
 
-        private val computeInvoice: F[TimeCharge.Invoice] = {
-          def invoice(corrections: List[Correction]): StateT[F, TimeAccountingState, TimeCharge.Invoice] =
+        // Computes the invoice and the setups, which are found in the complete
+        // visit state but charged according to what remains after discounts.
+        private val compute: F[(TimeCharge.Invoice, List[TimeAccounting.Setup])] = {
+          def invoice(corrections: List[Correction]): StateT[F, TimeAccountingState, (TimeCharge.Invoice, List[TimeAccounting.Setup])] =
             for {
               ini <- StateT.get[F, TimeAccountingState]
               nod <- noDataDiscount
@@ -237,7 +270,10 @@ object TimeAccountingService {
               qa  <- qaDiscounts
               // ... other discounts here ...
               fin <- StateT.get[F, TimeAccountingState]
-            } yield TimeCharge.Invoice(ini.charge, nod ++ day ++ ovr ++ qa, fin.charge.corrected(corrections))
+            } yield (
+              TimeCharge.Invoice(ini.charge, nod ++ day ++ ovr ++ qa, fin.charge.corrected(corrections)),
+              ini.setups(fin)
+            )
 
           for {
             s <- initialState
@@ -245,6 +281,13 @@ object TimeAccountingService {
             i <- invoice(c).runA(s)
           } yield i
         }
+
+        // Replaces the visit's setups.
+        private def updateSetups(setups: List[TimeAccounting.Setup]): F[Unit] =
+          for {
+            _ <- session.execute(DeleteSetups)(visitId)
+            _ <- setups.zipWithIndex.traverse_ { (setup, idx) => session.execute(InsertSetup)(visitId, idx, setup) }
+          } yield ()
 
         private def updateInvoice(inv: TimeCharge.Invoice): F[Unit] =
           for {
@@ -306,6 +349,36 @@ object TimeAccountingService {
         session
           .execute(SelectProgram)(programId)
 
+      def selectVisitSetups(
+        visitId: Visit.Id
+      )(using Transaction[F], SuperUserAccess): F[List[TimeAccounting.Setup]] =
+        session.execute(SelectVisitSetups)(visitId)
+
+      def selectObservationsSetupCharge(
+        observationIds: List[Observation.Id]
+      )(using Transaction[F], SuperUserAccess): F[Map[Observation.Id, SetupCharge]] =
+        NonEmptyList.fromList(observationIds.distinct) match
+          case None      => Map.empty.pure
+          case Some(nel) =>
+            session
+              .execute(Statements.selectObservationsSetupCharge(nel))(nel)
+              .map(_.groupMapReduce(_._1)(_._2)(_ |+| _))
+
+      def selectProgramSetupCharge(
+        programId: Program.Id
+      )(using Transaction[F], SuperUserAccess): F[List[BandedSetupCharge]] =
+        session
+          .execute(SelectProgramSetupCharge)(programId)
+          .map { rows =>
+            // Rows are sorted by band, so grouping adjacent rows preserves the order.
+            rows.foldRight(List.empty[BandedSetupCharge]) {
+              case ((band, charge), BandedSetupCharge(b, c) :: tail) if b === band =>
+                BandedSetupCharge(band, charge |+| c) :: tail
+              case ((band, charge), acc) =>
+                BandedSetupCharge(band, charge) :: acc
+            }
+          }
+
     }
 
   object Statements {
@@ -313,17 +386,34 @@ object TimeAccountingService {
     private object codec {
 
       val atom_context: Decoder[TimeAccounting.AtomContext] =
-        (atom_id *: step_id.opt).to[TimeAccounting.AtomContext]
+        (atom_id *: step_id.opt *: sequence_type).to[TimeAccounting.AtomContext]
 
+      // Whether the event starts or continues a slew is determined later, when
+      // the event stream is processed.
       val context: Decoder[TimeAccounting.Context] =
         (
           visit_id                     *:
           obs_class.map(_.chargeClass) *:
           atom_context.opt
-        ).to[TimeAccounting.Context]
+        ).map { (v, c, a) => TimeAccounting.Context(v, c, a, slewing = false) }
 
       val event: Decoder[TimeAccounting.Event] =
-        (core_timestamp *: context).to[TimeAccounting.Event]
+        (core_timestamp *: context *: slew_stage.opt).to[TimeAccounting.Event]
+
+      val setup_time_breakdown: Codec[SetupTimeBreakdown] =
+        (categorized_time *: categorized_time *: categorized_time).to[SetupTimeBreakdown]
+
+      val setup: Codec[TimeAccounting.Setup] =
+        (setup_kind *: timestamp_interval *: setup_time_breakdown).to[TimeAccounting.Setup]
+
+      // A count and summed time for setups of a single kind.
+      val setup_charge: Decoder[SetupCharge] =
+        (setup_kind *: int8 *: setup_time_breakdown).map { (kind, count, time) =>
+          SetupCharge.of(
+            kind,
+            SetupChargeSummary(NonNegInt.unsafeFrom(count.min(Int.MaxValue.toLong).toInt), time)
+          )
+        }
 
       val discount: Codec[TimeCharge.Discount] =
         (
@@ -439,10 +529,13 @@ object TimeAccountingService {
           e.c_visit_id,
           COALESCE(s.c_observe_class, $obs_class),
           e.c_atom_id,
-          e.c_step_id
+          e.c_step_id,
+          a.c_sequence_type,
+          e.c_slew_stage
         FROM
           t_execution_event e
         LEFT JOIN t_step s USING (c_step_id)
+        LEFT JOIN t_atom a ON a.c_atom_id = e.c_atom_id
         WHERE
           e.c_visit_id = $visit_id
         ORDER BY
@@ -621,6 +714,90 @@ object TimeAccountingService {
         WHERE c_observation_id IN (${observation_id.nel(oids)})
         GROUP BY c_observation_id
       """.query(observation_id *: categorized_time)
+
+    // Sums of the setup time columns, in SetupTimeBreakdown order.
+    private val SetupTimeSums: String =
+      """
+        COALESCE(SUM(s.c_slew_non_charged_time),  '0'::interval),
+        COALESCE(SUM(s.c_slew_program_time),      '0'::interval),
+        COALESCE(SUM(s.c_acq_non_charged_time),   '0'::interval),
+        COALESCE(SUM(s.c_acq_program_time),       '0'::interval),
+        COALESCE(SUM(s.c_other_non_charged_time), '0'::interval),
+        COALESCE(SUM(s.c_other_program_time),     '0'::interval)
+      """
+
+    val DeleteSetups: Command[Visit.Id] =
+      sql"""
+        DELETE FROM t_visit_setup WHERE c_visit_id = $visit_id
+      """.command
+
+    val InsertSetup: Command[(Visit.Id, Int, TimeAccounting.Setup)] =
+      sql"""
+        INSERT INTO t_visit_setup (
+          c_visit_id,
+          c_index,
+          c_kind,
+          c_start,
+          c_end,
+          c_slew_non_charged_time,
+          c_slew_program_time,
+          c_acq_non_charged_time,
+          c_acq_program_time,
+          c_other_non_charged_time,
+          c_other_program_time
+        ) VALUES (
+          $visit_id,
+          $int4,
+          ${codec.setup}
+        )
+      """.command
+
+    val SelectVisitSetups: Query[Visit.Id, TimeAccounting.Setup] =
+      sql"""
+        SELECT
+          c_kind,
+          c_start,
+          c_end,
+          c_slew_non_charged_time,
+          c_slew_program_time,
+          c_acq_non_charged_time,
+          c_acq_program_time,
+          c_other_non_charged_time,
+          c_other_program_time
+        FROM t_visit_setup
+        WHERE c_visit_id = $visit_id
+        ORDER BY c_index
+      """.query(codec.setup)
+
+    def selectObservationsSetupCharge(
+      oids: NonEmptyList[Observation.Id]
+    ): Query[oids.type, (Observation.Id, SetupCharge)] =
+      sql"""
+        SELECT
+          v.c_observation_id,
+          s.c_kind,
+          COUNT(*),
+          #$SetupTimeSums
+        FROM t_visit_setup s
+        INNER JOIN t_visit v ON v.c_visit_id = s.c_visit_id
+        WHERE v.c_observation_id IN (${observation_id.nel(oids)})
+        GROUP BY v.c_observation_id, s.c_kind
+      """.query(observation_id *: codec.setup_charge)
+
+    val SelectProgramSetupCharge: Query[Program.Id, (Option[ScienceBand], SetupCharge)] =
+      sql"""
+        SELECT
+          o.c_science_band,
+          s.c_kind,
+          COUNT(*),
+          #$SetupTimeSums
+        FROM t_visit_setup s
+        INNER JOIN t_visit v ON v.c_visit_id = s.c_visit_id
+        INNER JOIN t_observation o ON o.c_observation_id = v.c_observation_id
+        WHERE o.c_program_id = $program_id
+        GROUP BY o.c_science_band, s.c_kind
+        ORDER BY o.c_science_band ASC NULLS FIRST
+      """.query(science_band.opt *: codec.setup_charge)
 
     val SelectProgram: Query[Program.Id, BandedTime] =
       sql"""

@@ -5,19 +5,26 @@ package lucuma.odb.service
 
 import cats.Eq
 import cats.Order.catsKernelOrderingForOrder
+import cats.data.NonEmptyList
 import cats.syntax.apply.*
 import cats.syntax.functor.*
+import cats.syntax.monoid.*
 import cats.syntax.option.*
 import cats.syntax.order.*
 import fs2.Pipe
 import fs2.Stream
 import lucuma.core.enums.ChargeClass
+import lucuma.core.enums.SequenceType
+import lucuma.core.enums.SetupKind
+import lucuma.core.enums.SlewStage
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.CategorizedTime
+import lucuma.core.model.sequence.SetupTimeBreakdown
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 
+import scala.annotation.tailrec
 import scala.collection.immutable.SortedMap
 import scala.collection.immutable.SortedSet
 
@@ -203,6 +210,64 @@ sealed class TimeAccountingState private (val toMap: SortedMap[TimestampInterval
     (new TimeAccountingState(in), new TimeAccountingState(out))
   }
 
+  /**
+   * Finds the setups in this state and charges them according to `charged`.
+   * This state is expected to be the complete (undiscounted) state of a visit,
+   * which determines where the setups are, while `charged` is what remains
+   * after discounts are applied, which determines what they cost.
+   *
+   * A setup is a maximal run of time not spent executing science atoms that
+   * includes slewing or executing acquisition atoms.  It ends when the first
+   * science step begins.  Setups that include a slew, or which precede any
+   * science in the visit, are full setups; those that follow science without
+   * slewing are reacquisitions.  Within a setup, time is charged to slewing,
+   * to the acquisition sequence, or else to "other" setup time.
+   */
+  def setups(charged: TimeAccountingState): List[TimeAccounting.Setup] = {
+
+    type Entry = (TimestampInterval, TimeAccounting.Context)
+
+    def isScience(c: TimeAccounting.Context): Boolean =
+      c.atom.exists(_.sequenceType === SequenceType.Science)
+
+    def isAcquisition(c: TimeAccounting.Context): Boolean =
+      c.atom.exists(_.sequenceType === SequenceType.Acquisition)
+
+    // Maximal runs of non-science entries, each paired with whether any
+    // science precedes it in the visit.
+    @tailrec
+    def runs(
+      rem:  List[Entry],
+      seen: Boolean,
+      acc:  List[(Boolean, NonEmptyList[Entry])]
+    ): List[(Boolean, NonEmptyList[Entry])] = {
+      val (sci, rest)      = rem.span(e => isScience(e._2))
+      val seenʹ            = seen || sci.nonEmpty
+      val (run, remaining) = rest.span(e => !isScience(e._2))
+      NonEmptyList.fromList(run) match {
+        case None      => acc.reverse
+        case Some(nel) => runs(remaining, seenʹ, (seenʹ, nel) :: acc)
+      }
+    }
+
+    def charge(interval: TimestampInterval): SetupTimeBreakdown =
+      charged.between(interval).toList.foldLeft(SetupTimeBreakdown.Zero) { case (c, (i, ctx)) =>
+        val t = CategorizedTime.Zero.sumCharge(ctx.chargeClass, i.timeSpan)
+        val l =
+          if (ctx.slewing) SetupTimeBreakdown.slew
+          else if (isAcquisition(ctx)) SetupTimeBreakdown.acquisition
+          else SetupTimeBreakdown.other
+        l.modify(_ |+| t)(c)
+      }
+
+    runs(toList, seen = false, Nil).collect {
+      case (seen, run) if run.exists((_, c) => c.slewing || isAcquisition(c)) =>
+        val kind     = if (run.exists(_._2.slewing) || !seen) SetupKind.Full else SetupKind.Reacquisition
+        val interval = run.head._1.span(run.last._1)
+        TimeAccounting.Setup(kind, interval, charge(interval))
+    }
+  }
+
   override def equals(that: Any): Boolean =
     that match {
       case s: TimeAccountingState => toMap === s.toMap
@@ -252,18 +317,28 @@ object TimeAccountingState {
     import TimeAccounting.Context
     import TimeAccounting.Event
 
+    // Mark the events that begin or continue a period of slewing.  A slew
+    // starts with a slew start event and lasts until the slew end or the next
+    // atom event, whichever comes first.
+    val markSlewing: Pipe[F, Event, Event] =
+      _.mapAccumulate(false) { (slewing, e) =>
+         val slewingʹ = e.context.atom.fold(e.slewStage.fold(slewing)(_ === SlewStage.StartSlew))(_ => false)
+         (slewingʹ, Event.context.andThen(Context.slewing).replace(slewingʹ)(e))
+       }
+       .map(_._2)
+
     // Clean the event stream to make it easier to process.
     // * We don't need sequence level events, except at the beginning and end if
-    //   present there
+    //   present there or where slewing starts or stops
     // * Contiguous events with the same context can be collapsed into just the
     //   first and last ones
     val cleanEvents: Pipe[F, Event, Event] =
       _.zipWithPreviousAndNext
        .flatMap {
-         case (None, cur, _   ) => Stream.emit(cur)
-         case (_,    cur, None) => Stream.emit(cur)
-         case (_,    cur, _   ) => if (cur.context.atom.isDefined) Stream.emit(cur)
-                                   else Stream.empty
+         case (None,       cur, _   ) => Stream.emit(cur)
+         case (_,          cur, None) => Stream.emit(cur)
+         case (Some(prev), cur, _   ) => if (cur.context.atom.isDefined || cur.context.slewing =!= prev.context.slewing) Stream.emit(cur)
+                                         else Stream.empty
        }
        .groupAdjacentBy(_.context)
        .flatMap { case (ctx, events) =>
@@ -282,18 +357,18 @@ object TimeAccountingState {
              cur.timestamp.intervalUntil(next.timestamp) -> cur.context
            )
 
-         case (cur, Some(next)) if cur.context.atom.map(_.atomId) === next.context.atom.map(_.atomId) =>
+         case (cur, Some(next)) if cur.context.atom.isDefined && cur.context.atom.map(_.atomId) === next.context.atom.map(_.atomId) =>
            // Time within an atom, but not in any particular step.
            val ac  = cur.context.atom.map(AtomContext.stepId.replace(None))
-           val ctx = Context(visitId, chargeClass, ac)
+           val ctx = Context(visitId, chargeClass, ac, slewing = false)
            Stream.emit(
              cur.timestamp.intervalUntil(next.timestamp) -> ctx
            )
 
          case (cur, Some(next)) =>
-           // Time not in any particular atom.
+           // Time not in any particular atom, possibly slewing.
            Stream.emit(
-             cur.timestamp.intervalUntil(next.timestamp) -> Context(visitId, chargeClass, None)
+             cur.timestamp.intervalUntil(next.timestamp) -> Context(visitId, chargeClass, None, cur.context.slewing)
            )
 
          case (cur, None) =>
@@ -302,7 +377,8 @@ object TimeAccountingState {
        }
 
 
-    in.through(cleanEvents)
+    in.through(markSlewing)
+     .through(cleanEvents)
      .through(makeEntries)
      .filter { case (interval, _) => interval.nonEmpty }
      .fold(Empty.toMap) { case (state, (interval, ctx)) =>

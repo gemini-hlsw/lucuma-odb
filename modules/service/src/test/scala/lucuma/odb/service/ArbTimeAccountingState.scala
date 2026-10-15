@@ -6,6 +6,7 @@ package lucuma.odb.service
 import cats.syntax.option.*
 import cats.syntax.traverse.*
 import lucuma.core.enums.ChargeClass
+import lucuma.core.enums.SequenceType
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
 import lucuma.core.util.Timestamp
@@ -33,8 +34,9 @@ trait ArbTimeAccountingState {
   val genAtom: Gen[List[Option[AtomContext]]] =
     for {
       aid <- arbitrary[Atom.Id]
+      st  <- arbitrary[SequenceType]
       n   <- Gen.chooseNum(0, 10)
-      a0  <- Gen.listOfN(n, arbitrary[AtomContext].map(AtomContext.atomId.replace(aid)))
+      a0  <- Gen.listOfN(n, arbitrary[AtomContext].map(AtomContext.atomId.replace(aid).andThen(AtomContext.sequenceType.replace(st))))
       a1  <- a0.flatTraverse { ac =>
               Gen.chooseNum(0, 10).flatMap { n =>
                 Gen.listOfN(n, Gen.frequency(19 -> ac.some, 1 -> none[AtomContext]))
@@ -49,7 +51,7 @@ trait ArbTimeAccountingState {
       ss <- Gen.listOfN(n, genAtom).map(_.flatten)
       es <- Gen.listOfN(ss.size, Gen.chooseNum(0L, 1000L))
                .map(_.scanLeft(min)((t, inc) => t.plusMillisOption(inc).get))
-               .map(_.drop(1).zip(ss).map { case (t, s) => Event(t, Context(vid, c, s)) })
+               .map(_.drop(1).zip(ss).map { case (t, s) => Event(t, Context(vid, c, s, slewing = false), None) })
     } yield es
 
   given Arbitrary[TimeAccountingState] =

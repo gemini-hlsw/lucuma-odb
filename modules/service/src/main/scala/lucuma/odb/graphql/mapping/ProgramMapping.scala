@@ -27,6 +27,7 @@ import lucuma.core.model.Program
 import lucuma.core.model.ProgramNote
 import lucuma.core.model.ProgramUser
 import lucuma.core.model.User
+import lucuma.core.model.sequence.BandedSetupCharge
 import lucuma.core.model.sequence.BandedTime
 import lucuma.core.model.sequence.CategorizedTimeRange
 import lucuma.core.util.CalculatedValue
@@ -99,6 +100,7 @@ trait ProgramMapping[F[_]]
       EffectField("timeEstimateBanded", estimateBandedHandler, List("id")),
 
       EffectField("timeCharge", timeChargeHandler, List("id")),
+      EffectField("setupCharge", setupChargeHandler, List("id")),
       SqlObject("userInvitations", Join(ProgramView.Id, UserInvitationTable.ProgramId)),
       SqlObject("allocations", Join(ProgramView.Id, AllocationTable.ProgramId)),
       SqlField("calibrationRole", ProgramView.CalibrationRole),
@@ -265,6 +267,14 @@ trait ProgramMapping[F[_]]
       services.useTransactionally {
         Services.asSuperUser:
           timeAccountingService.selectProgram(pid)
+      }
+    }
+
+  private val setupChargeHandler: EffectHandler[F] =
+    keyValueEffectHandler[Program.Id, List[BandedSetupCharge]]("id") { pid =>
+      services.useTransactionally {
+        Services.asSuperUser:
+          timeAccountingService.selectProgramSetupCharge(pid)
       }
     }
 

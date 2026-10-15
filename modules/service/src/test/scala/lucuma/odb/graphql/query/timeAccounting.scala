@@ -22,6 +22,7 @@ import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.Site
+import lucuma.core.enums.SlewStage
 import lucuma.core.enums.StepStage
 import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.enums.TwilightType.Nautical
@@ -1396,5 +1397,206 @@ class timeAccounting extends OdbSuite with DatabaseOperations with ExecutionTest
       _ <- expect(pi, invoiceQuery(v1.oid), invoiceExected(invoice1, Nil))
     yield ()
 
+
+
+  // Setups.  A visit with a slew, an acquisition, science, a reacquisition
+  // and more science:
+  //
+  //   0-10 slew, 15-25 acquisition, 40-60 science, 70-80 acquisition, 90-100 science
+  //
+  // gives a full setup [0, 40) (10s slew, 10s acquisition, 20s other) and a
+  // reacquisition [60, 90) (10s acquisition, 20s other).
+  def recordSetupVisit(idx: Int): IO[VisitNode] =
+    for
+      pid <- createProgramAs(pi)
+      tid <- createTargetWithProfileAs(pi, pid)
+      oid <- createObservationAs(pi, pid, mode.some, tid)
+      acq <- acquisitionSequenceIds(serviceUser, oid)
+      sci <- scienceSequenceIds(serviceUser, oid)
+      v   <- recordVisitForObs(pid, oid, serviceUser, visitTime, 2, 1, 1, idx, sci)
+      a0  <- recordAtom(serviceUser, v.vid, acq.toList(0)._1, acq.toList(0)._2, 1, 1, idx + 10)
+      a1  <- recordAtom(serviceUser, v.vid, acq.toList(1)._1, acq.toList(1)._2, 1, 1, idx + 20)
+      es   = setupEvents(v, a0, a1)
+      _   <- insertEvents(v.pid, es)
+    yield v.copy(atoms = v.atoms ++ List(a0, a1))
+
+  def setupEvents(v: VisitNode, acq0: AtomNode, acq1: AtomNode): List[ExecutionEvent] =
+    def step(a: AtomNode, start: Int, end: Int): List[ExecutionEvent] =
+      val sid = a.steps.head.sid
+      List(
+        StepEvent(EventId, start.fromNightStart, v.oid, v.vid, none, a.aid, sid, StepStage.StartStep),
+        StepEvent(EventId, end.fromNightStart,   v.oid, v.vid, none, a.aid, sid, StepStage.EndStep)
+      )
+
+    List(
+      SlewEvent(EventId, 0.fromNightStart,  v.oid, v.vid, none, SlewStage.StartSlew),
+      SlewEvent(EventId, 10.fromNightStart, v.oid, v.vid, none, SlewStage.EndSlew)
+    ) ++ step(acq0, 15, 25) ++ step(v.atoms(0), 40, 60) ++ step(acq1, 70, 80) ++ step(v.atoms(1), 90, 100)
+
+  def programSeconds(n: Int): Json =
+    expectedCategorizedTime(CategorizedTime(ChargeClass.Program -> n.sec))
+
+  def expectedSetupTime(slew: Int, acquisition: Int, other: Int): Json =
+    json"""
+      {
+        "slew":        ${programSeconds(slew)},
+        "acquisition": ${programSeconds(acquisition)},
+        "other":       ${programSeconds(other)},
+        "total":       ${programSeconds(slew + acquisition + other)}
+      }
+    """
+
+  val SetupTimeFields: String =
+    """
+      slew { program { seconds } nonCharged { seconds } total { seconds } }
+      acquisition { program { seconds } nonCharged { seconds } total { seconds } }
+      other { program { seconds } nonCharged { seconds } total { seconds } }
+      total { program { seconds } nonCharged { seconds } total { seconds } }
+    """
+
+  def setupQuery(oid: Observation.Id): String =
+    s"""
+      query {
+        observation(observationId: "$oid") {
+          execution {
+            setupCharge {
+              full { count time { $SetupTimeFields } }
+              reacquisition { count time { $SetupTimeFields } }
+              total { $SetupTimeFields }
+            }
+            visits {
+              matches {
+                setups {
+                  kind
+                  interval { start end }
+                  timeCharge { $SetupTimeFields }
+                }
+              }
+            }
+          }
+        }
+      }
+    """
+
+  def setupExpected: Either[List[String], Json] =
+    json"""
+      {
+        "observation": {
+          "execution": {
+            "setupCharge": {
+              "full": { "count": 1, "time": ${expectedSetupTime(10, 10, 20)} },
+              "reacquisition": { "count": 1, "time": ${expectedSetupTime(0, 10, 20)} },
+              "total": ${expectedSetupTime(10, 20, 40)}
+            },
+            "visits": {
+              "matches": [
+                {
+                  "setups": [
+                    {
+                      "kind": "FULL",
+                      "interval": { "start": ${t00.asJson}, "end": ${t40.asJson} },
+                      "timeCharge": ${expectedSetupTime(10, 10, 20)}
+                    },
+                    {
+                      "kind": "REACQUISITION",
+                      "interval": { "start": ${60.fromNightStart.asJson}, "end": ${90.fromNightStart.asJson} },
+                      "timeCharge": ${expectedSetupTime(0, 10, 20)}
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      }
+    """.asRight
+
+  test("setups: slew, acquisition, science and a reacquisition") {
+    for
+      _ <- cleanup
+      v <- recordSetupVisit(9300)
+      _ <- runTimeAccounting(v.oid)
+      _ <- expect(pi, setupQuery(v.oid), setupExpected)
+      // Tracking setups does not change what is charged.
+      _ <- assertIO(finalProgramTime(v.oid), 100.sec)
+    yield ()
+  }
+
+  test("setups: program setup charge") {
+    for
+      _ <- cleanup
+      v <- recordSetupVisit(9400)
+      _ <- runTimeAccounting(v.oid)
+      _ <- expect(
+             pi,
+             s"""
+               query {
+                 program(programId: "${v.pid}") {
+                   setupCharge {
+                     band
+                     charge {
+                       full { count }
+                       reacquisition { count }
+                       total { $SetupTimeFields }
+                     }
+                   }
+                 }
+               }
+             """,
+             json"""
+               {
+                 "program": {
+                   "setupCharge": [
+                     {
+                       "band": null,
+                       "charge": {
+                         "full": { "count": 1 },
+                         "reacquisition": { "count": 1 },
+                         "total": ${expectedSetupTime(10, 20, 40)}
+                       }
+                     }
+                   ]
+                 }
+               }
+             """.asRight
+           )
+    yield ()
+  }
+
+  test("setups: no visits means a zero setup charge") {
+    for
+      pid <- createProgramAs(pi)
+      oid <- createObservationAs(pi, pid)
+      _   <- expect(
+               pi,
+               s"""
+                 query {
+                   observation(observationId: "$oid") {
+                     execution {
+                       setupCharge {
+                         full { count }
+                         reacquisition { count }
+                         total { total { total { seconds } } }
+                       }
+                     }
+                   }
+                 }
+               """,
+               json"""
+                 {
+                   "observation": {
+                     "execution": {
+                       "setupCharge": {
+                         "full": { "count": 0 },
+                         "reacquisition": { "count": 0 },
+                         "total": { "total": { "total": { "seconds": 0.000000 } } }
+                       }
+                     }
+                   }
+                 }
+               """.asRight
+             )
+    yield ()
+  }
 
 }

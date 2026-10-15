@@ -17,13 +17,17 @@ import lucuma.core.data.ZipperCodec
 import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.ScienceBand
 import lucuma.core.model.User
+import lucuma.core.model.sequence.BandedSetupCharge
 import lucuma.core.model.sequence.BandedTime
 import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.CategorizedTimeRange
 import lucuma.core.model.sequence.ConfigChangeEstimate
 import lucuma.core.model.sequence.DatasetEstimate
 import lucuma.core.model.sequence.DetectorEstimate
+import lucuma.core.model.sequence.SetupCharge
+import lucuma.core.model.sequence.SetupChargeSummary
 import lucuma.core.model.sequence.SetupTime
+import lucuma.core.model.sequence.SetupTimeBreakdown
 import lucuma.core.model.sequence.StepEstimate
 import lucuma.core.model.sequence.TimeChargeCorrection
 import lucuma.core.util.TimeSpan
@@ -184,6 +188,74 @@ trait TimeAccountingCodec {
       Json.obj(
         "band" -> a.band.asJson,
         "time" -> a.time.asJson
+      )
+    }
+
+  given Decoder[SetupTimeBreakdown] =
+    Decoder.instance { c =>
+      for {
+        s <- c.downField("slew").as[CategorizedTime]
+        a <- c.downField("acquisition").as[CategorizedTime]
+        o <- c.downField("other").as[CategorizedTime]
+      } yield SetupTimeBreakdown(s, a, o)
+    }
+
+  given (using Encoder[TimeSpan]): Encoder[SetupTimeBreakdown] =
+    Encoder.instance { (a: SetupTimeBreakdown) =>
+      Json.obj(
+        "slew"        -> a.slew.asJson,
+        "acquisition" -> a.acquisition.asJson,
+        "other"       -> a.other.asJson,
+        "total"       -> a.total.asJson
+      )
+    }
+
+  given Decoder[SetupChargeSummary] =
+    Decoder.instance { c =>
+      for {
+        n <- c.downField("count").as[NonNegInt]
+        t <- c.downField("time").as[SetupTimeBreakdown]
+      } yield SetupChargeSummary(n, t)
+    }
+
+  given (using Encoder[TimeSpan]): Encoder[SetupChargeSummary] =
+    Encoder.instance { (a: SetupChargeSummary) =>
+      Json.obj(
+        "count" -> a.count.asJson,
+        "time"  -> a.time.asJson
+      )
+    }
+
+  given Decoder[SetupCharge] =
+    Decoder.instance { c =>
+      for {
+        f <- c.downField("full").as[SetupChargeSummary]
+        r <- c.downField("reacquisition").as[SetupChargeSummary]
+      } yield SetupCharge(f, r)
+    }
+
+  given (using Encoder[TimeSpan]): Encoder[SetupCharge] =
+    Encoder.instance { (a: SetupCharge) =>
+      Json.obj(
+        "full"          -> a.full.asJson,
+        "reacquisition" -> a.reacquisition.asJson,
+        "total"         -> a.total.asJson
+      )
+    }
+
+  given Decoder[BandedSetupCharge] =
+    Decoder.instance { c =>
+      for {
+        b <- c.downField("band").as[Option[ScienceBand]]
+        s <- c.downField("charge").as[SetupCharge]
+      } yield BandedSetupCharge(b, s)
+    }
+
+  given (using Encoder[TimeSpan]): Encoder[BandedSetupCharge] =
+    Encoder.instance { (a: BandedSetupCharge) =>
+      Json.obj(
+        "band"   -> a.band.asJson,
+        "charge" -> a.charge.asJson
       )
     }
 

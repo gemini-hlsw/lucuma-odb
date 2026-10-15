@@ -10,6 +10,9 @@ import grackle.Query.Binding
 import grackle.Query.EffectHandler
 import grackle.QueryCompiler.Elab
 import grackle.TypeRef
+import io.circe.Encoder as CirceEncoder
+import io.circe.Json
+import io.circe.syntax.*
 import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.User
 import lucuma.core.model.Visit
@@ -18,8 +21,11 @@ import lucuma.odb.graphql.binding.ExecutionEventIdBinding
 import lucuma.odb.graphql.binding.NonNegIntBinding
 import lucuma.odb.graphql.binding.PosIntBinding
 import lucuma.odb.graphql.predicate.Predicates
+import lucuma.odb.json.time.query.given
+import lucuma.odb.json.timeaccounting.given
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
+import lucuma.odb.service.TimeAccounting
 
 import table.AtomRecordView
 import table.ExecutionEventTable
@@ -33,6 +39,7 @@ import table.VisitTable
 trait VisitMapping[F[_]] extends VisitTable[F]
                             with AtomRecordView[F]
                             with EventRangeEffectHandler[F]
+                            with KeyValueEffectHandler[F]
                             with ExecutionEventTable[F]
                             with Flamingos2StaticTable[F]
                             with GmosStaticTables[F]
@@ -59,6 +66,7 @@ trait VisitMapping[F[_]] extends VisitTable[F]
       SqlObject("datasets"),
       SqlObject("events"),
       SqlObject("timeChargeInvoice"),
+      EffectField("setups", setupsHandler, List("id")),
       SqlField("idempotencyKey", VisitTable.IdempotencyKey),
       SqlObject("flamingos2", Join(VisitTable.ObservationId, Flamingos2StaticTable.ObservationId)),
       SqlObject("gmosNorth",  Join(VisitTable.ObservationId, GmosNorthStaticTable.ObservationId)),
@@ -93,6 +101,20 @@ trait VisitMapping[F[_]] extends VisitTable[F]
     )) =>
       selectWithOffsetAndLimit(rOFFSET, rOFFSET_AT, rOFFSET_AFTER, rLIMIT, ExecutionEventType, "id", Predicates.executionEvent.id, Predicates.executionEvent.observation.program)
   }
+
+  private given CirceEncoder[TimeAccounting.Setup] =
+    CirceEncoder.instance: s =>
+      Json.obj(
+        "kind"       -> s.kind.asJson,
+        "interval"   -> s.interval.asJson,
+        "timeCharge" -> s.charge.asJson
+      )
+
+  private lazy val setupsHandler: EffectHandler[F] =
+    keyValueEffectHandler[Visit.Id, List[TimeAccounting.Setup]]("id"): vid =>
+      services.useTransactionally:
+        Services.asSuperUser:
+          timeAccountingService.selectVisitSetups(vid)
 
   private lazy val intervalHandler: EffectHandler[F] =
     eventRangeEffectHandler[Visit.Id]("id", services, executionEventService.visitRange)

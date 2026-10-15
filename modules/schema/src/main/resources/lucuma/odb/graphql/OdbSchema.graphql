@@ -372,6 +372,17 @@ type BandedTime {
 }
 
 """
+Setup time charged for observations in a particular science band.
+"""
+type BandedSetupCharge {
+  "ScienceBand associated with the setups, if any."
+  band: ScienceBand
+
+  "Setups executed and the time charged for them."
+  charge: SetupCharge!
+}
+
+"""
 A BandedTime that is automatically updated by a background process.
 """
 type CalculatedBandedTime {
@@ -6238,6 +6249,73 @@ type SetAllocationsResult {
   allocations: [Allocation!]!
 }
 
+"""
+Setups executed for an observation (or a collection of observations), split
+by kind, with the time charged for them.  The counts and times correspond to
+the `setupCount` / `setup.full` and `reacquisitionCount` /
+`setup.reacquisition` estimates.  Manual time charge corrections are not
+attributed to setups.
+"""
+type SetupCharge {
+  "Full setups: those that slew, or that precede any science in their visit."
+  full: SetupChargeSummary!
+
+  "Reacquisitions: setups that follow science in their visit without slewing."
+  reacquisition: SetupChargeSummary!
+
+  "Time charged for all setups, full and reacquisition."
+  total: SetupTimeBreakdown!
+}
+
+"""
+The number of setups of one kind and the time charged for them.
+"""
+type SetupChargeSummary {
+  "Number of setups."
+  count: NonNegInt!
+
+  "Time charged for the setups."
+  time: SetupTimeBreakdown!
+}
+
+"""
+A setup found by time accounting in a visit.
+"""
+type SetupRecord {
+  "Whether this is a full setup or a reacquisition."
+  kind: SetupKind!
+
+  """
+  Time span of the setup, from its start (typically a slew) until the first
+  science step begins (or the visit ends).
+  """
+  interval: TimestampInterval!
+
+  "Time charged for the setup, after discounts."
+  timeCharge: SetupTimeBreakdown!
+}
+
+"""
+Time charged for setting up on a target, broken down into its components.  A
+setup ends when the first science step begins.
+"""
+type SetupTimeBreakdown {
+  "Time spent slewing, from a slew start event until the slew end (or the next atom event, if no slew end arrives first)."
+  slew: CategorizedTime!
+
+  "Time spent executing the acquisition sequence proper."
+  acquisition: CategorizedTime!
+
+  """
+  Remaining setup time, neither slewing nor executing acquisition steps: for
+  example the lead-in to the acquisition and the hand-off to science.
+  """
+  other: CategorizedTime!
+
+  "Total setup time: slew, acquisition and other time combined."
+  total: CategorizedTime!
+}
+
 type SetupTime {
   """
   Full setup time estimate, including slew, configuration and target acquisition
@@ -9505,6 +9583,12 @@ type Execution {
 
   "Time accounting calculation for this observation."
   timeCharge: CategorizedTime!
+
+  """
+  Setups executed for this observation and the time charged for them, for
+  comparison with `originalEstimate`.
+  """
+  setupCharge: SetupCharge!
 
   """
   Whether the science sequence has been materialized.
@@ -18219,6 +18303,11 @@ type Program {
   timeCharge: [BandedTime!]!
 
   """
+  Program-wide setup charge, summing the setups of all observations by band.
+  """
+  setupCharge: [BandedSetupCharge!]!
+
+  """
   All user invitations associated with this program.
   """
   userInvitations: [UserInvitation!]!
@@ -19727,6 +19816,17 @@ type SequenceEvent implements ExecutionEvent {
   """
   idempotencyKey: IdempotencyKey
 
+}
+
+"""
+The kind of setup performed during a visit.
+"""
+enum SetupKind {
+  "A full setup, which slews (or starts the visit) and acquires the target."
+  FULL
+
+  "A reacquisition, recentering on the target after science has started."
+  REACQUISITION
 }
 
 """
@@ -22120,6 +22220,9 @@ type Visit {
 
   "Time accounting details for this visit."
   timeChargeInvoice: TimeChargeInvoice!
+
+  "Setups found in this visit by time accounting, in order."
+  setups: [SetupRecord!]!
 
   """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when

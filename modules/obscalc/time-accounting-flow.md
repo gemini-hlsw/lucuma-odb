@@ -334,6 +334,40 @@ events, then applies discounts and corrections to produce the invoice:
 
 Final charge = raw execution time − discounts, then corrected.
 
+## Setups
+
+The same recompute also records the visit's **setups** in `t_visit_setup`
+(migration `V1351__visit_setup.sql`), so that actual setup time can be compared
+with the setup estimate frozen in `Execution.originalEstimate`.
+
+**Finding setups.** Slew events are kept in the event stream, and the time from
+a slew start until the slew end (or the next atom event) is marked `slewing` in
+the state. Each atom interval carries its sequence type. A *setup* is a maximal
+run of time not spent executing science atoms that includes slewing or an
+acquisition atom; it ends when the first science step begins. Runs with neither
+(e.g. idle time between science atoms) are not setups.
+
+- **Full setup** — the run includes a slew, or no science precedes it in the visit.
+- **Reacquisition** — the run follows science in the visit without slewing.
+
+**Charging setups.** Setups are *located* in the complete (undiscounted) state
+but *charged* from the state remaining after discounts, so e.g. slewing before
+twilight or a QA-failed acquisition atom is already removed. Within a setup, time
+is split into `slew`, `acquisition` (the acquisition sequence proper) and `other`
+(neither, e.g. the lead-in to the acquisition and the hand-off to science).
+Manual corrections are not attributed to setups.
+
+Splitting intervals at slew boundaries never changes a visit's total: the extra
+pieces carry the same (visit default) charge class as the gap they divide.
+
+**Existing visits.** Setups are written only by a recompute, so
+`V1351__visit_setup.sql` calls `invalidate_visit_time_accounting` for every
+visit with execution events, and the worker recomputes them through the normal
+path. Unlike every other path, this **reprices** those visits with the current
+algorithm (corrections are reapplied, but on a possibly different base). That
+was accepted only because there was little production history at the time; it
+is not a pattern to repeat once there is.
+
 ## Known limitation: cross-visit overlap
 
 The overlap discount makes one visit's charge depend on *another* visit. Per-visit
@@ -356,6 +390,9 @@ write/execution path), so eventual consistency is safe:
 - `Observation.execution` time charge — `ExecutionMapping` via
   `timeAccountingService.selectObservations` (sums the visits).
 - `Program` banded time — `ProgramMapping` via `selectProgram`.
+- Setups — `Visit.setups` (`selectVisitSetups`), `Execution.setupCharge`
+  (`selectObservationsSetupCharge`) and `Program.setupCharge`
+  (`selectProgramSetupCharge`), all read from `t_visit_setup`.
 
 obscalc itself does **not** read time accounting, so there is no dependency
 cycle in that direction.

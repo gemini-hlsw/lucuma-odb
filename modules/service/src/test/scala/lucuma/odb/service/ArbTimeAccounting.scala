@@ -4,6 +4,8 @@
 package lucuma.odb.service
 
 import lucuma.core.enums.ChargeClass
+import lucuma.core.enums.SequenceType
+import lucuma.core.enums.SlewStage
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Step
@@ -30,16 +32,19 @@ trait ArbTimeAccounting {
       for {
         a <- arbitrary[Atom.Id]
         s <- arbitrary[Option[Step.Id]]
-      } yield AtomContext(a, s)
+        t <- arbitrary[SequenceType]
+      } yield AtomContext(a, s, t)
     }
 
   given Cogen[AtomContext] =
     Cogen[(
       Atom.Id,
       Option[Step.Id],
+      SequenceType
     )].contramap { a => (
       a.atomId,
       a.stepId,
+      a.sequenceType
     )}
 
   given Arbitrary[Context] =
@@ -48,18 +53,21 @@ trait ArbTimeAccounting {
         v <- arbitrary[Visit.Id]
         c <- arbitrary[ChargeClass]
         a <- arbitrary[Option[AtomContext]]
-      } yield Context(v, c, a)
+        s <- arbitrary[Boolean]
+      } yield Context(v, c, a, a.isEmpty && s)
     }
 
   given Cogen[Context] =
     Cogen[(
       Visit.Id,
       ChargeClass,
-      Option[AtomContext]
+      Option[AtomContext],
+      Boolean
     )].contramap { a => (
       a.visitId,
       a.chargeClass,
-      a.atom
+      a.atom,
+      a.slewing
     )}
 
   given Arbitrary[Event] =
@@ -67,16 +75,19 @@ trait ArbTimeAccounting {
       for {
         t <- arbitrary[Timestamp]
         c <- arbitrary[Context]
-      } yield Event(t, c)
+        s <- arbitrary[Option[SlewStage]]
+      } yield Event(t, c, s)
     }
 
   given Cogen[Event] =
     Cogen[(
       Timestamp,
-      Context
+      Context,
+      Option[SlewStage]
     )].contramap { a => (
       a.timestamp,
-      a.context
+      a.context,
+      a.slewStage
     )}
 
 }
