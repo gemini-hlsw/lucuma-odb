@@ -6243,7 +6243,7 @@ guide star or acquisition.  The instrument is the only parameter.  Every step
 of its sequence must be a DAY_CAL with guiding disabled.
 """
 type DaytimeCalibration {
-  mode: DayCalObservingModeType!
+  mode: DaytimeCalibrationObservingModeType!
 
   """
   Instrument of the calibration.
@@ -8873,9 +8873,9 @@ enum ExchangeObservingModeType {
 }
 
 """
-DayCalObservingModeType
+DaytimeCalibrationObservingModeType
 """
-enum DayCalObservingModeType {
+enum DaytimeCalibrationObservingModeType {
   DAYTIME_CALIBRATION
 }
 

@@ -4,7 +4,7 @@
 package lucuma.odb.sequence.daytimecal
 
 import cats.Eq
-import lucuma.core.enums.DayCalObservingModeType
+import lucuma.core.enums.DaytimeCalibrationObservingModeType
 import lucuma.core.enums.Instrument
 import lucuma.odb.sequence.util.HashBytes
 
@@ -14,23 +14,10 @@ import lucuma.odb.sequence.util.HashBytes
 final case class Config(
   instrument: Instrument
 ):
-  def mode: DayCalObservingModeType =
-    DayCalObservingModeType.DaytimeCalibration
+  def mode: DaytimeCalibrationObservingModeType =
+    DaytimeCalibrationObservingModeType.DaytimeCalibration
 
 object Config:
-
-  /** Instruments a daytime calibration may use.
-   *  GHOST is pending.
-   *  This could belong to lucuma-core
-   */
-  val AllowedInstruments: Set[Instrument] =
-    Set(
-      Instrument.Flamingos2,
-      Instrument.GmosNorth,
-      Instrument.GmosSouth,
-      Instrument.Gnirs,
-      Instrument.Igrins2
-    )
 
   given Eq[Config] =
     Eq.by(_.instrument)

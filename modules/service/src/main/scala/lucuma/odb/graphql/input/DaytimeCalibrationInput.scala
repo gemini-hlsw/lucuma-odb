@@ -4,6 +4,7 @@
 package lucuma.odb.graphql.input
 
 import grackle.Result
+import lucuma.core.enums.DaytimeCalibrationObservingModeType
 import lucuma.core.enums.Instrument
 import lucuma.odb.graphql.binding.InstrumentBinding
 import lucuma.odb.graphql.binding.Matcher
@@ -26,7 +27,7 @@ object DaytimeCalibrationInput:
 
   private val AllowedInstrumentBinding: Matcher[Instrument] =
     InstrumentBinding.rmap: i =>
-      if Config.AllowedInstruments.contains(i) then Result.success(i)
+      if DaytimeCalibrationObservingModeType.DaytimeCalibration.daytimeCalInstruments.contains(i) then Result.success(i)
       else Result.failure(s"Instrument ${i.tag} does not support daytime calibrations.")
 
   val CreateBinding: Matcher[Create] =

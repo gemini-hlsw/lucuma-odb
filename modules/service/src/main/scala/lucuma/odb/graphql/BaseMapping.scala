@@ -118,7 +118,7 @@ trait BaseMapping[F[_]]
   lazy val DatasetChronicleEntryType               = schema.ref("DatasetChronicleEntry")
   lazy val DatasetChronicleEntrySelectResultType   = schema.ref("DatasetChronicleEntrySelectResult")
   lazy val DatasetEditType                         = schema.ref("DatasetEdit")
-  lazy val DayCalObservingModeTypeType             = schema.ref("DayCalObservingModeType")
+  lazy val DaytimeCalibrationObservingModeTypeType = schema.ref("DaytimeCalibrationObservingModeType")
   lazy val DaytimeCalibrationType                  = schema.ref("DaytimeCalibration")
   lazy val DatasetEventType                        = schema.ref("DatasetEvent")
   lazy val DatasetIdType                           = schema.ref("DatasetId")

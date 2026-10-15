@@ -10,7 +10,7 @@ import io.circe.Encoder
 import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.enums.AltairMode
-import lucuma.core.enums.DayCalObservingModeType
+import lucuma.core.enums.DaytimeCalibrationObservingModeType
 import lucuma.core.enums.ExchangeObservingModeType
 import lucuma.core.enums.Flamingos2Disperser
 import lucuma.core.enums.GmosNorthFilter
@@ -157,7 +157,7 @@ object configurationrequest:
 
         // Exchange observations are not approved through configuration requests and have no
         // `Configuration.ObservingMode`. `ConfigurationService` relies on this failing.
-        case _: ExchangeObservingModeType | _: DayCalObservingModeType =>
+        case _: ExchangeObservingModeType | _: DaytimeCalibrationObservingModeType =>
           // Report the mode as it arrived, rather than the enum's name.  Daytime
           // calibrations have no target and are not approved either.
           Left(DecodingFailure(s"couldn't decode mode: ${modeField.as[String].getOrElse("")}", Nil))

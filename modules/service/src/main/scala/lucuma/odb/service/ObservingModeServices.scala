@@ -12,7 +12,7 @@ import cats.syntax.option.*
 import cats.syntax.traverse.*
 import grackle.Result
 import grackle.syntax.*
-import lucuma.core.enums.DayCalObservingModeType
+import lucuma.core.enums.DaytimeCalibrationObservingModeType
 import lucuma.core.enums.ExchangeObservingModeType
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.VisitorObservingModeType
@@ -82,7 +82,7 @@ object ObservingModeServices:
 
         which.groupMap(_._2)(_._1).toList.traverse {
 
-          case (_: DayCalObservingModeType, oids) =>
+          case (_: DaytimeCalibrationObservingModeType, oids) =>
             daytimeCalibrationService
               .select(oids)
               .map(_.widen[ObservingMode])
@@ -229,24 +229,24 @@ object ObservingModeServices:
 
         val deleteObservingMode: F[Unit] =
           mode match
-            case _: DayCalObservingModeType           => daytimeCalibrationService.delete(which)
-            case _: ExchangeObservingModeType         => exchangeService.delete(which)
-            case ObservingModeType.Flamingos2LongSlit => flamingos2LongSlitService.delete(which)
-            case ObservingModeType.Flamingos2Imaging  => flamingos2ImagingService.delete(which)
-            case ObservingModeType.Flamingos2Mos      => flamingos2MosService.delete(which)
-            case ObservingModeType.GhostIfu           => ghostIfuService.delete(which)
-            case ObservingModeType.GmosNorthImaging   => gmosImagingService.deleteNorth(which)
-            case ObservingModeType.GmosNorthLongSlit  => gmosLongSlitService.deleteNorth(which)
-            case ObservingModeType.GmosNorthMos       => gmosMosService.deleteNorth(which)
-            case ObservingModeType.GmosSouthImaging   => gmosImagingService.deleteSouth(which)
-            case ObservingModeType.GmosSouthLongSlit  => gmosLongSlitService.deleteSouth(which)
-            case ObservingModeType.GmosSouthMos       => gmosMosService.deleteSouth(which)
-            case ObservingModeType.GmosNorthIfu       => gmosIfuService.deleteNorth(which)
-            case ObservingModeType.GmosSouthIfu       => gmosIfuService.deleteSouth(which)
-            case ObservingModeType.GnirsImaging       => gnirsImagingService.delete(which)
+            case _: DaytimeCalibrationObservingModeType => daytimeCalibrationService.delete(which)
+            case _: ExchangeObservingModeType           => exchangeService.delete(which)
+            case ObservingModeType.Flamingos2LongSlit   => flamingos2LongSlitService.delete(which)
+            case ObservingModeType.Flamingos2Imaging    => flamingos2ImagingService.delete(which)
+            case ObservingModeType.Flamingos2Mos        => flamingos2MosService.delete(which)
+            case ObservingModeType.GhostIfu             => ghostIfuService.delete(which)
+            case ObservingModeType.GmosNorthImaging     => gmosImagingService.deleteNorth(which)
+            case ObservingModeType.GmosNorthLongSlit    => gmosLongSlitService.deleteNorth(which)
+            case ObservingModeType.GmosNorthMos         => gmosMosService.deleteNorth(which)
+            case ObservingModeType.GmosSouthImaging     => gmosImagingService.deleteSouth(which)
+            case ObservingModeType.GmosSouthLongSlit    => gmosLongSlitService.deleteSouth(which)
+            case ObservingModeType.GmosSouthMos         => gmosMosService.deleteSouth(which)
+            case ObservingModeType.GmosNorthIfu         => gmosIfuService.deleteNorth(which)
+            case ObservingModeType.GmosSouthIfu         => gmosIfuService.deleteSouth(which)
+            case ObservingModeType.GnirsImaging         => gnirsImagingService.delete(which)
             case ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu => gnirsSpectroscopyService.delete(which)
-            case ObservingModeType.Igrins2LongSlit    => igrins2LongSlitService.delete(which)
-            case _: VisitorObservingModeType          => visitorService.delete(which)
+            case ObservingModeType.Igrins2LongSlit      => igrins2LongSlitService.delete(which)
+            case _: VisitorObservingModeType            => visitorService.delete(which)
 
         deleteObservingMode *> deleteExposureTimeModes
 
@@ -294,24 +294,24 @@ object ObservingModeServices:
 
         def cloneObservingMode(etms: List[(ExposureTimeModeId, ExposureTimeModeId)]): F[Unit] =
           mode match
-            case _: DayCalObservingModeType           => daytimeCalibrationService.clone(origOid, newOid)
-            case _: ExchangeObservingModeType         => exchangeService.clone(origOid, newOid)
-            case ObservingModeType.Flamingos2LongSlit => flamingos2LongSlitService.clone(origOid, newOid)
-            case ObservingModeType.Flamingos2Imaging  => flamingos2ImagingService.clone(origOid, newOid, etms)
-            case ObservingModeType.Flamingos2Mos      => flamingos2MosService.clone(origOid, newOid)
-            case ObservingModeType.GhostIfu           => ghostIfuService.clone(origOid, newOid, etms)
-            case ObservingModeType.GmosNorthLongSlit  => gmosLongSlitService.cloneNorth(origOid, newOid)
-            case ObservingModeType.GmosNorthImaging   => gmosImagingService.cloneNorth(origOid, newOid, etms)
-            case ObservingModeType.GmosNorthMos       => gmosMosService.cloneNorth(origOid, newOid)
-            case ObservingModeType.GmosSouthLongSlit  => gmosLongSlitService.cloneSouth(origOid, newOid)
-            case ObservingModeType.GmosSouthImaging   => gmosImagingService.cloneSouth(origOid, newOid, etms)
-            case ObservingModeType.GmosSouthMos       => gmosMosService.cloneSouth(origOid, newOid)
-            case ObservingModeType.GmosNorthIfu       => gmosIfuService.cloneNorth(origOid, newOid)
-            case ObservingModeType.GmosSouthIfu       => gmosIfuService.cloneSouth(origOid, newOid)
-            case ObservingModeType.GnirsImaging       => gnirsImagingService.clone(origOid, newOid, etms)
+            case _: DaytimeCalibrationObservingModeType => daytimeCalibrationService.clone(origOid, newOid)
+            case _: ExchangeObservingModeType           => exchangeService.clone(origOid, newOid)
+            case ObservingModeType.Flamingos2LongSlit   => flamingos2LongSlitService.clone(origOid, newOid)
+            case ObservingModeType.Flamingos2Imaging    => flamingos2ImagingService.clone(origOid, newOid, etms)
+            case ObservingModeType.Flamingos2Mos        => flamingos2MosService.clone(origOid, newOid)
+            case ObservingModeType.GhostIfu             => ghostIfuService.clone(origOid, newOid, etms)
+            case ObservingModeType.GmosNorthLongSlit    => gmosLongSlitService.cloneNorth(origOid, newOid)
+            case ObservingModeType.GmosNorthImaging     => gmosImagingService.cloneNorth(origOid, newOid, etms)
+            case ObservingModeType.GmosNorthMos         => gmosMosService.cloneNorth(origOid, newOid)
+            case ObservingModeType.GmosSouthLongSlit    => gmosLongSlitService.cloneSouth(origOid, newOid)
+            case ObservingModeType.GmosSouthImaging     => gmosImagingService.cloneSouth(origOid, newOid, etms)
+            case ObservingModeType.GmosSouthMos         => gmosMosService.cloneSouth(origOid, newOid)
+            case ObservingModeType.GmosNorthIfu         => gmosIfuService.cloneNorth(origOid, newOid)
+            case ObservingModeType.GmosSouthIfu         => gmosIfuService.cloneSouth(origOid, newOid)
+            case ObservingModeType.GnirsImaging         => gnirsImagingService.clone(origOid, newOid, etms)
             case ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu => gnirsSpectroscopyService.clone(origOid, newOid, etms)
-            case ObservingModeType.Igrins2LongSlit    => igrins2LongSlitService.clone(origOid, newOid)
-            case _: VisitorObservingModeType          => visitorService.clone(origOid, newOid)
+            case ObservingModeType.Igrins2LongSlit      => igrins2LongSlitService.clone(origOid, newOid)
+            case _: VisitorObservingModeType            => visitorService.clone(origOid, newOid)
 
         exposureTimeModeService
           .clone(origOid, newOid)

@@ -18,7 +18,7 @@ import grackle.syntax.*
 import lucuma.core.enums.AltairMode
 import lucuma.core.enums.AltairNdFilter
 import lucuma.core.enums.CalibrationRole
-import lucuma.core.enums.DayCalObservingModeType
+import lucuma.core.enums.DaytimeCalibrationObservingModeType
 import lucuma.core.enums.CassRotator
 import lucuma.core.enums.CloneSequenceMode
 import lucuma.core.enums.FieldLens
@@ -556,7 +556,7 @@ object ObservationService {
       ): F[Result[Unit]] =
         val involved: List[Observation.Id] =
           existing.toList.collect:
-            case (Some(_: DayCalObservingModeType), oids) => oids
+            case (Some(_: DaytimeCalibrationObservingModeType), oids) => oids
             case (_, oids) if oEdit.exists(_.daytimeCalibration.isDefined) => oids
           .flatten
 

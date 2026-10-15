@@ -19,7 +19,7 @@ import eu.timepit.refined.types.numeric.NonNegInt
 import fs2.Stream
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ChargeClass
-import lucuma.core.enums.DayCalObservingModeType
+import lucuma.core.enums.DaytimeCalibrationObservingModeType
 import lucuma.core.enums.ExchangeObservingModeType
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ExecutionState
@@ -375,39 +375,39 @@ object Generator:
         else if ctx.params.isSpecPhotoProposal then EitherT.pure(flatDigest(ctx, SpecPhotoTimeEstimate))
         else
           ctx.params.observingMode.modeType match
-            case ObservingModeType.Flamingos2Imaging  =>
+            case ObservingModeType.Flamingos2Imaging    =>
               EitherT(streaming.selectOrGenerateFlamingos2Imaging(ctx)).flatMap(digest(_, calculator.flamingos2ImagingSetup))
-            case ObservingModeType.Flamingos2Mos      =>
+            case ObservingModeType.Flamingos2Mos        =>
               EitherT(streaming.selectOrGenerateFlamingos2Mos(ctx)).flatMap(digest(_, spectroscopySetup(calculator.flamingos2MosSetup)))
-            case ObservingModeType.Flamingos2LongSlit =>
+            case ObservingModeType.Flamingos2LongSlit   =>
               EitherT(streaming.selectOrGenerateFlamingos2LongSlit(ctx)).flatMap(digest(_, spectroscopySetup(calculator.flamingos2LongSlitSetup)))
-            case ObservingModeType.GhostIfu           =>
-              EitherT(streaming.selectOrGenerateGhost(ctx)).flatMap(digest(_, spectroscopySetup(calculator.ghostIfuSetup)))
-            case ObservingModeType.GmosNorthImaging   =>
+            case ObservingModeType.GhostIfu             =>
+              EitherT(streaming.selectOrGenerateGhost(  ctx)).flatMap(digest(_, spectroscopySetup(calculator.ghostIfuSetup)))
+            case ObservingModeType.GmosNorthImaging     =>
               EitherT(streaming.selectOrGenerateGmosNorthImaging(ctx)).flatMap(digest(_, calculator.gmosNorthImagingSetup))
-            case ObservingModeType.GmosNorthLongSlit  =>
+            case ObservingModeType.GmosNorthLongSlit    =>
               EitherT(streaming.selectOrGenerateGmosNorthLongSlit(ctx)).flatMap(digest(_, spectroscopySetup(calculator.gmosNorthLongSlitSetup)))
-            case ObservingModeType.GmosNorthMos       =>
+            case ObservingModeType.GmosNorthMos         =>
               EitherT(streaming.selectOrGenerateGmosNorthMos(ctx)).flatMap(digest(_, spectroscopySetup(calculator.gmosNorthMosSetup)))
-            case ObservingModeType.GmosSouthImaging   =>
+            case ObservingModeType.GmosSouthImaging     =>
               EitherT(streaming.selectOrGenerateGmosSouthImaging(ctx)).flatMap(digest(_, calculator.gmosSouthImagingSetup))
-            case ObservingModeType.GmosSouthLongSlit  =>
+            case ObservingModeType.GmosSouthLongSlit    =>
               EitherT(streaming.selectOrGenerateGmosSouthLongSlit(ctx)).flatMap(digest(_, spectroscopySetup(calculator.gmosSouthLongSlitSetup)))
-            case ObservingModeType.GmosNorthIfu       =>
+            case ObservingModeType.GmosNorthIfu         =>
               EitherT(streaming.selectOrGenerateGmosNorthIfu(ctx)).flatMap(digest(_, spectroscopySetup(calculator.gmosNorthIfuSetup)))
-            case ObservingModeType.GmosSouthIfu       =>
+            case ObservingModeType.GmosSouthIfu         =>
               EitherT(streaming.selectOrGenerateGmosSouthIfu(ctx)).flatMap(digest(_, spectroscopySetup(calculator.gmosSouthIfuSetup)))
-            case ObservingModeType.GnirsImaging       =>
+            case ObservingModeType.GnirsImaging         =>
               EitherT(streaming.selectOrGenerateGnirsImaging(ctx)).flatMap(digest(_, gnirsSetup(calculator.gnirsImagingSetup)))
-            case ObservingModeType.GmosSouthMos       =>
+            case ObservingModeType.GmosSouthMos         =>
               EitherT(streaming.selectOrGenerateGmosSouthMos(ctx)).flatMap(digest(_, spectroscopySetup(calculator.gmosSouthMosSetup)))
-            case ObservingModeType.GnirsLongSlit      =>
+            case ObservingModeType.GnirsLongSlit        =>
               EitherT(streaming.selectOrGenerateGnirsSpectroscopy(ctx)).flatMap(digest(_, spectroscopySetup(gnirsSetup(calculator.gnirsLongSlitSetup))))
-            case ObservingModeType.GnirsIfu           =>
+            case ObservingModeType.GnirsIfu             =>
               EitherT(streaming.selectOrGenerateGnirsSpectroscopy(ctx)).flatMap(digest(_, spectroscopySetup(gnirsSetup(calculator.gnirsIfuSetup))))
-            case ObservingModeType.Igrins2LongSlit    =>
+            case ObservingModeType.Igrins2LongSlit      =>
               EitherT(streaming.selectOrGenerateIgrins2LongSlit(ctx)).flatMap(digest(_, calculator.igrins2LongSlitSetup))
-            case _: DayCalObservingModeType           =>
+            case _: DaytimeCalibrationObservingModeType =>
               val noSetup = SetupTimeEstimateCalculator.Zero
               val d = daytimeInstrument(ctx) match
                 case Instrument.Flamingos2 => EitherT(streaming.selectDaytimeFlamingos2(ctx)).flatMap(digest(_, noSetup))
@@ -419,7 +419,7 @@ object Generator:
               d.map: d =>
                 if d.science.atomCount.value == 0 then d.copy(science = d.science.copy(executionState = ctx.params.executionState))
                 else d
-            case vis: VisitorObservingModeType        =>
+            case vis: VisitorObservingModeType          =>
               // There is no sequence for visitors we calculate the digest directly
               val state = ctx.params.declaredState.getOrElse(ExecutionState.Completed)
               calculator.visitorOverheads(vis) match
@@ -436,7 +436,7 @@ object Generator:
                   EitherT.pure[F, OdbError]:
                     VisitorExecutionDigestCalculator.alienDigest(totalRequestTime, state)
 
-            case _: ExchangeObservingModeType         =>
+            case _: ExchangeObservingModeType           =>
               // There is no sequence for exchange observations; we compute the
               // digest directly from the requested total time.
               val state = ctx.params.declaredState.getOrElse(ExecutionState.Completed)
@@ -470,26 +470,26 @@ object Generator:
         val stream =
           if isUnresolvedTelluric(ctx) || ctx.params.isSpecPhotoProposal then noSequence
           else ctx.params.observingMode.modeType match
-            case _: ExchangeObservingModeType         => noSequence
-            case ObservingModeType.Flamingos2Imaging  => EitherT(streaming.selectOrGenerateFlamingos2Imaging(ctx))
-            case ObservingModeType.Flamingos2LongSlit => EitherT(streaming.selectOrGenerateFlamingos2LongSlit(ctx))
-            case ObservingModeType.Flamingos2Mos      => EitherT(streaming.selectOrGenerateFlamingos2Mos(ctx))
-            case ObservingModeType.GhostIfu           => EitherT(streaming.selectOrGenerateGhost(ctx))
-            case ObservingModeType.GmosNorthImaging   => EitherT(streaming.selectOrGenerateGmosNorthImaging(ctx))
-            case ObservingModeType.GmosNorthLongSlit  => EitherT(streaming.selectOrGenerateGmosNorthLongSlit(ctx))
-            case ObservingModeType.GmosNorthMos       => EitherT(streaming.selectOrGenerateGmosNorthMos(ctx))
-            case ObservingModeType.GmosSouthImaging   => EitherT(streaming.selectOrGenerateGmosSouthImaging(ctx))
-            case ObservingModeType.GmosSouthLongSlit  => EitherT(streaming.selectOrGenerateGmosSouthLongSlit(ctx))
-            case ObservingModeType.GmosSouthMos       => EitherT(streaming.selectOrGenerateGmosSouthMos(ctx))
-            case ObservingModeType.GmosNorthIfu       => EitherT(streaming.selectOrGenerateGmosNorthIfu(ctx))
-            case ObservingModeType.GmosSouthIfu       => EitherT(streaming.selectOrGenerateGmosSouthIfu(ctx))
-            case ObservingModeType.GnirsImaging       => EitherT(streaming.selectOrGenerateGnirsImaging(ctx))
-            case ObservingModeType.GnirsIfu           => EitherT(streaming.selectOrGenerateGnirsSpectroscopy(ctx))
-            case ObservingModeType.GnirsLongSlit      => EitherT(streaming.selectOrGenerateGnirsSpectroscopy(ctx))
-            case ObservingModeType.Igrins2LongSlit    => EitherT(streaming.selectOrGenerateIgrins2LongSlit(ctx))
-            case _: DayCalObservingModeType           =>
+            case _: ExchangeObservingModeType           => noSequence
+            case ObservingModeType.Flamingos2Imaging    => EitherT(streaming.selectOrGenerateFlamingos2Imaging(ctx))
+            case ObservingModeType.Flamingos2LongSlit   => EitherT(streaming.selectOrGenerateFlamingos2LongSlit(ctx))
+            case ObservingModeType.Flamingos2Mos        => EitherT(streaming.selectOrGenerateFlamingos2Mos(ctx))
+            case ObservingModeType.GhostIfu             => EitherT(streaming.selectOrGenerateGhost(ctx))
+            case ObservingModeType.GmosNorthImaging     => EitherT(streaming.selectOrGenerateGmosNorthImaging(ctx))
+            case ObservingModeType.GmosNorthLongSlit    => EitherT(streaming.selectOrGenerateGmosNorthLongSlit(ctx))
+            case ObservingModeType.GmosNorthMos         => EitherT(streaming.selectOrGenerateGmosNorthMos(ctx))
+            case ObservingModeType.GmosSouthImaging     => EitherT(streaming.selectOrGenerateGmosSouthImaging(ctx))
+            case ObservingModeType.GmosSouthLongSlit    => EitherT(streaming.selectOrGenerateGmosSouthLongSlit(ctx))
+            case ObservingModeType.GmosSouthMos         => EitherT(streaming.selectOrGenerateGmosSouthMos(ctx))
+            case ObservingModeType.GmosNorthIfu         => EitherT(streaming.selectOrGenerateGmosNorthIfu(ctx))
+            case ObservingModeType.GmosSouthIfu         => EitherT(streaming.selectOrGenerateGmosSouthIfu(ctx))
+            case ObservingModeType.GnirsImaging         => EitherT(streaming.selectOrGenerateGnirsImaging(ctx))
+            case ObservingModeType.GnirsIfu             => EitherT(streaming.selectOrGenerateGnirsSpectroscopy(ctx))
+            case ObservingModeType.GnirsLongSlit        => EitherT(streaming.selectOrGenerateGnirsSpectroscopy(ctx))
+            case ObservingModeType.Igrins2LongSlit      => EitherT(streaming.selectOrGenerateIgrins2LongSlit(ctx))
+            case _: DaytimeCalibrationObservingModeType =>
               daytimeCalibration(ctx)([S, D] => (s: StreamingExecutionConfig[F, S, D]) => EitherT.rightT[F, OdbError](s: StreamingExecutionConfig[F, ?, ?]))
-            case _: VisitorObservingModeType          => noSequence
+            case _: VisitorObservingModeType            => noSequence
 
         (checkSequence *> stepCount).flatMap: sc =>
           val base = sc.value
@@ -570,7 +570,7 @@ object Generator:
             case _: ExchangeObservingModeType =>
               EitherT.rightT(InstrumentExecutionConfig.Exchange)
 
-            case _: DayCalObservingModeType =>
+            case _: DaytimeCalibrationObservingModeType =>
               daytimeInstrument(ctx) match
                 case Instrument.Flamingos2 =>
                   EitherT(streaming.selectDaytimeFlamingos2(ctx))
@@ -697,56 +697,56 @@ object Generator:
             case _: ExchangeObservingModeType =>
               EitherT.pure(())
 
-            case _: DayCalObservingModeType =>
+            case _: DaytimeCalibrationObservingModeType =>
               EitherT.pure(())
 
             // N.B. there is no imaging acquisition, but it should not blow up.
-            case ObservingModeType.Flamingos2Imaging  =>
+            case ObservingModeType.Flamingos2Imaging    =>
               EitherT.pure(())
 
-            case ObservingModeType.Flamingos2LongSlit =>
+            case ObservingModeType.Flamingos2LongSlit   =>
               go(freshAcq, ctxʹ.params.itcInput.toOption, streaming.generateFlamingos2LongSlit(ctxʹ))(sequenceService.resetFlamingos2Acquisition)
 
             // N.B. there is no MOS acquisition yet, so there is nothing to reset.
             // This becomes wrong once a MOS acquisition lands.
-            case ObservingModeType.Flamingos2Mos      =>
+            case ObservingModeType.Flamingos2Mos        =>
               EitherT.pure(())
 
             // N.B. there is no imaging acquisition, but it should not blow up.
-            case ObservingModeType.GhostIfu           =>
+            case ObservingModeType.GhostIfu             =>
               EitherT.pure(())
 
 
-            case ObservingModeType.GmosNorthImaging   =>
+            case ObservingModeType.GmosNorthImaging     =>
               EitherT.pure(())
 
-            case ObservingModeType.GmosNorthLongSlit  =>
+            case ObservingModeType.GmosNorthLongSlit    =>
               go(freshAcq, ctxʹ.params.itcInput.toOption, streaming.generateGmosNorthLongSlit(ctxʹ))(sequenceService.resetGmosNorthAcquisition)
 
-            case ObservingModeType.GmosSouthImaging   =>
+            case ObservingModeType.GmosSouthImaging     =>
               EitherT.pure(())
 
-            case ObservingModeType.GmosSouthLongSlit  =>
+            case ObservingModeType.GmosSouthLongSlit    =>
               go(freshAcq, ctxʹ.params.itcInput.toOption, streaming.generateGmosSouthLongSlit(ctxʹ))(sequenceService.resetGmosSouthAcquisition)
 
             case ObservingModeType.GmosNorthMos | ObservingModeType.GmosSouthMos  =>
               EitherT.pure(())
 
-            case ObservingModeType.GmosNorthIfu       =>
+            case ObservingModeType.GmosNorthIfu         =>
               go(freshAcq, ctxʹ.params.itcInput.toOption, streaming.generateGmosNorthIfu(ctxʹ))(sequenceService.resetGmosNorthAcquisition)
 
-            case ObservingModeType.GmosSouthIfu       =>
+            case ObservingModeType.GmosSouthIfu         =>
               go(freshAcq, ctxʹ.params.itcInput.toOption, streaming.generateGmosSouthIfu(ctxʹ))(sequenceService.resetGmosSouthAcquisition)
-            case ObservingModeType.GnirsImaging       =>
+            case ObservingModeType.GnirsImaging         =>
               EitherT.pure(())
 
             case ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu =>
               go(freshAcq, ctxʹ.params.itcInput.toOption, streaming.generateGnirsSpectroscopy(ctxʹ))(sequenceService.resetGnirsAcquisition)
 
-            case ObservingModeType.Igrins2LongSlit    =>
+            case ObservingModeType.Igrins2LongSlit      =>
               EitherT.pure(())
 
-            case _: VisitorObservingModeType          =>
+            case _: VisitorObservingModeType            =>
               EitherT.pure(())
 
         // Re-derive the acquisition ITC, bypassing the frozen snapshot, so that
@@ -863,7 +863,7 @@ object Generator:
             case _: ExchangeObservingModeType         =>
               EitherT.pure(())
 
-            case _: DayCalObservingModeType           =>
+            case _: DaytimeCalibrationObservingModeType =>
               EitherT.pure(())
 
         transactionallyWithContext(oid, commitHash): ctx =>

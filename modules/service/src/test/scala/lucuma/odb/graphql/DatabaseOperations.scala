@@ -23,7 +23,7 @@ import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.DatasetStage
 import lucuma.core.enums.EducationalStatus
 import lucuma.core.enums.EmailStatus
-import lucuma.core.enums.DayCalObservingModeType
+import lucuma.core.enums.DaytimeCalibrationObservingModeType
 import lucuma.core.enums.ExchangeObservingModeType
 import lucuma.core.enums.GeminiCallForProposalsType
 import lucuma.core.enums.Gender
@@ -1491,7 +1491,7 @@ trait DatabaseOperations { this: OdbSuite =>
 
   private def observingModeObject(observingMode: ObservingModeType): String =
     observingMode match
-      case _: DayCalObservingModeType =>
+      case _: DaytimeCalibrationObservingModeType =>
         """{
           daytimeCalibration: {
             instrument: GMOS_NORTH

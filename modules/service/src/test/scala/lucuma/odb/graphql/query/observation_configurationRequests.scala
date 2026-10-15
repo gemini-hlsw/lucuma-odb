@@ -10,7 +10,7 @@ import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
-import lucuma.core.enums.DayCalObservingModeType
+import lucuma.core.enums.DaytimeCalibrationObservingModeType
 import lucuma.core.enums.ExchangeObservingModeType
 import lucuma.core.enums.Flamingos2Disperser
 import lucuma.core.enums.GhostResolutionMode
@@ -150,7 +150,7 @@ class observation_configurationRequests
   def baseMutation(user: User, oid: Observation.Id, mode: ObservingModeType): IO[Unit] =
     mode match
       case _: ExchangeObservingModeType         => IO.unit
-      case _: DayCalObservingModeType           => IO.unit
+      case _: DaytimeCalibrationObservingModeType           => IO.unit
       case ObservingModeType.Flamingos2Imaging  => IO.unit
       case ObservingModeType.Flamingos2LongSlit => Mutation.forFlamingos2LongSlit(user, oid, Flamingos2Disperser.R1200HK)
       case ObservingModeType.Flamingos2Mos      => IO.unit
@@ -171,7 +171,7 @@ class observation_configurationRequests
   def compatibleMutation(user: User, oid: Observation.Id, mode: ObservingModeType): IO[Unit] =
     mode match
       case _: ExchangeObservingModeType         => IO.unit
-      case _: DayCalObservingModeType           => IO.unit
+      case _: DaytimeCalibrationObservingModeType           => IO.unit
       case ObservingModeType.Flamingos2Imaging  => IO.unit
       case ObservingModeType.Flamingos2LongSlit => IO.unit // no changes are compatible
       case ObservingModeType.Flamingos2Mos      => IO.unit
@@ -192,7 +192,7 @@ class observation_configurationRequests
   def incompatibleMutation(user: User, oid: Observation.Id, mode: ObservingModeType): Option[IO[Unit]] =
     mode match
       case _: ExchangeObservingModeType         => None
-      case _: DayCalObservingModeType           => None
+      case _: DaytimeCalibrationObservingModeType           => None
       case ObservingModeType.Flamingos2Imaging  => None
       case ObservingModeType.Flamingos2LongSlit => Some(Mutation.forFlamingos2LongSlit(user, oid, Flamingos2Disperser.R1200JH))
       case ObservingModeType.Flamingos2Mos      => None
@@ -282,7 +282,7 @@ class observation_configurationRequests
       oid   <-
         mode match
           case e: ExchangeObservingModeType         => createExchangeModeObservationAs(pi, pid, e, tid)
-          case _: DayCalObservingModeType           => IO.raiseError(new RuntimeException("Daytime calibrations have no configuration requests"))
+          case _: DaytimeCalibrationObservingModeType           => IO.raiseError(new RuntimeException("Daytime calibrations have no configuration requests"))
           case ObservingModeType.Flamingos2Imaging  => IO.raiseError(new RuntimeException("Flamingos2 imaging not supported yet"))
           case ObservingModeType.Flamingos2LongSlit => createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
           case ObservingModeType.Flamingos2Mos      => createObservationAs(pi, pid, ObservingModeType.Flamingos2Mos.some, tid)
