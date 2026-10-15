@@ -1,0 +1,639 @@
+{
+ "apiVersion": "dashboard.grafana.app/v1beta1",
+ "kind": "Dashboard",
+ "metadata": {
+  "name": "lucuma-overview",
+  "namespace": "stacks-1577729",
+  "annotations": {
+   "grafana.app/folder": "lucuma-health"
+  }
+ },
+ "spec": {
+  "title": "GPP Status Overview",
+  "uid": "lucuma-overview",
+  "tags": [
+   "lucuma",
+   "health",
+   "status"
+  ],
+  "timezone": "utc",
+  "schemaVersion": 39,
+  "editable": false,
+  "graphTooltip": 0,
+  "time": {
+   "from": "now-13d/d",
+   "to": "now"
+  },
+  "refresh": "15m",
+  "timepicker": {
+   "hidden": true
+  },
+  "description": "Current status and 14 days of daily availability for the GPP services, workers and database.",
+  "links": [
+   {
+    "title": "What the checks mean",
+    "type": "link",
+    "url": "https://github.com/gemini-hlsw/lucuma-odb/blob/main/ODB-README.md#health-endpoints",
+    "targetBlank": true
+   }
+  ],
+  "templating": {
+   "list": [
+    {
+     "name": "env",
+     "type": "constant",
+     "hide": 2,
+     "query": "dev"
+    }
+   ]
+  },
+  "annotations": {
+   "list": []
+  },
+  "panels": [
+   {
+    "id": 1,
+    "type": "stat",
+    "title": "Components",
+    "description": "Components by current state. Services and workers are Operational or Offline; the database is Degraded above 80% of its usable connections.",
+    "gridPos": {
+     "x": 0,
+     "y": 0,
+     "w": 24,
+     "h": 4
+    },
+    "datasource": {
+     "type": "prometheus",
+     "uid": "grafanacloud-prom"
+    },
+    "targets": [
+     {
+      "refId": "A",
+      "datasource": {
+       "type": "prometheus",
+       "uid": "grafanacloud-prom"
+      },
+      "instant": true,
+      "range": false,
+      "legendFormat": "Operational",
+      "expr": "count(((2 * max by (system) (last_over_time(probe_success{kind=\"readiness\", environment=\"$env\"}[40m]))) or (2 * (time() - max by (service) (lucuma_worker_last_iteration_epoch_seconds{deployment_environment_name=\"$env\"}) < bool 300)) or (2 - (sum(max by (application_name) (lucuma_db_connections_used{deployment_environment_name=\"$env\"})) / max(lucuma_db_connections_max{deployment_environment_name=\"$env\"}) > bool 0.8))) == 2) or vector(0)"
+     },
+     {
+      "refId": "B",
+      "datasource": {
+       "type": "prometheus",
+       "uid": "grafanacloud-prom"
+      },
+      "instant": true,
+      "range": false,
+      "legendFormat": "Degraded",
+      "expr": "count(((2 * max by (system) (last_over_time(probe_success{kind=\"readiness\", environment=\"$env\"}[40m]))) or (2 * (time() - max by (service) (lucuma_worker_last_iteration_epoch_seconds{deployment_environment_name=\"$env\"}) < bool 300)) or (2 - (sum(max by (application_name) (lucuma_db_connections_used{deployment_environment_name=\"$env\"})) / max(lucuma_db_connections_max{deployment_environment_name=\"$env\"}) > bool 0.8))) == 1) or vector(0)"
+     },
+     {
+      "refId": "C",
+      "datasource": {
+       "type": "prometheus",
+       "uid": "grafanacloud-prom"
+      },
+      "instant": true,
+      "range": false,
+      "legendFormat": "Offline",
+      "expr": "count(((2 * max by (system) (last_over_time(probe_success{kind=\"readiness\", environment=\"$env\"}[40m]))) or (2 * (time() - max by (service) (lucuma_worker_last_iteration_epoch_seconds{deployment_environment_name=\"$env\"}) < bool 300)) or (2 - (sum(max by (application_name) (lucuma_db_connections_used{deployment_environment_name=\"$env\"})) / max(lucuma_db_connections_max{deployment_environment_name=\"$env\"}) > bool 0.8))) == 0) or vector(0)"
+     }
+    ],
+    "options": {
+     "reduceOptions": {
+      "calcs": [
+       "lastNotNull"
+      ],
+      "fields": "",
+      "values": false
+     },
+     "orientation": "vertical",
+     "textMode": "value_and_name",
+     "colorMode": "value",
+     "graphMode": "none",
+     "justifyMode": "center"
+    },
+    "fieldConfig": {
+     "defaults": {
+      "decimals": 0,
+      "color": {
+       "mode": "fixed",
+       "fixedColor": "text"
+      }
+     },
+     "overrides": [
+      {
+       "matcher": {
+        "id": "byFrameRefID",
+        "options": "A"
+       },
+       "properties": [
+        {
+         "id": "color",
+         "value": {
+          "mode": "fixed",
+          "fixedColor": "green"
+         }
+        }
+       ]
+      },
+      {
+       "matcher": {
+        "id": "byFrameRefID",
+        "options": "B"
+       },
+       "properties": [
+        {
+         "id": "color",
+         "value": {
+          "mode": "fixed",
+          "fixedColor": "orange"
+         }
+        }
+       ]
+      },
+      {
+       "matcher": {
+        "id": "byFrameRefID",
+        "options": "C"
+       },
+       "properties": [
+        {
+         "id": "color",
+         "value": {
+          "mode": "fixed",
+          "fixedColor": "red"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "id": 2,
+    "type": "row",
+    "title": "Services",
+    "collapsed": false,
+    "panels": [],
+    "gridPos": {
+     "x": 0,
+     "y": 4,
+     "w": 24,
+     "h": 1
+    }
+   },
+   {
+    "id": 3,
+    "type": "stat",
+    "title": "Now",
+    "description": "Operational when every probe got HTTP 200 and status ok from GET /health/ready within the last 40 minutes.",
+    "gridPos": {
+     "x": 0,
+     "y": 5,
+     "w": 6,
+     "h": 6
+    },
+    "datasource": {
+     "type": "prometheus",
+     "uid": "grafanacloud-prom"
+    },
+    "targets": [
+     {
+      "refId": "A",
+      "datasource": {
+       "type": "prometheus",
+       "uid": "grafanacloud-prom"
+      },
+      "instant": true,
+      "range": false,
+      "legendFormat": "{{system}}",
+      "expr": "2 * max by (system) (last_over_time(probe_success{kind=\"readiness\", environment=\"$env\"}[40m]))"
+     }
+    ],
+    "options": {
+     "reduceOptions": {
+      "calcs": [
+       "lastNotNull"
+      ],
+      "fields": "",
+      "values": false
+     },
+     "orientation": "horizontal",
+     "textMode": "value_and_name",
+     "colorMode": "value",
+     "graphMode": "none",
+     "justifyMode": "auto"
+    },
+    "fieldConfig": {
+     "defaults": {
+      "mappings": [
+       {
+        "type": "value",
+        "options": {
+         "0": {
+          "text": "Offline",
+          "color": "red",
+          "index": 0
+         },
+         "1": {
+          "text": "Degraded",
+          "color": "orange",
+          "index": 1
+         },
+         "2": {
+          "text": "Operational",
+          "color": "green",
+          "index": 2
+         }
+        }
+       }
+      ],
+      "noValue": "No data"
+     },
+     "overrides": []
+    }
+   },
+   {
+    "id": 4,
+    "type": "status-history",
+    "title": "Daily availability",
+    "description": "Share of readiness probes that succeeded each UTC day. Green is 99.9% or better, orange 90% or better, red below.",
+    "gridPos": {
+     "x": 6,
+     "y": 5,
+     "w": 18,
+     "h": 6
+    },
+    "interval": "1d",
+    "maxDataPoints": 16,
+    "datasource": {
+     "type": "prometheus",
+     "uid": "grafanacloud-prom"
+    },
+    "targets": [
+     {
+      "refId": "A",
+      "datasource": {
+       "type": "prometheus",
+       "uid": "grafanacloud-prom"
+      },
+      "interval": "1d",
+      "legendFormat": "{{system}}",
+      "expr": "avg by (system) (avg_over_time(probe_success{kind=\"readiness\", environment=\"$env\"}[1d] offset -1d))"
+     }
+    ],
+    "options": {
+     "showValue": "never",
+     "rowHeight": 0.8,
+     "colWidth": 0.85,
+     "legend": {
+      "displayMode": "list",
+      "placement": "bottom",
+      "showLegend": false
+     },
+     "tooltip": {
+      "mode": "single"
+     }
+    },
+    "fieldConfig": {
+     "defaults": {
+      "unit": "percentunit",
+      "decimals": 1,
+      "color": {
+       "mode": "thresholds"
+      },
+      "thresholds": {
+       "mode": "absolute",
+       "steps": [
+        {
+         "color": "red",
+         "value": null
+        },
+        {
+         "color": "orange",
+         "value": 0.9
+        },
+        {
+         "color": "green",
+         "value": 0.999
+        }
+       ]
+      }
+     },
+     "overrides": []
+    }
+   },
+   {
+    "id": 5,
+    "type": "row",
+    "title": "Workers",
+    "collapsed": false,
+    "panels": [],
+    "gridPos": {
+     "x": 0,
+     "y": 11,
+     "w": 24,
+     "h": 1
+    }
+   },
+   {
+    "id": 6,
+    "type": "stat",
+    "title": "Now",
+    "description": "Operational when the worker loop reported an iteration in the last 5 minutes; the poll period is 10 seconds.",
+    "gridPos": {
+     "x": 0,
+     "y": 12,
+     "w": 6,
+     "h": 6
+    },
+    "datasource": {
+     "type": "prometheus",
+     "uid": "grafanacloud-prom"
+    },
+    "targets": [
+     {
+      "refId": "A",
+      "datasource": {
+       "type": "prometheus",
+       "uid": "grafanacloud-prom"
+      },
+      "instant": true,
+      "range": false,
+      "legendFormat": "{{service}}",
+      "expr": "2 * (time() - max by (service) (lucuma_worker_last_iteration_epoch_seconds{deployment_environment_name=\"$env\"}) < bool 300)"
+     }
+    ],
+    "options": {
+     "reduceOptions": {
+      "calcs": [
+       "lastNotNull"
+      ],
+      "fields": "",
+      "values": false
+     },
+     "orientation": "horizontal",
+     "textMode": "value_and_name",
+     "colorMode": "value",
+     "graphMode": "none",
+     "justifyMode": "auto"
+    },
+    "fieldConfig": {
+     "defaults": {
+      "mappings": [
+       {
+        "type": "value",
+        "options": {
+         "0": {
+          "text": "Offline",
+          "color": "red",
+          "index": 0
+         },
+         "1": {
+          "text": "Degraded",
+          "color": "orange",
+          "index": 1
+         },
+         "2": {
+          "text": "Operational",
+          "color": "green",
+          "index": 2
+         }
+        }
+       }
+      ],
+      "noValue": "No data"
+     },
+     "overrides": []
+    }
+   },
+   {
+    "id": 7,
+    "type": "status-history",
+    "title": "Daily availability",
+    "description": "Share of each UTC day, sampled every 5 minutes, in which the worker loop had reported within the last 5 minutes.",
+    "gridPos": {
+     "x": 6,
+     "y": 12,
+     "w": 18,
+     "h": 6
+    },
+    "interval": "1d",
+    "maxDataPoints": 16,
+    "datasource": {
+     "type": "prometheus",
+     "uid": "grafanacloud-prom"
+    },
+    "targets": [
+     {
+      "refId": "A",
+      "datasource": {
+       "type": "prometheus",
+       "uid": "grafanacloud-prom"
+      },
+      "interval": "1d",
+      "legendFormat": "{{service}}",
+      "expr": "avg_over_time((time() - max by (service) (lucuma_worker_last_iteration_epoch_seconds{deployment_environment_name=\"$env\"}) < bool 300)[1d:5m] offset -1d)"
+     }
+    ],
+    "options": {
+     "showValue": "never",
+     "rowHeight": 0.8,
+     "colWidth": 0.85,
+     "legend": {
+      "displayMode": "list",
+      "placement": "bottom",
+      "showLegend": false
+     },
+     "tooltip": {
+      "mode": "single"
+     }
+    },
+    "fieldConfig": {
+     "defaults": {
+      "unit": "percentunit",
+      "decimals": 1,
+      "color": {
+       "mode": "thresholds"
+      },
+      "thresholds": {
+       "mode": "absolute",
+       "steps": [
+        {
+         "color": "red",
+         "value": null
+        },
+        {
+         "color": "orange",
+         "value": 0.9
+        },
+        {
+         "color": "green",
+         "value": 0.999
+        }
+       ]
+      }
+     },
+     "overrides": []
+    }
+   },
+   {
+    "id": 8,
+    "type": "row",
+    "title": "Database",
+    "collapsed": false,
+    "panels": [],
+    "gridPos": {
+     "x": 0,
+     "y": 18,
+     "w": 24,
+     "h": 1
+    }
+   },
+   {
+    "id": 9,
+    "type": "stat",
+    "title": "Now",
+    "description": "Degraded when open connections exceed 80% of the usable limit.",
+    "gridPos": {
+     "x": 0,
+     "y": 19,
+     "w": 6,
+     "h": 3
+    },
+    "datasource": {
+     "type": "prometheus",
+     "uid": "grafanacloud-prom"
+    },
+    "targets": [
+     {
+      "refId": "A",
+      "datasource": {
+       "type": "prometheus",
+       "uid": "grafanacloud-prom"
+      },
+      "instant": true,
+      "range": false,
+      "legendFormat": "connections",
+      "expr": "2 - (sum(max by (application_name) (lucuma_db_connections_used{deployment_environment_name=\"$env\"})) / max(lucuma_db_connections_max{deployment_environment_name=\"$env\"}) > bool 0.8)"
+     }
+    ],
+    "options": {
+     "reduceOptions": {
+      "calcs": [
+       "lastNotNull"
+      ],
+      "fields": "",
+      "values": false
+     },
+     "orientation": "horizontal",
+     "textMode": "value_and_name",
+     "colorMode": "value",
+     "graphMode": "none",
+     "justifyMode": "auto"
+    },
+    "fieldConfig": {
+     "defaults": {
+      "mappings": [
+       {
+        "type": "value",
+        "options": {
+         "0": {
+          "text": "Offline",
+          "color": "red",
+          "index": 0
+         },
+         "1": {
+          "text": "Degraded",
+          "color": "orange",
+          "index": 1
+         },
+         "2": {
+          "text": "Operational",
+          "color": "green",
+          "index": 2
+         }
+        }
+       }
+      ],
+      "noValue": "No data"
+     },
+     "overrides": []
+    }
+   },
+   {
+    "id": 10,
+    "type": "status-history",
+    "title": "Daily headroom",
+    "description": "Share of each UTC day, sampled every 5 minutes, in which open connections stayed under 80% of the usable limit.",
+    "gridPos": {
+     "x": 6,
+     "y": 19,
+     "w": 18,
+     "h": 3
+    },
+    "interval": "1d",
+    "maxDataPoints": 16,
+    "datasource": {
+     "type": "prometheus",
+     "uid": "grafanacloud-prom"
+    },
+    "targets": [
+     {
+      "refId": "A",
+      "datasource": {
+       "type": "prometheus",
+       "uid": "grafanacloud-prom"
+      },
+      "interval": "1d",
+      "legendFormat": "connections",
+      "expr": "avg_over_time((sum(max by (application_name) (lucuma_db_connections_used{deployment_environment_name=\"$env\"})) / max(lucuma_db_connections_max{deployment_environment_name=\"$env\"}) < bool 0.8)[1d:5m] offset -1d)"
+     }
+    ],
+    "options": {
+     "showValue": "never",
+     "rowHeight": 0.8,
+     "colWidth": 0.85,
+     "legend": {
+      "displayMode": "list",
+      "placement": "bottom",
+      "showLegend": false
+     },
+     "tooltip": {
+      "mode": "single"
+     }
+    },
+    "fieldConfig": {
+     "defaults": {
+      "unit": "percentunit",
+      "decimals": 1,
+      "color": {
+       "mode": "thresholds"
+      },
+      "thresholds": {
+       "mode": "absolute",
+       "steps": [
+        {
+         "color": "red",
+         "value": null
+        },
+        {
+         "color": "orange",
+         "value": 0.9
+        },
+        {
+         "color": "green",
+         "value": 0.999
+        }
+       ]
+      }
+     },
+     "overrides": []
+    }
+   }
+  ]
+ }
+}

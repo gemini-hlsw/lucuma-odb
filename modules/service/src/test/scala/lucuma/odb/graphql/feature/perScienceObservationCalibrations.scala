@@ -19,6 +19,7 @@ import lucuma.catalog.telluric.TelluricTargetsClient
 import lucuma.core.enums.Band
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.Flamingos2Fpu
+import lucuma.core.enums.GeminiCallForProposalsType.DemoScience
 import lucuma.core.enums.GnirsFpuOther
 import lucuma.core.enums.GnirsFpuSlit
 import lucuma.core.enums.GnirsGrating
@@ -27,6 +28,7 @@ import lucuma.core.enums.GnirsPrism
 import lucuma.core.enums.GnirsWellDepth
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.enums.ProposalStatus
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.TargetDisposition
@@ -45,6 +47,7 @@ import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.model.Semester
 import lucuma.core.model.SiderealTracking
 import lucuma.core.model.SourceProfile
 import lucuma.core.model.SpectralDefinition
@@ -4154,6 +4157,31 @@ class perScienceObservationCalibrations
     yield
       assert(missing.exists(_.contains("target")), missing.toString)
       assertEquals(complete, Nil)
+
+  test("a user-defined telluric needs no configuration request"):
+    for
+      pid      <- createProgramWithUsPi(pi)
+      cid      <- createGeminiCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A"))
+      _        <- addDemoScienceProposal(pi, pid, cid)
+      tid      <- createTargetWithProfileAs(pi, pid)
+      oid      <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _        <- setUserDefinedTellurics(oid, 1)
+      _        <- runObscalcUpdate(pid, oid)
+      _        <- recalculateCalibrations(pid, when, oid)
+      tel      <- groupTellurics(oid).map(_.head)
+      standard <- createTargetWithProfileAs(pi, pid)
+      _        <- editAsterismAs(pi, tel, List(standard), Nil)
+      _        <- setProposalStatusDirectly(pid, ProposalStatus.Submitted)
+      _        <- setProposalStatusDirectly(pid, ProposalStatus.Accepted)
+      _        <- runObscalcUpdate(pid, oid)
+      _        <- runObscalcUpdate(pid, tel)
+      science  <- queryValidationMessages(oid)
+      telluric <- queryValidationMessages(tel)
+      state    <- queryObservationWorkflowState(pi, tel)
+    yield
+      assert(science.exists(_.toLowerCase.contains("configuration")), science.toString)
+      assertEquals(telluric, Nil)
+      assertEquals(state, ObservationWorkflowState.Defined)
 
   test("a converted user-defined telluric accepts PI edits"):
     for

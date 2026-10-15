@@ -1,0 +1,569 @@
+{
+ "apiVersion": "dashboard.grafana.app/v1beta1",
+ "kind": "Dashboard",
+ "metadata": {
+  "name": "lucuma-status",
+  "namespace": "stacks-1577729",
+  "annotations": {
+   "grafana.app/folder": "lucuma-health"
+  }
+ },
+ "spec": {
+  "title": "GPP Service Status",
+  "uid": "lucuma-status",
+  "tags": [
+   "lucuma",
+   "health",
+   "status"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "editable": false,
+  "graphTooltip": 1,
+  "time": {
+   "from": "now-7d",
+   "to": "now"
+  },
+  "refresh": "15m",
+  "timepicker": {
+   "refresh_intervals": [
+    "15m",
+    "1h"
+   ]
+  },
+  "description": "Public status of the GPP services: ODB, SSO and ITC readiness as probed by Grafana Synthetic Monitoring.",
+  "links": [
+   {
+    "title": "What the checks mean",
+    "type": "link",
+    "url": "https://github.com/gemini-hlsw/lucuma-odb/blob/main/ODB-README.md#health-endpoints",
+    "targetBlank": true
+   }
+  ],
+  "templating": {
+   "list": [
+    {
+     "name": "env",
+     "type": "constant",
+     "hide": 2,
+     "query": "dev"
+    }
+   ]
+  },
+  "annotations": {
+   "list": []
+  },
+  "panels": [
+   {
+    "id": 1,
+    "type": "stat",
+    "title": "Readiness now",
+    "description": "Latest readiness probe result per service. UP means every probe got HTTP 200 and status ok within the last 40 minutes.",
+    "gridPos": {
+     "x": 0,
+     "y": 0,
+     "w": 16,
+     "h": 6
+    },
+    "datasource": {
+     "type": "prometheus",
+     "uid": "grafanacloud-prom"
+    },
+    "targets": [
+     {
+      "refId": "A",
+      "datasource": {
+       "type": "prometheus",
+       "uid": "grafanacloud-prom"
+      },
+      "expr": "max by (system) (last_over_time(probe_success{kind=\"readiness\", environment=\"$env\"}[40m]))",
+      "legendFormat": "{{system}}",
+      "instant": true,
+      "range": false
+     }
+    ],
+    "options": {
+     "reduceOptions": {
+      "calcs": [
+       "lastNotNull"
+      ],
+      "fields": "",
+      "values": false
+     },
+     "orientation": "auto",
+     "textMode": "value_and_name",
+     "colorMode": "background",
+     "graphMode": "none",
+     "justifyMode": "center"
+    },
+    "fieldConfig": {
+     "defaults": {
+      "mappings": [
+       {
+        "type": "value",
+        "options": {
+         "0": {
+          "text": "DOWN",
+          "color": "red",
+          "index": 0
+         },
+         "1": {
+          "text": "UP",
+          "color": "green",
+          "index": 1
+         }
+        }
+       }
+      ],
+      "thresholds": {
+       "mode": "absolute",
+       "steps": [
+        {
+         "color": "red",
+         "value": null
+        },
+        {
+         "color": "green",
+         "value": 1
+        }
+       ]
+      },
+      "noValue": "NO DATA"
+     },
+     "overrides": []
+    }
+   },
+   {
+    "id": 2,
+    "type": "stat",
+    "title": "Uptime over the selected range",
+    "description": "Share of readiness probes that succeeded in the dashboard time range.",
+    "gridPos": {
+     "x": 16,
+     "y": 0,
+     "w": 8,
+     "h": 6
+    },
+    "datasource": {
+     "type": "prometheus",
+     "uid": "grafanacloud-prom"
+    },
+    "targets": [
+     {
+      "refId": "A",
+      "datasource": {
+       "type": "prometheus",
+       "uid": "grafanacloud-prom"
+      },
+      "expr": "avg by (system) (avg_over_time(probe_success{kind=\"readiness\", environment=\"$env\"}[$__range]))",
+      "legendFormat": "{{system}}",
+      "instant": true,
+      "range": false
+     }
+    ],
+    "options": {
+     "reduceOptions": {
+      "calcs": [
+       "lastNotNull"
+      ],
+      "fields": "",
+      "values": false
+     },
+     "orientation": "auto",
+     "textMode": "value_and_name",
+     "colorMode": "value",
+     "graphMode": "none",
+     "justifyMode": "center"
+    },
+    "fieldConfig": {
+     "defaults": {
+      "unit": "percentunit",
+      "decimals": 2,
+      "min": 0,
+      "max": 1,
+      "thresholds": {
+       "mode": "absolute",
+       "steps": [
+        {
+         "color": "red",
+         "value": null
+        },
+        {
+         "color": "orange",
+         "value": 0.99
+        },
+        {
+         "color": "green",
+         "value": 0.999
+        }
+       ]
+      }
+     },
+     "overrides": []
+    }
+   },
+   {
+    "id": 3,
+    "type": "state-timeline",
+    "title": "Readiness history",
+    "description": "Each probe sample. Gaps are the 15 minute probe spacing, not outages.",
+    "gridPos": {
+     "x": 0,
+     "y": 6,
+     "w": 24,
+     "h": 7
+    },
+    "datasource": {
+     "type": "prometheus",
+     "uid": "grafanacloud-prom"
+    },
+    "targets": [
+     {
+      "refId": "A",
+      "datasource": {
+       "type": "prometheus",
+       "uid": "grafanacloud-prom"
+      },
+      "expr": "max by (system) (probe_success{kind=\"readiness\", environment=\"$env\"})",
+      "legendFormat": "{{system}}"
+     }
+    ],
+    "options": {
+     "mergeValues": true,
+     "showValue": "never",
+     "alignValue": "center",
+     "rowHeight": 0.8,
+     "legend": {
+      "displayMode": "list",
+      "placement": "bottom",
+      "showLegend": false
+     },
+     "tooltip": {
+      "mode": "single"
+     }
+    },
+    "fieldConfig": {
+     "defaults": {
+      "mappings": [
+       {
+        "type": "value",
+        "options": {
+         "0": {
+          "text": "DOWN",
+          "color": "red",
+          "index": 0
+         },
+         "1": {
+          "text": "UP",
+          "color": "green",
+          "index": 1
+         }
+        }
+       }
+      ],
+      "color": {
+       "mode": "thresholds"
+      },
+      "thresholds": {
+       "mode": "absolute",
+       "steps": [
+        {
+         "color": "red",
+         "value": null
+        },
+        {
+         "color": "green",
+         "value": 1
+        }
+       ]
+      }
+     },
+     "overrides": []
+    }
+   },
+   {
+    "id": 4,
+    "type": "timeseries",
+    "title": "Readiness response time",
+    "description": "Time for GET /health/ready as seen from the probes, averaged across probes. Includes the dependency checks on a cache miss.",
+    "gridPos": {
+     "x": 0,
+     "y": 19,
+     "w": 24,
+     "h": 8
+    },
+    "datasource": {
+     "type": "prometheus",
+     "uid": "grafanacloud-prom"
+    },
+    "targets": [
+     {
+      "refId": "A",
+      "datasource": {
+       "type": "prometheus",
+       "uid": "grafanacloud-prom"
+      },
+      "expr": "avg by (system) (probe_duration_seconds{kind=\"readiness\", environment=\"$env\"})",
+      "legendFormat": "{{system}}"
+     }
+    ],
+    "options": {
+     "legend": {
+      "displayMode": "list",
+      "placement": "bottom",
+      "showLegend": true
+     },
+     "tooltip": {
+      "mode": "multi",
+      "sort": "desc"
+     }
+    },
+    "fieldConfig": {
+     "defaults": {
+      "unit": "s",
+      "decimals": 2,
+      "min": 0,
+      "custom": {
+       "lineWidth": 1,
+       "fillOpacity": 10,
+       "showPoints": "auto",
+       "spanNulls": 3600000
+      }
+     },
+     "overrides": []
+    }
+   },
+   {
+    "id": 6,
+    "type": "stat",
+    "title": "Worker dynos",
+    "description": "Background workers with no HTTP. ALIVE when the loop reported an iteration in the last 5 minutes; the poll period is 10 seconds.",
+    "gridPos": {
+     "x": 0,
+     "y": 13,
+     "w": 12,
+     "h": 6
+    },
+    "datasource": {
+     "type": "prometheus",
+     "uid": "grafanacloud-prom"
+    },
+    "targets": [
+     {
+      "refId": "A",
+      "datasource": {
+       "type": "prometheus",
+       "uid": "grafanacloud-prom"
+      },
+      "instant": true,
+      "range": false,
+      "legendFormat": "{{service}}",
+      "expr": "clamp_max(floor((time() - max by (service) (lucuma_worker_last_iteration_epoch_seconds{deployment_environment_name=\"$env\"})) / 300), 1)"
+     }
+    ],
+    "options": {
+     "reduceOptions": {
+      "calcs": [
+       "lastNotNull"
+      ],
+      "fields": "",
+      "values": false
+     },
+     "orientation": "auto",
+     "textMode": "value_and_name",
+     "colorMode": "background",
+     "graphMode": "none",
+     "justifyMode": "center"
+    },
+    "fieldConfig": {
+     "defaults": {
+      "mappings": [
+       {
+        "type": "value",
+        "options": {
+         "0": {
+          "text": "ALIVE",
+          "color": "green",
+          "index": 0
+         },
+         "1": {
+          "text": "STALE",
+          "color": "red",
+          "index": 1
+         }
+        }
+       }
+      ],
+      "thresholds": {
+       "mode": "absolute",
+       "steps": [
+        {
+         "color": "green",
+         "value": null
+        },
+        {
+         "color": "red",
+         "value": 1
+        }
+       ]
+      },
+      "noValue": "NO DATA"
+     },
+     "overrides": []
+    }
+   },
+   {
+    "id": 7,
+    "type": "timeseries",
+    "title": "Seconds since last worker iteration",
+    "description": "Staleness of each worker loop. Flat near the poll period is healthy; a rising line means the loop stopped.",
+    "gridPos": {
+     "x": 12,
+     "y": 13,
+     "w": 12,
+     "h": 6
+    },
+    "datasource": {
+     "type": "prometheus",
+     "uid": "grafanacloud-prom"
+    },
+    "targets": [
+     {
+      "refId": "A",
+      "datasource": {
+       "type": "prometheus",
+       "uid": "grafanacloud-prom"
+      },
+      "legendFormat": "{{service}}",
+      "expr": "time() - max by (service) (lucuma_worker_last_iteration_epoch_seconds{deployment_environment_name=\"$env\"})"
+     }
+    ],
+    "options": {
+     "legend": {
+      "displayMode": "list",
+      "placement": "bottom",
+      "showLegend": true
+     },
+     "tooltip": {
+      "mode": "multi",
+      "sort": "desc"
+     }
+    },
+    "fieldConfig": {
+     "defaults": {
+      "unit": "s",
+      "decimals": 0,
+      "min": 0,
+      "custom": {
+       "lineWidth": 1,
+       "fillOpacity": 10,
+       "showPoints": "never"
+      }
+     },
+     "overrides": []
+    }
+   },
+   {
+    "id": 8,
+    "type": "timeseries",
+    "title": "Database connections",
+    "description": "Open client connections by application_name, stacked, against the usable limit, max_connections less reserved slots (dashed). Sampled every minute by the odb web dyno.",
+    "gridPos": {
+     "x": 0,
+     "y": 27,
+     "w": 24,
+     "h": 8
+    },
+    "datasource": {
+     "type": "prometheus",
+     "uid": "grafanacloud-prom"
+    },
+    "targets": [
+     {
+      "refId": "A",
+      "datasource": {
+       "type": "prometheus",
+       "uid": "grafanacloud-prom"
+      },
+      "legendFormat": "{{application_name}}",
+      "expr": "max by (application_name) (lucuma_db_connections_used{deployment_environment_name=\"$env\"})"
+     },
+     {
+      "refId": "B",
+      "datasource": {
+       "type": "prometheus",
+       "uid": "grafanacloud-prom"
+      },
+      "legendFormat": "usable limit",
+      "expr": "max(lucuma_db_connections_max{deployment_environment_name=\"$env\"})"
+     }
+    ],
+    "options": {
+     "legend": {
+      "displayMode": "list",
+      "placement": "bottom",
+      "showLegend": true
+     },
+     "tooltip": {
+      "mode": "multi",
+      "sort": "desc"
+     }
+    },
+    "fieldConfig": {
+     "defaults": {
+      "unit": "short",
+      "decimals": 0,
+      "min": 0,
+      "custom": {
+       "lineWidth": 1,
+       "fillOpacity": 30,
+       "showPoints": "never",
+       "stacking": {
+        "mode": "normal",
+        "group": "A"
+       }
+      }
+     },
+     "overrides": [
+      {
+       "matcher": {
+        "id": "byFrameRefID",
+        "options": "B"
+       },
+       "properties": [
+        {
+         "id": "custom.stacking",
+         "value": {
+          "mode": "none",
+          "group": "A"
+         }
+        },
+        {
+         "id": "custom.fillOpacity",
+         "value": 0
+        },
+        {
+         "id": "custom.lineStyle",
+         "value": {
+          "fill": "dash",
+          "dash": [
+           10,
+           10
+          ]
+         }
+        },
+        {
+         "id": "color",
+         "value": {
+          "mode": "fixed",
+          "fixedColor": "red"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   }
+  ]
+ }
+}
