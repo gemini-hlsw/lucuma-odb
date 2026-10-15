@@ -9,6 +9,7 @@ import lucuma.core.enums.GnirsAcquisitionType
 import lucuma.core.enums.GnirsCamera
 import lucuma.core.enums.GnirsFilter
 import lucuma.core.enums.GnirsPixelScale
+import lucuma.core.enums.GnirsReadMode
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
@@ -16,7 +17,8 @@ import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 
 // Definitions that are shared across GNIRS modes.
-val MinAcquisitionExposureTime: TimeSpan = 100.msTimeSpan  // 0.1 s; actually determined by the read mode, but this is a reasonable lower bound for all modes.
+// The shortest exposure GNIRS allows is the VeryBright minimum exposure time.
+val MinAcquisitionExposureTime: TimeSpan = GnirsReadMode.VeryBright.minimumExposureTime
 val MaxAcquisitionExposureTime: TimeSpan = 60.secondTimeSpan
 
 // The fixed, single-coadd exposure time for the initial "keyhole"/field image of an
