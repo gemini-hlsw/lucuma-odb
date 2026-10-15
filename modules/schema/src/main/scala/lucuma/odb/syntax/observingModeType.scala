@@ -24,7 +24,6 @@ trait ToObservingModeTypeOps:
         case f: FacilityObservingModeType => f.instrument.some
         case v: VisitorObservingModeType  => v.instrument.some
         case _: ExchangeObservingModeType => none
-        // A daytime calibration's instrument is a parameter of its config, not of the type.
         case _: DayCalObservingModeType   => none
 
 object observingModeType extends ToObservingModeTypeOps

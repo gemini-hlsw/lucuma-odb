@@ -14,9 +14,9 @@ import lucuma.odb.sequence.flamingos2
 import lucuma.odb.sequence.gmos.InitialConfigs
 
 /**
- * Static configurations for daytime calibrations.  The usual defaults are
- * derived from the observing mode's parameters or the asterism, neither of
- * which a daytime calibration has, so each instrument gets a fixed constant.
+ * Static configurations for daytime calibrations.
+ * TODO: Review these are ok with science
+ * TODO: GHOST is pending, so not included here yet.
  */
 object StaticConfigs:
 

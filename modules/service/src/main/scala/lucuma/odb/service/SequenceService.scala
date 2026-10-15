@@ -728,8 +728,7 @@ object SequenceService:
             case _           =>
               ResultT.unit
 
-        // Daytime calibrations: science only, every step a day calibration, and
-        // never guided, since the dome is closed.
+        // Daytime calibrations: science only, every step a day calibration, and never guided.
         val checkDaytime: ResultT[F, List[ProtoAtom[ProtoStep[D]]]] =
           ResultT.liftF(selectDaytimeCalibration(observationId)).flatMap:
             case None    => ResultT.pure(sequence)
@@ -775,8 +774,7 @@ object SequenceService:
       ): F[Option[Instrument]] =
         session.option(Statements.SelectDaytimeCalibration)(observationId).map(_.flatten)
 
-      // Daytime calibrations have a fixed static config; the usual defaults derive
-      // it from mode parameters or the asterism, which they lack.
+      // Daytime calibrations have a fixed static config.
       private def staticFor[S](
         observationId: Observation.Id,
         instrument:    Instrument,

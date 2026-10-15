@@ -549,8 +549,7 @@ object ObservationService {
           } yield r).value.map(_.flatten)
         }
 
-      // A daytime calibration's instrument and kind are fixed once it has a stored
-      // sequence: the steps belong to that instrument and carry its invariant.
+      // A daytime calibration's instrument and kind are fixed once it has a stored sequence.
       private def checkDaytimeCalibrationModeChange(
         existing: Map[Option[ObservingModeType], List[Observation.Id]],
         oEdit:    Option[ObservingModeInput.Edit]
@@ -1499,7 +1498,6 @@ object ObservationService {
          void"SET " |+|
             sql"c_observing_mode_type = ${observing_mode_type.opt}"(newMode) |+| void", " |+|
             sql"c_instrument = ${instrument.opt}"(newInstrument) |+| void", " |+|
-            // The daytime calibration role follows the mode; other roles are untouched.
             sql"c_calibration_role = CASE WHEN $bool THEN 'daytime_calibration'::e_calibration_role WHEN c_calibration_role = 'daytime_calibration' THEN NULL ELSE c_calibration_role END"(daytime) |+| void" " |+|
        void"WHERE c_observation_id IN (" |+| which.map(sql"${observation_id}").intercalate(void", ") |+| void")"
 

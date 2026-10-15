@@ -57,9 +57,6 @@ import java.util.UUID
  */
 sealed trait GeneratorStreaming[F[_]]:
 
-  // Daytime calibrations: the stored sequence is read when present, otherwise
-  // the config is empty.  Calibration Sets will generate it in a later phase.
-
   def selectDaytimeFlamingos2(
     context: GeneratorContext
   )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, Flamingos2Static, Flamingos2Dynamic]]]

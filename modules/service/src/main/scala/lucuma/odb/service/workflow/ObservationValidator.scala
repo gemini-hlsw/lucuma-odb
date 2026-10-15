@@ -61,7 +61,6 @@ object ObservationValidator:
     val engValidator: ObservationValidator = _ =>
       ObservationValidationMap.empty
 
-    // A daytime calibration has no band; it only needs a sequence.
     val calibrationValidator: ObservationValidator = info =>
       if info.isDaytimeCalibration then DaytimeCalibrationValidator(info)
       else BandValidator(info)

@@ -30,8 +30,6 @@ trait ObservingModeMapping[F[_]]
     ObjectMapping(ObservingModeType)(
       SqlField("synthetic_id", ObservationView.ObservingMode.SyntheticId, key = true, hidden = true),
 
-      // Read from the observation rather than derived from the mode type, which
-      // cannot name a daytime calibration's instrument.
       SqlField("instrument", ObservationView.Instrument),
       SqlField("mode", ObservationView.ObservingMode.ObservingModeType),
 

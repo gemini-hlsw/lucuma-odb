@@ -9,9 +9,7 @@ import lucuma.core.enums.Instrument
 import lucuma.odb.sequence.util.HashBytes
 
 /**
- * Configuration for a daytime calibration: a staff-created calibration with
- * no target, ITC, guide star or acquisition.  The mode's only parameter is the
- * instrument.
+ * Configuration for a daytime calibration.  The mode's only parameter is the instrument.
  */
 final case class Config(
   instrument: Instrument
@@ -21,8 +19,9 @@ final case class Config(
 
 object Config:
 
-  /** Instruments a daytime calibration may use.  GHOST is pending: its static
-   *  config needs an IFU target mapping.
+  /** Instruments a daytime calibration may use.
+   *  GHOST is pending.
+   *  This could belong to lucuma-core
    */
   val AllowedInstruments: Set[Instrument] =
     Set(

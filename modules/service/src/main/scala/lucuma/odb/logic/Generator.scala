@@ -408,8 +408,6 @@ object Generator:
             case ObservingModeType.Igrins2LongSlit    =>
               EitherT(streaming.selectOrGenerateIgrins2LongSlit(ctx)).flatMap(digest(_, calculator.igrins2LongSlitSetup))
             case _: DayCalObservingModeType           =>
-              // The stored sequence is digested, with no setup.  An empty
-              // sequence folds to Completed, which must not read as done before steps exist.
               val noSetup = SetupTimeEstimateCalculator.Zero
               val d = daytimeInstrument(ctx) match
                 case Instrument.Flamingos2 => EitherT(streaming.selectDaytimeFlamingos2(ctx)).flatMap(digest(_, noSetup))

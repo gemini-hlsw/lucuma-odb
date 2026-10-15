@@ -39,7 +39,7 @@ trait SetupTimeEstimateCalculator:
 
 object SetupTimeEstimateCalculator:
 
-  /** No setup at all, for calibrations taken with the dome closed. */
+  /** No setup at all, for day calibrations closed dome. */
   val Zero: SetupTimeEstimateCalculator =
     new SetupTimeEstimateCalculator:
       override def estimateSetupTime: SetupTime =

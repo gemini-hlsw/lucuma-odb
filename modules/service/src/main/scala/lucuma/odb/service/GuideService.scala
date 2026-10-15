@@ -453,8 +453,7 @@ object GuideService {
     val (site: Site, observingModeType: ObservingModeType, agsWavelength: Wavelength) =
       params.observingMode match
         case c: daytimecal.Config                             =>
-          // Daytime calibrations are taken with the dome closed; AGS is skipped
-          // by their calibration role and these values are never used.
+          // Daytime calibrations are taken with the dome closed, AGS is skipped
           (c.instrument.site, ObservingModeType.DaytimeCalibration, Wavelength.Min)
         case c: exchange.Config                               =>
           // Exchange observations are not supported by AGS.  No guide probe is
