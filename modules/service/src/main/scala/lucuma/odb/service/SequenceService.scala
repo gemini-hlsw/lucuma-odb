@@ -16,6 +16,7 @@ import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
+import cats.syntax.traverse.*
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Pipe
 import fs2.Pure
@@ -28,6 +29,8 @@ import lucuma.core.enums.CloneSequenceMode
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
+import lucuma.core.enums.SmartGcalType
+import lucuma.core.enums.StepGuideState
 import lucuma.core.enums.StepType
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Atom
@@ -49,18 +52,24 @@ import lucuma.core.model.sequence.gnirs.GnirsDynamicConfig
 import lucuma.core.model.sequence.gnirs.GnirsStaticConfig
 import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig
 import lucuma.core.model.sequence.igrins2.Igrins2StaticConfig
+import lucuma.core.util.Enumerated
 import lucuma.core.util.TimeSpan
+import lucuma.core.util.Uid
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.mapping.AccessControl.CheckedWithId
 import lucuma.odb.logic.Generator.SequenceAtomLimit
+import lucuma.odb.logic.SmartGcalImplementation
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
+import lucuma.odb.sequence.SmartGcalExpander
 import lucuma.odb.sequence.StepTimeEstimateCalculator
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.StreamingExecutionConfig
 import lucuma.odb.sequence.data.UnsplittableAtom
+import lucuma.odb.sequence.gcalClass
 import lucuma.odb.sequence.util.AtomBuilder
+import lucuma.odb.sequence.util.StepInsertion
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Flamingos2Codecs.*
 import lucuma.odb.util.GhostCodecs.*
@@ -207,22 +216,26 @@ trait SequenceService[F[_]]:
 
   def materializeFlamingos2ExecutionConfig(
     observationId: Observation.Id,
-    stream:        StreamingExecutionConfig[F, Flamingos2StaticConfig, Flamingos2DynamicConfig]
+    stream:        StreamingExecutionConfig[F, Flamingos2StaticConfig, Flamingos2DynamicConfig],
+    sequenceTypes: Set[SequenceType] = Enumerated[SequenceType].all.toSet
   )(using Transaction[F], Services.ServiceAccess): F[Unit]
 
   def materializeGhostExecutionConfig(
     observationId: Observation.Id,
-    stream:        StreamingExecutionConfig[F, GhostStaticConfig, GhostDynamicConfig]
+    stream:        StreamingExecutionConfig[F, GhostStaticConfig, GhostDynamicConfig],
+    sequenceTypes: Set[SequenceType] = Enumerated[SequenceType].all.toSet
   )(using Transaction[F], Services.ServiceAccess): F[Unit]
 
   def materializeGmosNorthExecutionConfig(
     observationId: Observation.Id,
-    stream:        StreamingExecutionConfig[F, GmosNorthStatic, GmosNorth]
+    stream:        StreamingExecutionConfig[F, GmosNorthStatic, GmosNorth],
+    sequenceTypes: Set[SequenceType] = Enumerated[SequenceType].all.toSet
   )(using Transaction[F], Services.ServiceAccess): F[Unit]
 
   def materializeGmosSouthExecutionConfig(
     observationId: Observation.Id,
-    stream:        StreamingExecutionConfig[F, GmosSouthStatic, GmosSouth]
+    stream:        StreamingExecutionConfig[F, GmosSouthStatic, GmosSouth],
+    sequenceTypes: Set[SequenceType] = Enumerated[SequenceType].all.toSet
   )(using Transaction[F], Services.ServiceAccess): F[Unit]
 
   def selectFlamingos2Sequence(
@@ -270,7 +283,8 @@ trait SequenceService[F[_]]:
 
   def materializeIgrins2ExecutionConfig(
     observationId: Observation.Id,
-    stream:        StreamingExecutionConfig[F, Igrins2StaticConfig, Igrins2DynamicConfig]
+    stream:        StreamingExecutionConfig[F, Igrins2StaticConfig, Igrins2DynamicConfig],
+    sequenceTypes: Set[SequenceType] = Enumerated[SequenceType].all.toSet
   )(using Transaction[F], Services.ServiceAccess): F[Unit]
 
   def selectIgrins2Sequence(
@@ -300,7 +314,8 @@ trait SequenceService[F[_]]:
 
   def materializeGnirsExecutionConfig(
     observationId: Observation.Id,
-    stream:        StreamingExecutionConfig[F, GnirsStaticConfig, GnirsDynamicConfig]
+    stream:        StreamingExecutionConfig[F, GnirsStaticConfig, GnirsDynamicConfig],
+    sequenceTypes: Set[SequenceType] = Enumerated[SequenceType].all.toSet
   )(using Transaction[F], Services.ServiceAccess): F[Unit]
 
   def selectGnirsSequence(
@@ -336,6 +351,26 @@ trait SequenceService[F[_]]:
     mode:          CloneSequenceMode,
     sequenceTypes: List[SequenceType]
   )(using Transaction[F]): F[Result[Unit]]
+
+  /**
+   * Inserts the GCAL steps that the given smart GCAL types expand to into a
+   * materialized sequence, immediately after `afterStepId` or, if not
+   * specified, as the next steps to execute.  The smart GCAL lookup is based
+   * on the instrument configuration of `referenceStepId`, which defaults to
+   * the most recently executed step (or the first step if nothing has been
+   * executed).  The types are expanded in the order given, and a repeated type
+   * is expanded again for each occurrence.  See `StepInsertion` for the atom
+   * in which they are placed.  The sequence is marked as customized.
+   *
+   * @return ids of the inserted steps, in sequence order
+   */
+  def insertSmartGcal(
+    observationId:   Observation.Id,
+    sequenceType:    SequenceType,
+    smartGcalTypes:  NonEmptyList[SmartGcalType],
+    referenceStepId: Option[Step.Id],
+    afterStepId:     Option[Step.Id]
+  )(using Transaction[F]): F[Result[NonEmptyList[Step.Id]]]
 
 object SequenceService:
 
@@ -995,6 +1030,7 @@ object SequenceService:
       private def materializeExecutionConfig[S, D](
         observationId: Observation.Id,
         stream:        StreamingExecutionConfig[F, S, D],
+        sequenceTypes: Set[SequenceType],
         insertStatic:  (Observation.Id, S) => F[Option[Long]]
       )(
         insertSequence: (Observation.Id, SequenceType, Stream[F, Atom[D]]) => F[Unit]
@@ -1004,7 +1040,7 @@ object SequenceService:
           markMaterializedOrDoNothing(observationId, sequenceType).ifM(
             insertSequence(observationId, sequenceType, s),
             Applicative[F].unit
-          )
+          ).whenA(sequenceTypes.contains(sequenceType))
 
         insertStatic(observationId, stream.static)                  *>
         materializeSequence(SequenceType.Acquisition, stream.acquisition) *>
@@ -1012,39 +1048,45 @@ object SequenceService:
 
       override def materializeFlamingos2ExecutionConfig(
         observationId: Observation.Id,
-        stream:        StreamingExecutionConfig[F, Flamingos2StaticConfig, Flamingos2DynamicConfig]
+        stream:        StreamingExecutionConfig[F, Flamingos2StaticConfig, Flamingos2DynamicConfig],
+        sequenceTypes: Set[SequenceType]
       )(using Transaction[F], Services.ServiceAccess): F[Unit] =
-        materializeExecutionConfig(observationId, stream, flamingos2SequenceService.insertStatic)(insertFlamingos2Sequence)
+        materializeExecutionConfig(observationId, stream, sequenceTypes, flamingos2SequenceService.insertStatic)(insertFlamingos2Sequence)
 
       override def materializeGhostExecutionConfig(
         observationId: Observation.Id,
-        stream:        StreamingExecutionConfig[F, GhostStaticConfig, GhostDynamicConfig]
+        stream:        StreamingExecutionConfig[F, GhostStaticConfig, GhostDynamicConfig],
+        sequenceTypes: Set[SequenceType]
       )(using Transaction[F], Services.ServiceAccess): F[Unit] =
-        materializeExecutionConfig(observationId, stream, ghostSequenceService.insertStatic)(insertGhostSequence)
+        materializeExecutionConfig(observationId, stream, sequenceTypes, ghostSequenceService.insertStatic)(insertGhostSequence)
 
       override def materializeGmosNorthExecutionConfig(
         observationId: Observation.Id,
-        stream:        StreamingExecutionConfig[F, GmosNorthStatic, GmosNorth]
+        stream:        StreamingExecutionConfig[F, GmosNorthStatic, GmosNorth],
+        sequenceTypes: Set[SequenceType]
       )(using Transaction[F], Services.ServiceAccess): F[Unit] =
-        materializeExecutionConfig(observationId, stream, gmosSequenceService.insertGmosNorthStatic)(insertGmosNorthSequence)
+        materializeExecutionConfig(observationId, stream, sequenceTypes, gmosSequenceService.insertGmosNorthStatic)(insertGmosNorthSequence)
 
       override def materializeGmosSouthExecutionConfig(
         observationId: Observation.Id,
-        stream:        StreamingExecutionConfig[F, GmosSouthStatic, GmosSouth]
+        stream:        StreamingExecutionConfig[F, GmosSouthStatic, GmosSouth],
+        sequenceTypes: Set[SequenceType]
       )(using Transaction[F], Services.ServiceAccess): F[Unit] =
-        materializeExecutionConfig(observationId, stream, gmosSequenceService.insertGmosSouthStatic)(insertGmosSouthSequence)
+        materializeExecutionConfig(observationId, stream, sequenceTypes, gmosSequenceService.insertGmosSouthStatic)(insertGmosSouthSequence)
 
       override def materializeIgrins2ExecutionConfig(
         observationId: Observation.Id,
-        stream:        StreamingExecutionConfig[F, Igrins2StaticConfig, Igrins2DynamicConfig]
+        stream:        StreamingExecutionConfig[F, Igrins2StaticConfig, Igrins2DynamicConfig],
+        sequenceTypes: Set[SequenceType]
       )(using Transaction[F], Services.ServiceAccess): F[Unit] =
-        materializeExecutionConfig(observationId, stream, igrins2SequenceService.insertStatic)(insertIgrins2Sequence)
+        materializeExecutionConfig(observationId, stream, sequenceTypes, igrins2SequenceService.insertStatic)(insertIgrins2Sequence)
 
       override def materializeGnirsExecutionConfig(
         observationId: Observation.Id,
-        stream:        StreamingExecutionConfig[F, GnirsStaticConfig, GnirsDynamicConfig]
+        stream:        StreamingExecutionConfig[F, GnirsStaticConfig, GnirsDynamicConfig],
+        sequenceTypes: Set[SequenceType]
       )(using Transaction[F], Services.ServiceAccess): F[Unit] =
-        materializeExecutionConfig(observationId, stream, gnirsSequenceService.insertStatic)(insertGnirsSequence)
+        materializeExecutionConfig(observationId, stream, sequenceTypes, gnirsSequenceService.insertStatic)(insertGnirsSequence)
 
       private def selectSequence[S, D](
         instrument:    Instrument,
@@ -1269,6 +1311,179 @@ object SequenceService:
           case CloneSequenceMode.None         => Result.unit.pure[F]
           case CloneSequenceMode.AllSteps     => copyAll(pendingOnly = false)
           case CloneSequenceMode.PendingSteps => copyAll(pendingOnly = true)
+
+      private def insertSmartGcalSteps[S, D](
+        observation:      VisitService.ObsDescription,
+        observationId:    Observation.Id,
+        sequenceType:     SequenceType,
+        smartGcalTypes:   NonEmptyList[SmartGcalType],
+        referenceStepId:  Option[Step.Id],
+        afterStepId:      Option[Step.Id],
+        static:           S,
+        table:            Statements.DynamicTable[D],
+        estimator:        StepTimeEstimateCalculator[S, D],
+        expander:         SmartGcalExpander[F, S, D],
+        insertInstConfig: (rows: List[(Step.Id, D)]) => Command[rows.type]
+      )(using Transaction[F]): ResultT[F, NonEmptyList[Step.Id]] =
+
+        val instrument: Instrument = observation.instrument
+
+        def invalid[A](msg: String): Result[A] =
+          OdbError.InvalidArgument(msg.some).asFailure
+
+        // GCAL steps are taken with guiding disabled, at the reference step's
+        // offset.
+        def expand(reference: ProtoStep[D], sgt: SmartGcalType): ResultT[F, NonEmptyList[ProtoStep[D]]] =
+          val smart = ProtoStep(
+            reference.value,
+            StepConfig.SmartGcal(sgt),
+            TelescopeConfig(reference.telescopeConfig.offset, StepGuideState.Disabled),
+            observation.calibrationRole.gcalClass
+          )
+          ResultT:
+            expander
+              .expandStep(static, smart)
+              .map(_.fold(m => invalid(s"Cannot insert a smart GCAL ${sgt.tag} step: $m"), Result.success))
+
+        // The unexecuted part of an unsplittable observation's science
+        // sequence is a single atom, which may not grow beyond the step limit.
+        def checkUnsplittable(target: StepInsertion.Target, count: Int): ResultT[F, Unit] =
+          val targetAtom = target match
+            case StepInsertion.Target.Existing(aid, _, _) => aid.some
+            case StepInsertion.Target.NewAtom(_)          => none
+          val limit      = UnsplittableAtom.StepLimit.value
+
+          val check: F[Result[Unit]] =
+            session.unique(Statements.CountUnstartedSteps)(observationId, sequenceType, targetAtom).map: (atoms, pending) =>
+              // the target atom adds to the count unless it is already pending
+              if atoms + (if pending === 0 then 1 else 0) > 1 then invalid("Unsplittable observations may only contain a single atom.")
+              else if pending + count > limit then invalid(s"An unsplittable observation's atom may not contain more than $limit steps.")
+              else Result.unit
+
+          if sequenceType =!= SequenceType.Science then ResultT.unit
+          else ResultT(observationService.selectIsSplittable(observationId).flatMap:
+            case Some(false) => check
+            case _           => Result.unit.pure[F]
+          )
+
+        // Makes room for the new steps, returning the atom and index of the
+        // first new step.
+        def writeAtom(target: StepInsertion.Target, count: Int, batch: Int): F[(Atom.Id, Int)] =
+          def makeRoom(atomIndex: Int): F[Unit] =
+            session.execute(Statements.ShiftUnstartedAtoms)(observationId, sequenceType, atomIndex).void
+
+          target match
+            case StepInsertion.Target.Existing(aid, idx, atomIndex) =>
+              for
+                _ <- atomIndex.traverse_(i => makeRoom(i) *> session.execute(Statements.SetAtomIndex)(i, aid))
+                _ <- session.execute(Statements.ShiftUnstartedSteps)(count, aid, idx)
+              yield (aid, idx)
+            case StepInsertion.Target.NewAtom(atomIndex)            =>
+              for
+                _   <- makeRoom(atomIndex)
+                aid <- UUIDGen[F].randomUUID.map(Uid[Atom.Id].isoUuid.reverseGet)
+                rows = List((aid, observationId, sequenceType, instrument, atomIndex, none[String], batch))
+                _   <- session.execute(Statements.insertAtoms(rows))(rows)
+              yield (aid, 0)
+
+        def writeSteps(aid: Atom.Id, firstIndex: Int, steps: NonEmptyList[(Step.Id, ProtoStep[D], StepEstimate)]): F[Unit] =
+          val stepRows = steps.toList.zipWithIndex.map { case ((sid, step, est), i) =>
+            (sid, aid, instrument, step.stepConfig.stepType, firstIndex + i, step.observeClass,
+             est.total, step.telescopeConfig, step.breakpoint)
+          }
+          val gcalRows = steps.toList.flatMap((sid, step, _) => StepConfig.gcal.getOption(step.stepConfig).tupleLeft(sid))
+          val instRows = steps.toList.map((sid, step, _) => (sid, step.value))
+          for
+            _ <- session.execute(Statements.insertSteps(stepRows))(stepRows)
+            _ <- session.execute(Statements.insertGcalConfigs(gcalRows))(gcalRows).whenA(gcalRows.nonEmpty)
+            _ <- session.execute(insertInstConfig(instRows))(instRows)
+          yield ()
+
+        val key = (instrument, observationId, sequenceType)
+
+        for
+          // An unmaterialized sequence has no steps, so the plan below fails
+          // and there is nothing to lock (see `doReplace`).
+          m      <- ResultT.liftF(lockMaterialization(observationId, sequenceType))
+          _      <- ResultT.liftF(lockObservationExecution(observationId).whenA(m))
+          ref    <- ResultT.liftF(referenceStepId.flatTraverse(sid => session.option(Statements.selectInsertionStep(table))(key, sid)))
+          after  <- ResultT.liftF(afterStepId.flatTraverse(sid => session.option(Statements.selectInsertionStep(table))(key, sid)))
+          latest <- ResultT.liftF(session.option(Statements.selectLatestStartedStep(table))(key))
+          next   <- ResultT.liftF(session.option(Statements.selectFirstUnstartedStep(table))(key))
+          visit  <- ResultT.liftF(visitService.selectCurrent(observationId, observation))
+          // The new steps are an edit of the current run of the sequence, as a
+          // replacement is, so a new atom joins the current batch.
+          batch  <- ResultT.liftF(session.unique(Statements.SelectCurrentAtomBatch)(observationId, sequenceType))
+          plan   <- ResultT.fromResult(Result.fromEither(StepInsertion.plan(referenceStepId, ref, afterStepId, after, latest, next, visit, batch).leftMap(m => OdbError.InvalidArgument(m.some).asProblem)))
+          // each distinct type is looked up once
+          exp    <- smartGcalTypes.distinct.traverse(t => expand(plan.reference, t).tupleLeft(t)).map(_.toList.toMap)
+          steps   = smartGcalTypes.flatMap(exp)
+          _      <- checkUnsplittable(plan.target, steps.length)
+          last    = plan.previous.fold(StepTimeEstimateCalculator.Last.empty[D])(StepTimeEstimateCalculator.Last.empty[D].next)
+          ests    = steps.traverse(estimator.estimateOne(static, _)).runA(last).value
+          ids    <- ResultT.liftF(steps.traverse(_ => UUIDGen[F].randomUUID.map(Uid[Step.Id].isoUuid.reverseGet)))
+          target <- ResultT.liftF(writeAtom(plan.target, steps.length, batch))
+          _      <- ResultT.liftF(writeSteps(target._1, target._2, ids.zip(steps).zip(ests).map { case ((i, s), e) => (i, s, e) }))
+          _      <- ResultT.liftF(markMaterializedOrUpdate(observationId, sequenceType, customized = true))
+        yield ids
+
+      override def insertSmartGcal(
+        observationId:   Observation.Id,
+        sequenceType:    SequenceType,
+        smartGcalTypes:  NonEmptyList[SmartGcalType],
+        referenceStepId: Option[Step.Id],
+        afterStepId:     Option[Step.Id]
+      )(using Transaction[F]): F[Result[NonEmptyList[Step.Id]]] =
+
+        val expanders = SmartGcalImplementation.fromService(smartGcalService)
+
+        def insert[S, D](
+          observation:      VisitService.ObsDescription,
+          static:           ResultT[F, S],
+          table:            Statements.DynamicTable[D],
+          estimator:        StepTimeEstimateCalculator[S, D],
+          expander:         SmartGcalExpander[F, S, D],
+          insertInstConfig: (rows: List[(Step.Id, D)]) => Command[rows.type]
+        ): ResultT[F, NonEmptyList[Step.Id]] =
+          static.flatMap: s =>
+            insertSmartGcalSteps(
+              observation,
+              observationId,
+              sequenceType,
+              smartGcalTypes,
+              referenceStepId,
+              afterStepId,
+              s,
+              table,
+              estimator,
+              expander,
+              insertInstConfig
+            )
+
+        val ghostStatic: ResultT[F, GhostStaticConfig] =
+          ResultT(selectOrComputeGhostStatic(observationId).map(e => Result.fromEither(e.leftMap(_.asProblem))))
+
+        ResultT(session.option(Statements.SelectObsDescription)(observationId).map(o => Result.success(o.flatten)))
+          .flatMap:
+            case Some(o) =>
+              o.instrument match
+                case Instrument.Flamingos2 =>
+                  insert(o, selectStatic(observationId, "Flamingos 2", flamingos2SequenceService.selectStaticOrDefault), Statements.Flamingos2Table, estimator.flamingos2Step, expanders.flamingos2, Flamingos2SequenceService.Statements.insertDynamics)
+                case Instrument.Ghost      =>
+                  insert(o, ghostStatic, Statements.GhostTable, estimator.ghostStep, expanders.ghost, GhostSequenceService.Statements.insertDynamics)
+                case Instrument.GmosNorth  =>
+                  insert(o, selectStatic(observationId, "GMOS North", gmosSequenceService.selectGmosNorthStaticOrDefault), Statements.GmosNorthTable, estimator.gmosNorthStep, expanders.gmosNorth, GmosSequenceService.Statements.insertNorthDynamics)
+                case Instrument.GmosSouth  =>
+                  insert(o, selectStatic(observationId, "GMOS South", gmosSequenceService.selectGmosSouthStaticOrDefault), Statements.GmosSouthTable, estimator.gmosSouthStep, expanders.gmosSouth, GmosSequenceService.Statements.insertSouthDynamics)
+                case Instrument.Igrins2    =>
+                  insert(o, selectStatic(observationId, "IGRINS-2", igrins2SequenceService.selectStaticOrDefault), Statements.Igrins2Table, estimator.igrins2Step, expanders.igrins2, Igrins2SequenceService.Statements.insertDynamics)
+                case Instrument.Gnirs      =>
+                  insert(o, selectStatic(observationId, "GNIRS", gnirsSequenceService.selectStaticOrDefault), Statements.GnirsTable, estimator.gnirsStep, expanders.gnirs, GnirsSequenceService.Statements.insertDynamics)
+                case i                     =>
+                  ResultT(OdbError.InvalidArgument(s"Smart GCAL steps cannot be inserted into a ${i.longName} sequence.".some).asFailureF)
+            case None    =>
+              ResultT(OdbError.InvalidArgument(s"Observation $observationId has no instrument.".some).asFailureF)
+          .value
 
   object Statements:
 
@@ -1524,13 +1739,8 @@ object SequenceService:
     val GnirsTable: DynamicTable[GnirsDynamicConfig] =
       DynamicTable("t_gnirs_dynamic", GnirsSequenceService.Statements.GnirsDynamicColumns, gnirs_dynamic)
 
-    private def selectSequence[D](
-      table:      DynamicTable[D],
-      stepFilter: String,
-      orderBy:    String
-    ): Query[(Instrument, Observation.Id, SequenceType), (Atom.Id, Option[String], Step.Id, ProtoStep[D])] =
-
-      val proto_step = (
+    private def protoStep[D](table: DynamicTable[D]): Decoder[ProtoStep[D]] =
+      (
         table.decoder     *:
         step_config       *:
         telescope_config  *:
@@ -1538,21 +1748,23 @@ object SequenceService:
         breakpoint
       ).to[ProtoStep[D]]
 
-      sql"""
-        SELECT
-          a.c_atom_id,
-          a.c_description,
-          s.c_step_id,
-          #${encodeColumns("i".some, table.columns)},
+    // The columns decoded by `protoStep`.
+    private def protoStepColumns[D](table: DynamicTable[D]): String =
+      s"""
+          ${encodeColumns("i".some, table.columns)},
           s.c_step_type,
-          #${encodeColumns("g".some, StepConfigGcalColumns)},
-          #${encodeColumns("r".some, StepConfigSmartGcalColumns)},
+          ${encodeColumns("g".some, StepConfigGcalColumns)},
+          ${encodeColumns("r".some, StepConfigSmartGcalColumns)},
           s.c_offset_p,
           s.c_offset_q,
           s.c_guide_state,
           s.c_observe_class,
           s.c_breakpoint
+      """
 
+    // Joins the tables holding the columns decoded by `protoStep`.
+    private def stepsFrom[D](table: DynamicTable[D]): String =
+      s"""
         FROM t_atom a
 
         JOIN t_step s
@@ -1560,7 +1772,7 @@ object SequenceService:
 
         LEFT JOIN t_step_execution se ON se.c_step_id = s.c_step_id
 
-        JOIN #${table.name} i
+        JOIN ${table.name} i
           ON i.c_step_id = s.c_step_id
 
         LEFT JOIN t_step_config_gcal g
@@ -1568,6 +1780,22 @@ object SequenceService:
 
         LEFT JOIN t_step_config_smart_gcal r
           ON r.c_step_id = s.c_step_id
+      """
+
+    private def selectSequence[D](
+      table:      DynamicTable[D],
+      stepFilter: String,
+      orderBy:    String
+    ): Query[(Instrument, Observation.Id, SequenceType), (Atom.Id, Option[String], Step.Id, ProtoStep[D])] =
+
+      sql"""
+        SELECT
+          a.c_atom_id,
+          a.c_description,
+          s.c_step_id,
+          #${protoStepColumns(table)}
+
+        #${stepsFrom(table)}
 
         WHERE
           a.c_instrument     = $instrument      AND
@@ -1576,7 +1804,154 @@ object SequenceService:
           #$stepFilter
         ORDER BY
           #$orderBy
-      """.query(atom_id *: text.opt *: step_id *: proto_step)
+      """.query(atom_id *: text.opt *: step_id *: protoStep(table))
+
+    // A step with no execution event, or only a 'not_started' one.
+    private val IsUnstarted: String =
+      "(se.c_step_id IS NULL OR se.c_execution_state = 'not_started')"
+
+    private def insertionRow[D](table: DynamicTable[D]): Decoder[StepInsertion.Row[D]] =
+      (
+        atom_id                  *:
+        int4                     *:
+        int4                     *:
+        step_id                  *:
+        int4                     *:
+        step_execution_state.opt *:
+        visit_id.opt             *:
+        protoStep(table)
+      ).to[StepInsertion.Row[D]]
+
+    // The columns decoded by `insertionRow`, followed by the joins they need
+    // and the sequence selection.
+    private def insertionRowFrom[D](table: DynamicTable[D]): Fragment[(Instrument, Observation.Id, SequenceType)] =
+      sql"""
+        SELECT
+          a.c_atom_id,
+          a.c_atom_index,
+          a.c_batch,
+          s.c_step_id,
+          s.c_step_index,
+          se.c_execution_state,
+          se.c_visit_id,
+          #${protoStepColumns(table)}
+
+        #${stepsFrom(table)}
+
+        WHERE
+          a.c_instrument     = $instrument      AND
+          a.c_observation_id = $observation_id  AND
+          a.c_sequence_type  = $sequence_type
+      """
+
+    /** Selects a step of a sequence, executed or not. */
+    def selectInsertionStep[D](
+      table: DynamicTable[D]
+    ): Query[((Instrument, Observation.Id, SequenceType), Step.Id), StepInsertion.Row[D]] =
+      sql"""
+        ${insertionRowFrom(table)}
+          AND s.c_step_id = $step_id
+      """.query(insertionRow(table))
+
+    /** Selects the most recently started step of a sequence, if any. */
+    def selectLatestStartedStep[D](
+      table: DynamicTable[D]
+    ): Query[(Instrument, Observation.Id, SequenceType), StepInsertion.Row[D]] =
+      sql"""
+        ${insertionRowFrom(table)}
+          AND se.c_execution_state <> 'not_started'
+        ORDER BY se.c_execution_order DESC
+        LIMIT 1
+      """.query(insertionRow(table))
+
+    /** Selects the first unstarted step of a sequence, which would execute next. */
+    def selectFirstUnstartedStep[D](
+      table: DynamicTable[D]
+    ): Query[(Instrument, Observation.Id, SequenceType), StepInsertion.Row[D]] =
+      sql"""
+        ${insertionRowFrom(table)}
+          AND #$IsUnstarted
+        ORDER BY a.c_atom_index, s.c_step_index
+        LIMIT 1
+      """.query(insertionRow(table))
+
+    /**
+     * Counts the atoms with unstarted steps in a sequence, and the unstarted
+     * steps of the given atom.
+     */
+    val CountUnstartedSteps: Query[(Observation.Id, SequenceType, Option[Atom.Id]), (Int, Int)] =
+      sql"""
+        SELECT
+          COUNT(DISTINCT a.c_atom_id)::int4,
+          (COUNT(*) FILTER (WHERE a.c_atom_id = ${atom_id.opt}))::int4
+        FROM t_atom a
+        JOIN t_step s
+          ON s.c_atom_id = a.c_atom_id
+        LEFT JOIN t_step_execution se
+          ON se.c_step_id = s.c_step_id
+        WHERE a.c_observation_id = $observation_id
+          AND a.c_sequence_type  = $sequence_type
+          AND #$IsUnstarted
+      """.query(int4 *: int4).contramap((o, t, a) => (a, o, t))
+
+    /**
+     * Shifts the step index of the unstarted steps of an atom, starting at a
+     * given index, to make room for inserted steps.
+     */
+    val ShiftUnstartedSteps: Command[(Int, Atom.Id, Int)] =
+      sql"""
+        UPDATE t_step s
+           SET c_step_index = s.c_step_index + $int4
+         WHERE s.c_atom_id     = $atom_id
+           AND s.c_step_index >= $int4
+           AND NOT EXISTS (
+             SELECT 1
+               FROM t_step_execution se
+              WHERE se.c_step_id = s.c_step_id
+                AND se.c_execution_state <> 'not_started'
+           )
+      """.command
+
+    /**
+     * Increments the index of the atoms with unstarted steps, starting at a
+     * given index, to make room for an atom placed ahead of them.
+     */
+    val ShiftUnstartedAtoms: Command[(Observation.Id, SequenceType, Int)] =
+      sql"""
+        UPDATE t_atom a
+           SET c_atom_index = a.c_atom_index + 1
+         WHERE a.c_observation_id = $observation_id
+           AND a.c_sequence_type  = $sequence_type
+           AND a.c_atom_index    >= $int4
+           AND EXISTS (
+             SELECT 1
+               FROM t_step s
+               LEFT JOIN t_step_execution se
+                 ON se.c_step_id = s.c_step_id
+              WHERE s.c_atom_id = a.c_atom_id
+                AND #$IsUnstarted
+           )
+      """.command
+
+    val SetAtomIndex: Command[(Int, Atom.Id)] =
+      sql"""
+        UPDATE t_atom
+           SET c_atom_index = $int4
+         WHERE c_atom_id    = $atom_id
+      """.command
+
+    /**
+     * The observation's instrument and calibration role, provided it has an
+     * instrument.
+     */
+    val SelectObsDescription: Query[Observation.Id, Option[VisitService.ObsDescription]] =
+      sql"""
+        SELECT c_instrument,
+               c_calibration_role
+          FROM t_observation
+         WHERE c_observation_id = $observation_id
+      """.query(instrument.opt *: calibration_role.opt).map: (i, r) =>
+        i.map(VisitService.ObsDescription(_, r))
 
     private def selectRemainingSequence[D](
       table: DynamicTable[D]
