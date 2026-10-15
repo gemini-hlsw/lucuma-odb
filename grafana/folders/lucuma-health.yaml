@@ -1,0 +1,8 @@
+apiVersion: folder.grafana.app/v1
+kind: Folder
+metadata:
+  name: lucuma-health
+  namespace: stacks-1577729
+spec:
+  title: Lucuma Health
+  description: Readiness checks and worker liveness for the GPP services
