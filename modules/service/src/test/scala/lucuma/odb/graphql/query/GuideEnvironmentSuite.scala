@@ -27,11 +27,26 @@ import org.http4s.Request
 import org.http4s.Response
 
 import java.time.Instant
+import scala.util.matching.Regex
 
 trait GuideEnvironmentSuite extends ExecutionTestSupport:
 
   override protected def httpRequestHandler: Request[IO] => Resource[IO, Response[IO]] =
-    _ => Resource.eval(IO.pure(Response(body = Stream(gaiaResponseString).through(utf8.encode))))
+    req => Resource.eval(IO.pure(Response(body = Stream(gaiaResponseFor(req)).through(utf8.encode))))
+
+  private val SourceIdClause: Regex = """source_id\s*=\s*(\d+)""".r
+  private val TableRow: Regex       = """(?s)\s*<TR>.*?</TR>""".r
+
+  // A query by id answers with that star's row alone, as Gaia would. Any other query, and an id
+  // the table lacks, gets the whole table, whose first row then stands in for the star asked for.
+  private def gaiaResponseFor(req: Request[IO]): String =
+    val table: String = gaiaResponseString
+    req.uri.query.params.values.toList
+      .collectFirstSome(SourceIdClause.findFirstMatchIn(_).map(_.group(1)))
+      .map(id => s"<TD>$id</TD>")
+      .filter(table.contains)
+      .fold(table): cell =>
+        TableRow.replaceAllIn(table, m => if m.matched.contains(cell) then Regex.quoteReplacement(m.matched) else "")
 
   val gaiaSuccess: Timestamp = Timestamp.FromString.getOption("2023-08-30T00:00:00Z").get
 

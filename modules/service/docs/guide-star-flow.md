@@ -71,17 +71,16 @@ flowchart TD
     F --> G[write name and hash]
     G --> H{Altair?}
     H -- no --> I[done]
-    H -- yes --> J[run the generator: digestWithParams]
+    H -- yes --> J[run the generator: digest]
     J -- star usable --> I
-    J -- LGS+P1: problem recorded on the sequence, star kept --> I
-    J -- NGS, LGS: unusable or failure --> K[restore previous name and hash, report]
+    J -- unusable or failure --> K[restore previous name and hash, report]
 ```
 
 What the hash covers, via `ObservationInfo.overrideHash` and `SearchSettings.hash`: the `AgsParams`, AGS wavelength, offsets as defined on the observing mode (not as generated), Altair settings, explicit probe, constraints, explicit base, target and blind offset positions, the position angle constraint, and observation time and duration. It leaves out the generated sequence, the ITC result and the code version, so executing steps and deploying do not drop an override. The availability cache adds the code version, since it stores results rather than a choice.
 
 Validation of the override happens every time it is used: if the named star is no longer usable, `guideEnvironment` errors with "Guidestar X is not usable" and the generator (behind Altair) refuses to produce a sequence, instead of silently falling back to automatic selection.
 
-For Altair the mutation runs the generator after writing, since only a generation can tell whether the star works with the sequence it shapes. The generator runs outside the transaction (it calls Gaia and the ITC), so on failure the previous name and hash are written back by hand. In LGS+P1 the generator records the problem against the sequence rather than failing, so the override is kept and the error surfaces when the sequence is asked for.
+For Altair the mutation runs the generator after writing, since only a generation can tell whether the star works with the sequence it shapes. The generator runs outside the transaction (it calls Gaia and the ITC), so on failure the previous name and hash are written back by hand. The mutation reads the digest through `Generator.digest`, which reports the LGS+P1 problem the generator records against the sequence; `digestWithParams`, which the guide star search itself uses, leaves it out.
 
 ## Availability
 
@@ -126,7 +125,7 @@ flowchart TD
     H -- unusable or Gaia failure --> K[keep the sequence, record altairProblem]
 ```
 
-`altairProblem` is not a failure of generation: the guide star calculations need a sequence to check the star against, so `digestWithParams` (what `GuideService` calls) hands back the context as is, while `digest` and the other generator entry points report the problem. An NGS observation's default field lens follows the resolved star's separation, which is why `altair.fieldLens` resolves a star too.
+`altairProblem` is not a failure of generation: the guide star calculations need a sequence to check the star against, so `digestWithParams` (what the guide star search calls) hands back the context as is, while `digest` and the other generator entry points, `setGuideTargetName` among them, report the problem. An NGS observation's default field lens follows the resolved star's separation, which is why `altair.fieldLens` resolves a star too.
 
 ## Storage
 

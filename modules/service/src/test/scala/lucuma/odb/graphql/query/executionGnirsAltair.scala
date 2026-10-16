@@ -320,16 +320,6 @@ class executionGnirsAltair extends AltairItcRecording:
       assert(acq.nonEmpty, "the reset should call the acquisition ITC")
       assertNgs(acq.last, FieldLens.In)
 
-  // LGS+P1 guides with PWFS1, whose probe arm would vignette the AOWFS star.
-  test("an unusable stored star stops the sequence being materialized"):
-    for
-      (_, oid) <- observationWithAltair("{ mode: LGS_P1 }", aowfsStarName.some)
-      result   <- withServices(serviceUser)(_.generator.materialize(oid))
-    yield assert(
-      result.left.exists(_.message.contains("no longer usable")),
-      s"expected an unusable guide star error, found $result"
-    )
-
   test("clearing the guide star leaves the cached ITC result in place"):
     for
       (pid, oid) <- observationWithAltair("{ mode: NGS }", aowfsStarName.some)
@@ -367,20 +357,6 @@ class executionGnirsAltair extends AltairItcRecording:
           }
         """.asRight
       )
-
-  // LGS+P1 guides with PWFS1, whose probe arm would vignette a star as close in as the AOWFS one.
-  test("a stored star the current parameters rule out fails the sequence"):
-    for
-      (_, oid)   <- observationWithAltair("{ mode: LGS_P1 }", aowfsStarName.some)
-      _          <- clearItcCalls
-      digest     <- digestFor(oid)
-      (acq, sci) <- itcAltairCalls
-    yield
-      assert(
-        digest.left.exists(_.message.contains("no longer usable")),
-        s"expected an unusable guide star error, found $digest"
-      )
-      assertEquals(acq ++ sci, Nil, "an unusable stored star should reach no ITC call")
 
 // With a star inside the 1 arcsecond radius available, AGS prefers it and NGS drops the field lens.
 class executionGnirsAltairNearStar extends AltairItcRecording:
@@ -452,10 +428,9 @@ class executionGnirsAltairFrozen extends AltairItcRecording:
       assertEquals(acq ++ sci, Nil, "a frozen result should reach no remote ITC call")
 
 /**
- * Setting a guide star stores the name before the generator runs and the hash only afterwards, so
- * a generator failure in between must leave the observation exactly as it found it. A name stored
- * without a hash reads as a selection still waiting for its generation, and so would never go
- * stale.
+ * Setting a guide star behind Altair writes the name and hash, then runs the generator to check the
+ * star against the sequence it shapes. A generator failure, or a star the generator rules out, must
+ * leave the observation exactly as it found it.
  */
 class executionGnirsAltairFailedSet extends AltairItcRecording:
 
@@ -490,6 +465,22 @@ class executionGnirsAltairFailedSet extends AltairItcRecording:
       assert(before.exists((name, hash) => name.contains(aowfsStarName) && hash.isDefined), s"expected a stored selection, found $before")
       assert(failed.isLeft, "the mutation should fail while Gaia is unreachable")
       assertEquals(after, before)
+
+  // LGS+P1 guides with PWFS1, whose probe arm would vignette a star as close in as the AOWFS one.
+  // The generator records that problem against the sequence rather than failing, so the mutation
+  // has to look for it.
+  test("a star the generator rules out under LGS+P1 is rejected and leaves no selection"):
+    for
+      _        <- IO(gaiaDown.set(false))
+      (_, oid) <- observationWithAltair("{ mode: LGS_P1 }", none)
+      failed   <- setGuideTargetName(pi, oid, aowfsStarName.some).attempt
+      after    <- storedGuideStar(oid)
+    yield
+      assert(
+        failed.left.exists(_.getMessage.contains("no longer usable")),
+        s"expected an unusable guide star error, found $failed"
+      )
+      assertEquals(after, (none[String], none[String]).some)
 
 // The default candidate table is built for the PWFS patrol field; none of its stars lies inside
 // the much smaller AOWFS one, so AGS has nothing to offer Altair.

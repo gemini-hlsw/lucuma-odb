@@ -17,6 +17,8 @@ import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.odb.service.GuideService
 import lucuma.odb.service.Services
+import lucuma.odb.util.Codecs.*
+import skunk.implicits.*
 
 class guideEnvironmentGnirs extends ExecutionTestSupportForGnirs
                                   with GuideEnvironmentSuite:
@@ -282,6 +284,18 @@ class guideEnvironmentGnirsAltair extends ExecutionTestSupportForGnirs
     withServices(pi): services =>
       Services.asSuperUser(services.guideService.resolveGuideStar(oid)).flatMap(_.get)
 
+  // Behind the mutation's back, which would reject a star the generator rules out. The hash
+  // leaves the name out, so the override stays current.
+  private def storeGuideStarName(oid: Observation.Id, name: String): IO[Unit] =
+    withSession: s =>
+      s.execute(
+        sql"""
+          UPDATE t_observation
+             SET c_guide_target_name = $guide_target_name
+           WHERE c_observation_id = $observation_id
+        """.command
+      )(GuideStarName.unsafeFrom(name), oid).void
+
   private def assertResolvedStar(
     resolution:  GuideService.GuideStarResolution,
     name:        String,
@@ -322,8 +336,6 @@ class guideEnvironmentGnirsAltair extends ExecutionTestSupportForGnirs
         expected = altairGuideEnvironmentResult("LGS_P1", "PWFS1", pwfs1StarName)
       )
 
-  // The stored star is resolved by id, so the Gaia stub answers with the whole table and the
-  // first row stands in for the star that was asked for.
   test("the stored guide star resolves to its separation and R magnitude"):
     for
       oid        <- observationWithAltair("{ mode: NGS }")
@@ -352,7 +364,8 @@ class guideEnvironmentGnirsAltair extends ExecutionTestSupportForGnirs
   test("a stored star the current parameters rule out resolves as unusable"):
     for
       oid        <- observationWithAltair("{ mode: LGS_P1 }")
-      _          <- setGuideTargetName(pi, oid, aowfsStarName.some)
+      _          <- setGuideTargetName(pi, oid, pwfs1StarName.some)
+      _          <- storeGuideStarName(oid, aowfsStarName)
       resolution <- resolveGuideStar(oid)
     yield assertEquals(
       resolution,

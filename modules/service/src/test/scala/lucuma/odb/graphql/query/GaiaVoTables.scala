@@ -119,9 +119,7 @@ object GaiaVoTables:
   /**
    * The same stars with a BP magnitude, so that R can be estimated for the Altair limits, plus a
    * bright star close enough to the base to sit in the AOWFS patrol field and one far enough out
-   * that the PWFS1 probe arm clears the science field. The AOWFS star comes first because the
-   * stub answers a lookup by source id with the whole table, whose first row then stands in for
-   * the star that was asked for.
+   * that the PWFS1 probe arm clears the science field.
    */
   val altairCandidates: String =
   """<?xml version="1.0" encoding="UTF-8"?>
