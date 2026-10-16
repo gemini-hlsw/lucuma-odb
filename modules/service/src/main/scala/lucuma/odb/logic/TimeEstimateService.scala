@@ -6,14 +6,17 @@ package lucuma.odb.logic
 import cats.Order
 import cats.Order.catsKernelOrderingForOrder
 import cats.Semigroup
-import cats.data.OptionT
+import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.kernel.CommutativeMonoid
+import cats.syntax.applicative.*
 import cats.syntax.apply.*
+import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.functorFilter.*
 import cats.syntax.monoid.*
+import cats.syntax.traverse.*
 import eu.timepit.refined.types.numeric.NonNegShort
 import lucuma.core.enums.ScienceBand
 import lucuma.core.model.Group
@@ -44,12 +47,13 @@ sealed trait TimeEstimateService[F[_]]:
   )(using Transaction[F]): F[Option[CalculatedValue[CategorizedTimeRange]]]
 
   /**
-   * Estimates the remaining time for all observations in the group that are
-   * well defined.
+   * Estimates the remaining time for all observations in each group that are
+   * well defined.  Each program involved is loaded once, however many of its
+   * groups are requested.  The result has an entry for every requested group.
    */
-  def estimateGroupRange(
-    groupId: Group.Id
-  )(using Transaction[F]): F[Option[CalculatedValue[CategorizedTimeRange]]]
+  def estimateGroupRanges(
+    groupIds: List[Group.Id]
+  )(using Transaction[F]): F[Map[Group.Id, Option[CalculatedValue[CategorizedTimeRange]]]]
 
   /**
    * Estimates the remaining time for all observations in the program by band,
@@ -60,12 +64,14 @@ sealed trait TimeEstimateService[F[_]]:
   )(using Transaction[F]): F[Map[Option[ScienceBand], CalculatedValue[CategorizedTime]]]
 
   /**
-   * Estimates the remaining time for all observations in the group by band,
-   * ignoring `minRequired`.
+   * Estimates the remaining time for all observations in each group by band,
+   * ignoring `minRequired`.  Each program involved is loaded once, however
+   * many of its groups are requested.  The result has an entry for every
+   * requested group.
    */
-  def estimateGroupBanded(
-    groupId: Group.Id
-  )(using Transaction[F]): F[Map[Option[ScienceBand], CalculatedValue[CategorizedTime]]]
+  def estimateGroupsBanded(
+    groupIds: List[Group.Id]
+  )(using Transaction[F]): F[Map[Group.Id, Map[Option[ScienceBand], CalculatedValue[CategorizedTime]]]]
 
 
 object TimeEstimateService:
@@ -142,16 +148,27 @@ object TimeEstimateService:
         load(pid).map:
           case (tree, valueMap) => timeEstimateRange(pid, tree, valueMap)
 
-      override def estimateGroupRange(
-        gid: Group.Id
-      )(using Transaction[F]): F[Option[CalculatedValue[CategorizedTimeRange]]] =
-        (for
-          p <- OptionT(groupService.selectPid(gid))
-          d <- OptionT.liftF(load(p))
-          (tree, valueMap) = d
-          t <- OptionT.fromOption(tree.findGroup(gid))
-          r <- OptionT.fromOption(timeEstimateRange(p, t, valueMap))
-        yield r).value
+      // The requested groups, organized by the program that contains them.
+      private def groupsByProgram(
+        gids: List[Group.Id]
+      )(using Transaction[F]): F[Map[Program.Id, List[Group.Id]]] =
+        NonEmptyList
+          .fromList(gids.distinct)
+          .fold(Map.empty[Program.Id, List[Group.Id]].pure[F]): nel =>
+            groupService.selectPids(nel).map(_.toList.groupMap(_._2)(_._1))
+
+      override def estimateGroupRanges(
+        gids: List[Group.Id]
+      )(using Transaction[F]): F[Map[Group.Id, Option[CalculatedValue[CategorizedTimeRange]]]] =
+        groupsByProgram(gids)
+          .flatMap:
+            _.toList.flatTraverse: (pid, pgids) =>
+              load(pid).map: (tree, valueMap) =>
+                pgids.map: gid =>
+                  gid -> tree.findGroup(gid).flatMap(timeEstimateRange(pid, _, valueMap))
+          .map: found =>
+            val m = found.toMap
+            gids.map(gid => gid -> m.get(gid).flatten).toMap
 
       override def estimateProgramBanded(
         pid: Program.Id
@@ -164,25 +181,29 @@ object TimeEstimateService:
              .toList
              .groupMapReduce((_, band) => band)((oid, _) => valueMap.getOrElse(oid, CalculatedValue.empty[CategorizedTime]))(_ |+| _)
 
-      override def estimateGroupBanded(
-        gid: Group.Id
-      )(using Transaction[F]): F[Map[Option[ScienceBand], CalculatedValue[CategorizedTime]]] =
+      override def estimateGroupsBanded(
+        gids: List[Group.Id]
+      )(using Transaction[F]): F[Map[Group.Id, Map[Option[ScienceBand], CalculatedValue[CategorizedTime]]]] =
         def containedObs(root: GroupTree): Set[Observation.Id] =
           root match
             case GroupTree.Leaf(oid)                   => Set(oid)
             case GroupTree.Branch(children = children) => children.map(containedObs).combineAll
             case GroupTree.Root(_, children)           => children.map(containedObs).combineAll
 
-        val res = (for
-          p <- OptionT(groupService.selectPid(gid))
-          t <- OptionT.liftF(groupService.selectGroups(p))
-          os = t.findGroup(gid).map(containedObs).combineAll
-          b <- OptionT.liftF(observationService.selectBands(p))
-          c <- OptionT.liftF(obscalcService.selectProgramCategorizedTime(p))
-        yield
-          b.view
-           .filterKeys(os.contains)
-           .toList
-           .groupMapReduce((_, band) => band)((oid, _) => c.getOrElse(oid, CalculatedValue.empty[CategorizedTime]))(_ |+| _))
-
-        res.value.map(_.getOrElse(Map.empty))
+        groupsByProgram(gids)
+          .flatMap:
+            _.toList.flatTraverse: (pid, pgids) =>
+              (groupService.selectGroups(pid),
+               observationService.selectBands(pid),
+               obscalcService.selectProgramCategorizedTime(pid)
+              ).tupled.map: (tree, bandMap, valueMap) =>
+                pgids.map: gid =>
+                  val os = tree.findGroup(gid).map(containedObs).combineAll
+                  gid -> bandMap
+                    .view
+                    .filterKeys(os.contains)
+                    .toList
+                    .groupMapReduce((_, band) => band)((oid, _) => valueMap.getOrElse(oid, CalculatedValue.empty[CategorizedTime]))(_ |+| _)
+          .map: found =>
+            val m = found.toMap
+            gids.map(gid => gid -> m.getOrElse(gid, Map.empty)).toMap

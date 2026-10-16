@@ -88,14 +88,14 @@ trait GroupMapping[F[_]] extends GroupView[F] with ProgramView[F] with GroupElem
       }
 
   private lazy val estimateRangeHandler: EffectHandler[F] =
-    keyValueEffectHandler[Group.Id, Option[CalculatedValue[CategorizedTimeRange]]]("id"): gid =>
+    batchedKeyValueEffectHandler[Group.Id, Option[CalculatedValue[CategorizedTimeRange]]]("id"): gids =>
       services.useTransactionally:
         timeEstimateService
-          .estimateGroupRange(gid)
+          .estimateGroupRanges(gids)
 
   private lazy val estimateBandedHandler: EffectHandler[F] =
-    keyValueEffectHandler[Group.Id, List[CalculatedValue[BandedTime]]]("id"): gid =>
+    batchedKeyValueEffectHandler[Group.Id, List[CalculatedValue[BandedTime]]]("id"): gids =>
       services.useTransactionally:
         timeEstimateService
-          .estimateGroupBanded(gid)
-          .map(_.toList.sortBy(_._1).map((b, cv) => Monad[CalculatedValue].map(cv)(t => BandedTime(b, t))))
+          .estimateGroupsBanded(gids)
+          .map(_.view.mapValues(_.toList.sortBy(_._1).map((b, cv) => Monad[CalculatedValue].map(cv)(t => BandedTime(b, t)))).toMap)

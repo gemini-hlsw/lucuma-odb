@@ -47,6 +47,7 @@ trait GroupService[F[_]] {
     obsFilter: AppliedFragment = sql"c_existence = $existence"(Existence.Present)
   )(using Transaction[F]): F[GroupTree]
   def selectPid(groupId: Group.Id)(using Transaction[F]): F[Option[Program.Id]]
+  def selectPids(groupIds: NonEmptyList[Group.Id])(using Transaction[F]): F[Map[Group.Id, Program.Id]]
   def checkGroupInProgram(pid: Program.Id, gid: Group.Id)(using Transaction[F]): F[Result[Unit]]
   def cloneGroup(input: AccessControl.CheckedWithId[CloneGroupInput, Program.Id])(using Transaction[F]): F[Result[Group.Id]]
   def selectAllObservations(groupId: Group.Id)(using Transaction[F]): F[List[Observation.Id]]
@@ -353,6 +354,9 @@ object GroupService {
       def selectPid(groupId: Group.Id)(using Transaction[F]): F[Option[Program.Id]] =
         session.option(Statements.SelectPid)(groupId)
 
+      def selectPids(groupIds: NonEmptyList[Group.Id])(using Transaction[F]): F[Map[Group.Id, Program.Id]] =
+        session.execute(Statements.selectPids(groupIds.size))(groupIds.toList).map(_.toMap)
+
       def selectAllObservations(groupId: Group.Id)(using Transaction[F]): F[List[Observation.Id]] =
         session.execute(Statements.SelectAllObservationsInGroup)(groupId)
 
@@ -527,6 +531,17 @@ object GroupService {
         WHERE
           c_group_id = $group_id
       """.query(program_id)
+
+    def selectPids(n: Int): Query[List[Group.Id], (Group.Id, Program.Id)] =
+      sql"""
+        SELECT
+          c_group_id,
+          c_program_id
+        FROM
+          t_group
+        WHERE
+          c_group_id IN (${group_id.list(n)})
+      """.query(group_id *: program_id)
 
     val SelectAllObservationsInGroup: Query[Group.Id, Observation.Id] =
       sql"""

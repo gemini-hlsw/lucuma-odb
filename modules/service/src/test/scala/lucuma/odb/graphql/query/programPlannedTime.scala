@@ -1252,6 +1252,80 @@ class programPlannedTime extends ExecutionTestSupportForGmos:
         )
       )
 
+  // Group estimates are computed for every group in the result at once, loading
+  // each program only once.  Each group here has a distinct estimate, so a mix
+  // up between groups or programs shows.
+  test("group level range...: groups across programs and nesting, in one query"):
+    val setup: IO[(Program.Id, Program.Id, Group.Id, Group.Id, Group.Id)] =
+      for
+        pa  <- createProgram
+        ta  <- createTargetWithProfileAs(user, pa)
+        ga  <- createGroupAs(user, pa)
+        ga1 <- createGroupAs(user, pa, parentGroupId = ga.some)
+        osa <- createGmosNorthLongSlitObservationAs(user, pa, List(ta))
+        ola <- createLongerGmosNorthLongSlitObservationAs(user, pa, ta)
+        _   <- moveObsToGroup(ga, osa)
+        _   <- moveObsToGroup(ga1, ola)
+        pb  <- createProgram
+        tb  <- createTargetWithProfileAs(user, pb)
+        gb  <- createGroupAs(user, pb)
+        olb <- createLongerGmosNorthLongSlitObservationAs(user, pb, tb)
+        _   <- moveObsToGroup(gb, olb)
+        _   <- runObscalcUpdate(pa, osa)
+        _   <- runObscalcUpdate(pa, ola)
+        _   <- runObscalcUpdate(pb, olb)
+      yield (pa, pb, ga, ga1, gb)
+
+    for
+      (pa, pb, ga, ga1, gb) <- setup
+      js <- query(
+              user  = user,
+              query = s"""
+                query {
+                  programs(WHERE: { id: { IN: ["$pa", "$pb"] } }) {
+                    matches {
+                      allGroupElements {
+                        group {
+                          id
+                          timeEstimateRange {
+                            value {
+                              minimum { total { seconds } }
+                              maximum { total { seconds } }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              """
+            )
+    yield
+      val ranges: Map[Group.Id, (BigDecimal, BigDecimal)] =
+        js.hcursor
+          .downFields("programs", "matches")
+          .values.toList.flatten
+          .flatMap(_.hcursor.downField("allGroupElements").values.toList.flatten)
+          .flatMap: e =>
+            val g = e.hcursor.downField("group")
+            val v = g.downFields("timeEstimateRange", "value")
+            (for
+              id  <- g.downField("id").as[Group.Id]
+              min <- v.downFields("minimum", "total", "seconds").as[BigDecimal]
+              max <- v.downFields("maximum", "total", "seconds").as[BigDecimal]
+            yield id -> (min, max)).toOption
+          .toMap
+
+      val both = ShortTime + LongTime
+      assertEquals(
+        ranges,
+        Map(
+          ga  -> (both, both),
+          ga1 -> (LongTime, LongTime),
+          gb  -> (LongTime, LongTime)
+        )
+      )
+
   test("sc-8836"):
     val setup: IO[Group.Id] =
       for

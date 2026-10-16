@@ -50,4 +50,34 @@ trait KeyValueEffectHandler[F[_]: MonadCancelThrow] extends CirceMappingLike[F] 
         ).value
     }
 
+  /**
+   * Like `keyValueEffectHandler`, but computes the values for every key in the
+   * result at once, so that work shared between keys (e.g., loading the
+   * program that contains them) is done once rather than per key.
+   * `calculateAll` receives the distinct keys and must return a value for each
+   * of them.
+   */
+  def batchedKeyValueEffectHandler[K : ClassTag, T: Encoder](keyField: String)(
+    calculateAll: User ?=> List[K] => F[Map[K, T]]
+  ):  EffectHandler[F] =
+
+    new EffectHandler[F] {
+      override def runEffects(queries: List[(Query, Cursor)]): F[Result[List[Cursor]]] =
+        (for {
+          usr <- ResultT.fromResult(UserEnv.fromQueries(queries))
+          ctx <- ResultT(queries.traverse { case (_, cursor) => cursor.fieldAs[K](keyField) }.pure[F])
+          all <- ResultT.liftF(calculateAll(using usr)(ctx.distinct))
+          res <- ResultT(ctx
+                   .zip(queries)
+                   .traverse { case (k, (query, parentCursor)) =>
+                     for {
+                       result       <- all.get(k).fold(Result.internalError[T](s"No result computed for $k"))(Result.success)
+                       childContext <- Query.childContext(parentCursor.context, query)
+                     } yield CirceCursor(childContext, result.asJson, Some(parentCursor), parentCursor.fullEnv)
+                   }.pure[F]
+                 )
+          } yield res
+        ).value
+    }
+
 }
