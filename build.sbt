@@ -1230,7 +1230,7 @@ lazy val calibrations = project
   )
 
 // Pinned so a deploy always builds the same renderer; bump by PR.
-lazy val pyexploreRef = "0feeec993860db99810a86d57172b1a9dd2fa634"
+lazy val pyexploreRef = "b803838a9dede6911666eb22676dbbb087d08a55"
 
 lazy val pdfSummary = project
   .in(file("modules/pdf-summary"))
