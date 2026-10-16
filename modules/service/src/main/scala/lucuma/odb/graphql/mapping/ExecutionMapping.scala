@@ -31,6 +31,7 @@ import lucuma.odb.graphql.binding.NonNegIntBinding
 import lucuma.odb.graphql.binding.PosIntBinding
 import lucuma.odb.graphql.binding.VisitIdBinding
 import lucuma.odb.graphql.predicate.Predicates
+import lucuma.odb.graphql.table.ExecutionTimestampsView
 import lucuma.odb.graphql.table.ObscalcTable
 import lucuma.odb.json.all.query.given
 import lucuma.odb.logic.Generator
@@ -39,6 +40,7 @@ import lucuma.odb.service.Services.Syntax.*
 import org.http4s.client.Client
 
 trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
+                                with ExecutionTimestampsView[F]
                                 with ObscalcTable[F]
                                 with Predicates[F]
                                 with SelectSubquery {
@@ -62,6 +64,7 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
       SqlObject("visits"),
       SqlObject("originalEstimate"),
       EffectField("timeCharge", timeChargeHandler, List("id", "programId")),
+      SqlObject("timestamps", Join(ObservationView.Id, ExecutionTimestampsView.ObservationId)),
       SqlField("scienceSequenceIsMaterialized", ObservationView.ScienceSequenceIsMaterialized),
       SqlField("acquisitionSequenceIsMaterialized", ObservationView.AcquisitionSequenceIsMaterialized),
       SqlField("scienceSequenceIsCustomized", ObservationView.ScienceSequenceIsCustomized),

@@ -946,7 +946,7 @@ object GeneratorParamsService {
         SELECT
           c_observation_id,
           c_execution_state
-        FROM v_generator_params
+        FROM v_execution_state
         WHERE c_observation_id IN (""" |+|
           which.map(sql"$observation_id").intercalate(void", ") |+|
         void")"

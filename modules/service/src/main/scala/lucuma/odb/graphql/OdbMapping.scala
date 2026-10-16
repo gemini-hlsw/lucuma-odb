@@ -199,6 +199,7 @@ object OdbMapping {
           with DaytimeCalibrationMapping[F]
           with ExchangeMapping[F]
           with ExecutionMapping[F]
+          with ExecutionTimestampsMapping[F]
           with ExecutionEventAddedMapping[F]
           with ExecutionEventMapping[F]
           with ExecutionEventSelectResultMapping[F]
@@ -475,6 +476,7 @@ object OdbMapping {
                 ExecutionEventAddedMapping,
                 ExecutionEventMapping,
                 ExecutionMapping,
+                ExecutionTimestampsMapping,
                 FastTurnaroundMapping,
                 Flamingos2DynamicMapping,
                 Flamingos2LongSlitAcquisitionMapping,
