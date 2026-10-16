@@ -9,6 +9,7 @@ import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.SequenceDigest
 import lucuma.core.model.sequence.exposure.ExposureTimeViolation
 import lucuma.core.model.sequence.exposure.PendingExposureRules
+import lucuma.odb.sequence.SecondOrderOverlapCheck
 
 trait ToSequenceDigestOps:
 
@@ -16,9 +17,10 @@ trait ToSequenceDigestOps:
 
     /**
      * Adds an atom to the digest, checking the exposure times of its steps
-     * (see `ExposureTimeViolation.check`) as it goes.
+     * (see `ExposureTimeViolation.check`) and whether second order light
+     * overlaps their spectra (see `SecondOrderOverlapCheck`) as it goes.
      */
-    def add[D: PendingExposureRules](a: Atom[D], ctx: PendingExposureRules.Context): SequenceDigest =
+    def add[D: {PendingExposureRules, SecondOrderOverlapCheck}](a: Atom[D], ctx: PendingExposureRules.Context): SequenceDigest =
       SequenceDigest(
         observeClass           = self.observeClass |+| a.observeClass,
         timeEstimate           = self.timeEstimate |+| a.timeEstimate,
@@ -30,7 +32,9 @@ trait ToSequenceDigestOps:
         steps                  = a.steps.toList.foldLeft(self.steps)(_.add(_)),
         executionState         = self.executionState,
         exposureTimeViolations =
-          self.exposureTimeViolations ++ a.steps.toList.flatMap(ExposureTimeViolation.check(_, ctx))
+          self.exposureTimeViolations ++ a.steps.toList.flatMap(ExposureTimeViolation.check(_, ctx)),
+        secondOrderOverlaps    =
+          self.secondOrderOverlaps ++ a.steps.toList.flatMap(SecondOrderOverlapCheck[D].check)
       )
 
 object sequencedigest extends ToSequenceDigestOps

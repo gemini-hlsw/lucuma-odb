@@ -48,6 +48,7 @@ import lucuma.odb.data.Itc
 import lucuma.odb.data.ItcAcquisition
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.ObservingMode.Syntax.*
+import lucuma.odb.sequence.SecondOrderOverlapCheck
 import lucuma.odb.sequence.SetupTimeEstimateCalculator
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.ItcInput
@@ -318,10 +319,11 @@ object Generator:
         ctx: GeneratorContext
       )(using Transaction[F]): EitherT[F, OdbError, ExecutionDigest] =
 
-        // Exposure times are checked in the same pass over the steps.
+        // Exposure times and second order overlap are checked in the same pass
+        // over the steps.
         val exposure = PendingExposureRules.Context(ctx.constraints)
 
-        def digest[S, D: PendingExposureRules](
+        def digest[S, D: {PendingExposureRules, SecondOrderOverlapCheck}](
           stream:    StreamingExecutionConfig[F, S, D],
           estimator: SetupTimeEstimateCalculator
         ): EitherT[F, OdbError, ExecutionDigest] =

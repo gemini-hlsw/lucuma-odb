@@ -37,6 +37,7 @@ import lucuma.core.model.sequence.StepDigests
 import lucuma.core.model.sequence.StepEstimate
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.exposure.ExposureTimeViolation
+import lucuma.core.model.sequence.gmos.SecondOrderOverlap
 import lucuma.core.util.TimeSpan
 
 import scala.collection.immutable.SortedSet
@@ -148,6 +149,23 @@ trait SequenceCodec {
         "description" -> a.description.asJson
       )
 
+  // Stored only, never served, so always in (compact) picometers.
+  given Decoder[SecondOrderOverlap] =
+    import wavelength.decoder.given
+    Decoder.instance: c =>
+      for
+        o <- c.downField("onset").as[Wavelength]
+        w <- c.downField("centralWavelength").as[Wavelength]
+      yield SecondOrderOverlap(o, w)
+
+  given Encoder[SecondOrderOverlap] =
+    import wavelength.transport.given
+    Encoder.instance: (a: SecondOrderOverlap) =>
+      Json.obj(
+        "onset"             -> a.onset.asJson,
+        "centralWavelength" -> a.centralWavelength.asJson
+      )
+
   given Decoder[SequenceDigest] =
     Decoder.instance: c =>
       // Payloads that predate the step breakdown have no `steps`; read them as
@@ -161,7 +179,8 @@ trait SequenceCodec {
         s  <- c.downField("steps").as[Option[StepDigests]].map(_.getOrElse(StepDigests.Zero.copy(observing = StepDigest(NonNegInt.MinValue, t))))
         e  <- c.downField("executionState").as[ExecutionState]
         v  <- c.downField("exposureTimeViolations").as[Option[List[ExposureTimeViolation]]].map(_.fold(SortedSet.empty[ExposureTimeViolation])(SortedSet.from))
-      yield SequenceDigest(o, t, tc, n, g, s, e, v)
+        w  <- c.downField("secondOrderOverlaps").as[Option[List[SecondOrderOverlap]]].map(_.fold(SortedSet.empty[SecondOrderOverlap])(SortedSet.from))
+      yield SequenceDigest(o, t, tc, n, g, s, e, v, w)
 
   given (using Encoder[Offset], Encoder[TimeSpan]): Encoder[SequenceDigest] =
     Encoder.instance: (a: SequenceDigest) =>
@@ -173,7 +192,8 @@ trait SequenceCodec {
         "gcalSets"         -> a.gcalSets.asJson,
         "steps"                  -> a.steps.asJson,
         "executionState"         -> a.executionState.asJson,
-        "exposureTimeViolations" -> a.exposureTimeViolations.toList.asJson
+        "exposureTimeViolations" -> a.exposureTimeViolations.toList.asJson,
+        "secondOrderOverlaps"    -> a.secondOrderOverlaps.toList.asJson
       )
 
   given Decoder[CalibrationEstimate] =

@@ -24,6 +24,7 @@ import lucuma.core.model.sequence.gmos.GmosGratingConfig
 import lucuma.core.model.sequence.gmos.arb.ArbDynamicConfig.given
 import lucuma.core.model.sequence.gmos.arb.ArbGmosGratingConfig.given
 import lucuma.core.util.TimeSpan
+import lucuma.odb.sequence.SecondOrderOverlapCheck
 import munit.ScalaCheckSuite
 import org.scalacheck.Arbitrary
 import org.scalacheck.Prop.forAll
@@ -43,8 +44,9 @@ class SequenceDigestOpsSuite extends ScalaCheckSuite:
   private val ctx: PendingExposureRules.Context =
     PendingExposureRules.Context(sample[ConstraintSet])
 
-  // Steps without an instrument have no exposure rules.
-  given PendingExposureRules[Unit] = (_, _) => Nil
+  // Steps without an instrument have no exposure rules or spectra.
+  given PendingExposureRules[Unit]    = (_, _) => Nil
+  given SecondOrderOverlapCheck[Unit] = _ => None
 
   property("preserves ordering of atom steps"):
     forAll: (a: Atom[Unit]) =>
@@ -114,3 +116,8 @@ class SequenceDigestOpsSuite extends ScalaCheckSuite:
   test("the digest's violations are core's for its steps"):
     val sd = SequenceDigest.Zero.add(atom(step(1500)), ctx)
     assertEquals(sd.exposureTimeViolations.toList, ExposureTimeViolation.check(step(1500), ctx))
+
+  test("the digest's second order overlaps are the check's for its steps"):
+    val steps = List.fill(10)(step(20))
+    val sd    = SequenceDigest.Zero.add(atom(steps*), ctx)
+    assertEquals(sd.secondOrderOverlaps, SortedSet.from(steps.flatMap(SecondOrderOverlapCheck[DynamicConfig.GmosNorth].check)))
