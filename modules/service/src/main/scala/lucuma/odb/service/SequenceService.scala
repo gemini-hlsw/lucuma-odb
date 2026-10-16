@@ -28,7 +28,6 @@ import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.CloneSequenceMode
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObserveClass
-import lucuma.core.enums.StepGuideState
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.SmartGcalType
 import lucuma.core.enums.StepGuideState
