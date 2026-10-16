@@ -223,6 +223,7 @@ class ObscalcServiceSuite extends ObscalcServiceSuiteSupport:
               observing = StepDigest(NonNegInt.unsafeFrom(3 + RepeatingAtomCount), CategorizedTime(ChargeClass.Program -> TimeSpan.unsafeFromMicroseconds(617162500L)))
             ),
             ExecutionState.NotStarted,
+            SortedSet.empty,
             SortedSet.empty
           ),
           SequenceDigest(
@@ -242,6 +243,7 @@ class ObscalcServiceSuite extends ObscalcServiceSuiteSupport:
               observing = StepDigest(NonNegInt.unsafeFrom(10), CategorizedTime(ChargeClass.Program -> TimeSpan.FromSeconds.getOption(ScienceSequence - CalTime * 4).get))
             ),
             ExecutionState.NotStarted,
+            SortedSet.empty,
             SortedSet.empty
           )
       ),

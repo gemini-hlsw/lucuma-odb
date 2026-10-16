@@ -18068,6 +18068,13 @@ enum ObservationValidationCode {
   """
   EXPOSURE_TIME_WARNING
 
+  """
+  Second order light overlaps the first order spectrum of a GMOS spectroscopy
+  step: the step's wavelength coverage reaches past twice the shortest
+  wavelength reaching the grating.  An order-blocking filter may be needed.
+  """
+  SECOND_ORDER_OVERLAP
+
 }
 
 """

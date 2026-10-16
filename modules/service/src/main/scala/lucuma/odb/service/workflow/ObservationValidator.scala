@@ -72,6 +72,7 @@ object ObservationValidator:
       CfpRaDecValidator                        |+|
       BandValidator                            |+|
       GhostVMagnitudeValidator                 |+|
+      GmosSecondOrderOverlapValidator          |+|
       GnirsSpectroscopyValidator.configuration |+|
       GuideProbeValidator                      |+|
       AltairValidator                          |+|
