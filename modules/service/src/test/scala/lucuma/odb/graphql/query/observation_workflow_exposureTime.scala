@@ -268,6 +268,60 @@ class observation_workflow_exposureTime
                     )
     yield ()
 
+  test("the sequence digest reports the violations as step violations"):
+    for
+      (pid, oid) <- setup
+      _          <- replaceSequence(oid, SequenceType.Science, 0.5)
+      _          <- runObscalcUpdate(pid, oid)
+      _          <- expect(
+                      pi,
+                      s"""
+                        query {
+                          observation(observationId: ${oid.asJson}) {
+                            execution {
+                              digest {
+                                value {
+                                  acquisition { stepViolations { code } }
+                                  science {
+                                    stepViolations {
+                                      code
+                                      message
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      """,
+                      json"""
+                        {
+                          "observation": {
+                            "execution": {
+                              "digest": {
+                                "value": {
+                                  "acquisition": { "stepViolations": [] },
+                                  "science": {
+                                    "stepViolations": [
+                                      {
+                                        "code": "CONFIGURATION_ERROR",
+                                        "message": "Exposure times for GMOS North must be a whole number of seconds."
+                                      },
+                                      {
+                                        "code": "CONFIGURATION_ERROR",
+                                        "message": "Exposure times for GMOS North must be at least 1 s."
+                                      }
+                                    ]
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      """.asRight
+                    )
+    yield ()
+
   test("a fractional GMOS exposure time is an error"):
     for
       (pid, oid) <- setup

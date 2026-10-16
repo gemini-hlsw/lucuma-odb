@@ -18087,6 +18087,13 @@ enum ObservationValidationCode {
   """
   EXPOSURE_TIME_WARNING
 
+  """
+  Second order light overlaps the first order spectrum of a GMOS spectroscopy
+  step: the step's wavelength coverage reaches past twice the shortest
+  wavelength reaching the grating.  An order-blocking filter may be needed.
+  """
+  SECOND_ORDER_OVERLAP
+
 }
 
 """
@@ -19821,11 +19828,38 @@ type SequenceDigest {
   executionState: ExecutionState!
 
   """
+  The problems found in steps of the sequence, errors first, each reported once
+  however many steps share it.  They include the instrument's exposure rules
+  that steps violate (CONFIGURATION_ERROR for exposures that cannot be taken,
+  EXPOSURE_TIME_WARNING for those merely outside the recommended range, which
+  are reported for science steps alone) and, for GMOS spectroscopy, science
+  steps exposed to second order light (SECOND_ORDER_OVERLAP).
+  """
+  stepViolations: [StepViolation!]!
+
+  """
   The instrument's exposure rules that steps of the sequence violate, errors
   first.  Errors are exposures that cannot be taken; warnings are those merely
   outside the recommended range, and are reported for science steps alone.
+  These are the CONFIGURATION_ERROR and EXPOSURE_TIME_WARNING entries of
+  'stepViolations'.
   """
-  exposureTimeViolations: [ExposureTimeViolation!]!
+  exposureTimeViolations: [ExposureTimeViolation!]! @deprecated(reason: "Use stepViolations.")
+}
+
+"""
+A problem found in steps of a sequence, as the observation validation it
+raises.
+"""
+type StepViolation {
+  "The validation code reported for the problem."
+  code: ObservationValidationCode!
+
+  """
+  The problem as a sentence, e.g. "Exposure times for GMOS North must be at
+  least 1 s."
+  """
+  message: String!
 }
 
 """

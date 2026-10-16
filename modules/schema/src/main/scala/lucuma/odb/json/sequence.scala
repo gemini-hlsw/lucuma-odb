@@ -16,6 +16,7 @@ import io.circe.syntax.*
 import lucuma.core.enums.Breakpoint
 import lucuma.core.enums.ExecutionState
 import lucuma.core.enums.Instrument
+import lucuma.core.enums.ObservationValidationCode
 import lucuma.core.enums.ObserveClass
 import lucuma.core.math.Offset
 import lucuma.core.math.Wavelength
@@ -35,6 +36,7 @@ import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepDigest
 import lucuma.core.model.sequence.StepDigests
 import lucuma.core.model.sequence.StepEstimate
+import lucuma.core.model.sequence.StepViolation
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.exposure.ExposureTimeViolation
 import lucuma.core.util.TimeSpan
@@ -148,6 +150,28 @@ trait SequenceCodec {
         "description" -> a.description.asJson
       )
 
+  given Decoder[StepViolation] =
+    Decoder.instance: c =>
+      for
+        d <- c.downField("code").as[ObservationValidationCode]
+        m <- c.downField("message").as[String]
+      yield StepViolation(d, m)
+
+  given Encoder[StepViolation] =
+    Encoder.instance: (a: StepViolation) =>
+      Json.obj(
+        "code"    -> a.code.asJson,
+        "message" -> a.message.asJson
+      )
+
+  // The deprecated `exposureTimeViolations` view of a digest's step violations:
+  // those carrying the codes that exposure time violations are reported with
+  // (see `ExposureTimeViolation.toStepViolation`).
+  private def exposureTimeViolations(vs: SortedSet[StepViolation]): List[ExposureTimeViolation] =
+    vs.toList.collect:
+      case StepViolation(ObservationValidationCode.ConfigurationError, m)  => ExposureTimeViolation(ExposureTimeViolation.Severity.Error, m)
+      case StepViolation(ObservationValidationCode.ExposureTimeWarning, m) => ExposureTimeViolation(ExposureTimeViolation.Severity.Warning, m)
+
   given Decoder[SequenceDigest] =
     Decoder.instance: c =>
       // Payloads that predate the step breakdown have no `steps`; read them as
@@ -160,7 +184,12 @@ trait SequenceCodec {
         g  <- c.downField("gcalSets").as[Option[NonNegInt]].map(_.getOrElse(NonNegInt.MinValue))
         s  <- c.downField("steps").as[Option[StepDigests]].map(_.getOrElse(StepDigests.Zero.copy(observing = StepDigest(NonNegInt.MinValue, t))))
         e  <- c.downField("executionState").as[ExecutionState]
-        v  <- c.downField("exposureTimeViolations").as[Option[List[ExposureTimeViolation]]].map(_.fold(SortedSet.empty[ExposureTimeViolation])(SortedSet.from))
+        // Prefer the step violations, falling back to the exposure time
+        // violations of payloads that predate them (or clients that ask only
+        // for the deprecated field).
+        sv <- c.downField("stepViolations").as[Option[List[StepViolation]]]
+        ev <- c.downField("exposureTimeViolations").as[Option[List[ExposureTimeViolation]]]
+        v   = sv.orElse(ev.map(_.map(_.toStepViolation))).fold(SortedSet.empty[StepViolation])(SortedSet.from)
       yield SequenceDigest(o, t, tc, n, g, s, e, v)
 
   given (using Encoder[Offset], Encoder[TimeSpan]): Encoder[SequenceDigest] =
@@ -173,7 +202,8 @@ trait SequenceCodec {
         "gcalSets"         -> a.gcalSets.asJson,
         "steps"                  -> a.steps.asJson,
         "executionState"         -> a.executionState.asJson,
-        "exposureTimeViolations" -> a.exposureTimeViolations.toList.asJson
+        "stepViolations"         -> a.stepViolations.toList.asJson,
+        "exposureTimeViolations" -> exposureTimeViolations(a.stepViolations).asJson
       )
 
   given Decoder[CalibrationEstimate] =

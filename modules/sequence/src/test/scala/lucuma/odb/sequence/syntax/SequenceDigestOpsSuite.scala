@@ -5,8 +5,11 @@ package lucuma.odb.sequence.syntax
 
 import cats.data.NonEmptyList
 import cats.syntax.all.*
+import lucuma.core.enums.GmosGratingOrder
+import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.StepType
+import lucuma.core.math.Wavelength
 import lucuma.core.model.ConstraintSet
 import lucuma.core.model.arb.ArbConstraintSet.given
 import lucuma.core.model.sequence.Atom
@@ -22,8 +25,9 @@ import lucuma.core.model.sequence.exposure.PendingExposureRules
 import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.model.sequence.gmos.GmosGratingConfig
 import lucuma.core.model.sequence.gmos.arb.ArbDynamicConfig.given
-import lucuma.core.model.sequence.gmos.arb.ArbGmosGratingConfig.given
 import lucuma.core.util.TimeSpan
+import lucuma.odb.sequence.StepCheck
+import lucuma.odb.sequence.gmos.SecondOrderOverlap
 import munit.ScalaCheckSuite
 import org.scalacheck.Arbitrary
 import org.scalacheck.Prop.forAll
@@ -43,8 +47,8 @@ class SequenceDigestOpsSuite extends ScalaCheckSuite:
   private val ctx: PendingExposureRules.Context =
     PendingExposureRules.Context(sample[ConstraintSet])
 
-  // Steps without an instrument have no exposure rules.
-  given PendingExposureRules[Unit] = (_, _) => Nil
+  // Steps without an instrument have nothing to check.
+  given StepCheck[Unit] = (_, _) => Nil
 
   property("preserves ordering of atom steps"):
     forAll: (a: Atom[Unit]) =>
@@ -82,13 +86,22 @@ class SequenceDigestOpsSuite extends ScalaCheckSuite:
       sd.gcalSets.value === expected
 
   // A GMOS North long slit step, so only the 1 s minimum, whole seconds and
-  // the 1200 s cosmic ray warning apply.
+  // the 1200 s cosmic ray warning apply.  B1200 at 450 nm covers 368 - 532 nm,
+  // short of any second order onset, so only exposure times are reported.
   private def step(seconds: BigDecimal, observeClass: ObserveClass = ObserveClass.Science): Step[DynamicConfig.GmosNorth] =
     val d = sample[DynamicConfig.GmosNorth].copy(
       exposure      = TimeSpan.unsafeFromMicroseconds((seconds * 1_000_000).toLongExact),
-      gratingConfig = sample[GmosGratingConfig.North].some
+      gratingConfig = GmosGratingConfig.North(GmosNorthGrating.B1200_G5301, GmosGratingOrder.One, Wavelength.unsafeFromIntPicometers(450_000)).some
     )
     sample[Step[DynamicConfig.GmosNorth]].copy(instrumentConfig = d, stepConfig = StepConfig.Science, observeClass = observeClass)
+
+  // A 20 s R400 science step without a filter, centered at `nm`.
+  private def overlapStep(nm: Int): Step[DynamicConfig.GmosNorth] =
+    val s = step(20)
+    s.copy(instrumentConfig = s.instrumentConfig.copy(
+      gratingConfig = GmosGratingConfig.North(GmosNorthGrating.R400_G5310, GmosGratingOrder.One, Wavelength.unsafeFromIntPicometers(nm * 1000)).some,
+      filter        = None
+    ))
 
   private def atom(steps: Step[DynamicConfig.GmosNorth]*): Atom[DynamicConfig.GmosNorth] =
     sample[Atom[DynamicConfig.GmosNorth]].copy(steps = NonEmptyList.fromListUnsafe(steps.toList))
@@ -105,12 +118,17 @@ class SequenceDigestOpsSuite extends ScalaCheckSuite:
       SequenceDigest.Zero
         .add(atom(step(1300), step(20), step(1500)), ctx)
         .add(atom(step(0.5), step(0.25)), ctx)
-    assertEquals(sd.exposureTimeViolations.toList, List(error(Fractional), error(BelowMin), warning(CosmicRays)))
+    assertEquals(sd.stepViolations.toList, List(error(Fractional), error(BelowMin), warning(CosmicRays)).map(_.toStepViolation))
 
   test("acquisition steps are checked for errors alone"):
     val sd = SequenceDigest.Zero.add(atom(step(0, ObserveClass.Acquisition), step(1500, ObserveClass.Acquisition)), ctx)
-    assertEquals(sd.exposureTimeViolations.toList, List(error(BelowMin)))
+    assertEquals(sd.stepViolations.toList, List(error(BelowMin).toStepViolation))
 
   test("the digest's violations are core's for its steps"):
     val sd = SequenceDigest.Zero.add(atom(step(1500)), ctx)
-    assertEquals(sd.exposureTimeViolations.toList, ExposureTimeViolation.check(step(1500), ctx))
+    assertEquals(sd.stepViolations.toList, ExposureTimeViolation.check(step(1500), ctx).map(_.toStepViolation))
+
+  test("steps sharing a second order overlap report it once"):
+    // R400 without a filter reaches past 720 nm at each of these central wavelengths
+    val sd = SequenceDigest.Zero.add(atom(overlapStep(692), overlapStep(700), overlapStep(708)), ctx)
+    assertEquals(sd.stepViolations.toList, List(SecondOrderOverlap.gmosNorth(overlapStep(700)).get))

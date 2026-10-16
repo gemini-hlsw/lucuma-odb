@@ -14,8 +14,8 @@ import lucuma.core.enums.SequenceType
 import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.exposure.ExposureTimeViolation
-import lucuma.odb.service.workflow.validator.ExposureTimeValidator
 import lucuma.odb.service.workflow.validator.GnirsSpectroscopyValidator
+import lucuma.odb.service.workflow.validator.StepViolationValidator
 
 class observation_workflow_gnirs extends ExecutionTestSupportForGnirs:
 
@@ -131,23 +131,23 @@ class observation_workflow_gnirs extends ExecutionTestSupportForGnirs:
     (ObservationValidationCode.ExposureTimeWarning, msgs.toList)
 
   // Read mode exposure limits are reported per sequence by the
-  // ExposureTimeValidator rather than per wavelength by the GNIRS validator.
+  // StepViolationValidator rather than per wavelength by the GNIRS validator.
   private val veryBrightUnusuallyLong: String =
-    ExposureTimeValidator.message(
+    StepViolationValidator.message(
       SequenceType.Science,
       ExposureTimeViolation(
         ExposureTimeViolation.Severity.Warning,
         "Exposure times above 1 s are not recommended for GNIRS very bright read mode where a lower read noise mode is normally used."
-      )
+      ).toStepViolation
     )
 
   private val veryFaintTooShort: String =
-    ExposureTimeValidator.message(
+    StepViolationValidator.message(
       SequenceType.Science,
       ExposureTimeViolation(
         ExposureTimeViolation.Severity.Error,
         "Exposure times for GNIRS very faint read mode must be at least 18 s."
-      )
+      ).toStepViolation
     )
 
   private def nm(n: Int): Wavelength =

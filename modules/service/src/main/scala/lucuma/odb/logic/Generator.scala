@@ -49,6 +49,7 @@ import lucuma.odb.data.ItcAcquisition
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.ObservingMode.Syntax.*
 import lucuma.odb.sequence.SetupTimeEstimateCalculator
+import lucuma.odb.sequence.StepCheck
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.ItcInput
 import lucuma.odb.sequence.data.StreamingExecutionConfig
@@ -319,10 +320,10 @@ object Generator:
         ctx: GeneratorContext
       )(using Transaction[F]): EitherT[F, OdbError, ExecutionDigest] =
 
-        // Exposure times are checked in the same pass over the steps.
+        // Steps are checked (see StepCheck) in the same pass over them.
         val exposure = PendingExposureRules.Context(ctx.constraints)
 
-        def digest[S, D: PendingExposureRules](
+        def digest[S, D: StepCheck](
           stream:    StreamingExecutionConfig[F, S, D],
           estimator: SetupTimeEstimateCalculator
         ): EitherT[F, OdbError, ExecutionDigest] =
