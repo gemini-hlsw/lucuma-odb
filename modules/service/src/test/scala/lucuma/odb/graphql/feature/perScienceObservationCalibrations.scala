@@ -12,11 +12,6 @@ import io.circe.Decoder
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
-import lucuma.catalog.clients.SimbadClientMock
-import lucuma.catalog.clients.TelluricTargetsClientMock
-import lucuma.catalog.telluric.TelluricStar
-import lucuma.catalog.telluric.TelluricTargetsClient
-import lucuma.core.enums.Band
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.Flamingos2Fpu
 import lucuma.core.enums.GeminiCallForProposalsType.DemoScience
@@ -35,9 +30,6 @@ import lucuma.core.enums.TargetDisposition
 import lucuma.core.enums.TelluricCalibrationOrder
 import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.math.BoundedInterval
-import lucuma.core.math.BrightnessUnits.BrightnessMeasure
-import lucuma.core.math.BrightnessUnits.Integrated
-import lucuma.core.math.BrightnessValue
 import lucuma.core.math.Coordinates
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.SingleSN
@@ -48,11 +40,7 @@ import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Semester
-import lucuma.core.model.SiderealTracking
-import lucuma.core.model.SourceProfile
-import lucuma.core.model.SpectralDefinition
 import lucuma.core.model.Target
-import lucuma.core.model.TelluricType
 import lucuma.core.model.User
 import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.core.syntax.timespan.*
@@ -62,7 +50,6 @@ import lucuma.core.util.Timestamp
 import lucuma.itc.IntegrationTime
 import lucuma.itc.SignalToNoiseAt
 import lucuma.itc.client.SpectroscopyInput
-import lucuma.odb.TestCoordinates.coords
 import lucuma.odb.data.OdbError
 import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.graphql.query.ExecutionTestSupportForFlamingos2
@@ -79,12 +66,10 @@ import lucuma.odb.smartgcal.data.Gnirs
 import lucuma.odb.smartgcal.data.SmartGcalValue.LegacyInstrumentConfig
 import lucuma.odb.util.Codecs.observation_id
 import lucuma.odb.util.Codecs.user_state
-import lucuma.refined.*
 import skunk.syntax.all.*
 
 import java.time.LocalDateTime
 import java.time.ZoneOffset
-import scala.collection.immutable.SortedMap
 
 class perScienceObservationCalibrations
   extends OdbSuite
@@ -99,78 +84,6 @@ class perScienceObservationCalibrations
   val DefaultSnAt: Wavelength = Wavelength.fromIntNanometers(510).get
 
   val when = LocalDateTime.of(2024, 1, 1, 12, 0, 0).toInstant(ZoneOffset.UTC)
-
-  // Mock telluric star
-  val mockStarBefore = TelluricStar(
-    id = "12345",
-    spType = TelluricType.A0V,
-    coordinates = coords(123.456, 45.678),
-    distance = 100.5,
-    hmag = 7.5,
-    score = 0.95,
-    order = TelluricCalibrationOrder.Before,
-    sed = None
-  )
-
-  val mockStarAfter = TelluricStar(
-    id = "12346",
-    spType = TelluricType.A0V,
-    coordinates = coords(123.789, 45.123),
-    distance = 98.2,
-    hmag = 7.8,
-    score = 0.92,
-    order = TelluricCalibrationOrder.After,
-    sed = None
-  )
-
-  val mockBrightnesses = SortedMap[Band, BrightnessMeasure[Integrated]](
-    Band.J -> Band.J.defaultUnits[Integrated].withValueTagged(BrightnessValue.unsafeFrom(14.74))
-  )
-
-  val mockTarget = Target.Sidereal(
-    name = "HIP 12345".refined,
-    tracking = SiderealTracking(
-      baseCoordinates = mockStarBefore.coordinates,
-      epoch = lucuma.core.math.Epoch.J2000,
-      properMotion = None,
-      radialVelocity = None,
-      parallax = None
-    ),
-    sourceProfile = SourceProfile.Point(
-      SpectralDefinition.BandNormalized(None, mockBrightnesses)
-    ),
-    catalogInfo = None
-  )
-
-  val mockTelluricJson: Json = Json.obj(
-    "data" -> Json.obj(
-      "search" -> Json.arr(
-        Json.obj(
-          "ID" -> mockStarBefore.id.asJson,
-          "spType" -> Json.fromString(mockStarBefore.spType.tag),
-          "RA" -> mockStarBefore.coordinates.ra.toAngle.toDoubleDegrees.asJson,
-          "Dec" -> mockStarBefore.coordinates.dec.toAngle.toSignedDoubleDegrees.asJson,
-          "Distance" -> mockStarBefore.distance.asJson,
-          "Hmag" -> mockStarBefore.hmag.asJson,
-          "Score" -> mockStarBefore.score.asJson,
-          "Order" -> Json.fromString(mockStarBefore.order.tag)
-        ),
-        Json.obj(
-          "ID" -> mockStarAfter.id.asJson,
-          "spType" -> Json.fromString(mockStarAfter.spType.tag),
-          "RA" -> mockStarAfter.coordinates.ra.toAngle.toDoubleDegrees.asJson,
-          "Dec" -> mockStarAfter.coordinates.dec.toAngle.toSignedDoubleDegrees.asJson,
-          "Distance" -> mockStarAfter.distance.asJson,
-          "Hmag" -> mockStarAfter.hmag.asJson,
-          "Score" -> mockStarAfter.score.asJson,
-          "Order" -> Json.fromString(mockStarAfter.order.tag)
-        )
-      )
-    )
-  )
-
-  override protected def telluricClient: IO[TelluricTargetsClient[IO]] =
-    TelluricTargetsClientMock.fromJson(mockTelluricJson, SimbadClientMock.withSingleTarget(mockTarget))
 
   // The fake ITC measures the ticket's S/N of 116, so a telluric sized from it lands at 232.
   override def fakeSignalToNoiseAt(w: Wavelength): SignalToNoiseAt =

@@ -44,10 +44,8 @@ import io.circe.JsonObject
 import io.circe.syntax.*
 import io.laserdisc.pure.s3.tagless.S3AsyncClientOp
 import lucuma.catalog.clients.GaiaClient
-import lucuma.catalog.clients.SimbadClient
 import lucuma.catalog.goa.GoaClient
 import lucuma.catalog.goa.GoaClientMock
-import lucuma.catalog.simbad.SEDDataLoader
 import lucuma.catalog.telluric.TelluricTargetsClient
 import lucuma.catalog.votable.CatalogAdapter
 import lucuma.common.middleware.UserContext
@@ -445,16 +443,9 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       proposalEmails    = Config.ProposalEmails.uniform(EmailAddress.unsafeFrom("proposals@gpp.com"))
     )
 
-  val simbadClient: IO[SimbadClient[IO]] =
-    SEDDataLoader.loadMatcher[IO].map: matcher =>
-      SimbadClient.build[IO](httpClient, matcher)
-
+  /** Override to control what telluric resolution finds. Never the real client. */
   protected def telluricClient: IO[TelluricTargetsClient[IO]] =
-    given Tracer[IO] = Tracer.noop
-
-    simbadClient.flatMap: sc =>
-      TelluricTargetsClient
-        .build[IO](uri"https://telluric-targets.gpp.gemini.edu/", httpClient, sc)
+    TelluricMocks.client
 
   /** Override to control what the archive duplication search sees. */
   protected def goaClient: IO[GoaClient[IO]] =
