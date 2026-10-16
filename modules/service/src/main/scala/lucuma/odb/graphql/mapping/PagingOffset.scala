@@ -8,8 +8,7 @@ import cats.syntax.parallel.*
 import grackle.Predicate
 import grackle.Predicate.True
 import grackle.Result
-import grackle.syntax.*
-import lucuma.odb.graphql.binding.Matcher
+import lucuma.odb.graphql.input.oneOrDefault
 import lucuma.odb.graphql.predicate.LeafPredicates
 
 /**
@@ -19,8 +18,19 @@ import lucuma.odb.graphql.predicate.LeafPredicates
  */
 object PagingOffset:
 
-  val MoreThanOne: Result[Nothing] =
-    Matcher.validationFailure("Only one of `OFFSET`, `OFFSET_AT` and `OFFSET_AFTER` may be specified.")
+  /** As `predicate`, but the deprecated `OFFSET` pages by its own `offsetKey`. */
+  def predicate[A: Order, B: Order](
+    offsetKey:    LeafPredicates[B],
+    key:          LeafPredicates[A],
+    OFFSET:       Option[B],
+    OFFSET_AT:    Option[A],
+    OFFSET_AFTER: Option[A]
+  ): Result[Predicate] =
+    oneOrDefault[Predicate](True)(
+      OFFSET.map(offsetKey.gtEql) -> "OFFSET",
+      OFFSET_AT.map(key.gtEql)    -> "OFFSET_AT",
+      OFFSET_AFTER.map(key.gt)    -> "OFFSET_AFTER"
+    )
 
   def predicate[A: Order](
     key:          LeafPredicates[A],
@@ -28,12 +38,7 @@ object PagingOffset:
     OFFSET_AT:    Option[A],
     OFFSET_AFTER: Option[A]
   ): Result[Predicate] =
-    (OFFSET, OFFSET_AT, OFFSET_AFTER) match
-      case (None, None, None)    => True.success
-      case (Some(a), None, None) => key.gtEql(a).success
-      case (None, Some(a), None) => key.gtEql(a).success
-      case (None, None, Some(a)) => key.gt(a).success
-      case _                     => MoreThanOne
+    predicate(key, key, OFFSET, OFFSET_AT, OFFSET_AFTER)
 
   def predicate[A: Order](
     key:           LeafPredicates[A],
@@ -41,4 +46,4 @@ object PagingOffset:
     rOFFSET_AT:    Result[Option[A]],
     rOFFSET_AFTER: Result[Option[A]]
   ): Result[Predicate] =
-    (rOFFSET, rOFFSET_AT, rOFFSET_AFTER).parTupled.flatMap(predicate(key, _, _, _))
+    (rOFFSET, rOFFSET_AT, rOFFSET_AFTER).parFlatMapN(predicate(key, _, _, _))
