@@ -48,7 +48,6 @@ import lucuma.odb.data.AltairConfiguration
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.service.ObservationWorkflowService.UserState
 import lucuma.odb.syntax.instrument.*
-import lucuma.odb.syntax.observingModeType.*
 import lucuma.odb.util.Codecs.*
 import skunk.Encoder
 import skunk.Query
@@ -92,14 +91,13 @@ case class ObservationValidationInfo(
   subaruInstrument:       Option[SubaruInstrument] = None, // set for exchange_subaru observations
   explicitGuideProbe:     Option[GuideProbe] = None,
   altair:                 Option[AltairConfiguration],
-  executionDigest:        Option[ExecutionDigest] = None
+  executionDigest:        Option[ExecutionDigest] = None,
+  hasScienceSteps:        Boolean = false, // set for daytime calibrations
+  instrument:             Option[Instrument] = None
 ) {
 
   def isDeclaredComplete: Boolean =
     declaredExecutionState === Some(CoreExecutionState.DeclaredComplete)
-
-  def instrument: Option[Instrument] =
-    observingMode.flatMap(_.instrumentOption)
 
   def effectiveUserState: Option[UserState] =
     // Per-observation calibrations (tellurics, daytime pinhole flats) inherit
@@ -155,6 +153,9 @@ case class ObservationValidationInfo(
 
   def isExchange: Boolean =
     observingMode.exists(_.isExchange)
+
+  def isDaytimeCalibration: Boolean =
+    calibrationRole.contains(CalibrationRole.DaytimeCalibration)
 
   lazy val cfpMidpoint: Option[Timestamp] =
     for
@@ -247,6 +248,22 @@ object ObservationValidationInfo {
             configs.get(oid).fold(oid -> info): cfg =>
               oid -> info.copy(keckInstrument = cfg.keckInstrument, subaruInstrument = cfg.subaruInstrument)
 
+    // Whether a daytime calibration has stored science steps.  Only daytime
+    // calibrations are looked up.
+    def addDaytimeCalibrationInfos(input: Map[Observation.Id, ObservationValidationInfo]): F[Map[Observation.Id, ObservationValidationInfo]] =
+      NonEmptyList.fromList(input.collect { case (oid, info) if info.isDaytimeCalibration => oid }.toList) match
+        case None      => input.pure[F]
+        case Some(nel) =>
+          val enc = observation_id.nel(nel)
+          session
+            .stream(Statements.WithScienceSteps(enc))(nel, 1024)
+            .compile
+            .toList
+            .map(_.toSet)
+            .map: withSteps =>
+              input.map: (oid, info) =>
+                oid -> (if info.isDaytimeCalibration then info.copy(hasScienceSteps = withSteps.contains(oid)) else info)
+
     def addProgramAllocations(input: Map[Observation.Id, ObservationValidationInfo]): F[Map[Observation.Id, ObservationValidationInfo]] =
       NonEmptyList.fromList(input.values.map(_.pid).toList.distinct) match
         case None => input.pure[F]
@@ -326,12 +343,22 @@ object ObservationValidationInfo {
           .flatMap(addGeneratorParams)
           .flatMap(addCfpInfos)
           .flatMap(addExchangeInfos)
+          .flatMap(addDaytimeCalibrationInfos)
           .flatMap(addProgramAllocations)
           .flatMap(addCoordinates)
           .flatMap(addOtherConfigErrors)
   }
 
   object Statements {
+
+    def WithScienceSteps[A <: NonEmptyList[Observation.Id]](enc: skunk.Encoder[A]): Query[A, Observation.Id] =
+      sql"""
+        SELECT DISTINCT a.c_observation_id
+          FROM t_atom a
+          JOIN t_step s ON s.c_atom_id = a.c_atom_id
+         WHERE a.c_sequence_type = 'science'
+           AND a.c_observation_id IN ($enc)
+      """.query(observation_id)
 
     def ObservationValidationInfosWithoutAsterisms[A <: NonEmptyList[Observation.Id]](enc: Encoder[A]): Query[A, ObservationValidationInfo] =
       sql"""
@@ -340,6 +367,7 @@ object ObservationValidationInfo {
           p.c_program_type,
           o.c_observation_id,
           o.c_observing_mode_type,
+          o.c_instrument,
           o.c_explicit_ra,
           o.c_explicit_dec,
           o.c_calibration_role,
@@ -392,6 +420,7 @@ object ObservationValidationInfo {
         program_type                    *:
         observation_id                  *:
         observing_mode_type.opt         *:
+        instrument.opt                  *:
         right_ascension.opt             *:
         declination.opt                 *:
         calibration_role.opt            *:
@@ -420,13 +449,13 @@ object ObservationValidationInfo {
         altair_nd_filter.opt
       )
       .map:
-        case (pid, tpe, oid, mode, ra, dec, cal, isUserDefinedTelluric, state, ds, ps, too, sched, ceil, permitted, cfp, sci, state2, ce, iq, sb, wv, er, wl, ovcs, egp, altairMode, fieldLens, cassRotator, ndFilter) =>
+        case (pid, tpe, oid, mode, inst, ra, dec, cal, isUserDefinedTelluric, state, ds, ps, too, sched, ceil, permitted, cfp, sci, state2, ce, iq, sb, wv, er, wl, ovcs, egp, altairMode, fieldLens, cassRotator, ndFilter) =>
           val cs = ConstraintSet(iq, ce, sb, wv, er)
           // All-or-nothing (field lens aside) is a DB CHECK; the fallbacks here
           // are unreachable in practice, not a second source of truth for them.
           val altair = altairMode.map: m =>
             AltairConfiguration(m, fieldLens, cassRotator.getOrElse(CassRotator.Following), ndFilter.getOrElse(AltairNdFilter.Out))
-          ObservationValidationInfo(pid, tpe, oid, cs, wl, mode, None, (ra, dec).mapN(Coordinates.apply), cal, isUserDefinedTelluric, state, ds, ps, too, sched, ceil, permitted, cfp, sci, Nil, state2, ovcs, explicitGuideProbe = egp, altair = altair)
+          ObservationValidationInfo(pid, tpe, oid, cs, wl, mode, None, (ra, dec).mapN(Coordinates.apply), cal, isUserDefinedTelluric, state, ds, ps, too, sched, ceil, permitted, cfp, sci, Nil, state2, ovcs, explicitGuideProbe = egp, altair = altair, instrument = inst)
 
     def ProgramAllocations[A <: NonEmptyList[Program.Id]](enc: Encoder[A]): Query[A, (Program.Id, ScienceBand)] =
       sql"""

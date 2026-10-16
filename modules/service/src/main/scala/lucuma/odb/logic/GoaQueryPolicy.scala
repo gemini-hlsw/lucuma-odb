@@ -27,6 +27,7 @@ import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
 import lucuma.odb.data.ArchiveSearchPointing
 import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.sequence.ObservingMode.Syntax.*
+import lucuma.odb.sequence.daytimecal.Config as DaytimeCalibration
 import lucuma.odb.sequence.exchange.Config as Exchange
 import lucuma.odb.sequence.flamingos2.imaging.Config as Flamingos2Imaging
 import lucuma.odb.sequence.flamingos2.longslit.Config as Flamingos2LongSlit
@@ -133,6 +134,8 @@ object GoaQueryPolicy:
     val pa  = Angle.Angle0
     val off = Offset.Zero
     mode match
+      case _: DaytimeCalibration =>
+        Nil
       case _: Exchange           =>
         Nil
       case _: Flamingos2Imaging  =>
@@ -179,6 +182,7 @@ object GoaQueryPolicy:
    */
   def scienceMode(mode: ObservingMode): Option[ScienceMode] =
     mode match
+      case _: DaytimeCalibration => none
       case _: Exchange           => none
       case _: Flamingos2Imaging  => ScienceMode.Imaging.some
       case _: Flamingos2LongSlit => ScienceMode.Spectroscopy.some

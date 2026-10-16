@@ -13,6 +13,7 @@ extension(role: Option[CalibrationRole])
     role match
       case Some(CalibrationRole.Twilight)            => ObserveClass.DayCal
       case Some(CalibrationRole.DaytimePinhole)      => ObserveClass.DayCal
+      case Some(CalibrationRole.DaytimeCalibration)  => ObserveClass.DayCal
       case Some(CalibrationRole.Telluric)            => ObserveClass.NightCal
       case Some(CalibrationRole.SpectroPhotometric)  => ObserveClass.NightCal
       case _                                         => ObserveClass.Science
@@ -22,6 +23,7 @@ extension(role: Option[CalibrationRole])
     role match
       case Some(CalibrationRole.Twilight)            => ObserveClass.DayCal
       case Some(CalibrationRole.DaytimePinhole)      => ObserveClass.DayCal
+      case Some(CalibrationRole.DaytimeCalibration)  => ObserveClass.DayCal
       case _                                         => ObserveClass.NightCal
 
   // whether science steps are guided for a particular calibration role.  this
@@ -31,4 +33,5 @@ extension(role: Option[CalibrationRole])
     role match
       case Some(CalibrationRole.Twilight)            => StepGuideState.Disabled
       case Some(CalibrationRole.DaytimePinhole)      => StepGuideState.Disabled
+      case Some(CalibrationRole.DaytimeCalibration)  => StepGuideState.Disabled
       case _                                         => StepGuideState.Enabled

@@ -61,8 +61,9 @@ object ObservationValidator:
     val engValidator: ObservationValidator = _ =>
       ObservationValidationMap.empty
 
-    val calibrationValidator: ObservationValidator =
-      BandValidator
+    val calibrationValidator: ObservationValidator = info =>
+      if info.isDaytimeCalibration then DaytimeCalibrationValidator(info)
+      else BandValidator(info)
 
     val scienceValidator1: ObservationValidator =
       GeneratorValidator                       |+|

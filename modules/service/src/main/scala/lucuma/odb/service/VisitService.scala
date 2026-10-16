@@ -98,7 +98,8 @@ object VisitService:
              Some(CalibrationRole.SpectroPhotometric) |
              Some(CalibrationRole.Telluric)            => true
         case Some(CalibrationRole.Twilight)          |
-             Some(CalibrationRole.DaytimePinhole)      => false
+             Some(CalibrationRole.DaytimePinhole)      |
+             Some(CalibrationRole.DaytimeCalibration)  => false
 
   def instantiate[F[_]: Concurrent](using Services[F]): VisitService[F] =
     new VisitService[F]:

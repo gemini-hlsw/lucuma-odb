@@ -8,9 +8,12 @@ import lucuma.core.enums.ObservingModeType
 // Modes that the generic, mode-iterating test harnesses (clone, configuration
 // requests, ...) do not exercise.  The exchange modes are excluded because they
 // require a matching exchange proposal and do not participate in configuration
-// requests; they are covered by their own dedicated suites instead.
+// requests; they are covered by their own dedicated suites instead.  Daytime
+// calibrations are staff-only and have no target, so no configuration
+// requests either; they too have dedicated suites.
 val UnImplementedModes: Set[ObservingModeType] =
   Set(
+    ObservingModeType.DaytimeCalibration,
     ObservingModeType.ExchangeKeck,
     ObservingModeType.ExchangeSubaru,
     ObservingModeType.Flamingos2Imaging,

@@ -21,6 +21,7 @@ import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.DatasetStage
+import lucuma.core.enums.DaytimeCalibrationObservingModeType
 import lucuma.core.enums.EducationalStatus
 import lucuma.core.enums.EmailStatus
 import lucuma.core.enums.ExchangeObservingModeType
@@ -1490,6 +1491,13 @@ trait DatabaseOperations { this: OdbSuite =>
 
   private def observingModeObject(observingMode: ObservingModeType): String =
     observingMode match
+      case _: DaytimeCalibrationObservingModeType =>
+        """{
+          daytimeCalibration: {
+            instrument: GMOS_NORTH
+          }
+        }"""
+
       case e: ExchangeObservingModeType =>
         s"""{
           exchange: {

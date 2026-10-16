@@ -4,6 +4,7 @@
 package lucuma.odb.syntax
 
 import cats.syntax.option.*
+import lucuma.core.enums.DaytimeCalibrationObservingModeType
 import lucuma.core.enums.ExchangeObservingModeType
 import lucuma.core.enums.FacilityObservingModeType
 import lucuma.core.enums.Instrument
@@ -20,8 +21,9 @@ trait ToObservingModeTypeOps:
      */
     def instrumentOption: Option[Instrument] =
       self match
-        case f: FacilityObservingModeType => f.instrument.some
-        case v: VisitorObservingModeType  => v.instrument.some
-        case _: ExchangeObservingModeType => none
+        case f: FacilityObservingModeType           => f.instrument.some
+        case v: VisitorObservingModeType            => v.instrument.some
+        case _: ExchangeObservingModeType           => none
+        case _: DaytimeCalibrationObservingModeType => none
 
 object observingModeType extends ToObservingModeTypeOps
