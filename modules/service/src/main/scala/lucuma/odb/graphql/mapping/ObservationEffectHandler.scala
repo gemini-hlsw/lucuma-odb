@@ -8,6 +8,7 @@ import cats.Eq
 import cats.syntax.applicative.*
 import cats.syntax.apply.*
 import cats.syntax.eq.*
+import cats.syntax.functor.*
 import cats.syntax.traverse.*
 import grackle.Cursor
 import grackle.Env
@@ -24,7 +25,7 @@ import lucuma.core.model.User
 
 import table.ObservationView
 
-trait ObservationEffectHandler[F[_]] extends ObservationView[F] {
+trait ObservationEffectHandler[F[_]] extends ObservationView[F] with KeyValueEffectHandler[F] {
 
   protected def effectHandler[E, R](
     readEnv:   Env => Result[E],
@@ -51,28 +52,15 @@ trait ObservationEffectHandler[F[_]] extends ObservationView[F] {
     readCursor:   Cursor => Result[E],
     calculateAll: User ?=> List[(Observation.Id, E)] => F[Map[Observation.Id, Result[R]]]
   )(using CirceEncoder[R]): EffectHandler[F] =
-    new EffectHandler[F] {
-
-      private def rows(queries: List[(Query, Cursor)]): Result[List[(Observation.Id, E)]] =
-        queries.traverse:
-          case (_, cursor) => (cursor.fieldAs[Observation.Id]("id"), readCursor(cursor)).tupled
-
-      private def missing(oid: Observation.Id): Result[R] =
-        Result.failure(s"No result computed for observation $oid")
-
-      def runEffects(queries: List[(Query, Cursor)]): F[Result[List[Cursor]]] =
-        (for {
-          usr <- ResultT.fromResult(UserEnv.fromQueries(queries))
-          os  <- ResultT(rows(queries).pure[F])
-          map <- ResultT.liftF(calculateAll(using usr)(os))
-          res <- ResultT(os.map(_._1).zip(queries).traverse { case (oid, (query, parentCursor)) =>
-                   for {
-                     r            <- map.getOrElse(oid, missing(oid))
-                     childContext <- Query.childContext(parentCursor.context, query)
-                   } yield CirceCursor(childContext, r.asJson, Some(parentCursor), parentCursor.fullEnv)
-                 }.pure)
-        } yield res).value
-    }
+    keyedBatchEffectHandler[(Observation.Id, E), R](
+      cursor => (cursor.fieldAs[Observation.Id]("id"), readCursor(cursor)).tupled,
+      (rows, _) =>
+        calculateAll(rows).map: m =>
+          rows.map: row =>
+            row -> m.getOrElse(row._1, Result.failure(s"No result computed for observation ${row._1}"))
+          .toMap,
+      (_, r) => r.asJson.success
+    )
 
   protected def readQueryAndCursorEffectHander[E, R](
     readQueryAndCursor:   (Query, Cursor) => Result[E],

@@ -5,7 +5,9 @@ package lucuma.odb.graphql
 package query
 
 import cats.effect.IO
+import cats.syntax.apply.*
 import cats.syntax.option.*
+import cats.syntax.traverse.*
 import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
@@ -1323,6 +1325,109 @@ class programPlannedTime extends ExecutionTestSupportForGmos:
           ga  -> (both, both),
           ga1 -> (LongTime, LongTime),
           gb  -> (LongTime, LongTime)
+        )
+      )
+
+  // Both estimate fields are served by one handler, in one call.  Again each
+  // group's estimates are distinct, here by band too.
+  test("group level range and banded: groups across programs and nesting, in one query"):
+    val setup: IO[(Program.Id, Program.Id, Group.Id, Group.Id, Group.Id)] =
+      for
+        pa  <- createProgram
+        _   <- setAllocationsAs(user, pa, List(AllocationB1, AllocationB2))
+        ta  <- createTargetWithProfileAs(user, pa)
+        ga  <- createGroupAs(user, pa)
+        ga1 <- createGroupAs(user, pa, parentGroupId = ga.some)
+        osa <- createBandedGmosNorthLongSlitObservationAs(user, pa, ta, ScienceBand.Band2.some)
+        ola <- createLongerGmosNorthLongSlitObservationAs(user, pa, ta)
+        _   <- moveObsToGroup(ga, osa)
+        _   <- moveObsToGroup(ga1, ola)
+        pb  <- createProgram
+        _   <- setAllocationsAs(user, pb, List(AllocationB1, AllocationB2))
+        tb  <- createTargetWithProfileAs(user, pb)
+        gb  <- createGroupAs(user, pb)
+        olb <- createLongerGmosNorthLongSlitObservationAs(user, pb, tb)
+        _   <- setScienceBandAs(user, olb, ScienceBand.Band1.some)
+        _   <- moveObsToGroup(gb, olb)
+        _   <- runObscalcUpdate(pa, osa)
+        _   <- runObscalcUpdate(pa, ola)
+        _   <- runObscalcUpdate(pb, olb)
+      yield (pa, pb, ga, ga1, gb)
+
+    for
+      (pa, pb, ga, ga1, gb) <- setup
+      js <- query(
+              user  = user,
+              query = s"""
+                query {
+                  programs(WHERE: { id: { IN: ["$pa", "$pb"] } }) {
+                    matches {
+                      allGroupElements {
+                        group {
+                          id
+                          timeEstimateRange {
+                            value {
+                              minimum { total { seconds } }
+                              maximum { total { seconds } }
+                            }
+                          }
+                          timeEstimateBanded {
+                            value {
+                              band
+                              time { total { seconds } }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              """
+            )
+    yield
+      val groups: List[io.circe.ACursor] =
+        js.hcursor
+          .downFields("programs", "matches")
+          .values.toList.flatten
+          .flatMap(_.hcursor.downField("allGroupElements").values.toList.flatten)
+          .map(_.hcursor.downField("group"))
+          .filter(_.downField("id").succeeded)
+
+      val ranges: Map[Group.Id, (BigDecimal, BigDecimal)] =
+        groups.flatMap: g =>
+          val v = g.downFields("timeEstimateRange", "value")
+          (for
+            id  <- g.downField("id").as[Group.Id]
+            min <- v.downFields("minimum", "total", "seconds").as[BigDecimal]
+            max <- v.downFields("maximum", "total", "seconds").as[BigDecimal]
+          yield id -> (min, max)).toOption
+        .toMap
+
+      val banded: Map[Group.Id, List[(Option[String], BigDecimal)]] =
+        groups.flatMap: g =>
+          (for
+            id <- g.downField("id").as[Group.Id]
+            bs <- g.downField("timeEstimateBanded").values.toList.flatten.traverse: b =>
+                    val v = b.hcursor.downField("value")
+                    (v.downField("band").as[Option[String]], v.downFields("time", "total", "seconds").as[BigDecimal]).tupled
+          yield id -> bs).toOption
+        .toMap
+
+      val both = ShortTime + LongTime
+      assertEquals(
+        ranges,
+        Map(
+          ga  -> (both, both),
+          ga1 -> (LongTime, LongTime),
+          gb  -> (LongTime, LongTime)
+        )
+      )
+      assertEquals(
+        banded,
+        Map(
+          ga  -> List(None -> LongTime, Some("BAND2") -> ShortTime),
+          ga1 -> List(None -> LongTime),
+          gb  -> List(Some("BAND1") -> LongTime)
         )
       )
 

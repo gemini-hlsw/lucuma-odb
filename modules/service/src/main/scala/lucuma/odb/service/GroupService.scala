@@ -355,7 +355,7 @@ object GroupService {
         session.option(Statements.SelectPid)(groupId)
 
       def selectPids(groupIds: NonEmptyList[Group.Id])(using Transaction[F]): F[Map[Group.Id, Program.Id]] =
-        session.execute(Statements.selectPids(groupIds.size))(groupIds.toList).map(_.toMap)
+        session.execute(Statements.SelectPids)(groupIds.toList).map(_.toMap)
 
       def selectAllObservations(groupId: Group.Id)(using Transaction[F]): F[List[Observation.Id]] =
         session.execute(Statements.SelectAllObservationsInGroup)(groupId)
@@ -532,7 +532,9 @@ object GroupService {
           c_group_id = $group_id
       """.query(program_id)
 
-    def selectPids(n: Int): Query[List[Group.Id], (Group.Id, Program.Id)] =
+    // A single array parameter, so that any number of groups binds as one
+    // prepared statement.
+    val SelectPids: Query[List[Group.Id], (Group.Id, Program.Id)] =
       sql"""
         SELECT
           c_group_id,
@@ -540,7 +542,7 @@ object GroupService {
         FROM
           t_group
         WHERE
-          c_group_id IN (${group_id.list(n)})
+          c_group_id = ANY(${_gid[Group.Id]})
       """.query(group_id *: program_id)
 
     val SelectAllObservationsInGroup: Query[Group.Id, Observation.Id] =

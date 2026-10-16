@@ -125,6 +125,12 @@ trait Codecs extends CoreCodecs {
   def gid[A](implicit ev: Gid[A]): Codec[A] =
     codecFromPrism(ev.fromString, Type.varchar)
 
+  /** Codec for an array of ids, so that a list of any length binds as one parameter. */
+  def _gid[A](implicit ev: Gid[A]): Codec[List[A]] =
+    Codec
+      .array[A](ev.fromString.reverseGet, s => ev.fromString.getOption(s).toRight(s"Invalid id: $s"), Type("_varchar", List(Type.varchar)))
+      .imap[List[A]](_.flattenTo(List))(Arr.fromFoldable)
+
   def uid[A](implicit ev: Uid[A]): Codec[A] =
     codecFromPrism(ev.fromString, Type.varchar)
 

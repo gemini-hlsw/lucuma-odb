@@ -15,7 +15,9 @@ import grackle.Query.EffectHandler
 import grackle.Result
 import grackle.ResultT
 import grackle.circe.CirceMappingLike
+import grackle.syntax.*
 import io.circe.Encoder
+import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.model.User
 
@@ -51,33 +53,43 @@ trait KeyValueEffectHandler[F[_]: MonadCancelThrow] extends CirceMappingLike[F] 
     }
 
   /**
-   * Like `keyValueEffectHandler`, but computes the values for every key in the
-   * result at once, so that work shared between keys (e.g., loading the
-   * program that contains them) is done once rather than per key.
-   * `calculateAll` receives the distinct keys and must return a value for each
-   * of them.
+   * An `EffectHandler` that computes the values for every key in the result at
+   * once, so that work shared between keys (e.g., loading the program that
+   * contains them) is done once rather than per key.
+   *
+   * Grackle hands a handler every query that uses it, across all the fields
+   * it serves, so one handler may back several fields.  `calculateAll`
+   * receives the distinct keys read from the cursors along with the names of
+   * the fields requested, and `encode` turns a key's value into the JSON for
+   * one of those fields.
    */
-  def batchedKeyValueEffectHandler[K : ClassTag, T: Encoder](keyField: String)(
-    calculateAll: User ?=> List[K] => F[Map[K, T]]
-  ):  EffectHandler[F] =
+  def keyedBatchEffectHandler[K, T](
+    readKey:      Cursor => Result[K],
+    calculateAll: User ?=> (List[K], Set[String]) => F[Map[K, Result[T]]],
+    encode:       (String, T) => Result[Json]
+  ): EffectHandler[F] =
 
     new EffectHandler[F] {
       override def runEffects(queries: List[(Query, Cursor)]): F[Result[List[Cursor]]] =
         (for {
-          usr <- ResultT.fromResult(UserEnv.fromQueries(queries))
-          ctx <- ResultT(queries.traverse { case (_, cursor) => cursor.fieldAs[K](keyField) }.pure[F])
-          all <- ResultT.liftF(calculateAll(using usr)(ctx.distinct))
-          res <- ResultT(ctx
-                   .zip(queries)
-                   .traverse { case (k, (query, parentCursor)) =>
-                     for {
-                       result       <- all.get(k).fold(Result.internalError[T](s"No result computed for $k"))(Result.success)
-                       childContext <- Query.childContext(parentCursor.context, query)
-                     } yield CirceCursor(childContext, result.asJson, Some(parentCursor), parentCursor.fullEnv)
-                   }.pure[F]
-                 )
-          } yield res
-        ).value
+          usr    <- ResultT.fromResult(UserEnv.fromQueries(queries))
+          keys   <- ResultT(queries.traverse { case (_, cursor) => readKey(cursor) }.pure[F])
+          fields <- ResultT(queries.traverse { case (query, _) =>
+                      Query.rootName(query).map(_._1).toResultOrError("Query has the wrong shape")
+                    }.pure[F])
+          all    <- ResultT.liftF(calculateAll(using usr)(keys.distinct, fields.toSet))
+          res    <- ResultT(keys
+                      .zip(fields)
+                      .zip(queries)
+                      .traverse { case ((k, field), (query, parentCursor)) =>
+                        for {
+                          value        <- all.getOrElse(k, Result.failure(s"No result computed for $k"))
+                          json         <- encode(field, value)
+                          childContext <- Query.childContext(parentCursor.context, query)
+                        } yield CirceCursor(childContext, json, Some(parentCursor), parentCursor.fullEnv)
+                      }.pure[F]
+                    )
+        } yield res).value
     }
 
 }
