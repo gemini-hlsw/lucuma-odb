@@ -18,9 +18,9 @@ import grackle.syntax.*
 import lucuma.core.enums.AltairMode
 import lucuma.core.enums.AltairNdFilter
 import lucuma.core.enums.CalibrationRole
-import lucuma.core.enums.DaytimeCalibrationObservingModeType
 import lucuma.core.enums.CassRotator
 import lucuma.core.enums.CloneSequenceMode
+import lucuma.core.enums.DaytimeCalibrationObservingModeType
 import lucuma.core.enums.FieldLens
 import lucuma.core.enums.FocalPlane
 import lucuma.core.enums.GuideProbe
