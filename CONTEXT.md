@@ -271,3 +271,17 @@ _Avoid_: copy sequence flag, duplicate sequence, regenerate.
 **Guide Star Override**:
 A guide star a user named for an observation, used in place of the one the automatic search would choose. It holds until the user clears it or an input that decides which stars can guide the observation changes; executing the observation is not such a change.
 _Avoid_: manually selected guide star, selected guide star, guide target name, pick, selection.
+
+### Daytime Calibrations
+
+**Daytime Calibration**:
+A staff-created calibration observation with no target, no ITC, no guide star and no acquisition, taken with the dome closed and not charged to anyone. It is declared by its Daytime Calibration Mode, which the ODB pairs with the `DAYTIME_CALIBRATION` calibration role: the two always go together. Its science sequence may mix any `DAY_CAL` step kinds (biases, darks, flats, arcs) in any configuration; no step may be anything else, and none is guided. Until it has a sequence the observation is Undefined. May live in any program. Its sequence is entered by hand today and generated from Calibration Sets later; cadence is future work. Neither a Twilight (on-sky at dusk, keeps its target) nor a Daytime Pinhole (generated per GNIRS science observation, uses the ITC) is one, despite their `DAY_CAL` steps. Usually taken during the day, hence the name, but biases and darks may also run at night.
+_Avoid_: day cal (alone, the step-level class), baseline calibration (a Smart GCAL lookup kind), pinhole (one kind, not the concept), daytime flag (it is a role plus a mode, not a boolean), charged to the observatory (it is non-charged).
+
+**Daytime Calibration Mode**:
+A single observing mode holding the Gemini facility instrument of a Daytime Calibration and, once Calibration Sets exist, the ordered list of them. Staff-only. The sequence it generates follows the usual Materialized Sequence rule: generated until the first visit or a hand edit, stored and editable afterwards.
+_Avoid_: daytime mode (ambiguous with the time of day), instrument-only mode, one mode per instrument (the instrument is a parameter, not a kind).
+
+**Calibration Set**:
+One row of a Daytime Calibration Mode: a kind (bias, dark, flat or arc), an exposure count, and a single instrument setup, which the generator expands into that many identical `DAY_CAL` steps, one atom each. Flats and arcs take their lamp from Smart GCAL unless given explicitly. Planned, not yet built.
+_Avoid_: configuration (clashes with Configuration Request and the observing configuration), step generator (the mechanism, not the thing), template.

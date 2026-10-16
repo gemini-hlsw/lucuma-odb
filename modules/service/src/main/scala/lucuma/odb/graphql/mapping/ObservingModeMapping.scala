@@ -6,13 +6,12 @@ package lucuma.odb.graphql
 package mapping
 
 import grackle.skunk.SkunkMapping
-import lucuma.core.enums.ObservingModeType
-import lucuma.odb.syntax.observingModeType.*
 
 import table.*
 
 trait ObservingModeMapping[F[_]]
   extends ObservationView[F]
+     with DaytimeCalibrationView[F]
      with ExchangeView[F]
      with Flamingos2ImagingView[F]
      with GnirsImagingView[F]
@@ -31,9 +30,10 @@ trait ObservingModeMapping[F[_]]
     ObjectMapping(ObservingModeType)(
       SqlField("synthetic_id", ObservationView.ObservingMode.SyntheticId, key = true, hidden = true),
 
-      FieldRef[ObservingModeType]("mode").as("instrument", _.instrumentOption),
+      SqlField("instrument", ObservationView.Instrument),
       SqlField("mode", ObservationView.ObservingMode.ObservingModeType),
 
+      SqlObject("daytimeCalibration", Join(ObservationView.Id, DaytimeCalibrationView.ObservationId)),
       SqlObject("exchange",           Join(ObservationView.Id, ExchangeView.ObservationId)),
       SqlObject("flamingos2Imaging",  Join(ObservationView.Id, Flamingos2ImagingView.ObservationId)),
       SqlObject("gnirsImaging",       Join(ObservationView.Id, GnirsImagingView.ObservationId)),

@@ -129,6 +129,8 @@ trait Services[F[_]]:
 
   def emailService: EmailService[F]
 
+  def daytimeCalibrationService: DaytimeCalibrationService[F]
+
   def exchangeService: ExchangeService[F]
 
   /** The `ExecutionDigestService`. */
@@ -379,6 +381,7 @@ object Services:
       lazy val chronicleService = ChronicleService.instantiate
       lazy val configurationService = ConfigurationService.instantiate
       lazy val datasetService = DatasetService.instantiate
+      lazy val daytimeCalibrationService = DaytimeCalibrationService.instantiate
       lazy val exchangeService = ExchangeService.instantiate
       lazy val executionDigestService = ExecutionDigestService.instantiate
       lazy val executionEventService = ExecutionEventService.instantiate
@@ -461,6 +464,7 @@ object Services:
     def chronicleService[F[_]](using Services[F]): ChronicleService[F] = summon[Services[F]].chronicleService
     def configurationService[F[_]](using Services[F]): ConfigurationService[F] = summon[Services[F]].configurationService
     def datasetService[F[_]](using Services[F]): DatasetService[F] = summon[Services[F]].datasetService
+    def daytimeCalibrationService[F[_]](using Services[F]): DaytimeCalibrationService[F] = summon[Services[F]].daytimeCalibrationService
     def exchangeService[F[_]](using Services[F]) = summon[Services[F]].exchangeService
     def executionDigestService[F[_]](using Services[F]): ExecutionDigestService[F] = summon[Services[F]].executionDigestService
     def executionEventService[F[_]](using Services[F]): ExecutionEventService[F] = summon[Services[F]].executionEventService

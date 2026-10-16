@@ -66,6 +66,7 @@ import lucuma.odb.sequence.data.ItcInput
 import lucuma.odb.sequence.data.ItcInputDerivation
 import lucuma.odb.sequence.data.MissingParam
 import lucuma.odb.sequence.data.MissingParamSet
+import lucuma.odb.sequence.daytimecal
 import lucuma.odb.sequence.exchange
 import lucuma.odb.sequence.flamingos2
 import lucuma.odb.sequence.ghost
@@ -284,7 +285,7 @@ object GeneratorParamsService {
         // let it through so the generator can charge a placeholder time.  A
         // user-defined one is the user's to complete, so it is checked as science.
         val targetCheck =
-          if !isUserDefinedTelluric.value && calibrationRole.exists(r => r === CalibrationRole.DaytimePinhole || r === CalibrationRole.Telluric) then
+          if !isUserDefinedTelluric.value && calibrationRole.exists(r => r === CalibrationRole.DaytimePinhole || r === CalibrationRole.Telluric || r === CalibrationRole.DaytimeCalibration) then
             ().asRight[NonEmptyList[MissingParam]]
           else
             params
@@ -407,6 +408,24 @@ object GeneratorParamsService {
               c.explicitReadMode.getOrElse(Flamingos2ReadMode.forExposureTime(time))
 
         observingMode(obsParams.targets, config, obsParams.calibrationRole, obsParams.isUserDefinedTelluric).flatMap:
+
+          // Daytime calibrations have no target and no ITC.
+          case dc: daytimecal.Config =>
+            GeneratorParams(
+              ItcInputDerivation.NotApplicable,
+              obsParams.scienceBand,
+              dc,
+              obsParams.calibrationRole,
+              obsParams.proposalStatus,
+              hasTarget,
+              obsParams.declaredState,
+              obsParams.executionState,
+              obsParams.stepCount,
+              obsParams.schedulingMode.isSplittable,
+              obsParams.altair,
+              obsParams.guideProbe,
+              obsParams.tellurics
+            ).asRight
 
           // Exchange Modes (no ITC, like visitors)
           case exc: exchange.Config =>

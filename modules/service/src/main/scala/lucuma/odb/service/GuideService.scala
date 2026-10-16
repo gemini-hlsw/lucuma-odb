@@ -78,6 +78,7 @@ import lucuma.odb.json.all.query.given
 import lucuma.odb.json.target
 import lucuma.odb.logic.GeneratorError
 import lucuma.odb.sequence.data.GeneratorParams
+import lucuma.odb.sequence.daytimecal
 import lucuma.odb.sequence.exchange
 import lucuma.odb.sequence.flamingos2
 import lucuma.odb.sequence.ghost
@@ -203,7 +204,7 @@ object GuideService {
     // Calibration roles that don't use guide stars; an empty guide environment is
     // returned for these without invoking AGS.
     val CalRolesWithoutGuiding: Set[CalibrationRole] =
-      Set(CalibrationRole.Twilight, CalibrationRole.DaytimePinhole)
+      Set(CalibrationRole.Twilight, CalibrationRole.DaytimePinhole, CalibrationRole.DaytimeCalibration)
 
     val posAngle: Lens[GuideEnvironment, Angle] =
       Focus[GuideEnvironment](_.posAngle)
@@ -451,6 +452,9 @@ object GuideService {
   case class SearchSettings(params: GeneratorParams) {
     val (site: Site, observingModeType: ObservingModeType, agsWavelength: Wavelength) =
       params.observingMode match
+        case c: daytimecal.Config                             =>
+          // Daytime calibrations are taken with the dome closed, AGS is skipped
+          (c.instrument.site, ObservingModeType.DaytimeCalibration, Wavelength.Min)
         case c: exchange.Config                               =>
           // Exchange observations are not supported by AGS.  No guide probe is
           // defined for exchange modes, so `agsParamsFor` is always empty and
@@ -503,6 +507,7 @@ object GuideService {
     // The offsets as defined, not as generated: imaging positions follow the exposure count.
     private def offsetDefinition: Array[Byte] =
       params.observingMode match
+        case _: daytimecal.Config              => Array.emptyByteArray
         case _: exchange.Config                => Array.emptyByteArray
         case c: flamingos2.imaging.Config      => c.variant.hashBytes
         case c: flamingos2.longslit.Config     => c.telescopeConfigs.hashBytes

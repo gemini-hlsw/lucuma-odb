@@ -20,6 +20,7 @@ import lucuma.core.enums.AltairNdFilter
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.CassRotator
 import lucuma.core.enums.CloneSequenceMode
+import lucuma.core.enums.DaytimeCalibrationObservingModeType
 import lucuma.core.enums.FieldLens
 import lucuma.core.enums.FocalPlane
 import lucuma.core.enums.GuideProbe
@@ -479,10 +480,11 @@ object ObservationService {
           }
 
       private def updateObservingModeType(
-        newMode: Option[ObservingModeType],
-        which:   NonEmptyList[Observation.Id]
+        newMode:    Option[ObservingModeType],
+        instrument: Option[Instrument],
+        which:      NonEmptyList[Observation.Id]
       ): F[Unit] = {
-        val af = Statements.updateObservingModeType(newMode, which)
+        val af = Statements.updateObservingModeType(newMode, instrument, which)
         session.prepareR(af.fragment.command).use { pq =>
           pq.execute(af.argument).void
         }
@@ -495,18 +497,23 @@ object ObservationService {
       )(using Transaction[F], SuperUserAccess): F[Result[Unit]] =
 
         nEdit.toOptionOption.fold(Result.unit.pure[F]) { oEdit =>
-          for {
-            m <- selectObservingModes(oids.toList)
+          (for {
+            m <- ResultT.liftF(selectObservingModes(oids.toList))
+            _ <- ResultT(checkDaytimeCalibrationModeChange(m, oEdit))
             // Rewrite the observation's mode type to match the edit:
             //  - delete (oEdit = None): null the type so it no longer references the deleted row.
             //  - full edit (observingModeType = Some): set the new type.
             //  - partial in-place edit (observingModeType = None): leave it as-is; nulling would
             //    orphan the mode row. This happens e.g. for a GNIRS spectroscopy edit that doesn't
             //    change the FPU and so can't determine slit vs ifu.
-            _ <- oEdit match
-                   case None       => updateObservingModeType(None, oids)
-                   case Some(edit) => edit.observingModeType.traverse_(t => updateObservingModeType(Some(t), oids))
-            r <- m.toList.traverse { case (existingMode, matchingOids) =>
+            _ <- ResultT.liftF[F, Unit]:
+                   oEdit match
+                     case None       => updateObservingModeType(None, None, oids)
+                     case Some(edit) =>
+                       edit.observingModeType.traverse_ { t =>
+                         updateObservingModeType(Some(t), t.instrumentOption.orElse(edit.daytimeCalibration.flatMap(_.instrument)), oids)
+                       }
+            r <- ResultT.liftF(m.toList.traverse { case (existingMode, matchingOids) =>
 
               (existingMode, oEdit) match {
                 // `forall` (rather than `contains`) so a partial edit whose mode type is
@@ -538,9 +545,27 @@ object ObservationService {
                   // do nothing
                   Result.unit.pure[F]
               }
-            }.map(_.sequence.void)
-          } yield r
+            }.map(_.sequence.void))
+          } yield r).value.map(_.flatten)
         }
+
+      // A daytime calibration's instrument and kind are fixed once it has a stored sequence.
+      private def checkDaytimeCalibrationModeChange(
+        existing: Map[Option[ObservingModeType], List[Observation.Id]],
+        oEdit:    Option[ObservingModeInput.Edit]
+      ): F[Result[Unit]] =
+        val involved: List[Observation.Id] =
+          existing.toList.collect:
+            case (Some(_: DaytimeCalibrationObservingModeType), oids) => oids
+            case (_, oids) if oEdit.exists(_.daytimeCalibration.isDefined) => oids
+          .flatten
+
+        NonEmptyList.fromList(involved).fold(Result.unit.pure[F]): oids =>
+          session.execute(Statements.selectWithAtoms(oids))(oids).map: withAtoms =>
+            if withAtoms.isEmpty then Result.unit
+            else OdbError.InvalidArgument(
+              s"Cannot change the observing mode of a daytime calibration with a stored sequence (${withAtoms.mkString(", ")}). Delete the sequence first.".some
+            ).asFailure
 
       // Applying the same move to a list of observations will put them all together in the
       // destination group (or at the top level) in no particular order.
@@ -978,13 +1003,13 @@ object ObservationService {
           cs.getOrElse(ConstraintSetInput.NominalConstraints),
           SET.scienceRequirements,
           SET.observingMode.flatMap(_.observingModeType),
-          SET.observingMode.flatMap(_.observingModeType).flatMap(_.instrumentOption),
+          SET.observingMode.flatMap(m => m.observingModeType.flatMap(_.instrumentOption).orElse(m.daytimeCalibration.map(_.instrument))),
           SET.observerNotes,
           SET.targetEnvironment.flatMap(_.useBlindOffset).getOrElse(false),
           SET.targetEnvironment.map(_.blindOffsetType).getOrElse(BlindOffsetType.Manual),
           SET.targetEnvironment.flatMap(_.explicitGuideProbe),
           SET.targetEnvironment.flatMap(_.altair),
-          calibrationRole,
+          calibrationRole.orElse(SET.observingMode.flatMap(_.daytimeCalibration).as(CalibrationRole.DaytimeCalibration)),
           SET.scheduling.flatMap(_.schedulingModeToWrite).getOrElse(SchedulingMode.Unconstrained),
           SET.scheduling.flatMap(_.tooActivation).getOrElse(TooActivation.None),
           SET.priority.getOrElse(ObservationPriority.Medium)
@@ -1464,14 +1489,24 @@ object ObservationService {
     }
 
     def updateObservingModeType(
-      newMode: Option[ObservingModeType],
-      which:   NonEmptyList[Observation.Id]
+      newMode:    Option[ObservingModeType],
+      newInstrument: Option[Instrument],
+      which:      NonEmptyList[Observation.Id]
     ): AppliedFragment =
+      val daytime = newMode.exists(_.isDaytimeCalibration)
       void"UPDATE t_observation " |+|
          void"SET " |+|
             sql"c_observing_mode_type = ${observing_mode_type.opt}"(newMode) |+| void", " |+|
-            sql"c_instrument = ${instrument.opt}"(newMode.flatMap(_.instrumentOption)) |+| void" " |+|
+            sql"c_instrument = ${instrument.opt}"(newInstrument) |+| void", " |+|
+            sql"c_calibration_role = CASE WHEN $bool THEN 'daytime_calibration'::e_calibration_role WHEN c_calibration_role = 'daytime_calibration' THEN NULL ELSE c_calibration_role END"(daytime) |+| void" " |+|
        void"WHERE c_observation_id IN (" |+| which.map(sql"${observation_id}").intercalate(void", ") |+| void")"
+
+    def selectWithAtoms[A <: NonEmptyList[Observation.Id]](a: A): Query[a.type, Observation.Id] =
+      sql"""
+        SELECT DISTINCT c_observation_id
+          FROM t_atom
+         WHERE c_observation_id IN (${observation_id.nel(a)})
+      """.query(observation_id)
 
     /**
      * Clone the base slice (just t_observation) and return the new obs id, or none if the original
@@ -1507,6 +1542,7 @@ object ObservationService {
           c_spec_focal_plane_angle,
           c_spec_capability,
           c_observing_mode_type,
+          c_calibration_role,
           c_img_minimum_fov,
           c_img_narrow_filters,
           c_img_broad_filters,
@@ -1551,6 +1587,9 @@ object ObservationService {
           c_spec_focal_plane_angle,
           c_spec_capability,
           c_observing_mode_type,
+          -- A daytime calibration keeps its role, which its mode requires; any
+          -- other calibration clones as a plain science observation.
+          CASE WHEN c_calibration_role = 'daytime_calibration' THEN c_calibration_role END,
           c_img_minimum_fov,
           c_img_narrow_filters,
           c_img_broad_filters,

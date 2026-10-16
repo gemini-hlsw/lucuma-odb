@@ -31,6 +31,7 @@ import lucuma.odb.graphql.input.GmosLongSlitInput
 import lucuma.odb.graphql.input.ImagingVariantInput
 import lucuma.odb.graphql.input.ObservingModeInput
 import lucuma.odb.sequence.ObservingMode
+import lucuma.odb.sequence.daytimecal.Config as DaytimeCalibrationConfig
 import lucuma.odb.sequence.exchange.Config as ExchangeConfig
 import lucuma.odb.sequence.flamingos2.imaging.Config as Flamingos2ImagingConfig
 import lucuma.odb.sequence.flamingos2.longslit.Config as Flamingos2Config
@@ -50,6 +51,9 @@ sealed trait CalibrationConfigSubset derives Eq:
   def modeType: ObservingModeType
 
 object CalibrationConfigSubset:
+
+  case class DaytimeCalibrationConfigSubset(config: DaytimeCalibrationConfig) extends CalibrationConfigSubset:
+    def modeType: ObservingModeType = config.mode
 
   case class ExchangeConfigSubset(config: ExchangeConfig) extends CalibrationConfigSubset:
     def modeType: ObservingModeType = config.mode
@@ -192,6 +196,7 @@ object CalibrationConfigSubset:
         none,
         none,
         none,
+        none,
         GmosImagingInput.Create(
           ImagingVariantInput.Default,
           filters.map(f => GmosImagingFilterInput(f, none)),
@@ -236,6 +241,7 @@ object CalibrationConfigSubset:
         none,
         none,
         none,
+        none,
         GmosImagingInput.Create(
           ImagingVariantInput.Default,
           filters.map(f => GmosImagingFilterInput(f, none)),
@@ -264,6 +270,7 @@ object CalibrationConfigSubset:
 
     def toLongSlitInput: ObservingModeInput.Create =
       ObservingModeInput.Create(
+        none,
         none,
         none,
         Flamingos2LongSlitInput.Create(disperser, filter, fpu, none, none, none, none, none, none).some,
@@ -300,6 +307,9 @@ object CalibrationConfigSubset:
   extension (mode: ObservingMode)
     def toConfigSubset: CalibrationConfigSubset =
       mode match
+        case d: DaytimeCalibrationConfig =>
+          DaytimeCalibrationConfigSubset(d)
+
         case e: ExchangeConfig =>
           ExchangeConfigSubset(e)
 

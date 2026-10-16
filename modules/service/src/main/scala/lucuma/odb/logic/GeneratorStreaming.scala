@@ -38,6 +38,7 @@ import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.sequence.ObservingMode.Syntax.*
 import lucuma.odb.sequence.data.StreamingExecutionConfig
+import lucuma.odb.sequence.daytimecal.StaticConfigs as DaytimeStatics
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.sequence.util.SequenceIds
 import lucuma.odb.service.Services
@@ -55,6 +56,26 @@ import java.util.UUID
  * from the database if present, or else generate the sequence from scratch.
  */
 sealed trait GeneratorStreaming[F[_]]:
+
+  def selectDaytimeFlamingos2(
+    context: GeneratorContext
+  )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, Flamingos2Static, Flamingos2Dynamic]]]
+
+  def selectDaytimeGmosNorth(
+    context: GeneratorContext
+  )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, GmosNorthStatic, GmosNorthDynamic]]]
+
+  def selectDaytimeGmosSouth(
+    context: GeneratorContext
+  )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, GmosSouthStatic, GmosSouthDynamic]]]
+
+  def selectDaytimeGnirs(
+    context: GeneratorContext
+  )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, GnirsStatic, GnirsDynamic]]]
+
+  def selectDaytimeIgrins2(
+    context: GeneratorContext
+  )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, Igrins2Static, Igrins2Dynamic]]]
 
   def selectOrGenerateFlamingos2LongSlit(
     context: GeneratorContext
@@ -301,6 +322,41 @@ object GeneratorStreaming:
             if context.params.isSplittable then gen.asRight
             else gen.unsplit(context.oid)
           ).map(_.covary[F])
+
+      private def selectOrEmpty[S, D](
+        static: S,
+        lookup: (SequenceType, S) => (Transaction[F]) ?=> F[Option[Stream[F, Atom[D]]]]
+      )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, S, D]]] =
+        selectOrGenerate(
+          static,
+          lookup,
+          StreamingExecutionConfig[F, S, D](static, Stream.empty, Stream.empty).asRight[OdbError].pure[F]
+        )
+
+      override def selectDaytimeFlamingos2(
+        context: GeneratorContext
+      )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, Flamingos2Static, Flamingos2Dynamic]]] =
+        selectOrEmpty(DaytimeStatics.Flamingos2, sequenceService.selectFlamingos2Sequence(context.oid, _, _))
+
+      override def selectDaytimeGmosNorth(
+        context: GeneratorContext
+      )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, GmosNorthStatic, GmosNorthDynamic]]] =
+        selectOrEmpty(DaytimeStatics.GmosNorth, sequenceService.selectGmosNorthSequence(context.oid, _, _))
+
+      override def selectDaytimeGmosSouth(
+        context: GeneratorContext
+      )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, GmosSouthStatic, GmosSouthDynamic]]] =
+        selectOrEmpty(DaytimeStatics.GmosSouth, sequenceService.selectGmosSouthSequence(context.oid, _, _))
+
+      override def selectDaytimeGnirs(
+        context: GeneratorContext
+      )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, GnirsStatic, GnirsDynamic]]] =
+        selectOrEmpty(DaytimeStatics.Gnirs, sequenceService.selectGnirsSequence(context.oid, _, _))
+
+      override def selectDaytimeIgrins2(
+        context: GeneratorContext
+      )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, Igrins2Static, Igrins2Dynamic]]] =
+        selectOrEmpty(DaytimeStatics.Igrins2, sequenceService.selectIgrins2Sequence(context.oid, _, _))
 
       override def selectOrGenerateFlamingos2LongSlit(
         context: GeneratorContext

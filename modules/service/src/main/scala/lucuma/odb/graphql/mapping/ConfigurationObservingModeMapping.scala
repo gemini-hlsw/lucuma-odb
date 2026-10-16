@@ -32,7 +32,7 @@ trait ConfigurationObservingModeMappings[F[_]]
   private lazy val ConfigurationObservingModeMapping: ObjectMapping =
     ObjectMapping(ObservationType / "configuration" / "observingMode")(
       SqlField("synthetic_id", ObservationView.ObservingMode.SyntheticId, key = true, hidden = true),
-      FieldRef[ObservingModeType]("mode").as("instrument", _.instrumentOption),
+      SqlField("instrument", ObservationView.Instrument),
       SqlField("mode", ObservationView.ObservingMode.ObservingModeType),
       SqlObject("flamingos2LongSlit", Join(ObservationView.Id, Flamingos2LongSlitView.ObservationId)),
       SqlObject("flamingos2Mos", Join(ObservationView.Id, Flamingos2MosView.ObservationId)),

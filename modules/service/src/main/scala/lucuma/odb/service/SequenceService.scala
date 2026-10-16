@@ -67,6 +67,7 @@ import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.StreamingExecutionConfig
 import lucuma.odb.sequence.data.UnsplittableAtom
+import lucuma.odb.sequence.daytimecal.StaticConfigs as DaytimeStatics
 import lucuma.odb.sequence.gcalClass
 import lucuma.odb.sequence.util.AtomBuilder
 import lucuma.odb.sequence.util.StepInsertion
@@ -726,7 +727,22 @@ object SequenceService:
             case _           =>
               ResultT.unit
 
-        val doReplace: F[Stream[Pure, Atom[D]]] =
+        // Daytime calibrations: science only, every step a day calibration, and never guided.
+        val checkDaytime: ResultT[F, List[ProtoAtom[ProtoStep[D]]]] =
+          ResultT.liftF(selectDaytimeCalibration(observationId)).flatMap:
+            case None    => ResultT.pure(sequence)
+            case Some(_) =>
+              val badClass = sequence.flatMap(_.steps.toList).exists(_.observeClass =!= ObserveClass.DayCal)
+              if sequenceType =!= SequenceType.Science then
+                ResultT(OdbError.InvalidArgument("Daytime calibrations have no acquisition sequence.".some).asFailureF)
+              else if badClass then
+                ResultT(OdbError.InvalidArgument("Every step of a daytime calibration must have observe class DAY_CAL.".some).asFailureF)
+              else
+                ResultT.pure:
+                  sequence.map: atom =>
+                    atom.copy(steps = atom.steps.map(step => step.copy(telescopeConfig = step.telescopeConfig.copy(guiding = StepGuideState.Disabled))))
+
+        def doReplace(sequence: List[ProtoAtom[ProtoStep[D]]]): F[Stream[Pure, Atom[D]]] =
           val atoms = atomBuilder.buildStream(Stream.emits(sequence))
 
           // Why take the execution lock only if the sequence is materialized?
@@ -749,7 +765,24 @@ object SequenceService:
             _ <- insertSequence(instrument, observationId, sequenceType, atoms.covary[F], batch, insertInstConfig)
           yield atoms
 
-        checkAtomLength *> checkUnsplittable *> ResultT.liftF(doReplace)
+        checkAtomLength *> checkUnsplittable *> checkDaytime.flatMap(seq => ResultT.liftF(doReplace(seq)))
+
+      // A daytime calibration's instrument, when the observation is one.
+      private def selectDaytimeCalibration(
+        observationId: Observation.Id
+      ): F[Option[Instrument]] =
+        session.option(Statements.SelectDaytimeCalibration)(observationId).map(_.flatten)
+
+      // Daytime calibrations have a fixed static config.
+      private def staticFor[S](
+        observationId: Observation.Id,
+        instrument:    Instrument,
+        daytime:       S
+      )(select: => ResultT[F, S]): ResultT[F, S] =
+        ResultT.liftF(selectDaytimeCalibration(observationId)).flatMap:
+          case Some(i) if i === instrument => ResultT.pure(daytime)
+          case Some(i)                     => ResultT(OdbError.InvalidArgument(s"Observation $observationId is a ${i.longName} daytime calibration.".some).asFailureF)
+          case None                        => select
 
       private def selectStatic[S](
         observationId: Observation.Id,
@@ -776,7 +809,7 @@ object SequenceService:
       )(using Transaction[F]): F[Result[Stream[Pure, Atom[Flamingos2DynamicConfig]]]] =
 
         (for
-          s <- selectStatic(observationId, "Flamingos 2", flamingos2SequenceService.selectStaticOrDefault)
+          s <- staticFor(observationId, Instrument.Flamingos2, DaytimeStatics.Flamingos2)(selectStatic(observationId, "Flamingos 2", flamingos2SequenceService.selectStaticOrDefault))
           b <- ResultT.liftF(atomBuilder(sequenceType, s, namespace, estimator.flamingos2Step))
           r <- replaceSequence(
                  Instrument.Flamingos2,
@@ -854,7 +887,7 @@ object SequenceService:
         namespace:     Option[UUID] = None
       )(using Transaction[F]): F[Result[Stream[Pure, Atom[GmosNorth]]]] =
         (for
-          s <- selectStatic(observationId, "GMOS North", gmosSequenceService.selectGmosNorthStaticOrDefault)
+          s <- staticFor(observationId, Instrument.GmosNorth, DaytimeStatics.GmosNorth)(selectStatic(observationId, "GMOS North", gmosSequenceService.selectGmosNorthStaticOrDefault))
           b <- ResultT.liftF(atomBuilder(sequenceType, s, namespace, estimator.gmosNorthStep))
           r <- replaceSequence(
                  Instrument.GmosNorth,
@@ -889,7 +922,7 @@ object SequenceService:
         namespace:     Option[UUID] = None
       )(using Transaction[F]): F[Result[Stream[Pure, Atom[GmosSouth]]]] =
         (for
-          s <- selectStatic(observationId, "GMOS South", gmosSequenceService.selectGmosSouthStaticOrDefault)
+          s <- staticFor(observationId, Instrument.GmosSouth, DaytimeStatics.GmosSouth)(selectStatic(observationId, "GMOS South", gmosSequenceService.selectGmosSouthStaticOrDefault))
           b <- ResultT.liftF(atomBuilder(sequenceType, s, namespace, estimator.gmosSouthStep))
           r <- replaceSequence(
                  Instrument.GmosSouth,
@@ -925,7 +958,7 @@ object SequenceService:
         namespace:     Option[UUID] = None
       )(using Transaction[F]): F[Result[Stream[Pure, Atom[Igrins2DynamicConfig]]]] =
         (for
-          s <- selectStatic(observationId, "IGRINS-2", igrins2SequenceService.selectStaticOrDefault)
+          s <- staticFor(observationId, Instrument.Igrins2, DaytimeStatics.Igrins2)(selectStatic(observationId, "IGRINS-2", igrins2SequenceService.selectStaticOrDefault))
           b <- ResultT.liftF(atomBuilder(sequenceType, s, namespace, estimator.igrins2Step))
           r <- replaceSequence(
                  Instrument.Igrins2,
@@ -960,7 +993,7 @@ object SequenceService:
         namespace:     Option[UUID] = None
       )(using Transaction[F]): F[Result[Stream[Pure, Atom[GnirsDynamicConfig]]]] =
         (for
-          s <- selectStatic(observationId, "GNIRS", gnirsSequenceService.selectStaticOrDefault)
+          s <- staticFor(observationId, Instrument.Gnirs, DaytimeStatics.Gnirs)(selectStatic(observationId, "GNIRS", gnirsSequenceService.selectStaticOrDefault))
           b <- ResultT.liftF(atomBuilder(sequenceType, s, namespace, estimator.gnirsStep))
           r <- replaceSequence(
                  Instrument.Gnirs,
@@ -1486,6 +1519,14 @@ object SequenceService:
           .value
 
   object Statements:
+
+    val SelectDaytimeCalibration: Query[Observation.Id, Option[Instrument]] =
+      sql"""
+        SELECT c_instrument
+          FROM t_observation
+         WHERE c_observation_id   = $observation_id
+           AND c_calibration_role = 'daytime_calibration'
+      """.query(instrument.opt)
 
     val AbandonAndDeleteUnexecuted: Command[(Observation.Id, SequenceType)] =
       sql"""
