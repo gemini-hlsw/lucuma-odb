@@ -30,6 +30,9 @@ class executionGnirsAltairSetup extends ExecutionTestSupportForGnirs
   private val NgsSetup: TimeSpan = 15.minTimeSpan
   private val LgsSetup: TimeSpan = 25.minTimeSpan
 
+  // The only candidate inside the AOWFS patrol field, so the only one NGS and LGS accept.
+  private val aowfsStarName: String = "Gaia DR3 3219118090462917888"
+
   private def setAltair(oid: Observation.Id, altair: String): IO[Unit] =
     query(
       user  = pi,
@@ -52,7 +55,7 @@ class executionGnirsAltairSetup extends ExecutionTestSupportForGnirs
       o <- createObservationAs(pi, p, List(t))
       _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
       _ <- setAltair(o, altair)
-      _ <- IO.whenA(guideStar)(setGuideTargetName(pi, o, defaultTargetName.some))
+      _ <- IO.whenA(guideStar)(setGuideTargetName(pi, o, aowfsStarName.some))
     yield (p, o)
 
   private def setupTime(pid: Program.Id, oid: Observation.Id): IO[TimeSpan] =
