@@ -126,3 +126,37 @@ class createObservation_DaytimeCalibration extends OdbSuite with DatabaseOperati
         """.asRight
       )
     yield ()
+
+  test("a clone keeps the role, mode and instrument"):
+    for
+      pid   <- createProgramAs(staff)
+      oid   <- createDaytimeCalibrationAs(staff, pid)
+      clone <- cloneObservationAs(staff, oid)
+      _     <- expect(
+        user     = staff,
+        query    = s"""
+          query {
+            observation(observationId: ${clone.asJson}) {
+              calibrationRole
+              observingMode {
+                mode
+                instrument
+                daytimeCalibration { instrument }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "observation": {
+              "calibrationRole": "DAYTIME_CALIBRATION",
+              "observingMode": {
+                "mode": "DAYTIME_CALIBRATION",
+                "instrument": "GMOS_NORTH",
+                "daytimeCalibration": { "instrument": "GMOS_NORTH" }
+              }
+            }
+          }
+        """.asRight
+      )
+    yield ()

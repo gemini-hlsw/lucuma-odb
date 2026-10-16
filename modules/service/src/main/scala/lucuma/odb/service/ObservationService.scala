@@ -1542,6 +1542,7 @@ object ObservationService {
           c_spec_focal_plane_angle,
           c_spec_capability,
           c_observing_mode_type,
+          c_calibration_role,
           c_img_minimum_fov,
           c_img_narrow_filters,
           c_img_broad_filters,
@@ -1586,6 +1587,9 @@ object ObservationService {
           c_spec_focal_plane_angle,
           c_spec_capability,
           c_observing_mode_type,
+          -- A daytime calibration keeps its role, which its mode requires; any
+          -- other calibration clones as a plain science observation.
+          CASE WHEN c_calibration_role = 'daytime_calibration' THEN c_calibration_role END,
           c_img_minimum_fov,
           c_img_narrow_filters,
           c_img_broad_filters,

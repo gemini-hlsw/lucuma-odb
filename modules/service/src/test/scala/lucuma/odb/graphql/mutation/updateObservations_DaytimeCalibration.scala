@@ -95,3 +95,50 @@ class updateObservations_DaytimeCalibration extends OdbSuite with DatabaseOperat
         expected = { case OdbError.NotAuthorized(_, _) => () }
       )
     yield ()
+
+  private val gmosNorthLongSlit: String =
+    """
+      {
+        gmosNorthLongSlit: {
+          grating: B1200_G5301
+          filter: G_PRIME
+          fpu: LONG_SLIT_0_25
+          centralWavelength: { nanometers: 500 }
+        }
+      }
+    """
+
+  test("a PI may not clear a daytime calibration in their own program"):
+    for
+      pid <- createProgramAs(pi)
+      oid <- createDaytimeCalibrationAs(staff, pid)
+      _   <- expect(
+        user     = pi,
+        query    = updateQuery(oid, "null"),
+        expected = json"""{ "updateObservations": { "observations": [] } }""".asRight
+      )
+      _   <- expect(
+        user     = pi,
+        query    = updateQuery(oid, gmosNorthLongSlit),
+        expected = json"""{ "updateObservations": { "observations": [] } }""".asRight
+      )
+    yield ()
+
+  test("staff may clear a daytime calibration's mode while no sequence is stored"):
+    for
+      pid <- createProgramAs(pi)
+      oid <- createDaytimeCalibrationAs(staff, pid)
+      _   <- expect(
+        user     = staff,
+        query    = updateQuery(oid, "null"),
+        expected = json"""
+          {
+            "updateObservations": {
+              "observations": [
+                { "calibrationRole": null, "observingMode": null }
+              ]
+            }
+          }
+        """.asRight
+      )
+    yield ()
