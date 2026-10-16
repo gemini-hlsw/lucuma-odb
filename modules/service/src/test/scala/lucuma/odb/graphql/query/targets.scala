@@ -233,7 +233,7 @@ class targets extends OdbSuite {
               }
             }
           """,
-          expected = Left(List("Only one of `OFFSET`, `OFFSET_AT` and `OFFSET_AFTER` may be specified."))
+          expected = Left(List("Expected at most one of OFFSET, OFFSET_AT, OFFSET_AFTER"))
         )
       }
     }
