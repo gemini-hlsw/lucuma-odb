@@ -9617,6 +9617,9 @@ type Execution {
   "Time accounting calculation for this observation."
   timeCharge: CategorizedTime!
 
+  "When execution events were recorded for this observation, and when it completed."
+  timestamps: ExecutionTimestamps!
+
   """
   Whether the science sequence has been materialized.
   This will happen when the sequence is executed or if it is manually edited.
@@ -9643,6 +9646,38 @@ type Execution {
   `regenerate` set.
   """
   acquisitionSequenceIsCustomized: Boolean!
+}
+
+"""
+Execution event times for an observation, across all of its visits, derived
+from the events available in `Execution.events`.  Every event counts, slews
+included.  All fields are null until the first event is recorded.
+"""
+type ExecutionTimestamps {
+  """
+  Time of the observation's earliest execution event, across all of its
+  visits (ordinarily in the first visit).  The earliest and latest events
+  generally fall in different visits, so `lastEventTime - firstEventTime` is not
+  the execution time.
+  """
+  firstEventTime: Timestamp
+
+  """
+  Time of the observation's latest execution event, across all of its visits
+  (ordinarily in the most recent visit).  The earliest and latest events
+  generally fall in different visits, so `lastEventTime - firstEventTime` is not
+  the execution time.
+  """
+  lastEventTime: Timestamp
+
+  """
+  Time of the observation's last execution event, once its execution state is
+  `COMPLETED` or `DECLARED_COMPLETE`, and null otherwise.  Declaring an
+  observation complete does not itself set the time, so a declared-complete
+  observation without any events has no completion time.  The value follows
+  any events recorded after completion.
+  """
+  completionTime: Timestamp
 }
 
 """

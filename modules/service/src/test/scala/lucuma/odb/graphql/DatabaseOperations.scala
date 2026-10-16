@@ -3321,6 +3321,13 @@ trait DatabaseOperations { this: OdbSuite =>
         sql"update t_observation set c_declared_state = 'declared_complete' where c_observation_id = $observation_id".command
       )(oid).void
 
+  /** Reopens the observation as staff declaring a completed visitor observation ongoing does. */
+  def declareOngoingDirectly(oid: Observation.Id): IO[Unit] =
+    withFreshSession: s =>
+      s.execute(
+        sql"update t_observation set c_declared_state = 'declared_ongoing' where c_observation_id = $observation_id".command
+      )(oid).void
+
   /** Adds co-investigators and invites each one, as submission requires. */
   def addCoisAs(u: User, pid: Program.Id, ps: List[Partner] = List(Partner.CA, Partner.US)): IO[Unit] =
     ps.traverse_ : p =>
