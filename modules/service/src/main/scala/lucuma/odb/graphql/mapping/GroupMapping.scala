@@ -15,12 +15,14 @@ import grackle.Query.EffectHandler
 import grackle.Query.FilterOrderByOffsetLimit
 import grackle.Query.OrderSelection
 import grackle.QueryCompiler.Elab
+import grackle.Result
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
+import grackle.syntax.*
+import io.circe.syntax.*
 import lucuma.core.model.Group
 import lucuma.core.model.User
 import lucuma.core.model.sequence.BandedTime
-import lucuma.core.model.sequence.CategorizedTimeRange
 import lucuma.core.util.CalculatedValue
 import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
@@ -33,6 +35,7 @@ import lucuma.odb.json.calculatedValue.given
 import lucuma.odb.json.time.query.given
 import lucuma.odb.json.timeaccounting.given
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
+import lucuma.odb.logic.TimeEstimateService
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services
 import org.http4s.client.Client
@@ -64,8 +67,8 @@ trait GroupMapping[F[_]] extends GroupView[F] with ProgramView[F] with GroupElem
       SqlObject("elements", Join(GroupView.Id, GroupElementView.GroupId)),
       SqlObject("program", Join(GroupView.ProgramId, ProgramView.Id)),
 
-      EffectField("timeEstimateRange", estimateRangeHandler, List("id")),
-      EffectField("timeEstimateBanded", estimateBandedHandler, List("id")),
+      EffectField(RangeField, estimateHandler, List("id")),
+      EffectField(BandedField, estimateHandler, List("id")),
 
       SqlField("existence", GroupView.Existence),
       SqlField("system", GroupView.System),
@@ -87,15 +90,26 @@ trait GroupMapping[F[_]] extends GroupView[F] with ProgramView[F] with GroupElem
           )
       }
 
-  private lazy val estimateRangeHandler: EffectHandler[F] =
-    keyValueEffectHandler[Group.Id, Option[CalculatedValue[CategorizedTimeRange]]]("id"): gid =>
-      services.useTransactionally:
-        timeEstimateService
-          .estimateGroupRange(gid)
+  private val RangeField  = "timeEstimateRange"
+  private val BandedField = "timeEstimateBanded"
 
-  private lazy val estimateBandedHandler: EffectHandler[F] =
-    keyValueEffectHandler[Group.Id, List[CalculatedValue[BandedTime]]]("id"): gid =>
-      services.useTransactionally:
-        timeEstimateService
-          .estimateGroupBanded(gid)
-          .map(_.toList.sortBy(_._1).map((b, cv) => Monad[CalculatedValue].map(cv)(t => BandedTime(b, t))))
+  // One handler serves both estimate fields.  Grackle batches by handler, so it
+  // receives every group for both fields at once and each program is loaded
+  // only once.
+  private lazy val estimateHandler: EffectHandler[F] =
+    keyedBatchEffectHandler[Group.Id, TimeEstimateService.GroupEstimate](
+      _.fieldAs[Group.Id]("id"),
+      (gids, fields) =>
+        services.useTransactionally:
+          timeEstimateService
+            .estimateGroups(gids, fields.contains(BandedField))
+            .map(_.view.mapValues(_.success).toMap),
+      {
+        case (RangeField, e)  =>
+          e.range.asJson.success
+        case (BandedField, e) =>
+          e.banded.toList.sortBy(_._1).map((b, cv) => Monad[CalculatedValue].map(cv)(t => BandedTime(b, t))).asJson.success
+        case (field, _)       =>
+          Result.internalError(s"Unexpected group time estimate field: $field")
+      }
+    )
