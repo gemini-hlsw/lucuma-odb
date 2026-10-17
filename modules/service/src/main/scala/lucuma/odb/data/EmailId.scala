@@ -3,7 +3,11 @@
 
 package lucuma.odb.data
 
+import cats.kernel.Order
 import cats.syntax.all.*
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.cats.refTypeOrder
+import eu.timepit.refined.collection.NonEmpty
 import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Decoder
 
@@ -16,6 +20,8 @@ object EmailId:
 
   extension (id: EmailId)
     def value: NonEmptyString = id
+
+  given Order[EmailId] = refTypeOrder[Refined, String, NonEmpty]
 
   // When sending email, the id comes wrapped in superfluous angle brackes. Remove them and make sure we still have something...
   // But, also handle the case where there are no brackets - such as in the webhooks. Or if mailgun drops them in the future.
