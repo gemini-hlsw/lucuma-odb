@@ -14,12 +14,10 @@ object UserAttributes:
 
   val UserIdKey: AttributeKey[String]      = AttributeKey("user.id")
   val UserAccessKey: AttributeKey[String]  = AttributeKey("user.access")
-  val UserDisplayKey: AttributeKey[String] = AttributeKey("user.displayName")
 
-  /** Summarizes a user as a set of trace attributes. */
+  /** Summarizes a user as a set of trace attributes. No name or email: those are PII. */
   given userAttributes: Attributes.Make[User] = u =>
     Attributes(
       Attribute(UserIdKey, u.id.show),
-      Attribute(UserAccessKey, u.role.access.tag),
-      Attribute(UserDisplayKey, u.displayName)
+      Attribute(UserAccessKey, u.role.access.tag)
     )

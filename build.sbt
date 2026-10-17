@@ -559,6 +559,10 @@ ThisBuild / githubWorkflowAddedJobs ++= Seq(
   )
 )
 
+// Enhanced exceptions replace the real stack trace with the async trace, which hid the failing frame
+val RealStackTracesProp = "cats.effect.tracing.exceptions.enhanced=false"
+lazy val realStackTraces = bashScriptExtraDefines += "addJava \"-D" + RealStackTracesProp + "\""
+
 lazy val buildInfoSettings = Seq(
   buildInfoKeys         := Seq[BuildInfoKey](
       scalaVersion,
@@ -1187,9 +1191,11 @@ lazy val service = project
     ),
     reStart / envVars += "PORT" -> "8082",
     reStartArgs += "serve",
+    reStart / javaOptions += s"-D$RealStackTracesProp",
     description                     := "Lucuma ODB Service",
     // Grackle validates the type mappings per new user; Heroku's default stack is too small
     bashScriptExtraDefines += """addJava "-Xss1m"""",
+    realStackTraces,
     // Add command line parameters
     bashScriptExtraDefines += """set -- -Dfile.encoding=UTF-8 serve""",
     // Name of the launch script
@@ -1206,6 +1212,7 @@ lazy val obscalc = project
     projectDependencyArtifacts  := (Compile / dependencyClasspathAsJars).value,
     reStart / envVars += "PORT" -> "8082",
     description                     := "Lucuma ODB ObsCalc Service",
+    realStackTraces,
     // Add command line parameters
     bashScriptExtraDefines += """set -- -Dfile.encoding=UTF-8""",
     // Name of the launch script
@@ -1222,6 +1229,7 @@ lazy val calibrations = project
     projectDependencyArtifacts  := (Compile / dependencyClasspathAsJars).value,
     reStart / envVars += "PORT" -> "8082",
     description                     := "Lucuma ODB Calibrations Service",
+    realStackTraces,
     // Add command line parameters
     bashScriptExtraDefines += """set -- -Dfile.encoding=UTF-8""",
     // Name of the launch script
@@ -1246,6 +1254,7 @@ lazy val pdfSummary = project
     lucumaDockerHeapSubtract := 400,
     // We need a bit larger stack space for the grackle mapping
     bashScriptExtraDefines += """addJava "-Xss1m"""",
+    realStackTraces,
     bashScriptExtraDefines += """set -- -Dfile.encoding=UTF-8""",
     executableScriptName            := "lucuma-odb-pdf-summary-service",
     // pyexplore is private: the token comes in as a BuildKit secret (never a

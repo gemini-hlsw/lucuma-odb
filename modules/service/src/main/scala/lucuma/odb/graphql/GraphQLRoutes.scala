@@ -42,6 +42,8 @@ import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.LoggerFactory
 import org.typelevel.log4cats.syntax.*
 import org.typelevel.otel4s.Attribute
+import org.typelevel.otel4s.AttributeKey
+import org.typelevel.otel4s.trace.Span
 import org.typelevel.otel4s.trace.SpanFinalizer
 import org.typelevel.otel4s.trace.SpanKind
 import org.typelevel.otel4s.trace.StatusCode
@@ -55,6 +57,16 @@ import java.nio.file.Path as NIOPath
 import scala.concurrent.duration.*
 
 object GraphQLRoutes {
+
+  /** Full GraphQL document of a failed request; `graphql.document` itself is truncated at 1 KB. */
+  val FullDocumentKey: AttributeKey[String] = AttributeKey("graphql.document.full")
+
+  /** Safety net so a runaway query cannot blow up the span. */
+  val MaxFullDocumentLength: Int = 64 * 1024
+
+  def capDocument(document: String): String =
+    if document.length <= MaxFullDocumentLength then document
+    else s"${document.take(MaxFullDocumentLength)}... (truncated at $MaxFullDocumentLength of ${document.length} chars)"
 
   /** Finalization strategy for GraphQL *subscription* spans: a client disconnect (cancellation) is
     * a normal lifecycle event, not an error.
@@ -120,6 +132,11 @@ object GraphQLRoutes {
       def debug(ctx: RequestContext, message: String): F[Unit] =
         L.debug(s"${describe(ctx)}: $message")
 
+      // The routes library truncates `graphql.document` at 1 KB on every span. A 500 needs the
+      // whole query to reproduce, so record it in full on internal errors only.
+      def recordFullDocument(span: Span[F], document: String): F[Unit] =
+        span.addAttribute(Attribute(GraphQLRoutes.FullDocumentKey, GraphQLRoutes.capDocument(document)))
+
       // Unvalidated, because `validateOnce` validates the mapping with a larger thread stack.
       val service: GraphQLService[F] =
         new GraphQLService[F](odbMapping) {
@@ -158,8 +175,11 @@ object GraphQLRoutes {
                     .handleError(Result.InternalError.apply)
                     .flatTap {
                       case Result.InternalError(t: TooManyParametersException) =>
+                        recordFullDocument(span, document) *>
                         error(ctx, s"Internal error: ${t.getClass.getSimpleName}: ${t.getMessage}\nCompiled query:\n${request.query.render.take(4096)}", t)
-                      case Result.InternalError(t) => error(ctx, s"Internal error: ${t.getClass.getSimpleName}: ${t.getMessage}", t)
+                      case Result.InternalError(t) =>
+                        recordFullDocument(span, document) *>
+                        error(ctx, s"Internal error: ${t.getClass.getSimpleName}: ${t.getMessage}", t)
                       case _                       => debug(ctx, s"Query (success).")
                     }
                 ).flatMap: (elapsed, result) =>
