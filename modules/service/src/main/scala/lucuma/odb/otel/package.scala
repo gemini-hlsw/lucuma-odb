@@ -21,7 +21,6 @@ val GroupIdKey: AttributeKey[String]         = AttributeKey("group.id")
 
 val UserIdKey: AttributeKey[String]      = UserAttributes.UserIdKey
 val UserAccessKey: AttributeKey[String]  = UserAttributes.UserAccessKey
-val UserDisplayKey: AttributeKey[String] = UserAttributes.UserDisplayKey
 given attrsUser: Attributes.Make[User]   = UserAttributes.userAttributes
 
 given attrFromProgId: Attribute.From[Program.Id, String]    = _.show
