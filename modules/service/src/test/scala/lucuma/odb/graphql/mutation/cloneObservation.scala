@@ -1730,7 +1730,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations with M
                         ${filterJson(Flamingos2Filter.Y, 100, 1210)},
                         ${filterJson(Flamingos2Filter.J, 100, 1210)}
                       ],
-                      "defaultReadMode": "FAINT",
+                      "defaultReadMode": "BRIGHT",
                       "explicitReadMode": "BRIGHT",
                       "decker": "IMAGING",
                       "defaultDecker": "IMAGING",

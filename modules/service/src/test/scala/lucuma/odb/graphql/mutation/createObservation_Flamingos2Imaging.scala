@@ -86,7 +86,7 @@ class createObservation_Flamingos2Imaging extends OdbSuite:
                       { "filter": "Y" },
                       { "filter": "J" }
                     ],
-                    "defaultReadMode": "FAINT",
+                    "defaultReadMode": "BRIGHT",
                     "explicitReadMode": "BRIGHT",
                     "defaultReads": "READS_1",
                     "explicitReads": null,
