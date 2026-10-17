@@ -81,7 +81,9 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
       SqlField("programId", ObservationView.ProgramId, hidden = true),
       SqlField("id", ObservationView.Id, key = true, hidden = true),
       asterismObject("asterism"),
-      asterismObject("firstScienceTarget"),
+      // A 1:1 join on a view column, not asterismObject: the two-hop join yields
+      // one row per asterism member, which breaks grackle's per-branch LIMIT.
+      SqlObject("firstScienceTarget", Join(ObservationView.FirstScienceTargetId, TargetView.TargetId)),
       signalToNoiseTargetObject("explicitSignalToNoiseTarget"),
       SqlObject("explicitBase"),
       SqlField("useBlindOffset", ObservationView.UseBlindOffset),
@@ -158,17 +160,17 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
   private lazy val fieldLensHandler: EffectHandler[F] =
     altairFieldLensHandler(AltairConfiguration.fieldLens)
 
-  private def asterismQuery(includeDeleted: Boolean, firstOnly: Boolean, child: Query): Query =
+  private def asterismQuery(includeDeleted: Boolean, child: Query): Query =
     FilterOrderByOffsetLimit(
       pred   = Some(Predicates.target.existence.includeDeleted(includeDeleted)),
       oss    = List(OrderSelection[Target.Id](TargetType / "id")).some,
       offset = none,
-      limit  = Option.when(firstOnly)(1),
+      limit  = none,
       child  = child
     )
 
   // A singular target reached via a database join (blind offset / signal-to-noise
-  // target). Handled via joins, not GraphQL predicates.
+  // / first science target). Handled via joins, not GraphQL predicates.
   private def singleTargetQuery(child: Query): Query =
     FilterOrderByOffsetLimit(
       pred   = none,
@@ -182,18 +184,17 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
     case (TargetEnvironmentType, "asterism", List(BooleanBinding("includeDeleted", rIncludeDeleted))) =>
       Elab.transformChild { child =>
         rIncludeDeleted.map { includeDeleted =>
-          asterismQuery(includeDeleted, firstOnly = false, child)
+          asterismQuery(includeDeleted, child)
         }
       }
 
-    // TODO: not yet working
+    // The view column already resolves the first present target, so
+    // includeDeleted has nothing left to change.
     case (TargetEnvironmentType, "firstScienceTarget", List(
-      BooleanBinding("includeDeleted", rIncludeDeleted)
+      BooleanBinding("includeDeleted", _)
     )) =>
       Elab.transformChild { child =>
-        rIncludeDeleted.map { includeDeleted =>
-          Unique(asterismQuery(includeDeleted, firstOnly = true, child))
-        }
+        Unique(singleTargetQuery(child))
       }
 
     case (TargetEnvironmentType, "guideAvailability", List(
@@ -217,7 +218,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
   }
 
   def basePositionQueryHandler: EffectHandler[F] =
-    // Collapse the per-observation N+1 by resolving the whole batch in a single session. 
+    // Collapse the per-observation N+1 by resolving the whole batch in a single session.
     batchedEffectHandler: oids =>
       services.use: s =>
         Services.asSuperUser:
