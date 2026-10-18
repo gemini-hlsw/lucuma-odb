@@ -21664,9 +21664,9 @@ type TargetEnvironment {
   """
   firstScienceTarget(
     """
-    Set to true to include deleted values
+    Ignored: the first science target is always the first present asterism member.
     """
-    includeDeleted: Boolean! = false
+    includeDeleted: Boolean! = false @deprecated(reason: "Has no effect; deleted targets are never returned.")
   ): Target
 
   """

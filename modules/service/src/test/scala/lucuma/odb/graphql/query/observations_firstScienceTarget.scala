@@ -56,24 +56,25 @@ class observations_firstScienceTarget extends OdbSuite:
                   assertEquals(rows, all.take(n).map(oid => (oid, t1).asRight), s"LIMIT $n")
     yield ()
 
-  test("firstScienceTarget skips a deleted first target"):
+  test("firstScienceTarget skips a deleted first target, even with includeDeleted"):
     for
       pid <- createProgramAs(pi)
       t1  <- createTargetAs(pi, pid, "One")
       t2  <- createTargetAs(pi, pid, "Two")
       oid <- createGmosNorthImagingObservationAs(pi, pid, t1, t2)
       _   <- deleteTargetAs(pi, t1)
-      _   <- expect(
-               pi,
-               s"""
-                 query {
-                   observation(observationId: "$oid") {
-                     targetEnvironment { firstScienceTarget { id } }
+      _   <- List("", "(includeDeleted: true)").traverse_ : args =>
+               expect(
+                 pi,
+                 s"""
+                   query {
+                     observation(observationId: "$oid") {
+                       targetEnvironment { firstScienceTarget$args { id } }
+                     }
                    }
-                 }
-               """,
-               json"""
-                 { "observation": { "targetEnvironment": { "firstScienceTarget": { "id": $t2 } } } }
-               """.asRight
-             )
+                 """,
+                 json"""
+                   { "observation": { "targetEnvironment": { "firstScienceTarget": { "id": $t2 } } } }
+                 """.asRight
+               )
     yield ()
