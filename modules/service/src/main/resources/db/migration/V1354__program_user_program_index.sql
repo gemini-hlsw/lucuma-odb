@@ -4,3 +4,6 @@
 -- table.
 CREATE INDEX i_program_user_program
   ON t_program_user (c_program_id);
+
+-- Duplicate of unique_program_user_one_pi (V0936).
+DROP INDEX unique_pi_role_per_program;
