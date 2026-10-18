@@ -45,12 +45,12 @@ class executionSciFlamingos2Imaging extends ExecutionTestSupportForFlamingos2:
       exposureTime,
       none,
       filter,
-      Flamingos2ReadMode.Faint,
+      Flamingos2ReadMode.Bright,
       Flamingos2LyotWheel.F16,
       Flamingos2FpuMask.Imaging,
       Flamingos2Decker.Imaging,
       Flamingos2ReadoutMode.Science,
-      Flamingos2ReadMode.Faint.readCount
+      Flamingos2ReadMode.Bright.readCount
     )
 
   private def sciStep(

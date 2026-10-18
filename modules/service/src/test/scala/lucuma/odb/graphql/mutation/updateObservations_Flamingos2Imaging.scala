@@ -78,7 +78,7 @@ class updateObservations_Flamingos2Imaging extends OdbSuite with UpdateObservati
                     { "filter": "Y" },
                     { "filter": "J" }
                   ],
-                  "defaultReadMode": "FAINT",
+                  "defaultReadMode": "BRIGHT",
                   "explicitReadMode": "BRIGHT",
                   "defaultReads": "READS_1",
                   "explicitReads": null,
