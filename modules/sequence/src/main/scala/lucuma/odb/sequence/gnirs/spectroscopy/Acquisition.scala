@@ -109,7 +109,7 @@ object Acquisition:
       // The through-IFU phase pauses first for the operator to apply the offsets
       // measured on the field image, so its first step carries a breakpoint.
       val throughPhase: NonEmptyList[ProtoStep[GnirsDynamicConfig]] =
-        NonEmptyList.fromListUnsafe(ifuImage.toList ++ throughSky.toList ++ List(through, through))
+        NonEmptyList.fromListUnsafe(ifuImage.toList ++ throughSky.toList ++ List(through))
       NonEmptyList.fromListUnsafe(
         flats ++ fieldSky.toList ++ (field :: throughPhase.head.withBreakpoint :: throughPhase.tail)
       )

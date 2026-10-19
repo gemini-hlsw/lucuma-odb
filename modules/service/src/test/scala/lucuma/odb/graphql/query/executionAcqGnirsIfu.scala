@@ -164,12 +164,12 @@ class executionAcqGnirsIfu extends ExecutionTestSupportForGnirs:
       """
     .asJson
 
-  // 5_000_000 µs = 5 s → integration 5s ⇒ acquisition mode Bright; the through-IFU steps
-  // expose 2× the field image (10s). Both fall in the BRIGHT read-mode range.
+  // 5_000_000 µs = 5 s → integration 5s ⇒ acquisition mode Bright; the through-IFU step
+  // exposes 2× the field image (10s). Both fall in the BRIGHT read-mode range.
   val Brightµs:        Long =  5_000_000L
   val BrightThroughµs: Long = 10_000_000L
 
-  test("LR-IFU Bright acquisition — field, offset IFU image, 2 through-IFU steps"):
+  test("LR-IFU Bright acquisition — field, offset IFU image, through-IFU step"):
     val setup: IO[Observation.Id] =
       for
         p <- createProgram
@@ -194,7 +194,6 @@ class executionAcqGnirsIfu extends ExecutionTestSupportForGnirs:
                     "steps": [
                       ${fieldStep(Brightµs, 1, "ORDER4", "BRIGHT", 0, 0)},
                       ${ifuImageStep("LOW_RESOLUTION")},
-                      ${throughIfuStep("LOW_RESOLUTION")(BrightThroughµs, 1, "ORDER4", "BRIGHT", 0, 0)},
                       ${throughIfuStep("LOW_RESOLUTION")(BrightThroughµs, 1, "ORDER4", "BRIGHT", 0, 0)}
                     ]
                   },
@@ -238,7 +237,6 @@ class executionAcqGnirsIfu extends ExecutionTestSupportForGnirs:
                     "steps": [
                       ${fieldStep(VeryBrightµs, 1, "H2", "VERY_BRIGHT", 0, 0)},
                       ${ifuImageStep("LOW_RESOLUTION")},
-                      ${throughIfuStep("LOW_RESOLUTION")(VeryBrightThroughµs, 1, "H2", "BRIGHT", 0, 0)},
                       ${throughIfuStep("LOW_RESOLUTION")(VeryBrightThroughµs, 1, "H2", "BRIGHT", 0, 0)}
                     ]
                   },
@@ -282,7 +280,6 @@ class executionAcqGnirsIfu extends ExecutionTestSupportForGnirs:
                       ${fieldStep(Faintµs, 1, "ORDER4", "FAINT", -10, 0)},
                       ${fieldStep(Faintµs, 1, "ORDER4", "FAINT", 0, 0)},
                       ${throughIfuStep("LOW_RESOLUTION")(FaintThroughµs, 1, "ORDER4", "FAINT", -10, 0, "ENABLED")},
-                      ${throughIfuStep("LOW_RESOLUTION")(FaintThroughµs, 1, "ORDER4", "FAINT", 0, 0)},
                       ${throughIfuStep("LOW_RESOLUTION")(FaintThroughµs, 1, "ORDER4", "FAINT", 0, 0)}
                     ]
                   },
@@ -322,7 +319,6 @@ class executionAcqGnirsIfu extends ExecutionTestSupportForGnirs:
                       ${fieldStep(Faintµs, 1, "ORDER4", "FAINT", 0, 10)},
                       ${fieldStep(Faintµs, 1, "ORDER4", "FAINT", 0, 0)},
                       ${throughIfuStep("LOW_RESOLUTION")(FaintThroughµs, 1, "ORDER4", "FAINT", 0, 10, "ENABLED")},
-                      ${throughIfuStep("LOW_RESOLUTION")(FaintThroughµs, 1, "ORDER4", "FAINT", 0, 0)},
                       ${throughIfuStep("LOW_RESOLUTION")(FaintThroughµs, 1, "ORDER4", "FAINT", 0, 0)}
                     ]
                   },
@@ -377,7 +373,6 @@ class executionAcqGnirsIfu extends ExecutionTestSupportForGnirs:
                       { "instrumentConfig": { "coadds": 6 } },
                       { "instrumentConfig": { "coadds": 6 } },
                       { "instrumentConfig": { "coadds": 6 } },
-                      { "instrumentConfig": { "coadds": 6 } },
                       { "instrumentConfig": { "coadds": 6 } }
                     ]
                   }
@@ -415,7 +410,6 @@ class executionAcqGnirsIfu extends ExecutionTestSupportForGnirs:
                       ${alignmentFlatStep("HIGH_RESOLUTION")},
                       ${fieldStep(Brightµs, 1, "ORDER4", "BRIGHT", 0, 0)},
                       ${ifuImageStep("HIGH_RESOLUTION")},
-                      ${throughIfuStep("HIGH_RESOLUTION")(BrightThroughµs, 1, "ORDER4", "BRIGHT", 0, 0)},
                       ${throughIfuStep("HIGH_RESOLUTION")(BrightThroughµs, 1, "ORDER4", "BRIGHT", 0, 0)}
                     ]
                   },
@@ -456,7 +450,6 @@ class executionAcqGnirsIfu extends ExecutionTestSupportForGnirs:
                       ${fieldStep(Faintµs, 1, "ORDER4", "FAINT", -10, 0)},
                       ${fieldStep(Faintµs, 1, "ORDER4", "FAINT", 0, 0)},
                       ${throughIfuStep("HIGH_RESOLUTION")(FaintThroughµs, 1, "ORDER4", "FAINT", -10, 0, "ENABLED")},
-                      ${throughIfuStep("HIGH_RESOLUTION")(FaintThroughµs, 1, "ORDER4", "FAINT", 0, 0)},
                       ${throughIfuStep("HIGH_RESOLUTION")(FaintThroughµs, 1, "ORDER4", "FAINT", 0, 0)}
                     ]
                   },
