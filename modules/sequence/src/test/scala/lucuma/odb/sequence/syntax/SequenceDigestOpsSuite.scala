@@ -7,6 +7,7 @@ import cats.data.NonEmptyList
 import cats.syntax.all.*
 import lucuma.core.enums.GmosGratingOrder
 import lucuma.core.enums.GmosNorthGrating
+import lucuma.core.enums.ObservationValidationCode
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.StepType
 import lucuma.core.math.Wavelength
@@ -17,10 +18,11 @@ import lucuma.core.model.sequence.SequenceDigest
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepDigest
+import lucuma.core.model.sequence.StepViolation
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.arb.ArbAtom.given
 import lucuma.core.model.sequence.arb.ArbStep.given
-import lucuma.core.model.sequence.exposure.ExposureTimeViolation
+import lucuma.core.model.sequence.exposure.ExposureRules
 import lucuma.core.model.sequence.exposure.PendingExposureRules
 import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.model.sequence.gmos.GmosGratingConfig
@@ -110,23 +112,23 @@ class SequenceDigestOpsSuite extends ScalaCheckSuite:
   private val Fractional = "Exposure times for GMOS North must be a whole number of seconds."
   private val CosmicRays = "Exposure times above 1200 s are not recommended for GMOS North due to cosmic ray contamination."
 
-  private def error(d: String): ExposureTimeViolation   = ExposureTimeViolation(ExposureTimeViolation.Severity.Error, d)
-  private def warning(d: String): ExposureTimeViolation = ExposureTimeViolation(ExposureTimeViolation.Severity.Warning, d)
+  private def error(d: String): StepViolation   = StepViolation(ObservationValidationCode.ConfigurationError, d)
+  private def warning(d: String): StepViolation = StepViolation(ObservationValidationCode.ExposureTimeWarning, d)
 
   test("a rule violated by many steps is reported once, errors first"):
     val sd =
       SequenceDigest.Zero
         .add(atom(step(1300), step(20), step(1500)), ctx)
         .add(atom(step(0.5), step(0.25)), ctx)
-    assertEquals(sd.stepViolations.toList, List(error(Fractional), error(BelowMin), warning(CosmicRays)).map(_.toStepViolation))
+    assertEquals(sd.stepViolations.toList, List(error(Fractional), error(BelowMin), warning(CosmicRays)))
 
   test("acquisition steps are checked for errors alone"):
     val sd = SequenceDigest.Zero.add(atom(step(0, ObserveClass.Acquisition), step(1500, ObserveClass.Acquisition)), ctx)
-    assertEquals(sd.stepViolations.toList, List(error(BelowMin).toStepViolation))
+    assertEquals(sd.stepViolations.toList, List(error(BelowMin)))
 
   test("the digest's violations are core's for its steps"):
     val sd = SequenceDigest.Zero.add(atom(step(1500)), ctx)
-    assertEquals(sd.stepViolations.toList, ExposureTimeViolation.check(step(1500), ctx).map(_.toStepViolation))
+    assertEquals(sd.stepViolations.toList, ExposureRules.check(step(1500), ctx))
 
   test("steps sharing a second order overlap report it once"):
     // R400 without a filter reaches past 720 nm at each of these central wavelengths

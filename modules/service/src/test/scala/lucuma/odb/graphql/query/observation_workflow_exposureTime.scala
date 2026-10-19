@@ -227,60 +227,6 @@ class observation_workflow_exposureTime
                             execution {
                               digest {
                                 value {
-                                  acquisition { exposureTimeViolations { severity } }
-                                  science {
-                                    exposureTimeViolations {
-                                      severity
-                                      description
-                                    }
-                                  }
-                                }
-                              }
-                            }
-                          }
-                        }
-                      """,
-                      json"""
-                        {
-                          "observation": {
-                            "execution": {
-                              "digest": {
-                                "value": {
-                                  "acquisition": { "exposureTimeViolations": [] },
-                                  "science": {
-                                    "exposureTimeViolations": [
-                                      {
-                                        "severity": "ERROR",
-                                        "description": "Exposure times for GMOS North must be a whole number of seconds."
-                                      },
-                                      {
-                                        "severity": "ERROR",
-                                        "description": "Exposure times for GMOS North must be at least 1 s."
-                                      }
-                                    ]
-                                  }
-                                }
-                              }
-                            }
-                          }
-                        }
-                      """.asRight
-                    )
-    yield ()
-
-  test("the sequence digest reports the violations as step violations"):
-    for
-      (pid, oid) <- setup
-      _          <- replaceSequence(oid, SequenceType.Science, 0.5)
-      _          <- runObscalcUpdate(pid, oid)
-      _          <- expect(
-                      pi,
-                      s"""
-                        query {
-                          observation(observationId: ${oid.asJson}) {
-                            execution {
-                              digest {
-                                value {
                                   acquisition { stepViolations { code } }
                                   science {
                                     stepViolations {

@@ -17,7 +17,7 @@ import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepViolation
 import lucuma.core.model.sequence.arb.ArbStep.given
-import lucuma.core.model.sequence.exposure.ExposureTimeViolation
+import lucuma.core.model.sequence.exposure.ExposureRules
 import lucuma.core.model.sequence.exposure.PendingExposureRules
 import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.model.sequence.gmos.GmosGratingConfig
@@ -110,5 +110,5 @@ class SecondOrderOverlapSuite extends FunSuite:
     val s   = north(GmosNorthGrating.R400_G5310.some, None, 700)
     assertEquals(
       StepCheck[DynamicConfig.GmosNorth].violations(s, ctx),
-      ExposureTimeViolation.check(s, ctx).map(_.toStepViolation) ++ overlapsAt(720).toList
+      ExposureRules.check(s, ctx) ++ overlapsAt(720).toList
     )

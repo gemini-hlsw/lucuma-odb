@@ -3001,7 +3001,7 @@ class perScienceObservationCalibrations
                         execution {
                           digest {
                             value {
-                              science { exposureTimeViolations { severity description } }
+                              science { stepViolations { code message } }
                             }
                           }
                         }
@@ -3014,7 +3014,7 @@ class perScienceObservationCalibrations
                         "execution" -> Json.obj(
                           "digest" -> Json.obj(
                             "value" -> Json.obj(
-                              "science" -> Json.obj("exposureTimeViolations" -> Json.arr())
+                              "science" -> Json.obj("stepViolations" -> Json.arr())
                             )
                           )
                         )

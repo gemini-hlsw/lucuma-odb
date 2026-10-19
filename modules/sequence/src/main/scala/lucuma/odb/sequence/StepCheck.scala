@@ -5,7 +5,7 @@ package lucuma.odb.sequence
 
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepViolation
-import lucuma.core.model.sequence.exposure.ExposureTimeViolation
+import lucuma.core.model.sequence.exposure.ExposureRules
 import lucuma.core.model.sequence.exposure.PendingExposureRules
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.model.sequence.ghost.GhostDynamicConfig
@@ -18,7 +18,7 @@ import lucuma.odb.sequence.gmos.SecondOrderOverlap
  * The problems found in a step of a sequence, as validations.  Steps are
  * checked as the sequence digest is computed, so generated and edited
  * sequences alike are covered.  Every instrument's exposure times are checked
- * against its exposure rules (see `ExposureTimeViolation.check`); an
+ * against its exposure rules (see `ExposureRules.check`); an
  * instrument may add checks of its own, such as GMOS's second order overlap.
  * A new kind of step check is an addition here and a validation code for it.
  */
@@ -31,7 +31,7 @@ object StepCheck:
     ev
 
   private def exposure[D: PendingExposureRules](step: Step[D], ctx: PendingExposureRules.Context): List[StepViolation] =
-    ExposureTimeViolation.check(step, ctx).map(_.toStepViolation)
+    ExposureRules.check(step, ctx)
 
   private def exposureOnly[D: PendingExposureRules]: StepCheck[D] =
     exposure(_, _)
