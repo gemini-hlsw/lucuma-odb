@@ -56,6 +56,31 @@ trait DaytimeCalibrationOps extends ReplaceSequenceOps:
       }
     """
 
+  // A GHOST dark.
+  def ghostDarkStep: String =
+    s"""
+      {
+        instrumentConfig: {
+          red: {
+            exposureTime: { seconds: 10 }
+            exposureCount: 1
+            binning: ONE_BY_ONE
+            readMode: MEDIUM
+          }
+          blue: {
+            exposureTime: { seconds: 10 }
+            exposureCount: 1
+            binning: ONE_BY_ONE
+            readMode: MEDIUM
+          }
+          ifu1FiberAgitator: DISABLED
+          ifu2FiberAgitator: DISABLED
+        }
+        stepConfig: { dark: true }
+        observeClass: DAY_CAL
+      }
+    """
+
   def workflowQuery(oid: Observation.Id): String =
     s"""
       query {

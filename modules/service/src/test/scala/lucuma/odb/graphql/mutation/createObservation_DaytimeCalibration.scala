@@ -82,6 +82,38 @@ class createObservation_DaytimeCalibration extends OdbSuite with DatabaseOperati
       )
     yield ()
 
+  test("staff create a GHOST daytime calibration"):
+    for
+      pid <- createProgramAs(staff)
+      _   <- expect(
+        user     = staff,
+        query    = createQuery(pid, "GHOST"),
+        expected = json"""
+          {
+            "createObservation": {
+              "observation": {
+                "calibrationRole": "DAYTIME_CALIBRATION",
+                "observingMode": {
+                  "mode": "DAYTIME_CALIBRATION",
+                  "instrument": "GHOST",
+                  "daytimeCalibration": {
+                    "mode": "DAYTIME_CALIBRATION",
+                    "instrument": "GHOST"
+                  }
+                },
+                "configuration": {
+                  "observingMode": {
+                    "mode": "DAYTIME_CALIBRATION",
+                    "instrument": "GHOST"
+                  }
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+    yield ()
+
   test("a PI may not create a daytime calibration"):
     for
       pid <- createProgramAs(pi)
@@ -97,7 +129,7 @@ class createObservation_DaytimeCalibration extends OdbSuite with DatabaseOperati
       pid <- createProgramAs(staff)
       _   <- expectOdbError(
         user     = staff,
-        query    = createQuery(pid, "GHOST"),
+        query    = createQuery(pid, "MAROON_X"),
         expected = { case OdbError.InvalidArgument(Some(m)) if m.contains("does not support daytime calibrations") => () }
       )
     yield ()

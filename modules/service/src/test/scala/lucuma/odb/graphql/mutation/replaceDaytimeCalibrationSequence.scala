@@ -6,6 +6,8 @@ package mutation
 
 import cats.syntax.either.*
 import io.circe.literal.*
+import io.circe.syntax.*
+import lucuma.core.enums.Instrument
 import lucuma.core.enums.SequenceType
 import lucuma.core.model.Observation
 import lucuma.odb.data.OdbError
@@ -86,6 +88,66 @@ class replaceDaytimeCalibrationSequence extends OdbSuite with DatabaseOperations
         user     = staff,
         query    = replaceQuery(oid, SequenceType.Acquisition, gmosNorthDarkStep()),
         expected = { case OdbError.InvalidArgument(Some(m)) if m.contains("acquisition") => () }
+      )
+    yield ()
+
+  test("GHOST static has no IFU target"):
+    def replaceGhost(oid: Observation.Id): String =
+      s"""
+        mutation {
+          replaceGhostSequence(input: ${input(oid, SequenceType.Science, atomInput("Darks", ghostDarkStep))}) {
+            sequence { description }
+          }
+        }
+      """
+
+    def executionQuery(oid: Observation.Id): String =
+      s"""
+        query {
+          executionConfig(observationId: ${oid.asJson}) {
+            ghost {
+              static {
+                resolutionMode
+                ifuMapping { mappingType singleTarget { ifu1 } }
+                slitViewingCameraExposureTime { seconds }
+              }
+              science {
+                nextAtom {
+                  steps { observeClass }
+                }
+              }
+            }
+          }
+        }
+      """
+
+    for
+      pid <- createProgramAs(staff)
+      oid <- createDaytimeCalibrationAs(staff, pid, Instrument.Ghost)
+      _   <- query(staff, replaceGhost(oid))
+      _   <- expect(
+        user     = staff,
+        query    = executionQuery(oid),
+        expected = json"""
+          {
+            "executionConfig": {
+              "ghost": {
+                "static": {
+                  "resolutionMode": "STANDARD",
+                  "ifuMapping": { "mappingType": "NO_TARGET", "singleTarget": null },
+                  "slitViewingCameraExposureTime": null
+                },
+                "science": {
+                  "nextAtom": {
+                    "steps": [
+                      { "observeClass": "DAY_CAL" }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        """.asRight
       )
     yield ()
 

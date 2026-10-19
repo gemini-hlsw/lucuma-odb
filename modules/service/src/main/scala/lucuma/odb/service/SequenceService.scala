@@ -852,7 +852,7 @@ object SequenceService:
         namespace:      Option[UUID] = None
       )(using Transaction[F]): F[Result[Stream[Pure, Atom[GhostDynamicConfig]]]] =
         (for
-          s <- ResultT(selectOrComputeGhostStatic(observationId).map(e => Result.fromEither(e.leftMap(_.asProblem))))
+          s <- staticFor(observationId, Instrument.Ghost, DaytimeStatics.Ghost)(ResultT(selectOrComputeGhostStatic(observationId).map(e => Result.fromEither(e.leftMap(_.asProblem)))))
           b <- ResultT.liftF(atomBuilder(sequenceType, s, namespace, estimator.ghostStep))
           r <- replaceSequence(
                  Instrument.Ghost,

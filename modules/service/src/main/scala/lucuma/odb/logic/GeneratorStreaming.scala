@@ -61,6 +61,10 @@ sealed trait GeneratorStreaming[F[_]]:
     context: GeneratorContext
   )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, Flamingos2Static, Flamingos2Dynamic]]]
 
+  def selectDaytimeGhost(
+    context: GeneratorContext
+  )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, GhostStatic, GhostDynamic]]]
+
   def selectDaytimeGmosNorth(
     context: GeneratorContext
   )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, GmosNorthStatic, GmosNorthDynamic]]]
@@ -337,6 +341,11 @@ object GeneratorStreaming:
         context: GeneratorContext
       )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, Flamingos2Static, Flamingos2Dynamic]]] =
         selectOrEmpty(DaytimeStatics.Flamingos2, sequenceService.selectFlamingos2Sequence(context.oid, _, _))
+
+      override def selectDaytimeGhost(
+        context: GeneratorContext
+      )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, GhostStatic, GhostDynamic]]] =
+        selectOrEmpty(DaytimeStatics.Ghost, sequenceService.selectGhostSequence(context.oid, _, _))
 
       override def selectDaytimeGmosNorth(
         context: GeneratorContext

@@ -65,6 +65,7 @@ trait GhostCodec:
                  case GhostIfuMappingType.TargetPlusSky => c.downField("targetPlusSky").as[TargetPlusSky]
                  case GhostIfuMappingType.SkyPlusTarget => c.downField("skyPlusTarget").as[SkyPlusTarget]
                  case GhostIfuMappingType.DualTarget    => c.downField("dualTarget").as[DualTarget]
+                 case GhostIfuMappingType.NoTarget      => Right(NoTarget)
         yield m
 
     given Decoder[GhostStaticConfig] =
@@ -137,6 +138,7 @@ trait GhostCodec:
           case m @ TargetPlusSky(_, _) => ("targetPlusSky", m.asJson).some
           case m @ SkyPlusTarget(_, _) => ("skyPlusTarget", m.asJson).some
           case m @ DualTarget(_, _)    => ("dualTarget",    m.asJson).some
+          case NoTarget                => none
 
       Encoder.instance: a =>
         Json.fromFields(

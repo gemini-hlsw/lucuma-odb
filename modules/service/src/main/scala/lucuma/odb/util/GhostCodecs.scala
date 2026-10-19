@@ -98,6 +98,8 @@ trait GhostCodecs:
         GhostIfuMapping.SkyPlusTarget(ifu1, ifu2).asRight
       case (GhostIfuMappingType.DualTarget, IfuSlot.Target(ifu1), IfuSlot.Target(ifu2)) =>
         GhostIfuMapping.DualTarget(ifu1, ifu2).asRight
+      case (GhostIfuMappingType.NoTarget, IfuSlot.Empty, IfuSlot.Empty)                 =>
+        GhostIfuMapping.NoTarget.asRight
       case (mappingType, slot1, slot2)                                                  =>
         s"Inconsistent GHOST IFU mapping: $mappingType, $slot1, $slot2".asLeft
     } {
@@ -109,6 +111,8 @@ trait GhostCodecs:
         (GhostIfuMappingType.SkyPlusTarget, IfuSlot.Sky(ifu1), IfuSlot.Target(ifu2))
       case GhostIfuMapping.DualTarget(ifu1, ifu2)    =>
         (GhostIfuMappingType.DualTarget, IfuSlot.Target(ifu1), IfuSlot.Target(ifu2))
+      case GhostIfuMapping.NoTarget                  =>
+        (GhostIfuMappingType.NoTarget, IfuSlot.Empty, IfuSlot.Empty)
     }
 
 

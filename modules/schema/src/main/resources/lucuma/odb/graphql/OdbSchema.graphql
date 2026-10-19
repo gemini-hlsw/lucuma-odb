@@ -6256,8 +6256,8 @@ Daytime calibration mode input.  Staff only.
 """
 input DaytimeCalibrationInput {
   """
-  Instrument of the calibration: FLAMINGOS2, GMOS_NORTH, GMOS_SOUTH, GNIRS
-  or IGRINS2.
+  Instrument of the calibration: FLAMINGOS2, GHOST, GMOS_NORTH, GMOS_SOUTH,
+  GNIRS or IGRINS2.
   """
   instrument: Instrument!
 }
@@ -11803,11 +11803,16 @@ enum GhostIfuMappingType {
   SKY_PLUS_TARGET
 
   DUAL_TARGET
+
+  """
+  No IFU is assigned a target. Used by daytime calibrations.
+  """
+  NO_TARGET
 }
 
 """
 Describes how the target(s) and sky position (if any) are mapped to the GHOST
-IFUs.  If the `mappingType` is `NONSIDEREAL` then all other fields will be
+IFUs.  If the `mappingType` is `NO_TARGET` then all other fields will be
 `null`.  Otherwise, there will be a single non-null field that corresponds to
 the `mappingType`.
 """

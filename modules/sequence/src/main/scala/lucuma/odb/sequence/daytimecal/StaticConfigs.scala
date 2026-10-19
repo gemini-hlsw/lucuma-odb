@@ -3,9 +3,12 @@
 
 package lucuma.odb.sequence.daytimecal
 
+import lucuma.core.enums.GhostResolutionMode
 import lucuma.core.enums.GnirsWellDepth
 import lucuma.core.enums.Igrins2SlitOffsetPreset
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
+import lucuma.core.model.sequence.ghost.GhostIfuMapping
+import lucuma.core.model.sequence.ghost.GhostStaticConfig
 import lucuma.core.model.sequence.gmos.StaticConfig
 import lucuma.core.model.sequence.gnirs.GnirsStaticConfig
 import lucuma.core.model.sequence.igrins2.Igrins2SVCImages
@@ -16,12 +19,15 @@ import lucuma.odb.sequence.gmos.InitialConfigs
 /**
  * Static configurations for daytime calibrations.
  * TODO: Review these are ok with science
- * TODO: GHOST is pending, so not included here yet.
  */
 object StaticConfigs:
 
   val Flamingos2: Flamingos2StaticConfig =
     flamingos2.Static
+
+  // TODO: Review the resolution mode with science
+  val Ghost: GhostStaticConfig =
+    GhostStaticConfig(GhostResolutionMode.Standard, GhostIfuMapping.NoTarget, None)
 
   val GmosNorth: StaticConfig.GmosNorth =
     InitialConfigs.GmosNorthStatic
