@@ -128,7 +128,8 @@ object Acquisition:
       time:                IntegrationTime
     ): Steps =
       val acqExposureTime: TimeSpan = time.exposureTime
-      val readMode: GnirsReadMode   = GnirsReadMode.forExposureTime(acqExposureTime)
+      // The ITC's read mode goes with its exposure; the fixed FPU image exposure derives its own.
+      val readMode: GnirsReadMode   = time.gnirsReadMode.getOrElse(GnirsReadMode.forExposureTime(acqExposureTime))
       // The science-aperture decker, from camera + prism (always Mirror) for the long
       // slit.  (IFU acquisitions take the computeIfu path.)  The decker depends only on the
       // pixel scale, which the acquisition camera shares, so it is the same either way.
@@ -230,6 +231,9 @@ object Acquisition:
       time:           IntegrationTime
     ): IfuSteps =
       val fieldExposureTime: TimeSpan   = time.exposureTime
+      // The ITC's read mode serves the field and through-IFU steps it was computed for; only
+      // the fixed IFU image exposure derives its own.
+      val acqReadMode: GnirsReadMode    = time.gnirsReadMode.getOrElse(GnirsReadMode.forExposureTime(fieldExposureTime))
       // The through-IFU steps expose twice as long as the field image (per the OCS IFU
       // acquisition templates).
       val throughExposureTime: TimeSpan = fieldExposureTime *| 2
@@ -249,7 +253,7 @@ object Acquisition:
                              acquisitionMirror = GnirsAcquisitionMirrorMode.In,
                              camera            = config.acquisitionCamera,
                              focus             = config.focus,
-                             readMode          = GnirsReadMode.forExposureTime(fieldExposureTime),
+                             readMode          = acqReadMode,
                              decker            = GnirsDecker.Acquisition,
                              fpu               = GnirsFpu.Other(GnirsFpuOther.Acquisition)
                            )
@@ -277,7 +281,7 @@ object Acquisition:
                              exposure = throughExposureTime,
                              coadds   = acqCoadds,
                              filter   = selectedFilter,
-                             readMode = GnirsReadMode.forExposureTime(throughExposureTime),
+                             readMode = acqReadMode,
                              decker   = ifuDecker,
                              fpu      = config.fpu
                            )

@@ -14,6 +14,7 @@ object all
     with Flamingos2FpuSyntax
     with Flamingos2DisperserSyntax
     with Flamingos2FilterSyntax
+    with Flamingos2ReadModeSyntax
     with GhostBinningSyntax
     with GhostReadModeSyntax
     with GhostResolutionModeSyntax

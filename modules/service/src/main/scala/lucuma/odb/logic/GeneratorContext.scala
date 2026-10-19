@@ -75,6 +75,8 @@ case class GeneratorContext(
       md5.update(z.focus.value.exposureTime.hashBytes)
       md5.update(z.focus.value.frameCount.hashBytes)
       md5.update(z.focus.value.coadds.hashBytes)
+      md5.update(z.focus.value.gnirsReadMode.fold("")(_.tag).hashBytes)
+      md5.update(z.focus.value.flamingos2ReadMode.fold("")(_.tag).hashBytes)
 
     def addKeyedResultSet[A: HashBytes](kv: (A, Zipper[ItcResult])): Unit =
       md5.update(kv._1.hashBytes)

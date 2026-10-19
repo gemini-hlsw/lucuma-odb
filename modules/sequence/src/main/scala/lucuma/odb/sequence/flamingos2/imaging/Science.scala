@@ -18,6 +18,7 @@ import fs2.Pure
 import fs2.Stream
 import lucuma.core.data.Zipper
 import lucuma.core.enums.Flamingos2Filter
+import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.StepGuideState
 import lucuma.core.model.sequence.StepConfig
@@ -25,7 +26,6 @@ import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig as F2
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
 import lucuma.core.optics.syntax.lens.*
-import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
 import lucuma.odb.data.ItcResult as Result
 import lucuma.odb.data.ItcScience.Flamingos2Imaging
@@ -45,18 +45,22 @@ object Science:
     def setup(config: Config): State[F2, Unit] =
       for
         _ <- F2.decker      := config.decker
-        _ <- F2.readMode    := config.readMode
-        _ <- F2.reads       := config.reads
         _ <- F2.readoutMode := config.readoutMode
       yield ()
 
     def runSetup(config: Config): F2 =
       setup(config).runS(initialDynamicConfig).value
 
-    def setFilter(filter: Flamingos2Filter, time: TimeSpan): State[F2, Unit] =
+    // The read mode: the explicit one if set, else the one the ITC reports (its choice in
+    // S/N mode, the requested default in time-and-count mode).  The reads follow it.
+    def setFilter(config: Config, filter: Flamingos2Filter, time: IntegrationTime): State[F2, Unit] =
+      val readMode: Flamingos2ReadMode =
+        config.explicitReadMode.orElse(time.flamingos2ReadMode).getOrElse(config.defaultReadMode)
       for
         _ <- F2.filter   := filter
-        _ <- F2.exposure := time
+        _ <- F2.exposure := time.exposureTime
+        _ <- F2.readMode := readMode
+        _ <- F2.reads    := config.explicitReads.getOrElse(readMode.readCount)
       yield ()
 
     def grouped(
@@ -69,7 +73,7 @@ object Science:
       def oneFilter(filter: Flamingos2Filter): State[F2, Stream[Pure, ProtoAtom[ProtoStep[F2]]]] =
         val integrationTime = time(filter).get.focus._2
         for
-          _   <- setFilter(filter, integrationTime.exposureTime)
+          _   <- setFilter(config, filter, integrationTime)
           sky <- skyOffsets
                    .traverse: offset =>
                      scienceStep(offset, ObserveClass.Science)
@@ -108,7 +112,7 @@ object Science:
       def skySteps(skyList: List[(Flamingos2Filter, TelescopeConfig)]): State[F2, List[ProtoStep[F2]]] =
         skyList.traverse: (filter, offset) =>
           for
-            _ <- setFilter(filter, filterTimes(filter).exposureTime)
+            _ <- setFilter(config, filter, filterTimes(filter))
             s <- scienceStep(offset, ObserveClass.Science)
           yield s
 
@@ -128,7 +132,7 @@ object Science:
         filters
           .traverse: filter =>
             for
-              _ <- setFilter(filter, filterTimes(filter).exposureTime)
+              _ <- setFilter(config, filter, filterTimes(filter))
               d <- State.get
             yield Stream.emits(List.fill(perFilterCounts(filter))(d))
           .map(lst => Stream.emits(lst).flatten)

@@ -18,6 +18,7 @@ import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
 import lucuma.itc.AsterismIntegrationTimeOutcomes
 import lucuma.itc.IntegrationTime
+import lucuma.itc.ItcReadMode
 import lucuma.itc.ItcVersions
 import lucuma.itc.SignalToNoiseAt
 import lucuma.itc.TargetIntegrationTime
@@ -42,6 +43,16 @@ object TestItcClient {
       case InstrumentMode.GnirsImaging(coadds = c)      => c
       case _                                             => PosInt.unsafeFrom(1)
 
+  // OCS echoes the requested read mode back in time-and-count mode (S/N mode selects its
+  // own, which `withResult` supplies).
+  private def requestedReadMode(mode: InstrumentMode): Option[ItcReadMode] =
+    mode match
+      case InstrumentMode.GnirsSpectroscopy(readMode = r)      => ItcReadMode.Gnirs(r).some
+      case InstrumentMode.GnirsImaging(readMode = r)           => ItcReadMode.Gnirs(r).some
+      case InstrumentMode.Flamingos2Spectroscopy(readMode = r) => ItcReadMode.Flamingos2(r).some
+      case InstrumentMode.Flamingos2Imaging(readMode = r)      => ItcReadMode.Flamingos2(r).some
+      case _                                                   => None
+
   def withResult[F[_]: Applicative](
     result:      IntegrationTime,
     bandOrLine:  Either[Band, Wavelength]
@@ -57,7 +68,7 @@ object TestItcClient {
             case ExposureTimeMode.SignalToNoiseMode(_, _)   =>
               result
             case ExposureTimeMode.TimeAndCountMode(t, c, _) =>
-              IntegrationTime(t, c, requestedCoadds(input.mode))
+              IntegrationTime(t, c, requestedCoadds(input.mode), requestedReadMode(input.mode))
 
         val snAt = input.mode.exposureTimeMode match
           case ExposureTimeMode.SignalToNoiseMode(sn, at) =>

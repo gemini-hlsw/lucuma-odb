@@ -75,9 +75,12 @@ object MosTelluric:
       calRole: Option[CalibrationRole]
     ): (NonEmptyList[ProtoStep[F2]], ProtoStep[F2]) =
 
+      // The explicit read mode if set, else the one the ITC reports (its choice in S/N
+      // mode, the requested one in time-and-count mode).
       val readMode =
         config
           .explicitReadMode
+          .orElse(time.flamingos2ReadMode)
           .getOrElse(Flamingos2ReadMode.forExposureTime(time.exposureTime))
 
       val mask = Flamingos2FpuMask.builtin(config.equivalentFpu)

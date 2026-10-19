@@ -33,7 +33,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
   override def fakeItcSpectroscopyResult: IntegrationTime =
     IntegrationTime(
       20.minTimeSpan,
-      PosInt.unsafeFrom(10),
+      PosInt.unsafeFrom(10)
     )
 
   // * Arc:

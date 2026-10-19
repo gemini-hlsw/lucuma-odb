@@ -111,9 +111,12 @@ object Science:
          calRole: Option[CalibrationRole]
       ): PreDef =
 
+        // The explicit read mode if set, else the one the ITC reports (its choice in S/N
+        // mode, the requested one in time-and-count mode).
         val readMode =
           config
             .explicitReadMode
+            .orElse(time.flamingos2ReadMode)
             .getOrElse:
               Flamingos2ReadMode.forExposureTime(time.exposureTime)
 

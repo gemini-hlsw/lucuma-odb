@@ -19,7 +19,6 @@ import fs2.Stream
 import lucuma.core.data.Zipper
 import lucuma.core.enums.GnirsFilter
 import lucuma.core.enums.GnirsFpuOther.Acquisition
-import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.StepGuideState
 import lucuma.core.model.sequence.StepConfig
@@ -56,13 +55,14 @@ object Science:
     def runSetup(config: Config): GnirsDynamicConfig =
       setup(config).runS(initialDynamicConfig).value
 
-    // The read mode follows the exposure time unless explicitly overridden.
+    // The read mode: the explicit one if set, else the one the ITC reports (its choice in
+    // S/N mode, the requested default in time-and-count mode).
     def setFilter(config: Config, filter: GnirsFilter, time: IntegrationTime): State[GnirsDynamicConfig, Unit] =
       for
         _ <- GnirsDynamicConfig.filter   := filter
         _ <- GnirsDynamicConfig.exposure := time.exposureTime
         _ <- GnirsDynamicConfig.coadds   := time.coadds
-        _ <- GnirsDynamicConfig.readMode := config.explicitReadMode.getOrElse(GnirsReadMode.forExposureTime(time.exposureTime))
+        _ <- GnirsDynamicConfig.readMode := config.explicitReadMode.orElse(time.gnirsReadMode).getOrElse(defaultReadMode(time.exposureTime))
       yield ()
 
     def grouped(

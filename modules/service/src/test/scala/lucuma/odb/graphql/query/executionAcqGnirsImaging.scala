@@ -18,6 +18,7 @@ import lucuma.core.syntax.string.*
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
+import lucuma.itc.ItcReadMode
 import lucuma.itc.client.ImagingInput
 import lucuma.itc.client.InstrumentMode
 import lucuma.odb.sequence.gnirs.imaging.Acquisition.RepeatingAtomCount
@@ -40,17 +41,20 @@ class executionAcqGnirsImaging extends ExecutionTestSupportForGnirs:
   //   J  → 2s × 3 = 6s   → Bright
   //   K  → 30s × 1 = 30s → Faint
   //   Y  → 0.3s × 1      → Very Bright (with an H2 pass of 2s × 3)
+  // Each S/N result carries the read mode the ITC chose, one slower than its exposure
+  // would derive, so the on-target steps can only have it from the ITC.
   override def fakeItcImagingResultFor(input: ImagingInput): Option[IntegrationTime] =
     input.mode match
       case InstrumentMode.GnirsImaging(exposureTimeMode = ExposureTimeMode.SignalToNoiseMode(_, _), filter = filter) =>
         filter match
-          case GnirsFilter.J      => IntegrationTime(2.secTimeSpan,  3.refined).some
-          case GnirsFilter.K      => IntegrationTime(30.secTimeSpan, 1.refined).some
-          case GnirsFilter.Y      => IntegrationTime(300.msTimeSpan, 1.refined).some
-          case GnirsFilter.H2     => IntegrationTime(2.secTimeSpan,  3.refined).some
-          case GnirsFilter.Order4 => IntegrationTime(5.secTimeSpan,  1.refined).some
+          case GnirsFilter.J      => IntegrationTime(2.secTimeSpan,  3.refined, readMode = ItcReadMode.Gnirs(GnirsReadMode.Faint).some).some
+          case GnirsFilter.K      => IntegrationTime(30.secTimeSpan, 1.refined, readMode = ItcReadMode.Gnirs(GnirsReadMode.VeryFaint).some).some
+          case GnirsFilter.Y      => IntegrationTime(300.msTimeSpan, 1.refined, readMode = ItcReadMode.Gnirs(GnirsReadMode.Bright).some).some
+          case GnirsFilter.H2     => IntegrationTime(2.secTimeSpan,  3.refined, readMode = ItcReadMode.Gnirs(GnirsReadMode.Faint).some).some
+          case GnirsFilter.Order4 => IntegrationTime(5.secTimeSpan,  1.refined, readMode = ItcReadMode.Gnirs(GnirsReadMode.Faint).some).some
           case _                  => none
-      // Time-and-count echoes the user's request, as the real ITC does.
+      // Time-and-count echoes the user's request, as the real ITC does (OdbSuite adds
+      // the requested read mode).
       case InstrumentMode.GnirsImaging(exposureTimeMode = ExposureTimeMode.TimeAndCountMode(time, count, _)) =>
         IntegrationTime(time, count).some
       case _ => none
@@ -103,9 +107,8 @@ class executionAcqGnirsImaging extends ExecutionTestSupportForGnirs:
   private def gnirsAcqImagingQuery(oid: Observation.Id): String =
     executionConfigQuery(oid, "gnirs", "acquisition", AcqStepsQuery, None)
 
-  private def readMode(t: TimeSpan): String =
-    GnirsReadMode.forExposureTime(t).tag.toScreamingSnakeCase
-
+  // The keyhole image derives its read mode from its fixed exposure; the ITC steps take
+  // the ITC's.
   private def acqStep(
     exposure:   TimeSpan,
     coadds:     Int,
@@ -114,7 +117,8 @@ class executionAcqGnirsImaging extends ExecutionTestSupportForGnirs:
     p:          Int,
     q:          Int,
     guiding:    StepGuideState,
-    breakpoint: String = "DISABLED"
+    readMode:   GnirsReadMode = GnirsReadMode.Bright,
+    breakpoint: String        = "DISABLED"
   ): Json =
     json"""
       {
@@ -125,7 +129,7 @@ class executionAcqGnirsImaging extends ExecutionTestSupportForGnirs:
           "decker":    "ACQUISITION",
           "fpuOther":  "ACQUISITION",
           "camera":    ${camera.asJson},
-          "readMode":  ${readMode(exposure).asJson}
+          "readMode":  ${readMode.tag.toScreamingSnakeCase.asJson}
         },
         "telescopeConfig": ${expectedTelescopeConfig(p, q, guiding)},
         "observeClass": "ACQUISITION",
@@ -160,9 +164,9 @@ class executionAcqGnirsImaging extends ExecutionTestSupportForGnirs:
 
   // The on-target step, with and without an enabled breakpoint (for the initial atom
   // and the repeating "Fine Adjustments" atoms respectively).
-  private def onTargetSteps(exposure: TimeSpan, coadds: Int, filter: GnirsFilter, camera: String): (Json, Json) =
-    (acqStep(exposure, coadds, filter, camera, 0, 0, StepGuideState.Enabled, "ENABLED"),
-     acqStep(exposure, coadds, filter, camera, 0, 0, StepGuideState.Enabled))
+  private def onTargetSteps(exposure: TimeSpan, coadds: Int, filter: GnirsFilter, camera: String, readMode: GnirsReadMode): (Json, Json) =
+    (acqStep(exposure, coadds, filter, camera, 0, 0, StepGuideState.Enabled, readMode, "ENABLED"),
+     acqStep(exposure, coadds, filter, camera, 0, 0, StepGuideState.Enabled, readMode))
 
   private def imagingObs(camera: String, filter: String): IO[Observation.Id] =
     val mode =
@@ -183,7 +187,7 @@ class executionAcqGnirsImaging extends ExecutionTestSupportForGnirs:
     // short-camera J row, which covers the photometric J as well as Order5), 1 coadd.
     // On-target: (0,0), J, 2s (ITC), 3 coadds.
     val field                     = acqStep(15.secTimeSpan, 1, GnirsFilter.J, "SHORT_BLUE", 10, 0, StepGuideState.Disabled)
-    val (onTargetBreak, onTarget) = onTargetSteps(2.secTimeSpan, 3, GnirsFilter.J, "SHORT_BLUE")
+    val (onTargetBreak, onTarget) = onTargetSteps(2.secTimeSpan, 3, GnirsFilter.J, "SHORT_BLUE", GnirsReadMode.Faint)
     imagingObs("SHORT_BLUE", "J").flatMap: oid =>
       expect(pi, gnirsAcqImagingQuery(oid), expectedAcquisition(field, onTargetBreak, onTarget).asRight)
 
@@ -192,15 +196,15 @@ class executionAcqGnirsImaging extends ExecutionTestSupportForGnirs:
     // the narrow-band H2, which the table images in H. Field image: (10,0), H (Order4),
     // 3s, 1 coadd. On-target: (0,0), H2, 2s (H2 ITC pass), 3 coadds.
     val field                     = acqStep(3.secTimeSpan, 1, GnirsFilter.Order4, "SHORT_BLUE", 10, 0, StepGuideState.Disabled)
-    val (onTargetBreak, onTarget) = onTargetSteps(2.secTimeSpan, 3, GnirsFilter.H2, "SHORT_BLUE")
+    val (onTargetBreak, onTarget) = onTargetSteps(2.secTimeSpan, 3, GnirsFilter.H2, "SHORT_BLUE", GnirsReadMode.Faint)
     imagingObs("SHORT_BLUE", "Y").flatMap: oid =>
       expect(pi, gnirsAcqImagingQuery(oid), expectedAcquisition(field, onTargetBreak, onTarget).asRight)
 
   test("Faint: both images in first filter with the ITC exposure, field offset (0,10)"):
     // First filter K classifies as Faint (30s). Field/keyhole image: (0,10), K, 30s
     // (ITC), 1 coadd. On-target: (0,0), K, 30s, 1 coadd.
-    val field                     = acqStep(30.secTimeSpan, 1, GnirsFilter.K, "SHORT_BLUE", 0, 10, StepGuideState.Disabled)
-    val (onTargetBreak, onTarget) = onTargetSteps(30.secTimeSpan, 1, GnirsFilter.K, "SHORT_BLUE")
+    val field                     = acqStep(30.secTimeSpan, 1, GnirsFilter.K, "SHORT_BLUE", 0, 10, StepGuideState.Disabled, GnirsReadMode.VeryFaint)
+    val (onTargetBreak, onTarget) = onTargetSteps(30.secTimeSpan, 1, GnirsFilter.K, "SHORT_BLUE", GnirsReadMode.VeryFaint)
     imagingObs("SHORT_BLUE", "K").flatMap: oid =>
       expect(pi, gnirsAcqImagingQuery(oid), expectedAcquisition(field, onTargetBreak, onTarget).asRight)
 
@@ -208,7 +212,7 @@ class executionAcqGnirsImaging extends ExecutionTestSupportForGnirs:
     // Same Bright classification as the short-camera case, but the table sends J (and X)
     // to H on the long camera, at that camera's 15s H exposure.
     val field                     = acqStep(15.secTimeSpan, 1, GnirsFilter.Order4, "LONG_BLUE", 10, 0, StepGuideState.Disabled)
-    val (onTargetBreak, onTarget) = onTargetSteps(2.secTimeSpan, 3, GnirsFilter.J, "LONG_BLUE")
+    val (onTargetBreak, onTarget) = onTargetSteps(2.secTimeSpan, 3, GnirsFilter.J, "LONG_BLUE", GnirsReadMode.Faint)
     imagingObs("LONG_BLUE", "J").flatMap: oid =>
       expect(pi, gnirsAcqImagingQuery(oid), expectedAcquisition(field, onTargetBreak, onTarget).asRight)
 
@@ -216,7 +220,7 @@ class executionAcqGnirsImaging extends ExecutionTestSupportForGnirs:
     // First filter K would classify as Faint (30s), but the explicit type wins: the field
     // image reverts to the fixed keyhole exposure at (10,0) with a single coadd.
     val field                     = acqStep(3.secTimeSpan, 1, GnirsFilter.K, "SHORT_BLUE", 10, 0, StepGuideState.Disabled)
-    val (onTargetBreak, onTarget) = onTargetSteps(30.secTimeSpan, 1, GnirsFilter.K, "SHORT_BLUE")
+    val (onTargetBreak, onTarget) = onTargetSteps(30.secTimeSpan, 1, GnirsFilter.K, "SHORT_BLUE", GnirsReadMode.VeryFaint)
     imagingObs("SHORT_BLUE", "K").flatMap: oid =>
       setImagingAcquisition(oid, "{ explicitAcquisitionType: BRIGHT }") *>
       expect(pi, gnirsAcqImagingQuery(oid), expectedAcquisition(field, onTargetBreak, onTarget).asRight)
@@ -224,8 +228,8 @@ class executionAcqGnirsImaging extends ExecutionTestSupportForGnirs:
   test("An explicit FAINT type uses the configured sky offset for the field image"):
     // First filter J would classify as Bright, but the explicit FAINT type puts the field
     // image at the configured sky offset with the ITC exposure and coadds.
-    val field                     = acqStep(2.secTimeSpan, 3, GnirsFilter.J, "SHORT_BLUE", 0, 5, StepGuideState.Disabled)
-    val (onTargetBreak, onTarget) = onTargetSteps(2.secTimeSpan, 3, GnirsFilter.J, "SHORT_BLUE")
+    val field                     = acqStep(2.secTimeSpan, 3, GnirsFilter.J, "SHORT_BLUE", 0, 5, StepGuideState.Disabled, GnirsReadMode.Faint)
+    val (onTargetBreak, onTarget) = onTargetSteps(2.secTimeSpan, 3, GnirsFilter.J, "SHORT_BLUE", GnirsReadMode.Faint)
     imagingObs("SHORT_BLUE", "J").flatMap: oid =>
       setImagingAcquisition(oid,
         """{
@@ -239,7 +243,7 @@ class executionAcqGnirsImaging extends ExecutionTestSupportForGnirs:
     // The science filter is J, but the acquisition images through Order4 — both in the
     // ITC call (5s => Bright) and in the generated steps.
     val field                     = acqStep(3.secTimeSpan, 1, GnirsFilter.Order4, "SHORT_BLUE", 10, 0, StepGuideState.Disabled)
-    val (onTargetBreak, onTarget) = onTargetSteps(5.secTimeSpan, 1, GnirsFilter.Order4, "SHORT_BLUE")
+    val (onTargetBreak, onTarget) = onTargetSteps(5.secTimeSpan, 1, GnirsFilter.Order4, "SHORT_BLUE", GnirsReadMode.Faint)
     imagingObs("SHORT_BLUE", "J").flatMap: oid =>
       setImagingAcquisition(oid, "{ explicitFilter: ORDER4 }") *>
       expect(pi, gnirsAcqImagingQuery(oid), expectedAcquisition(field, onTargetBreak, onTarget).asRight)
@@ -248,7 +252,7 @@ class executionAcqGnirsImaging extends ExecutionTestSupportForGnirs:
     // Y classifies as Very Bright, which would normally image the target through H2. An
     // explicit filter overrides that; only the field image stays on H (Order4).
     val field                     = acqStep(3.secTimeSpan, 1, GnirsFilter.Order4, "SHORT_BLUE", 10, 0, StepGuideState.Disabled)
-    val (onTargetBreak, onTarget) = onTargetSteps(5.secTimeSpan, 1, GnirsFilter.Order4, "SHORT_BLUE")
+    val (onTargetBreak, onTarget) = onTargetSteps(5.secTimeSpan, 1, GnirsFilter.Order4, "SHORT_BLUE", GnirsReadMode.Faint)
     imagingObs("SHORT_BLUE", "Y").flatMap: oid =>
       setImagingAcquisition(oid, "{ explicitAcquisitionType: VERY_BRIGHT, explicitFilter: ORDER4 }") *>
       expect(pi, gnirsAcqImagingQuery(oid), expectedAcquisition(field, onTargetBreak, onTarget).asRight)
@@ -258,7 +262,7 @@ class executionAcqGnirsImaging extends ExecutionTestSupportForGnirs:
     // to image the keyhole in H. The table's long-camera K row now applies, 15s, 1 coadd.
     // The explicit type pins Very Bright even though the K ITC exposure is 30s.
     val field                     = acqStep(15.secTimeSpan, 1, GnirsFilter.K, "LONG_BLUE", 10, 0, StepGuideState.Disabled)
-    val (onTargetBreak, onTarget) = onTargetSteps(30.secTimeSpan, 1, GnirsFilter.K, "LONG_BLUE")
+    val (onTargetBreak, onTarget) = onTargetSteps(30.secTimeSpan, 1, GnirsFilter.K, "LONG_BLUE", GnirsReadMode.VeryFaint)
     imagingObs("LONG_BLUE", "Y").flatMap: oid =>
       setImagingAcquisition(oid, "{ explicitAcquisitionType: VERY_BRIGHT, explicitFilter: K }") *>
         expect(pi, gnirsAcqImagingQuery(oid), expectedAcquisition(field, onTargetBreak, onTarget).asRight)
@@ -267,7 +271,7 @@ class executionAcqGnirsImaging extends ExecutionTestSupportForGnirs:
     // In time-and-count mode the ITC echoes the requested exposure and the explicit
     // coadds size the steps (rather than the ITC exposure count).
     val field                     = acqStep(4.secTimeSpan, 5, GnirsFilter.J, "SHORT_BLUE", 0, 10, StepGuideState.Disabled)
-    val (onTargetBreak, onTarget) = onTargetSteps(4.secTimeSpan, 5, GnirsFilter.J, "SHORT_BLUE")
+    val (onTargetBreak, onTarget) = onTargetSteps(4.secTimeSpan, 5, GnirsFilter.J, "SHORT_BLUE", GnirsReadMode.Bright)
     imagingObs("SHORT_BLUE", "J").flatMap: oid =>
       setImagingAcquisition(oid,
         """{

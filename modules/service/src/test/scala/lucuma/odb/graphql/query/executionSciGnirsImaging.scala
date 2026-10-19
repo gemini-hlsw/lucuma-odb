@@ -12,29 +12,45 @@ import io.circe.syntax.*
 import lucuma.core.enums.GnirsFilter
 import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.StepGuideState
+import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.core.syntax.string.*
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
+import lucuma.itc.ItcReadMode
 import lucuma.itc.client.ImagingInput
 import lucuma.itc.client.InstrumentMode
 import lucuma.refined.*
 
 class executionSciGnirsImaging extends ExecutionTestSupportForGnirs:
 
-  // 10s (Bright) for J; 25s (Faint) so the derived read mode differs per filter.
-  private val TimeJ = IntegrationTime(10.secondTimeSpan, 2.refined)
-  private val TimeH = IntegrationTime(25.secondTimeSpan, 3.refined)
+  // The S/N results carry the read mode the ITC chose, each one no exposure time rule
+  // would derive (10s and 25s both default to Bright), so a step can only have it from
+  // the ITC.
+  private val ReadModeJ = GnirsReadMode.Faint
+  private val ReadModeH = GnirsReadMode.VeryFaint
+  private val TimeJ     = IntegrationTime(10.secondTimeSpan, 2.refined, readMode = ItcReadMode.Gnirs(ReadModeJ).some)
+  private val TimeH     = IntegrationTime(25.secondTimeSpan, 3.refined, readMode = ItcReadMode.Gnirs(ReadModeH).some)
+
+  private def itcReadMode(filter: GnirsFilter): GnirsReadMode =
+    filter match
+      case GnirsFilter.J => ReadModeJ
+      case _             => ReadModeH
 
   override def fakeItcImagingResultFor(input: ImagingInput): Option[IntegrationTime] =
     input.mode match
-      case InstrumentMode.GnirsImaging(filter = f) =>
-        f match
-          case GnirsFilter.J      => TimeJ.some
-          case GnirsFilter.Order4 => TimeH.some
-          case _                  => none
-      case _                                       => none
+      case InstrumentMode.GnirsImaging(exposureTimeMode = etm, filter = f) =>
+        etm match
+          case ExposureTimeMode.SignalToNoiseMode(_, _)   =>
+            f match
+              case GnirsFilter.J      => TimeJ.some
+              case GnirsFilter.Order4 => TimeH.some
+              case _                  => none
+          // Time-and-count echoes the request; OdbSuite adds the requested read mode.
+          case ExposureTimeMode.TimeAndCountMode(t, c, _) =>
+            IntegrationTime(t, c).some
+      case _                                                             => none
 
   private def sciStep(
     filter:       GnirsFilter,
@@ -42,7 +58,8 @@ class executionSciGnirsImaging extends ExecutionTestSupportForGnirs:
     p:            Int            = 0,
     q:            Int            = 0,
     guiding:      StepGuideState = StepGuideState.Enabled,
-    coadds:       Int            = 1
+    coadds:       Int            = 1,
+    readMode:     Option[GnirsReadMode] = None
   ): Json =
     json"""
       {
@@ -58,7 +75,7 @@ class executionSciGnirsImaging extends ExecutionTestSupportForGnirs:
           "acquisitionMirrorOut": null,
           "camera":               "SHORT_BLUE",
           "focusMotorSteps":      null,
-          "readMode":             ${GnirsReadMode.forExposureTime(exposureTime).tag.toScreamingSnakeCase.asJson}
+          "readMode":             ${readMode.getOrElse(itcReadMode(filter)).tag.toScreamingSnakeCase.asJson}
         },
         "stepConfig": { "stepType": "SCIENCE" },
         "telescopeConfig": ${expectedTelescopeConfig(p, q, guiding)},
@@ -154,9 +171,73 @@ class executionSciGnirsImaging extends ExecutionTestSupportForGnirs:
         o <- createObservationWithModeAs(pi, p, List(t), mode)
       yield o
 
+    // Time-and-count takes the default read mode (Bright at 10s), S/N the ITC's.
     val atoms =
-      List.fill(2)(sciAtomOf(sciStep(GnirsFilter.J, 10.secondTimeSpan, coadds = 4))) ++
+      List.fill(2)(sciAtomOf(sciStep(GnirsFilter.J, 10.secondTimeSpan, coadds = 4, readMode = GnirsReadMode.Bright.some))) ++
       List.fill(3)(sciAtomOf(sciStep(GnirsFilter.Order4, 25.secondTimeSpan)))
+
+    setup.flatMap: oid =>
+      expect(pi, gnirsScienceQuery(oid, 100.some), expectedScience(atoms).asRight)
+
+  test("time-and-count read mode defaults to Bright, Very Bright under 0.6s (sc-10909)"):
+    // Unlike spectroscopy, a long imaging exposure does not drop to Faint.
+    val mode =
+      s"""
+        gnirsImaging: {
+          camera: SHORT_BLUE
+          variant: { grouped: { skyCount: 0 } }
+          filters: [
+            {
+              filter: J
+              exposureTimeMode: {
+                timeAndCount: { time: { seconds: 25.0 }, count: 2, at: { nanometers: 1250.0 } }
+              }
+            },
+            {
+              filter: ORDER4
+              exposureTimeMode: {
+                timeAndCount: { time: { seconds: 0.5 }, count: 3, at: { nanometers: 1650.0 } }
+              }
+            }
+          ]
+        }
+      """
+
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createObservationWithModeAs(pi, p, List(t), mode)
+      yield o
+
+    val atoms =
+      List.fill(2)(sciAtomOf(sciStep(GnirsFilter.J, 25.secondTimeSpan, readMode = GnirsReadMode.Bright.some))) ++
+      List.fill(3)(sciAtomOf(sciStep(GnirsFilter.Order4, 500.msTimeSpan, readMode = GnirsReadMode.VeryBright.some)))
+
+    setup.flatMap: oid =>
+      expect(pi, gnirsScienceQuery(oid, 100.some), expectedScience(atoms).asRight)
+
+  test("an explicit read mode overrides the ITC's"):
+    val mode =
+      s"""
+        gnirsImaging: {
+          camera: SHORT_BLUE
+          variant: { grouped: { skyCount: 0 } }
+          explicitReadMode: BRIGHT
+          filters: [ { filter: J }, { filter: ORDER4 } ]
+        }
+      """
+
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createObservationWithModeAs(pi, p, List(t), mode)
+      yield o
+
+    val atoms =
+      List.fill(2)(sciAtomOf(sciStep(GnirsFilter.J, 10.secondTimeSpan, readMode = GnirsReadMode.Bright.some))) ++
+      List.fill(3)(sciAtomOf(sciStep(GnirsFilter.Order4, 25.secondTimeSpan, readMode = GnirsReadMode.Bright.some)))
 
     setup.flatMap: oid =>
       expect(pi, gnirsScienceQuery(oid, 100.some), expectedScience(atoms).asRight)

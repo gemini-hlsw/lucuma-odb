@@ -10,6 +10,8 @@ import io.circe.generic.semiauto.*
 import lucuma.core.data.Zipper
 import lucuma.core.data.ZipperCodec.given
 import lucuma.core.enums.Band
+import lucuma.core.enums.Flamingos2ReadMode
+import lucuma.core.enums.GnirsReadMode
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.SingleSN
 import lucuma.core.math.TotalSN
@@ -20,6 +22,7 @@ import lucuma.itc.Error.given
 import lucuma.itc.IntegrationTime
 import lucuma.itc.ItcCcd
 import lucuma.itc.ItcGraph
+import lucuma.itc.ItcReadMode
 import lucuma.itc.ItcSeries
 import lucuma.itc.ItcWarning
 import lucuma.itc.SignalToNoiseAt
@@ -68,7 +71,9 @@ object decoders:
       k <- c.downField("coadds")
              .as[Int]
              .flatMap(k => PosInt.from(k).leftMap(m => DecodingFailure(m, c.history)))
-    } yield IntegrationTime(t, n, k)
+      g <- c.downField("gnirsReadMode").as[Option[GnirsReadMode]]
+      f <- c.downField("flamingos2ReadMode").as[Option[Flamingos2ReadMode]]
+    } yield IntegrationTime(t, n, k, ItcReadMode.fromFields(g, f))
 
   given Decoder[SingleSN] = Decoder[SignalToNoise].map(SingleSN(_))
   given Decoder[TotalSN]  = Decoder[SignalToNoise].map(TotalSN(_))

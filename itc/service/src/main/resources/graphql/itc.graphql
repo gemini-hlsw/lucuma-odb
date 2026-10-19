@@ -700,6 +700,20 @@ type IntegrationTime {
   coadds: PosInt!
 
   exposureCount: PosInt! @deprecated(reason: "Use `frameCount`.")
+
+  """
+  The GNIRS read mode this result was computed with: chosen by the ITC in
+  signal-to-noise mode, the requested one in time-and-count mode.  Null for
+  other instruments.
+  """
+  gnirsReadMode: GnirsReadMode
+
+  """
+  The Flamingos 2 read mode this result was computed with: chosen by the ITC in
+  signal-to-noise mode, the requested one in time-and-count mode.  Null for
+  other instruments.
+  """
+  flamingos2ReadMode: Flamingos2ReadMode
 }
 
 type CalculationResult {

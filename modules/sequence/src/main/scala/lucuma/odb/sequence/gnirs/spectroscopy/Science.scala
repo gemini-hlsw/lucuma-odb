@@ -116,7 +116,9 @@ object Science:
         // telescope configs from the observing mode in order, producing one
         // science ProtoStep per offset.  The same (science) dynamic config is
         // used for the calibration steps so the smart gcal lookup matches.
-        val resolvedReadMode = config.explicitReadMode.getOrElse(GnirsReadMode.forExposureTime(time.exposureTime))
+        // The explicit read mode if set, else the one the ITC reports (its choice in S/N
+        // mode, the requested default in time-and-count mode).
+        val resolvedReadMode = config.explicitReadMode.orElse(time.gnirsReadMode).getOrElse(GnirsReadMode.forExposureTime(time.exposureTime))
         val acqMirror        = GnirsAcquisitionMirrorMode.Out(
           config.prism,
           config.grating,

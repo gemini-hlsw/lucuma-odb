@@ -65,12 +65,14 @@ import lucuma.horizons.HorizonsClient
 import lucuma.itc.AsterismIntegrationTimeOutcomes
 import lucuma.itc.IntegrationTime
 import lucuma.itc.ItcCcd
+import lucuma.itc.ItcReadMode
 import lucuma.itc.ItcVersions
 import lucuma.itc.SignalToNoiseAt
 import lucuma.itc.TargetIntegrationTime
 import lucuma.itc.TargetIntegrationTimeOutcome
 import lucuma.itc.client.ClientCalculationResult
 import lucuma.itc.client.ImagingInput
+import lucuma.itc.client.InstrumentMode
 import lucuma.itc.client.ItcClient
 import lucuma.itc.client.SpectroscopyInput
 import lucuma.odb.Config
@@ -272,7 +274,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   val FakeItcResult: IntegrationTime =
     IntegrationTime(
       10.secTimeSpan,
-      PosInt.unsafeFrom(6),
+      PosInt.unsafeFrom(6)
     )
 
   // Provides a hook to allow test cases to alter the dummy ITC results.
@@ -321,11 +323,25 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       case lucuma.itc.client.InstrumentMode.GnirsImaging(coadds = c)      => c
       case _                                                               => PosInt.unsafeFrom(1)
 
+  // OCS echoes the requested read mode back in time-and-count mode and selects its own in
+  // S/N mode; the fake reports none there, leaving the sequence to its exposure time rule.
+  private def fakeReadMode(mode: InstrumentMode): Option[ItcReadMode] =
+    mode.exposureTimeMode match
+      case ExposureTimeMode.SignalToNoiseMode(_, _)   => None
+      case ExposureTimeMode.TimeAndCountMode(_, _, _) =>
+        mode match
+          case InstrumentMode.GnirsSpectroscopy(readMode = r)      => ItcReadMode.Gnirs(r).some
+          case InstrumentMode.GnirsImaging(readMode = r)           => ItcReadMode.Gnirs(r).some
+          case InstrumentMode.Flamingos2Spectroscopy(readMode = r) => ItcReadMode.Flamingos2(r).some
+          case InstrumentMode.Flamingos2Imaging(readMode = r)      => ItcReadMode.Flamingos2(r).some
+          case _                                                   => None
+
   protected def itcClient: ItcClient[IO] =
     new ItcClient[IO] {
 
       override def imaging(input: ImagingInput, useCache: Boolean): IO[ClientCalculationResult] =
-        val result = fakeItcImagingResultFor(input).getOrElse(fakeItcImagingResult).copy(coadds = requestedCoadds(input.mode))
+        val hooked = fakeItcImagingResultFor(input).getOrElse(fakeItcImagingResult)
+        val result = hooked.copy(coadds = requestedCoadds(input.mode), readMode = hooked.readMode.orElse(fakeReadMode(input.mode)))
         ClientCalculationResult(
           FakeItcVersions,
           AsterismIntegrationTimeOutcomes(
@@ -358,7 +374,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
               case ExposureTimeMode.SignalToNoiseMode(_, _)   =>
                 fakeItcSpectroscopyResultFor(input).getOrElse(fakeItcSpectroscopyResult)
               case ExposureTimeMode.TimeAndCountMode(t, c, _) =>
-                IntegrationTime(t, PosInt.unsafeFrom(c.value), requestedCoadds(input.mode))
+                IntegrationTime(t, PosInt.unsafeFrom(c.value), requestedCoadds(input.mode), fakeReadMode(input.mode))
 
           ClientCalculationResult(
             FakeItcVersions,

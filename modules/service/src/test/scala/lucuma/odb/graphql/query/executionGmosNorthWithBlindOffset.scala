@@ -33,7 +33,7 @@ class executionGmosNorthWithBlindOffset extends ExecutionTestSupportForGmos:
   override def fakeItcImagingResult: IntegrationTime =
     IntegrationTime(
       20.secTimeSpan,
-      PosInt.unsafeFrom(6),
+      PosInt.unsafeFrom(6)
     )
 
   // Override static acquisition configs to match flat timing from runtime ITC mock

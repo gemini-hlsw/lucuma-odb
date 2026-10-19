@@ -21,6 +21,8 @@ object SpectroscopyIntegrationTime extends GraphQLOperation[Unit] {
         }
         frameCount
         coadds
+        gnirsReadMode
+        flamingos2ReadMode
       }
 
       fragment TargetIntegrationTimeFields on TargetIntegrationTime {
@@ -108,6 +110,8 @@ object ImagingIntegrationTime extends GraphQLOperation[Unit] {
         }
         frameCount
         coadds
+        gnirsReadMode
+        flamingos2ReadMode
       }
 
       fragment TargetIntegrationTimeFields on TargetIntegrationTime {
@@ -195,6 +199,8 @@ object SpectroscopyIntegrationTimeAndGraphsQuery extends GraphQLOperation[Unit] 
         }
         frameCount
         coadds
+        gnirsReadMode
+        flamingos2ReadMode
       }
 
       fragment TargetIntegrationTimeFields on TargetIntegrationTime {
