@@ -48,6 +48,12 @@ trait GroupService[F[_]] {
   )(using Transaction[F]): F[GroupTree]
   def selectPid(groupId: Group.Id)(using Transaction[F]): F[Option[Program.Id]]
   def selectPids(groupIds: NonEmptyList[Group.Id])(using Transaction[F]): F[Map[Group.Id, Program.Id]]
+
+  /**
+   * The programs containing the given groups, each with its group tree loaded
+   * once, for callers that compute several things over the same groups.
+   */
+  def selectProgramTrees(groupIds: List[Group.Id])(using Transaction[F]): F[List[GroupService.ProgramTree]]
   def checkGroupInProgram(pid: Program.Id, gid: Group.Id)(using Transaction[F]): F[Result[Unit]]
   def cloneGroup(input: AccessControl.CheckedWithId[CloneGroupInput, Program.Id])(using Transaction[F]): F[Result[Group.Id]]
   def selectAllObservations(groupId: Group.Id)(using Transaction[F]): F[List[Observation.Id]]
@@ -58,6 +64,13 @@ object GroupService {
 
   object GroupElement:
     type Id = Either[Group.Id, Observation.Id]
+
+  /** A program's group tree, with the groups of interest in it. */
+  case class ProgramTree(
+    programId: Program.Id,
+    tree:      GroupTree,
+    groupIds:  List[Group.Id]
+  )
 
   /** A group to create */
   case class NewGroup(SET: GroupPropertiesInput.Create, initialContents: List[GroupElement.Id])
@@ -356,6 +369,14 @@ object GroupService {
 
       def selectPids(groupIds: NonEmptyList[Group.Id])(using Transaction[F]): F[Map[Group.Id, Program.Id]] =
         session.execute(Statements.SelectPids)(groupIds.toList).map(_.toMap)
+
+      def selectProgramTrees(groupIds: List[Group.Id])(using Transaction[F]): F[List[ProgramTree]] =
+        NonEmptyList
+          .fromList(groupIds.distinct)
+          .fold(List.empty[ProgramTree].pure[F]): nel =>
+            selectPids(nel).flatMap:
+              _.toList.groupMap(_._2)(_._1).toList.traverse: (pid, gids) =>
+                selectGroups(pid).map(ProgramTree(pid, _, gids))
 
       def selectAllObservations(groupId: Group.Id)(using Transaction[F]): F[List[Observation.Id]] =
         session.execute(Statements.SelectAllObservationsInGroup)(groupId)

@@ -9663,6 +9663,13 @@ type ExecutionTimestamps {
   firstEventTime: Timestamp
 
   """
+  Time of the observation's first execution event other than a slew, which is
+  when its execution started.  This is null until such an event is recorded,
+  even if the telescope has slewed to the target.
+  """
+  startTime: Timestamp
+
+  """
   Time of the observation's latest execution event, across all of its visits
   (ordinarily in the most recent visit).  The earliest and latest events
   generally fall in different visits, so `lastEventTime - firstEventTime` is not
@@ -15645,6 +15652,14 @@ type Group {
   """
   timeEstimateBanded: [CalculatedBandedTime!]!
 
+  """
+  The group's progress toward satisfying its constraints: how many elements
+  are complete, whether the group is complete or can no longer be completed,
+  and when and what may be observed next.  Calculated when queried, so it is
+  never out of date.  Null for a deleted group.
+  """
+  progress: GroupProgress
+
   existence: Existence!
 
   """
@@ -15660,6 +15675,123 @@ type Group {
 }
 
 scalar GroupId
+
+"""
+Where a group stands in satisfying its constraints: whether it has anything to
+observe, has started, is complete, or can no longer be completed.
+"""
+enum GroupStatus {
+  """
+  The group has nothing to observe: no elements, or only inactive observations
+  and empty subgroups.  Its parent group leaves it out.
+  """
+  EMPTY
+
+  """
+  Nothing in the group has started executing (slews alone don't count), and the
+  group can still be completed.
+  """
+  PENDING
+
+  "Execution has started and the group can still be completed."
+  ONGOING
+
+  """
+  Enough elements are complete and every constraint is met.  An element may
+  still be executing.
+  """
+  COMPLETE
+
+  "The group can no longer be completed without human intervention."
+  UNSCHEDULABLE
+}
+
+"A reason a group can no longer be completed: a constraint it can no longer meet."
+enum GroupConstraintViolation {
+  "In an ordered group, an element completed before an earlier one."
+  ORDER
+
+  """
+  An element started before the minimum interval had passed since the previous
+  completion.
+  """
+  MINIMUM_INTERVAL
+
+  """
+  An element completed after the maximum interval had passed since the previous
+  completion, or the maximum interval has passed since the last completion
+  without another.
+  """
+  MAXIMUM_INTERVAL
+
+  """
+  In a same-night group, completions fell on different nights, or the night of
+  the completions ends (or ends before the minimum interval passes) with
+  elements still to observe.
+  """
+  SAME_NIGHT
+
+  "A same-night group has observations at more than one site."
+  SAME_NIGHT_MULTIPLE_SITES
+
+  "Too few viable (non-inactive) elements remain to reach the minimum."
+  INSUFFICIENT_ELEMENTS
+
+  "A subgroup that the group needs can no longer be completed."
+  SUBGROUP_UNSCHEDULABLE
+}
+
+"""
+When the next element of a group may be observed, given the completions so far.
+The window reflects only the group's own constraints.  The program's active
+period and each observation's timing windows also apply, and are left to the
+scheduler to combine with it.
+"""
+type GroupWindow {
+  "The earliest time the next element may start, per the minimum interval."
+  start: Timestamp!
+
+  """
+  The latest time the next element may finish, per the maximum interval or the
+  end of the night for a same-night group.  Null if there is no such limit.
+  Fitting an observation into the window (say, by its time estimate) is left to
+  the scheduler.
+  """
+  end: Timestamp
+}
+
+"A group's progress toward satisfying its constraints."
+type GroupProgress {
+  status: GroupStatus!
+
+  """
+  The number of the group's complete elements that count toward it, a subgroup
+  counting as one element.  An ordered group's elements after the first
+  `required` don't count, nor do an unordered group's completions after it is
+  complete.  Always zero while empty or pending, and fewer than `required` while
+  ongoing.
+  """
+  completed: NonNegInt!
+
+  """
+  The number of elements the group requires: its `minimumRequired`, or every
+  viable (non-inactive) element when that is unset.  Zero only when empty.
+  """
+  required: NonNegInt!
+
+  """
+  When the next element may be observed.  Set only while the group is ongoing
+  and its constraints restrict the timing.
+  """
+  nextWindow: GroupWindow
+
+  """
+  Why the group can no longer be completed: the constraints it can no longer
+  meet.  Empty unless unschedulable.  A subgroup's own violations are on its
+  own `progress`.
+  """
+  violations: [GroupConstraintViolation!]!
+}
 
 "Groups contain observations and other groups. Exactly one will be defined."
 type GroupElement {

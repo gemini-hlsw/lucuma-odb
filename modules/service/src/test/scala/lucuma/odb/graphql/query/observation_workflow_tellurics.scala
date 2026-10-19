@@ -100,44 +100,56 @@ class observation_workflow_tellurics
       """)
     )
 
+  // Offered to a per-observation calibration while it is inherited and not
+  // itself declined: only a telluric may be declined.
+  private def declinableFor(role: CalibrationRole): List[ObservationWorkflowState] =
+    if role === CalibrationRole.Telluric then List(ObservationWorkflowState.Inactive)
+    else Nil
+
+  // An accepted program with a science observation and a calibration of the
+  // given role in one group.
+  private def setup(role: CalibrationRole): IO[(Program.Id, Observation.Id, Observation.Id)] =
+    for
+      cfp <- createGeminiCallForProposalsAs(staff)
+      pid <- createProgramWithNonPartnerPi(pi)
+      _   <- addProposal(pi, pid, Some(cfp), None)
+      _   <- addPartnerSplits(pi, pid)
+      _   <- addCoisAs(pi, pid)
+      tid <- createTargetWithProfileAs(pi, pid)
+
+      // science
+      sci <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      _   <- updateCloudExtinctionAs(pi, sci, CloudExtinction.Preset.OnePointZero)  // ask for poor conditions
+      _   <- createConfigurationRequestAs(pi, sci).flatMap(setConfigurationRequestStatusAs(staff, _, ConfigurationRequestStatus.Approved))
+      _   <- computeItcResultAs(pi, sci)
+
+      // Cal
+      cal <- createObservationAs(pi, pid, tid)
+
+      // Group, and *then* set cal role
+      gid <- createGroupAs(pi, pid, None)
+      _   <- moveObservationAs(pi, sci, Some(gid))
+      _   <- moveObservationAs(pi, cal, Some(gid))
+      _   <- setObservationCalibrationRole(List(cal), role)
+      _   <- setProposalStatus(staff, pid, "ACCEPTED")
+
+    yield (pid, sci, cal)
+
+  private def calibrationWorkflow(
+    state:       ObservationWorkflowState,
+    transitions: List[ObservationWorkflowState]
+  ): Json =
+    workflowQueryResult(
+      CalculatedValue(CalculationState.Ready, ObservationWorkflow(state, transitions, Nil))
+    )
+
   // A per-observation calibration (telluric or daytime pinhole) inherits its
   // science observation's workflow state. A daytime pinhole has no transitions
   // of its own; a telluric may additionally be declined.
   private def workflowFollowsScience(role: CalibrationRole): IO[Unit] =
+    val declinable: List[ObservationWorkflowState] = declinableFor(role)
 
-    // Offered while the calibration is inherited and not itself declined.
-    val declinable: List[ObservationWorkflowState] =
-      if role === CalibrationRole.Telluric then List(ObservationWorkflowState.Inactive)
-      else Nil
-
-    val setup: IO[(Program.Id, Observation.Id, Observation.Id)] =
-      for
-        cfp <- createGeminiCallForProposalsAs(staff)
-        pid <- createProgramWithNonPartnerPi(pi)
-        _   <- addProposal(pi, pid, Some(cfp), None)
-        _   <- addPartnerSplits(pi, pid)
-        _   <- addCoisAs(pi, pid)
-        tid <- createTargetWithProfileAs(pi, pid)
-
-        // science
-        sci <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-        _   <- updateCloudExtinctionAs(pi, sci, CloudExtinction.Preset.OnePointZero)  // ask for poor conditions
-        _   <- createConfigurationRequestAs(pi, sci).flatMap(setConfigurationRequestStatusAs(staff, _, ConfigurationRequestStatus.Approved))
-        _   <- computeItcResultAs(pi, sci)
-
-        // Cal
-        cal <- createObservationAs(pi, pid, tid)
-
-        // Group, and *then* set cal role
-        gid <- createGroupAs(pi, pid, None)
-        _   <- moveObservationAs(pi, sci, Some(gid))
-        _   <- moveObservationAs(pi, cal, Some(gid))
-        _   <- setObservationCalibrationRole(List(cal), role)
-        _   <- setProposalStatus(staff, pid, "ACCEPTED")
-
-      yield (pid, sci, cal)
-
-    setup.flatMap: (pid, sci, cal) =>
+    setup(role).flatMap: (pid, sci, cal) =>
       // Initially we expect science to be defined, with transitions to inactive and ready
       runObscalcUpdateAs(serviceUser, pid, sci) >>
       expect(
@@ -229,5 +241,17 @@ class observation_workflow_tellurics
 
   test("daytime pinhole workflow follows science up to ready"):
     workflowFollowsScience(CalibrationRole.DaytimePinhole)
+
+  // Inheritance comes from a science observation that is present: once the
+  // science observation is deleted, the telluric no longer follows it.
+  test("a telluric doesn't follow a deleted science observation"):
+    val role = CalibrationRole.Telluric
+    setup(role).flatMap: (pid, sci, cal) =>
+      setObservationWorkflowState(pi, sci, ObservationWorkflowState.Inactive) >>
+      runObscalcUpdateAs(serviceUser, pid, cal) >>
+      expect(pi, workflowQuery(cal), calibrationWorkflow(ObservationWorkflowState.Inactive, Nil).asRight) >>
+      deleteObservation(pi, sci) >>
+      runObscalcUpdateAs(serviceUser, pid, cal) >>
+      expect(pi, workflowQuery(cal), calibrationWorkflow(ObservationWorkflowState.Defined, declinableFor(role)).asRight)
 
 }
