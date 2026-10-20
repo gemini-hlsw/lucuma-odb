@@ -16526,6 +16526,20 @@ type ItcResult {
 
   exposureCount: NonNegInt! @deprecated(reason: "Use `frameCount`.")
 
+  """
+  The GNIRS read mode this result was computed with: chosen by the ITC in
+  signal-to-noise mode, the requested one in time-and-count mode. Null for
+  other instruments and for results stored before this field was implemented.
+  """
+  gnirsReadMode: GnirsReadMode
+
+  """
+  The Flamingos 2 read mode this result was computed with: chosen by the ITC in
+  signal-to-noise mode, the requested one in time-and-count mode. Null for
+  other instruments and for results stored before this field was implemented.
+  """
+  flamingos2ReadMode: Flamingos2ReadMode
+
   signalToNoiseAt: SignalToNoiseAt
 
   """

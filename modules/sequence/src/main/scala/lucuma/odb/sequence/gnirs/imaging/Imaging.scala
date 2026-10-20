@@ -7,17 +7,29 @@ package imaging
 
 import cats.data.EitherT
 import cats.effect.Sync
+import cats.syntax.all.*
 import fs2.Pure
 import lucuma.core.enums.GnirsAcquisitionType
+import lucuma.core.enums.GnirsReadMode
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.gnirs.GnirsDynamicConfig
 import lucuma.core.model.sequence.gnirs.GnirsStaticConfig
+import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
 import lucuma.odb.data.ItcScience.GnirsImaging
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.StreamingExecutionConfig
 
 import java.util.UUID
+
+/**
+ * The time-and-count read mode when none is explicit: Bright, or Very Bright below its
+ * minimum exposure (https://app.shortcut.com/lucuma/story/10909). Faint is only ever an
+ * explicit choice. In signal-to-noise mode the ITC selects the read mode instead.
+ */
+def defaultReadMode(exposureTime: TimeSpan): GnirsReadMode =
+  if exposureTime < GnirsReadMode.Bright.minimumExposureTime then GnirsReadMode.VeryBright
+  else GnirsReadMode.Bright
 
 object Imaging:
 
@@ -54,5 +66,5 @@ object Imaging:
       config,
       acquisitionItc,
       pinnedAcqType,
-      Science.gnirs(estimator, static, namespace, config, scienceItc)
+      Science.gnirs(observationId, estimator, static, namespace, config, scienceItc)
     )

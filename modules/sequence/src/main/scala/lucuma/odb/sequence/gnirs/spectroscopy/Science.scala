@@ -107,16 +107,19 @@ object Science:
     object PreDef:
 
       def apply(
-        config:  Config,
-        sw:      CentralWavelengthConfig,
-        time:    IntegrationTime,
-        calRole: Option[CalibrationRole]
+        config:   Config,
+        sw:       CentralWavelengthConfig,
+        time:     IntegrationTime,
+        readMode: GnirsReadMode,
+        calRole:  Option[CalibrationRole]
       ): PreDef =
         // Configure the dynamic config for a science step, then traverse the
         // telescope configs from the observing mode in order, producing one
         // science ProtoStep per offset.  The same (science) dynamic config is
         // used for the calibration steps so the smart gcal lookup matches.
-        val resolvedReadMode = config.explicitReadMode.getOrElse(GnirsReadMode.forExposureTime(time.exposureTime))
+        // The explicit read mode if set, else the ITC's (its choice in S/N mode, the
+        // requested default in time-and-count mode).
+        val resolvedReadMode = config.explicitReadMode.getOrElse(readMode)
         val acqMirror        = GnirsAcquisitionMirrorMode.Out(
           config.prism,
           config.grating,
@@ -164,7 +167,8 @@ object Science:
       expander: SmartGcalExpander[F, GnirsStaticConfig, GnirsDynamicConfig],
       calRole:  Option[CalibrationRole]
     ): EitherT[F, String, StepDefinition] =
-      PreDef(config, sw, time, calRole).expand(static, expander)
+      EitherT.fromEither[F](itcReadMode(time)).flatMap: readMode =>
+        PreDef(config, sw, time, readMode, calRole).expand(static, expander)
 
     /**
      * One step definition per central wavelength.  Each gets its own SmartGcal

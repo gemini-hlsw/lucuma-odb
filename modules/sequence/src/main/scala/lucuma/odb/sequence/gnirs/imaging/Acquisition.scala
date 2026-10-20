@@ -97,22 +97,23 @@ object Acquisition:
       keyholeFilter:       GnirsFilter,
       keyholeExposureTime: TimeSpan,
       acqCoadds:           PosInt,
-      time:                IntegrationTime
+      time:                IntegrationTime,
+      acqReadMode:         GnirsReadMode
     ): Steps =
       val acqExposureTime: TimeSpan = time.exposureTime
 
-      // The field/keyhole image: filter, exposure and coadds depend on the brightness type.
-      // Very Bright / Bright take it at the keyhole offset with the table's filter and fixed
-      // single-coadd exposure.  Faint instead doubles it as the sky frame for the on-target
-      // image, so it is taken at the sky offset and must match that image's filter, exposure
-      // and coadds -- the table would decouple the pair and cost the sky subtraction a faint
-      // target needs.
-      val (fieldFilter: GnirsFilter, fieldExposureTime: TimeSpan, fieldCoadds: PosInt, fieldOffset: Offset) =
+      // The field/keyhole image: filter, exposure, coadds and read mode depend on the
+      // brightness type. Very Bright / Bright take it at the keyhole offset with the table's
+      // filter and fixed single-coadd exposure, whose read mode follows from that exposure.
+      // Faint instead doubles it as the sky frame for the on-target image, so it is taken at
+      // the sky offset and must match that image's filter, exposure, coadds and read mode --
+      // the table would decouple the pair and cost the sky subtraction a faint target needs.
+      val (fieldFilter: GnirsFilter, fieldExposureTime: TimeSpan, fieldCoadds: PosInt, fieldReadMode: GnirsReadMode, fieldOffset: Offset) =
         mode match
           case GnirsAcquisitionMode.VeryBright | GnirsAcquisitionMode.Bright =>
-            (keyholeFilter,  keyholeExposureTime, SingleCoadd, Offset(Offset.P(10.arcsec), Offset.Q(0.arcsec)))
+            (keyholeFilter,  keyholeExposureTime, SingleCoadd, GnirsReadMode.forExposureTime(keyholeExposureTime), Offset(Offset.P(10.arcsec), Offset.Q(0.arcsec)))
           case GnirsAcquisitionMode.Faint(sky)                               =>
-            (selectedFilter, acqExposureTime,     acqCoadds,   sky)
+            (selectedFilter, acqExposureTime,     acqCoadds,   acqReadMode,                                        sky)
 
       eval:
         for
@@ -123,7 +124,7 @@ object Acquisition:
                             filter            = fieldFilter,
                             acquisitionMirror = GnirsAcquisitionMirrorMode.In,
                             camera            = camera,
-                            readMode          = GnirsReadMode.forExposureTime(fieldExposureTime),
+                            readMode          = fieldReadMode,
                             decker            = GnirsDecker.Acquisition,
                             fpu               = GnirsFpu.Other(GnirsFpuOther.Acquisition)
                           )
@@ -136,7 +137,7 @@ object Acquisition:
                             exposure = acqExposureTime,
                             coadds   = acqCoadds,
                             filter   = selectedFilter,
-                            readMode = GnirsReadMode.forExposureTime(acqExposureTime)
+                            readMode = acqReadMode
                           )
           onTarget   <- scienceStep(0.arcsec, 0.arcsec, ObserveClass.Acquisition)
         yield Steps(fieldImage, onTarget)
@@ -184,7 +185,8 @@ object Acquisition:
           _.exposureTime.toNonNegMicroseconds.value > 0,
           sequenceError("GNIRS Imaging requires a positive acquisition exposure time.")
         )
-        .flatMap: t =>
+        .flatMap(t => itcReadMode(t).bimap(sequenceError, (t, _)))
+        .flatMap: (t, acqReadMode) =>
           val mode           = config.acquisition.resolvedMode(t, GnirsAcquisitionMode.Faint.DefaultImagingSkyOffset, pinnedAcqType)
           val selFilter      = config.acquisition.selectedFilter(mode, firstFilter)
           val coadds: PosInt = config.acquisition.resolvedCoadds(t)
@@ -193,7 +195,7 @@ object Acquisition:
           firstStepFilterAndExposure(config.camera, selFilter)
             .leftMap(sequenceError)
             .map: (keyholeFilter, keyholeExposure) =>
-              val steps: Steps = StepComputer.compute(config.camera, mode, selFilter, keyholeFilter, keyholeExposure, coadds, t)
+              val steps: Steps = StepComputer.compute(config.camera, mode, selFilter, keyholeFilter, keyholeExposure, coadds, t, acqReadMode)
               Generator(builder, steps.initialAtom, steps.repeatingAtom)
 
     generator.pure[F]

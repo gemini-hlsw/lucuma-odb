@@ -125,10 +125,10 @@ object Acquisition:
       fpuStepFilter:       GnirsFilter,
       fpuStepExposureTime: TimeSpan,
       selectedFilter:      GnirsFilter,
-      time:                IntegrationTime
+      time:                IntegrationTime,
+      readMode:            GnirsReadMode
     ): Steps =
       val acqExposureTime: TimeSpan = time.exposureTime
-      val readMode: GnirsReadMode   = GnirsReadMode.forExposureTime(acqExposureTime)
       // The science-aperture decker, from camera + prism (always Mirror) for the long
       // slit.  (IFU acquisitions take the computeIfu path.)  The decker depends only on the
       // pixel scale, which the acquisition camera shares, so it is the same either way.
@@ -227,7 +227,8 @@ object Acquisition:
       mode:           GnirsAcquisitionMode,
       selectedFilter: GnirsFilter,
       flats:          List[ProtoStep[GnirsDynamicConfig]],
-      time:           IntegrationTime
+      time:           IntegrationTime,
+      acqReadMode:    GnirsReadMode
     ): IfuSteps =
       val fieldExposureTime: TimeSpan   = time.exposureTime
       // The through-IFU steps expose twice as long as the field image (per the OCS IFU
@@ -249,7 +250,7 @@ object Acquisition:
                              acquisitionMirror = GnirsAcquisitionMirrorMode.In,
                              camera            = config.acquisitionCamera,
                              focus             = config.focus,
-                             readMode          = GnirsReadMode.forExposureTime(fieldExposureTime),
+                             readMode          = acqReadMode,
                              decker            = GnirsDecker.Acquisition,
                              fpu               = GnirsFpu.Other(GnirsFpuOther.Acquisition)
                            )
@@ -277,7 +278,7 @@ object Acquisition:
                              exposure = throughExposureTime,
                              coadds   = acqCoadds,
                              filter   = selectedFilter,
-                             readMode = GnirsReadMode.forExposureTime(throughExposureTime),
+                             readMode = acqReadMode,
                              decker   = ifuDecker,
                              fpu      = config.fpu
                            )
@@ -327,26 +328,27 @@ object Acquisition:
 
     // Resolve the acquisition mode (explicit or auto) and the selected filter (explicit,
     // or auto from the mode + spectroscopy wavelength).
-    val checked: Either[OdbError, (IntegrationTime, GnirsAcquisitionMode, GnirsFilter)] =
+    val checked: Either[OdbError, (IntegrationTime, GnirsReadMode, GnirsAcquisitionMode, GnirsFilter)] =
       time
         .filterOrElse(
           _.exposureTime.toNonNegMicroseconds.value > 0,
           sequenceError("GNIRS Spectroscopy requires a positive acquisition exposure time.")
         )
-        .map: t =>
-          val mode      = config.acquisition.resolvedMode(t, defaultFaintSkyOffset(config.fpu), pinnedAcqType)
-          val selFilter = config.acquisition
-                            .selectedFilter(mode, GnirsFilter.fromAcquisitionWavelength(config.primaryCentralWavelength))
-          (t, mode, selFilter)
+        .flatMap: t =>
+          itcReadMode(t).leftMap(sequenceError).map: readMode =>
+            val mode      = config.acquisition.resolvedMode(t, defaultFaintSkyOffset(config.fpu), pinnedAcqType)
+            val selFilter = config.acquisition
+                              .selectedFilter(mode, GnirsFilter.fromAcquisitionWavelength(config.primaryCentralWavelength))
+            (t, readMode, mode, selFilter)
 
     config.fpu match
       case GnirsFpu.Spectroscopy.Slit(_)  =>
         (for
-          (t, mode, selFilter) <- checked
-          fpuStep              <- firstStepFilterAndExposure(config.acquisitionCamera, selFilter).leftMap(sequenceError)
+          (t, readMode, mode, selFilter) <- checked
+          fpuStep                        <- firstStepFilterAndExposure(config.acquisitionCamera, selFilter).leftMap(sequenceError)
         yield
           val (fpuStepFilter: GnirsFilter, fpuStepExposureTime: TimeSpan) = fpuStep
-          val steps: Steps = StepComputer.compute(config, mode, fpuStepFilter, fpuStepExposureTime, selFilter, t)
+          val steps: Steps = StepComputer.compute(config, mode, fpuStepFilter, fpuStepExposureTime, selFilter, t, readMode)
           Generator(builder, steps.initialAtom, steps.repeatingAtom): SequenceGenerator[GnirsDynamicConfig]
         ).pure[F]
 
@@ -361,9 +363,9 @@ object Acquisition:
                 .bimap(sequenceError, _.toList)
 
         (for
-          (t, mode, selFilter) <- EitherT.fromEither[F](checked)
-          fs                   <- flats
+          (t, readMode, mode, selFilter) <- EitherT.fromEither[F](checked)
+          fs                             <- flats
         yield
-          val steps: IfuSteps = StepComputer.computeIfu(config, ifu, mode, selFilter, fs, t)
+          val steps: IfuSteps = StepComputer.computeIfu(config, ifu, mode, selFilter, fs, t, readMode)
           Generator(builder, steps.initialAtom, steps.repeatingAtom): SequenceGenerator[GnirsDynamicConfig]
         ).value

@@ -28,11 +28,13 @@ import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
 import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.core.syntax.display.*
 import lucuma.core.syntax.string.*
+import lucuma.core.util.Enumerated
 import lucuma.itc.AltairParameters
 import lucuma.itc.GraphType
 import lucuma.itc.ItcGhostDetector
 import lucuma.itc.ItcGraph
 import lucuma.itc.ItcGraphGroup
+import lucuma.itc.ItcResultReadMode
 import lucuma.itc.ItcSeries
 import lucuma.itc.ItcXAxis
 import lucuma.itc.SeriesDataType
@@ -223,11 +225,7 @@ private[legacy] object codecs:
       "filter"          -> Json.fromString(a.filter.ocs2Tag),
       "grism"           -> Json.fromString(a.disperser.ocs2Tag),
       "mask"            -> Json.fromString(f2MaskTag(a.fpu)),
-      "readMode"        -> Json.fromString(a.readMode match {
-        case Flamingos2ReadMode.Bright => "BRIGHT_OBJECT_SPEC"
-        case Flamingos2ReadMode.Medium => "MEDIUM_OBJECT_SPEC"
-        case Flamingos2ReadMode.Faint  => "FAINT_OBJECT_SPEC"
-      }),
+      "readMode"        -> Json.fromString(a.readMode.ocs2Tag),
       "customSlitWidth" -> Json.Null
     )
 
@@ -237,11 +235,7 @@ private[legacy] object codecs:
       "filter"          -> Json.fromString(a.filter.ocs2Tag),
       "grism"           -> Json.fromString("NONE"),
       "mask"            -> Json.fromString("FPU_NONE"),
-      "readMode"        -> Json.fromString(a.readMode match {
-        case Flamingos2ReadMode.Bright => "BRIGHT_OBJECT_SPEC"
-        case Flamingos2ReadMode.Medium => "MEDIUM_OBJECT_SPEC"
-        case Flamingos2ReadMode.Faint  => "FAINT_OBJECT_SPEC"
-      }),
+      "readMode"        -> Json.fromString(a.readMode.ocs2Tag),
       "customSlitWidth" -> Json.Null
     )
 
@@ -667,6 +661,18 @@ private[legacy] object codecs:
             .getOption(s.setScale(2, BigDecimal.RoundingMode.HALF_UP))
             .toRight(DecodingFailure("Invalid SignalToNoise value", c.history))
 
+  // The legacy ITC names the read mode by its enum constant, the tag the request carries.
+  given Decoder[ItcResultReadMode] = Decoder[String].emap: tag =>
+    Enumerated[GnirsReadMode].all
+      .find(_.ocs2Tag === tag)
+      .map(ItcResultReadMode.Gnirs.apply)
+      .orElse(
+        Enumerated[Flamingos2ReadMode].all
+          .find(_.ocs2Tag === tag)
+          .map(ItcResultReadMode.Flamingos2.apply)
+      )
+      .toRight(s"Unknown read mode: $tag")
+
   given Decoder[ExposureCalculation] = (c: HCursor) =>
     for
       time   <- c.downField("exposureTime").as[Double]
@@ -684,7 +690,8 @@ private[legacy] object codecs:
           .flatMap:
             refineV[Positive](_)
               .leftMap(e => DecodingFailure(e, c.downField("coadds").history))
-    yield ExposureCalculation(time, count, coadds)
+      rm     <- c.downField("readMode").as[Option[ItcResultReadMode]]
+    yield ExposureCalculation(time, count, coadds, rm)
 
   given Decoder[AllExposureCalculations] = (c: HCursor) =>
     for

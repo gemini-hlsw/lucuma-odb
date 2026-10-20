@@ -11,6 +11,7 @@ import lucuma.core.math.SingleSN
 import lucuma.core.math.TotalSN
 import lucuma.core.math.Wavelength
 import lucuma.itc.ItcGraphGroup
+import lucuma.itc.ItcResultReadMode
 
 case class GraphsRemoteResult(
   ccds:   NonEmptyChain[ItcRemoteCcd],
@@ -21,12 +22,13 @@ case class GraphsRemoteResult(
   val maxPeakPixelFlux: Int   = ccds.map(_.peakPixelFlux).maximum.toInt
 }
 
-// One detector's result: the exposure time of a single exposure, the number of frames and
-// the coadds per frame.
+// One detector's result: the exposure time of a single exposure, the number of frames, the
+// coadds per frame and, for the instruments whose recipe selects one, the read mode.
 case class ExposureCalculation(
   exposureTime: Double,
   frameCount:   NonNegInt,
-  coadds:       PosInt
+  coadds:       PosInt,
+  readMode:     Option[ItcResultReadMode]
 )
 
 case class SignalToNoiseAt(

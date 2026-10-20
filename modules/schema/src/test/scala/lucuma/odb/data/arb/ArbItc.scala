@@ -10,10 +10,12 @@ import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.data.Zipper
 import lucuma.core.data.arb.ArbZipper
 import lucuma.core.enums.Flamingos2Filter
+import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.GnirsAcquisitionType
 import lucuma.core.enums.GnirsFilter
+import lucuma.core.enums.GnirsReadMode
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.SingleSN
 import lucuma.core.math.TotalSN
@@ -26,6 +28,7 @@ import lucuma.core.util.arb.ArbEnumerated
 import lucuma.core.util.arb.ArbGid
 import lucuma.core.util.arb.ArbTimeSpan
 import lucuma.itc.IntegrationTime
+import lucuma.itc.ItcResultReadMode
 import lucuma.itc.SignalToNoiseAt
 import org.scalacheck.*
 import org.scalacheck.Arbitrary.arbitrary
@@ -40,17 +43,28 @@ trait ArbItc:
   import ArbZipper.given
 
   // This may exist elsewhere but I couldn't find it.
+  given Arbitrary[ItcResultReadMode] =
+    Arbitrary:
+      Gen.oneOf(
+        arbitrary[GnirsReadMode].map(ItcResultReadMode.Gnirs.apply),
+        arbitrary[Flamingos2ReadMode].map(ItcResultReadMode.Flamingos2.apply)
+      )
+
+  given Cogen[ItcResultReadMode] =
+    Cogen[String].contramap(_.toString)
+
   given Arbitrary[IntegrationTime] =
     Arbitrary:
       for
         t <- arbitrary[TimeSpan]
         c <- arbitrary[PosInt]
         k <- arbitrary[PosInt]
-      yield IntegrationTime(t, c, k)
+        r <- arbitrary[Option[ItcResultReadMode]]
+      yield IntegrationTime(t, c, k, r)
 
   given Cogen[IntegrationTime] =
-    Cogen[(TimeSpan, PosInt, PosInt)].contramap: a =>
-      (a.exposureTime, a.frameCount, a.coadds)
+    Cogen[(TimeSpan, PosInt, PosInt, Option[ItcResultReadMode])].contramap: a =>
+      (a.exposureTime, a.frameCount, a.coadds, a.readMode)
 
   // This may exist elsewhere but I couldn't find it.
   given Arbitrary[SignalToNoiseAt] =

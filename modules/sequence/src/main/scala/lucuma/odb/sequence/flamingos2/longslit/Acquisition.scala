@@ -7,6 +7,7 @@ package longslit
 
 import cats.Order.catsKernelOrderingForOrder
 import cats.data.NonEmptyList
+import cats.syntax.either.*
 import cats.syntax.option.*
 import cats.syntax.order.*
 import cats.syntax.traverse.*
@@ -72,6 +73,7 @@ object Acquisition:
   private object StepComputer extends SequenceState[F2] with Flamingos2InitialDynamicConfig:
     def compute(
       exposureTime: TimeSpan,
+      readMode:     Flamingos2ReadMode,
       acqConfig:    AcquisitionConfig,
       builtin:      Flamingos2Fpu
     ): Steps =
@@ -80,12 +82,12 @@ object Acquisition:
           _  <- F2.exposure    := exposureTime
           _  <- F2.disperser   := none[Flamingos2Disperser]
           _  <- F2.filter      := acqConfig.filter
-          _  <- F2.readMode    := Flamingos2ReadMode.forExposureTime(exposureTime)
+          _  <- F2.readMode    := readMode
           _  <- F2.lyotWheel   := Flamingos2LyotWheel.F16
           _  <- F2.fpu         := Flamingos2FpuMask.Imaging
           _  <- F2.decker      := Flamingos2FpuMask.Imaging.defaultDecker
           _  <- F2.readoutMode := Flamingos2ReadoutMode.Science
-          _  <- F2.reads       := Flamingos2ReadMode.forExposureTime(exposureTime).readCount
+          _  <- F2.reads       := readMode.readCount
           s0 <- scienceStep(0.arcsec,  0.arcsec, ObserveClass.Acquisition)
           s1 <- scienceStep(0.arcsec, 10.arcsec, ObserveClass.Acquisition)
 
@@ -125,13 +127,16 @@ object Acquisition:
         _.exposureTime.toNonNegMicroseconds.value > 0,
         OdbError.SequenceUnavailable(observationId, s"Could not generate a sequence for $observationId: Flamingos 2 Long Slit requires a positive exposure time.".some)
       )
-      .map: t =>
-        new Generator(
-          AtomBuilder.instantiate(
-            estimator,
-            static,
-            namespace,
-            SequenceType.Acquisition
-          ),
-          StepComputer.compute(t.exposureTime, config.acquisition, config.fpu)
-        )
+      .flatMap: t =>
+        itcReadMode(t)
+          .leftMap(msg => OdbError.SequenceUnavailable(observationId, s"Could not generate a sequence for $observationId: $msg.".some))
+          .map: readMode =>
+            new Generator(
+              AtomBuilder.instantiate(
+                estimator,
+                static,
+                namespace,
+                SequenceType.Acquisition
+              ),
+              StepComputer.compute(t.exposureTime, readMode, config.acquisition, config.fpu)
+            )

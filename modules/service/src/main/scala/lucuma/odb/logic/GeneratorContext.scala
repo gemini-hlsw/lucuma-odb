@@ -9,6 +9,7 @@ import cats.syntax.applicative.*
 import cats.syntax.either.*
 import cats.syntax.eq.*
 import cats.syntax.flatMap.*
+import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
 import grackle.Result
@@ -75,6 +76,8 @@ case class GeneratorContext(
       md5.update(z.focus.value.exposureTime.hashBytes)
       md5.update(z.focus.value.frameCount.hashBytes)
       md5.update(z.focus.value.coadds.hashBytes)
+      md5.update(z.focus.value.gnirsReadMode.foldMap(_.tag).hashBytes)
+      md5.update(z.focus.value.flamingos2ReadMode.foldMap(_.tag).hashBytes)
 
     def addKeyedResultSet[A: HashBytes](kv: (A, Zipper[ItcResult])): Unit =
       md5.update(kv._1.hashBytes)

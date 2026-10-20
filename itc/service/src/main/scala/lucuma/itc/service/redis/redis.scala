@@ -87,19 +87,25 @@ given Pickler[Wavelength] =
       .getOrElse(sys.error("cannot unpickle"))
   )(_.toPicometers.value.value)
 
-given Pickler[ItcGraph]                = generatePickler
-given Pickler[ItcGraphGroup]           = generatePickler
-given Pickler[ItcWarning]              = generatePickler
-given Pickler[ItcCcd]                  = generatePickler
-given Pickler[TotalSN]                 = transformPickler((s: SignalToNoise) => TotalSN(s))(_.value)
-given Pickler[SingleSN]                = transformPickler((s: SignalToNoise) => SingleSN(s))(_.value)
-given Pickler[SignalToNoiseAt]         = generatePickler
-given Pickler[IntegrationTime]         = generatePickler
-given Pickler[Zipper[IntegrationTime]] =
+given Pickler[ItcGraph]                     = generatePickler
+given Pickler[ItcGraphGroup]                = generatePickler
+given Pickler[ItcWarning]                   = generatePickler
+given Pickler[ItcCcd]                       = generatePickler
+given Pickler[TotalSN]                      = transformPickler((s: SignalToNoise) => TotalSN(s))(_.value)
+given Pickler[SingleSN]                     = transformPickler((s: SignalToNoise) => SingleSN(s))(_.value)
+given Pickler[SignalToNoiseAt]              = generatePickler
+given Pickler[ItcResultReadMode.Gnirs]      = generatePickler
+given Pickler[ItcResultReadMode.Flamingos2] = generatePickler
+given Pickler[ItcResultReadMode]            =
+  compositePickler[ItcResultReadMode]
+    .addConcreteType[ItcResultReadMode.Gnirs]
+    .addConcreteType[ItcResultReadMode.Flamingos2]
+given Pickler[IntegrationTime]              = generatePickler
+given Pickler[Zipper[IntegrationTime]]      =
   transformPickler[
     Zipper[IntegrationTime],
     (List[IntegrationTime], IntegrationTime, List[IntegrationTime])
   ]((l, a, r) => Zipper(l, a, r))(z => (z.lefts, z.focus, z.rights))
-given Pickler[TargetIntegrationTime]   = generatePickler
-given Pickler[TargetGraphs]            = generatePickler
-given Pickler[TargetTimeAndGraphs]     = generatePickler
+given Pickler[TargetIntegrationTime]        = generatePickler
+given Pickler[TargetGraphs]                 = generatePickler
+given Pickler[TargetTimeAndGraphs]          = generatePickler

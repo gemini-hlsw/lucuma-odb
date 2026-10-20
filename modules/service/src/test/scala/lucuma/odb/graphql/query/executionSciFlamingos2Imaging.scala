@@ -22,14 +22,24 @@ import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
+import lucuma.itc.ItcResultReadMode
 import lucuma.itc.client.ImagingInput
 import lucuma.itc.client.InstrumentMode
 import lucuma.refined.*
 
 class executionSciFlamingos2Imaging extends ExecutionTestSupportForFlamingos2:
 
-  private val TimeY = IntegrationTime(10.secondTimeSpan, 2.refined)
-  private val TimeJ = IntegrationTime(20.secondTimeSpan, 3.refined)
+  // The S/N results carry the read mode the ITC chose, neither the Bright imaging
+  // default, so a step can only have it from the ITC.
+  private val ReadModeY = Flamingos2ReadMode.Faint
+  private val ReadModeJ = Flamingos2ReadMode.Medium
+  private val TimeY     = IntegrationTime(10.secondTimeSpan, 2.refined, readMode = ItcResultReadMode.Flamingos2(ReadModeY).some)
+  private val TimeJ     = IntegrationTime(20.secondTimeSpan, 3.refined, readMode = ItcResultReadMode.Flamingos2(ReadModeJ).some)
+
+  private def itcReadMode(filter: Flamingos2Filter): Flamingos2ReadMode =
+    filter match
+      case Flamingos2Filter.Y => ReadModeY
+      case _                  => ReadModeJ
 
   override def fakeItcImagingResultFor(input: ImagingInput): Option[IntegrationTime] =
     input.mode match
@@ -45,12 +55,12 @@ class executionSciFlamingos2Imaging extends ExecutionTestSupportForFlamingos2:
       exposureTime,
       none,
       filter,
-      Flamingos2ReadMode.Bright,
+      itcReadMode(filter),
       Flamingos2LyotWheel.F16,
       Flamingos2FpuMask.Imaging,
       Flamingos2Decker.Imaging,
       Flamingos2ReadoutMode.Science,
-      Flamingos2ReadMode.Bright.readCount
+      itcReadMode(filter).readCount
     )
 
   private def sciStep(

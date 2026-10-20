@@ -16,10 +16,12 @@ import io.circe.syntax.*
 import lucuma.core.data.Zipper
 import lucuma.core.data.ZipperCodec
 import lucuma.core.enums.Flamingos2Filter
+import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.GnirsAcquisitionType
 import lucuma.core.enums.GnirsFilter
+import lucuma.core.enums.GnirsReadMode
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.SingleSN
 import lucuma.core.math.TotalSN
@@ -28,6 +30,7 @@ import lucuma.core.model.Target
 import lucuma.core.util.Enumerated
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
+import lucuma.itc.ItcResultReadMode
 import lucuma.itc.SignalToNoiseAt
 import lucuma.odb.data.Itc
 import lucuma.odb.data.ItcAcquisition
@@ -74,20 +77,30 @@ trait ItcCodec:
         frameCount      <- c.downField("frameCount").as[PosInt].orElse(c.downField("exposureCount").as[PosInt])
         // Results stored before coadds were reported carry none: they were all single-coadd.
         coadds          <- c.downField("coadds").as[Option[PosInt]].map(_.getOrElse(PosInt.unsafeFrom(1)))
+        // Results stored before the read mode was implemented carry none.
+        gnirsReadMode   <- c.downField("gnirsReadMode").as[Option[GnirsReadMode]]
+        f2ReadMode      <- c.downField("flamingos2ReadMode").as[Option[Flamingos2ReadMode]]
         signalToNoiseAt <- c.downField("signalToNoiseAt").as[Option[SignalToNoiseAt]]
         peakPixel       <- c.downField("peakPixel").as[Option[ItcPeakPixel]]
-      yield ItcResult(targetId, IntegrationTime(exposureTime, frameCount, coadds), signalToNoiseAt, peakPixel)
+      yield ItcResult(
+        targetId,
+        IntegrationTime(exposureTime, frameCount, coadds, ItcResultReadMode.fromFields(gnirsReadMode, f2ReadMode)),
+        signalToNoiseAt,
+        peakPixel
+      )
 
   given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[ItcResult] =
     Encoder.instance: a =>
       Json.obj(
-        "targetId"        -> a.targetId.asJson,
-        "exposureTime"    -> a.value.exposureTime.asJson,
-        "frameCount"      -> a.value.frameCount.value.asJson,
-        "coadds"          -> a.value.coadds.value.asJson,
-        "exposureCount"   -> a.value.frameCount.value.asJson,
-        "signalToNoiseAt" -> a.signalToNoise.asJson,
-        "peakPixel"       -> a.peakPixel.asJson
+        "targetId"           -> a.targetId.asJson,
+        "exposureTime"       -> a.value.exposureTime.asJson,
+        "frameCount"         -> a.value.frameCount.value.asJson,
+        "coadds"             -> a.value.coadds.value.asJson,
+        "exposureCount"      -> a.value.frameCount.value.asJson,
+        "gnirsReadMode"      -> a.value.gnirsReadMode.asJson,
+        "flamingos2ReadMode" -> a.value.flamingos2ReadMode.asJson,
+        "signalToNoiseAt"    -> a.signalToNoise.asJson,
+        "peakPixel"          -> a.peakPixel.asJson
       )
 
   // GnirsAcquisitionType is a plain Enumerated; encode by tag.  Round-trips

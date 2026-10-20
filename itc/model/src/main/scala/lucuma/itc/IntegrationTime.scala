@@ -10,19 +10,31 @@ import io.circe.Encoder
 import io.circe.Json
 import io.circe.refined.*
 import io.circe.syntax.*
+import lucuma.core.enums.Flamingos2ReadMode
+import lucuma.core.enums.GnirsReadMode
 import lucuma.core.util.TimeSpan
 
 /**
- * The exposure time of a single exposure, the number of frames to take and the coadds per frame. A
- * frame is what the detector delivers: `coadds` exposures summed on chip. Without coadds a frame is
- * one exposure, so the frame count is also the exposure count. In S/N mode the ITC chooses the
- * coadds; in time-and-count mode they are the requested ones.
+ * The exposure time of a single exposure, the number of frames to take, the coadds per frame and
+ * the read mode. A frame is what the detector delivers: `coadds` exposures summed on chip. Without
+ * coadds a frame is one exposure, so the frame count is also the exposure count. In S/N mode the
+ * ITC chooses the coadds and the read mode; in time-and-count mode they are the requested ones. The
+ * read mode is `None` for instruments whose recipe does not select one.
  */
 case class IntegrationTime(
   exposureTime: TimeSpan,
   frameCount:   PosInt,
-  coadds:       PosInt = PosInt.unsafeFrom(1)
+  coadds:       PosInt = PosInt.unsafeFrom(1),
+  readMode:     Option[ItcResultReadMode] = None
 ):
+  def gnirsReadMode: Option[GnirsReadMode] =
+    readMode.collect:
+      case ItcResultReadMode.Gnirs(readMode = r) => r
+
+  def flamingos2ReadMode: Option[Flamingos2ReadMode] =
+    readMode.collect:
+      case ItcResultReadMode.Flamingos2(readMode = r) => r
+
   /**
    * Single exposures over the whole result: every frame's coadds. Saturates rather than
    * overflowing; a count that large is unusable anyway.
@@ -39,8 +51,10 @@ object IntegrationTime:
   // `exposureCount` is the deprecated GraphQL name of `frameCount`.
   given (using Encoder[TimeSpan]): Encoder[IntegrationTime] = it =>
     Json.obj(
-      "exposureTime"  -> it.exposureTime.asJson,
-      "frameCount"    -> it.frameCount.asJson,
-      "coadds"        -> it.coadds.asJson,
-      "exposureCount" -> it.frameCount.asJson
+      "exposureTime"       -> it.exposureTime.asJson,
+      "frameCount"         -> it.frameCount.asJson,
+      "coadds"             -> it.coadds.asJson,
+      "exposureCount"      -> it.frameCount.asJson,
+      "gnirsReadMode"      -> it.gnirsReadMode.asJson,
+      "flamingos2ReadMode" -> it.flamingos2ReadMode.asJson
     )

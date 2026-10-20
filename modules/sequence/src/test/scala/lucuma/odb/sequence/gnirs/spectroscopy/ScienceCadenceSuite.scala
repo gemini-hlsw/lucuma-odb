@@ -20,6 +20,7 @@ import lucuma.core.enums.GnirsFilter
 import lucuma.core.enums.GnirsFpuSlit
 import lucuma.core.enums.GnirsGrating
 import lucuma.core.enums.GnirsPrism
+import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.GnirsWellDepth
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.StepGuideState
@@ -42,6 +43,7 @@ import lucuma.core.model.sequence.gnirs.GnirsStaticConfig
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
+import lucuma.itc.ItcResultReadMode
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.ProtoStep
 import munit.FunSuite
@@ -113,8 +115,12 @@ class ScienceCadenceSuite extends FunSuite:
       .instantiate[Eval](Oid, estimator, Static, Namespace, expander, config(times.map(_._1).toList*), times.asRight, none)
       .value
 
+  // The ITC reports the read mode it computed with; the exposure time rule stands in for it.
+  private def integrationTime(exposureTime: TimeSpan, frameCount: Int): IntegrationTime =
+    IntegrationTime(exposureTime, PosInt.unsafeFrom(frameCount), readMode = ItcResultReadMode.Gnirs(GnirsReadMode.forExposureTime(exposureTime)).some)
+
   private def generate(cycles: Int, ws: Wavelength*): Either[OdbError, List[Atom[GnirsDynamicConfig]]] =
-    instantiate(NonEmptyList.fromListUnsafe(ws.toList).map(w => w -> IntegrationTime(ExposureTime, PosInt.unsafeFrom(cycles * 4))))
+    instantiate(NonEmptyList.fromListUnsafe(ws.toList).map(w => w -> integrationTime(ExposureTime, cycles * 4)))
       .map(_.generate.toList)
 
   private def titles(cycles: Int, ws: Wavelength*): List[String] =
@@ -130,15 +136,15 @@ class ScienceCadenceSuite extends FunSuite:
       assertEquals(titles(cycles, ThermalInfrared), List.fill(cycles)(Sci) :+ Cal, s"thermal infrared, $cycles cycles")
 
   test("thermal infrared: a cycle longer than an hour is rejected"):
-    val long = instantiate(NonEmptyList.one(ThermalInfrared -> IntegrationTime(20.minTimeSpan, PosInt.unsafeFrom(4))))
+    val long = instantiate(NonEmptyList.one(ThermalInfrared -> integrationTime(20.minTimeSpan, 4)))
     assert(long.isLeft, "an 80 minute cycle should not fit the thermal infrared period")
 
   test("a near infrared cycle may run past an hour beside a thermal infrared wavelength"):
     // 80 minute cycles at 2200 nm, 20 minute cycles at 3500 nm: each wavelength
     // is held to its own interval.
     val times = NonEmptyList.of(
-      NearInfrared    -> IntegrationTime(20.minTimeSpan, PosInt.unsafeFrom(4)),
-      ThermalInfrared -> IntegrationTime(ExposureTime, PosInt.unsafeFrom(4))
+      NearInfrared    -> integrationTime(20.minTimeSpan, 4),
+      ThermalInfrared -> integrationTime(ExposureTime, 4)
     )
     val gen = instantiate(times)
     assert(gen.isRight, s"expected per wavelength limits, got $gen")

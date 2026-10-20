@@ -398,14 +398,27 @@ object GeneratorParamsService {
 
           GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, obsMode, obsParams.calibrationRole, obsParams.proposalStatus, hasTarget, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable, obsParams.altair, obsParams.guideProbe, obsParams.tellurics)
 
-        // Shared by long slit and MOS.  Signal-to-noise is solved by the ITC, so
-        // the read mode it is given is ignored; only Time & Count needs a real one.
+        // Shared by long slit and MOS.  Signal-to-noise is solved by the ITC, which
+        // selects the read mode itself and reports it, so the one it is given is
+        // ignored; only Time & Count needs a real one.
         def flamingos2ScienceReadMode(c: flamingos2.spectroscopy.Config): Flamingos2ReadMode =
           c.exposureTimeMode match
             case ExposureTimeMode.SignalToNoiseMode(_, _)       =>
               Flamingos2ReadMode.Bright
             case ExposureTimeMode.TimeAndCountMode(time = time) =>
               c.explicitReadMode.getOrElse(Flamingos2ReadMode.forExposureTime(time))
+
+        // Acquisitions have no explicit read mode: Time & Count derives it from the
+        // exposure time, and the ITC echoes it back for the acquisition steps.
+        def flamingos2AcquisitionReadMode(etm: ExposureTimeMode): Flamingos2ReadMode =
+          etm match
+            case ExposureTimeMode.SignalToNoiseMode(_, _)       => Flamingos2ReadMode.Bright
+            case ExposureTimeMode.TimeAndCountMode(time = time) => Flamingos2ReadMode.forExposureTime(time)
+
+        def gnirsAcquisitionReadMode(etm: ExposureTimeMode): GnirsReadMode =
+          etm match
+            case ExposureTimeMode.SignalToNoiseMode(_, _)       => GnirsReadMode.Bright
+            case ExposureTimeMode.TimeAndCountMode(time = time) => GnirsReadMode.forExposureTime(time)
 
         observingMode(obsParams.targets, config, obsParams.calibrationRole, obsParams.isUserDefinedTelluric).flatMap:
 
@@ -458,7 +471,7 @@ object GeneratorParamsService {
               acqMode = InstrumentMode.Flamingos2Imaging(
                 f2.acquisition.exposureTimeMode,
                 f2.acquisition.filter,
-                Flamingos2ReadMode.Bright // Default to Bright, may support overrides in the future
+                flamingos2AcquisitionReadMode(f2.acquisition.exposureTimeMode)
               ),
               sciMode = sciMode
             ).asRight
@@ -477,7 +490,7 @@ object GeneratorParamsService {
               acqMode = InstrumentMode.Flamingos2Imaging(
                 f2m.acquisition.exposureTimeMode,
                 f2m.acquisition.filter,
-                Flamingos2ReadMode.Bright // Default to Bright, may support overrides in the future
+                flamingos2AcquisitionReadMode(f2m.acquisition.exposureTimeMode)
               ),
               sciMode = sciMode
             ).asRight
@@ -501,12 +514,12 @@ object GeneratorParamsService {
             GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, f2, obsParams.calibrationRole, obsParams.proposalStatus, hasTarget, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable, obsParams.altair, obsParams.guideProbe, obsParams.tellurics).asRight
 
           case gnm @ gnirs.imaging.Config(filters = fs) =>
-            // An input per filter. In S/N mode the read mode is derived per step from
-            // the ITC exposure time, so the value passed here is ignored by the ITC.
+            // An input per filter. In S/N mode the ITC selects the read mode itself and
+            // reports it, so the value passed here is ignored.
             val inputs = fs.map: f =>
               val readMode = f.exposureTimeMode match
                 case ExposureTimeMode.SignalToNoiseMode(_, _)       => GnirsReadMode.Bright
-                case ExposureTimeMode.TimeAndCountMode(time = time) => gnm.explicitReadMode.getOrElse(GnirsReadMode.forExposureTime(time))
+                case ExposureTimeMode.TimeAndCountMode(time = time) => gnm.explicitReadMode.getOrElse(gnirs.imaging.defaultReadMode(time))
               ImagingParameters(
                 obsParams.constraints.toInput,
                 InstrumentMode.GnirsImaging(
@@ -537,7 +550,7 @@ object GeneratorParamsService {
                   exposureTimeMode = gnm.acquisition.itcExposureTimeMode,
                   filter           = acqFilter,
                   camera           = gnm.camera,
-                  readMode         = GnirsReadMode.Bright,
+                  readMode         = gnirsAcquisitionReadMode(gnm.acquisition.itcExposureTimeMode),
                   wellDepth        = gnm.wellDepth,
                   coadds           = gnm.acquisition.coadds
                 )
@@ -741,7 +754,7 @@ object GeneratorParamsService {
             val sciModes = gn.wavelengths.map: w =>
               val sciReadMode = w.exposureTimeMode match
                                   case ExposureTimeMode.SignalToNoiseMode(_, _) =>
-                                    GnirsReadMode.Bright // In practice this will be ignored by the ITC, which derives the read mode itself in S/N mode
+                                    GnirsReadMode.Bright // Ignored by the ITC, which selects the read mode itself in S/N mode and reports it
                                   case ExposureTimeMode.TimeAndCountMode(time = time) =>
                                     gn.explicitReadMode.getOrElse(GnirsReadMode.forExposureTime(time))
 
@@ -778,7 +791,7 @@ object GeneratorParamsService {
                 exposureTimeMode = gn.acquisition.itcExposureTimeMode,
                 filter           = acqFilter,
                 camera           = gn.acquisitionCamera,
-                readMode         = GnirsReadMode.Bright,
+                readMode         = gnirsAcquisitionReadMode(gn.acquisition.itcExposureTimeMode),
                 wellDepth        = gn.wellDepth,
                 coadds           = gn.acquisition.coadds
               ),

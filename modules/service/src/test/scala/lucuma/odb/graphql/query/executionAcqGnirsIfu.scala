@@ -237,10 +237,10 @@ class executionAcqGnirsIfu extends ExecutionTestSupportForGnirs:
                     "steps": [
                       ${fieldStep(VeryBrightµs, 1, "H2", "VERY_BRIGHT", 0, 0)},
                       ${ifuImageStep("LOW_RESOLUTION")},
-                      ${throughIfuStep("LOW_RESOLUTION")(VeryBrightThroughµs, 1, "H2", "BRIGHT", 0, 0)}
+                      ${throughIfuStep("LOW_RESOLUTION")(VeryBrightThroughµs, 1, "H2", "VERY_BRIGHT", 0, 0)}
                     ]
                   },
-                  "possibleFuture": ${fineAdjustments("LOW_RESOLUTION")(VeryBrightThroughµs, 1, "H2", "BRIGHT", RepeatingAtomCount)},
+                  "possibleFuture": ${fineAdjustments("LOW_RESOLUTION")(VeryBrightThroughµs, 1, "H2", "VERY_BRIGHT", RepeatingAtomCount)},
                   "hasMore": false
                 }
               }

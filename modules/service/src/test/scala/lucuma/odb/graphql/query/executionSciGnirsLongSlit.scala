@@ -5,18 +5,22 @@ package lucuma.odb.graphql.query
 
 import cats.effect.IO
 import cats.syntax.either.*
+import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.StepGuideState.Disabled
 import lucuma.core.enums.StepGuideState.Enabled
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.syntax.string.*
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
+import lucuma.itc.ItcResultReadMode
 import lucuma.itc.client.SpectroscopyInput
 import lucuma.odb.graphql.ACursorOps
 
@@ -30,13 +34,16 @@ class executionSciGnirsLongSlit extends ExecutionTestSupportForGnirs:
 
   val ExposureTime: TimeSpan = 30.secondTimeSpan
 
-  // In S/N mode the ITC picks the coadds; 2 here, so the science steps can be told
-  // apart from the configured single coadd.  Time-and-count keeps the shared fake.
-  val SignalToNoiseCoadds: PosInt = PosInt.unsafeFrom(2)
+  // In S/N mode the ITC picks the coadds and the read mode; 2 coadds and Very Faint
+  // here, so the science steps can be told apart from the configured single coadd and
+  // from the Faint that 30s would derive.  Time-and-count keeps the shared fake.
+  val SignalToNoiseCoadds: PosInt           = PosInt.unsafeFrom(2)
+  val SignalToNoiseReadMode: GnirsReadMode = GnirsReadMode.VeryFaint
 
   override def fakeItcSpectroscopyResultFor(input: SpectroscopyInput): Option[IntegrationTime] =
     input.mode.exposureTimeMode match
-      case ExposureTimeMode.SignalToNoiseMode(_, _)   => Some(IntegrationTime(ExposureTime, PosInt.unsafeFrom(3), SignalToNoiseCoadds))
+      case ExposureTimeMode.SignalToNoiseMode(_, _)   =>
+        Some(IntegrationTime(ExposureTime, PosInt.unsafeFrom(3), SignalToNoiseCoadds, ItcResultReadMode.Gnirs(SignalToNoiseReadMode).some))
       case ExposureTimeMode.TimeAndCountMode(_, _, _) => None
 
   // Default GNIRS observation:
@@ -839,7 +846,7 @@ class executionSciGnirsLongSlit extends ExecutionTestSupportForGnirs:
           ).asRight
       )
 
-  test("[gnirs] S/N mode: science steps take the coadds the ITC chose"):
+  test("[gnirs] S/N mode: science steps take the coadds and read mode the ITC chose"):
     val setup: IO[Observation.Id] =
       for
         oid <- gnirsObs
@@ -855,7 +862,7 @@ class executionSciGnirsLongSlit extends ExecutionTestSupportForGnirs:
             "executionConfig" -> Json.obj(
               "gnirs" -> Json.obj(
                 "science" -> Json.obj(
-                  "nextAtom" -> gnirsExpectedScienceAtom(DynamicSnapshot.copy(coadds = SignalToNoiseCoadds.value),
+                  "nextAtom" -> gnirsExpectedScienceAtom(DynamicSnapshot.copy(coadds = SignalToNoiseCoadds.value, readMode = SignalToNoiseReadMode.tag.toScreamingSnakeCase),
                     (0, 2, Enabled), (0, -4, Enabled), (0, -4, Enabled), (0, 2, Enabled)
                   ),
                   "possibleFuture" -> List(DefaultCalAtom).asJson,

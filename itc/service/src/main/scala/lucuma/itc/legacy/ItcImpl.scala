@@ -109,7 +109,11 @@ object ItcImpl {
             TimeSpan
               .fromSeconds(r.exposureTime)
               .map(expTime =>
-                IntegrationTime(expTime, PosInt.unsafeFrom(r.frameCount.value), r.coadds).pure
+                IntegrationTime(expTime,
+                                PosInt.unsafeFrom(r.frameCount.value),
+                                r.coadds,
+                                r.readMode
+                ).pure
               )
               .getOrElse:
                 F.raiseError:

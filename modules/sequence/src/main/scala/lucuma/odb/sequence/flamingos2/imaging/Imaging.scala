@@ -8,6 +8,7 @@ package imaging
 import cats.data.EitherT
 import cats.effect.Sync
 import fs2.Pure
+import lucuma.core.model.Observation
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
 import lucuma.odb.data.ItcScience.Flamingos2Imaging
@@ -28,13 +29,14 @@ object Imaging:
       .value
 
   def flamingos2[F[_]: Sync](
-    estimator:  StepTimeEstimateCalculator[Flamingos2StaticConfig, Flamingos2DynamicConfig],
-    namespace:  UUID,
-    config:     Config,
-    scienceItc: Either[OdbError, Flamingos2Imaging]
+    observationId: Observation.Id,
+    estimator:     StepTimeEstimateCalculator[Flamingos2StaticConfig, Flamingos2DynamicConfig],
+    namespace:     UUID,
+    config:        Config,
+    scienceItc:    Either[OdbError, Flamingos2Imaging]
   ): F[Either[OdbError, StreamingExecutionConfig[Pure, Flamingos2StaticConfig, Flamingos2DynamicConfig]]] =
     val static = config.staticConfig
     instantiate(
       static,
-      Science.flamingos2(estimator, static, namespace, config, scienceItc)
+      Science.flamingos2(observationId, estimator, static, namespace, config, scienceItc)
     )

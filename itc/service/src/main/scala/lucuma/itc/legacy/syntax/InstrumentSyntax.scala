@@ -193,6 +193,16 @@ trait Flamingos2FilterSyntax:
 
 object flamingos2filter extends Flamingos2FilterSyntax
 
+trait Flamingos2ReadModeSyntax:
+  import lucuma.core.enums.Flamingos2ReadMode
+  extension (self: Flamingos2ReadMode)
+    def ocs2Tag: String =
+      self match
+        case Flamingos2ReadMode.Bright => "BRIGHT_OBJECT_SPEC"
+        case Flamingos2ReadMode.Medium => "MEDIUM_OBJECT_SPEC"
+        case Flamingos2ReadMode.Faint  => "FAINT_OBJECT_SPEC"
+object flamingos2readmode extends Flamingos2ReadModeSyntax
+
 trait Flamingos2FpuSyntax:
   import lucuma.core.enums.Flamingos2Fpu
   import lucuma.core.enums.Flamingos2Fpu.*

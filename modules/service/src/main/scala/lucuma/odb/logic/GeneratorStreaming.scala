@@ -429,7 +429,7 @@ object GeneratorStreaming:
         (for
           cfg <- extractMode(ObservingMode.Flamingos2ImagingName, context)(_.asFlamingos2Imaging)
           itc  = requireImagingItc(ObservingMode.Flamingos2ImagingName, context.oid, context.itcRes, ItcScience.flamingos2Imaging.getOption)
-          gen <- EitherT(Imaging.flamingos2(calculator.flamingos2Step, context.namespace, cfg, itc))
+          gen <- EitherT(Imaging.flamingos2(context.oid, calculator.flamingos2Step, context.namespace, cfg, itc))
           res <- collapseIfNecessary(context, gen)
         yield res).value
 

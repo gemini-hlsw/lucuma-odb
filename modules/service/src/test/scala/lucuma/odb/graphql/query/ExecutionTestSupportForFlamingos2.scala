@@ -170,29 +170,35 @@ trait ExecutionTestSupportForFlamingos2 extends ExecutionTestSupport:
   def flamingos2ScienceQuery(oid: Observation.Id, futureLimit: Option[Int] = None, atomQuery: String = Flamingos2AtomQuery): String =
     executionConfigQuery(oid, "flamingos2", "science", atomQuery, futureLimit)
 
-  def flamingos2Science(exposureTime: TimeSpan): Flamingos2DynamicConfig =
+  def flamingos2Science(exposureTime: TimeSpan, readMode: Flamingos2ReadMode): Flamingos2DynamicConfig =
     Flamingos2DynamicConfig(
       exposureTime,
       Flamingos2Disperser.R1200JH.some,
       Flamingos2Filter.JH,
-      Flamingos2ReadMode.forExposureTime(exposureTime),
+      readMode,
       Flamingos2LyotWheel.F16,
       Flamingos2FpuMask.Builtin(Flamingos2Fpu.LongSlit1),
       Flamingos2Decker.LongSlit,
       Flamingos2ReadoutMode.Science,
-      Flamingos2ReadMode.forExposureTime(exposureTime).readCount
+      readMode.readCount
     )
 
-  val Flamingos2Science: Flamingos2DynamicConfig =
+  // With the read mode the exposure time derives, as when the ITC reports none.
+  def flamingos2Science(exposureTime: TimeSpan): Flamingos2DynamicConfig =
+    flamingos2Science(exposureTime, Flamingos2ReadMode.forExposureTime(exposureTime))
+
+  // Lazy: `fakeItcSpectroscopyResult` is overridden by suites whose own values are not yet
+  // initialised while this trait is.
+  lazy val Flamingos2Science: Flamingos2DynamicConfig =
     flamingos2Science(fakeItcSpectroscopyResult.exposureTime)
 
-  val Flamingos2Arc: Flamingos2DynamicConfig =
+  lazy val Flamingos2Arc: Flamingos2DynamicConfig =
     flamingos2Science(f2_arc_JH1.instrumentConfig.exposureTime)
 
-  val Flamingos2Flat: Flamingos2DynamicConfig =
+  lazy val Flamingos2Flat: Flamingos2DynamicConfig =
     flamingos2Science(f2_flat_JH1.instrumentConfig.exposureTime)
 
-  val Flamingos2AcqImage: Flamingos2DynamicConfig =
+  lazy val Flamingos2AcqImage: Flamingos2DynamicConfig =
     Flamingos2Science.copy(
       disperser = none,
       filter    = Flamingos2Filter.J,
@@ -200,7 +206,7 @@ trait ExecutionTestSupportForFlamingos2 extends ExecutionTestSupport:
       decker    = Flamingos2Decker.Imaging
     )
 
-  val Flamingos2AcqSlit: Flamingos2DynamicConfig =
+  lazy val Flamingos2AcqSlit: Flamingos2DynamicConfig =
     Flamingos2AcqImage.copy(
       fpu       = Flamingos2FpuMask.Builtin(Flamingos2Fpu.LongSlit1),
       decker    = Flamingos2Decker.LongSlit
@@ -281,16 +287,31 @@ trait ExecutionTestSupportForFlamingos2 extends ExecutionTestSupport:
 
     """
 
-  protected def flamingos2ExpectedScience(exposureTime: TimeSpan, p: Int, q: Int, g: StepGuideState): Json =
+  protected def flamingos2ExpectedScience(f2: Flamingos2DynamicConfig, p: Int, q: Int, g: StepGuideState): Json =
     json"""
       {
-        "instrumentConfig": ${flamingos2ExpectedInstrumentConfig(flamingos2Science(exposureTime))},
+        "instrumentConfig": ${flamingos2ExpectedInstrumentConfig(f2)},
         "stepConfig": { "stepType": "SCIENCE" },
         "telescopeConfig": ${expectedTelescopeConfig(p, q, g)},
         "observeClass": "SCIENCE",
         "breakpoint": "DISABLED"
       }
     """
+
+  protected def flamingos2ExpectedScience(exposureTime: TimeSpan, p: Int, q: Int, g: StepGuideState): Json =
+    flamingos2ExpectedScience(flamingos2Science(exposureTime), p, q, g)
+
+  protected def flamingos2ExpectedScienceAtom(
+    f2:     Flamingos2DynamicConfig,
+    offset: (Int, Int, StepGuideState)*
+  ): Json =
+    val sciSteps  = offset.toList.map((p, q, g) => flamingos2ExpectedScience(f2, p, q, g))
+
+    Json.obj(
+      "description" -> s"ABBA Cycle".asJson,
+      "observeClass" -> "SCIENCE".asJson,
+      "steps" -> sciSteps.asJson
+    )
 
   protected def flamingos2ExpectedScienceAtom(
     exposureTime: TimeSpan,
