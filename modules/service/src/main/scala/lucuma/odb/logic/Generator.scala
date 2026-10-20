@@ -269,6 +269,7 @@ object Generator:
       )(using Transaction[F]): EitherT[F, OdbError, A] =
         daytimeInstrument(ctx) match
           case Instrument.Flamingos2 => EitherT(streaming.selectDaytimeFlamingos2(ctx)).flatMap(s => f(s))
+          case Instrument.Ghost      => EitherT(streaming.selectDaytimeGhost(ctx)).flatMap(s => f(s))
           case Instrument.GmosNorth  => EitherT(streaming.selectDaytimeGmosNorth(ctx)).flatMap(s => f(s))
           case Instrument.GmosSouth  => EitherT(streaming.selectDaytimeGmosSouth(ctx)).flatMap(s => f(s))
           case Instrument.Gnirs      => EitherT(streaming.selectDaytimeGnirs(ctx)).flatMap(s => f(s))
@@ -411,6 +412,7 @@ object Generator:
               val noSetup = SetupTimeEstimateCalculator.Zero
               val d = daytimeInstrument(ctx) match
                 case Instrument.Flamingos2 => EitherT(streaming.selectDaytimeFlamingos2(ctx)).flatMap(digest(_, noSetup))
+                case Instrument.Ghost      => EitherT(streaming.selectDaytimeGhost(ctx)).flatMap(digest(_, noSetup))
                 case Instrument.GmosNorth  => EitherT(streaming.selectDaytimeGmosNorth(ctx)).flatMap(digest(_, noSetup))
                 case Instrument.GmosSouth  => EitherT(streaming.selectDaytimeGmosSouth(ctx)).flatMap(digest(_, noSetup))
                 case Instrument.Gnirs      => EitherT(streaming.selectDaytimeGnirs(ctx)).flatMap(digest(_, noSetup))
@@ -574,6 +576,10 @@ object Generator:
                   EitherT(streaming.selectDaytimeFlamingos2(ctx))
                     .flatMap(s => EitherT.liftF(executionConfig(s)))
                     .map(InstrumentExecutionConfig.Flamingos2.apply)
+                case Instrument.Ghost =>
+                  EitherT(streaming.selectDaytimeGhost(ctx))
+                    .flatMap(s => EitherT.liftF(executionConfig(s)))
+                    .map(InstrumentExecutionConfig.Ghost.apply)
                 case Instrument.GmosNorth =>
                   EitherT(streaming.selectDaytimeGmosNorth(ctx))
                     .flatMap(s => EitherT.liftF(executionConfig(s)))
