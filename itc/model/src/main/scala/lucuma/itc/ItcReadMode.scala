@@ -9,9 +9,8 @@ import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.GnirsReadMode
 
 /**
- * The detector read mode an ITC result was computed with, for the instruments whose recipe
- * selects one: chosen by the ITC in signal-to-noise mode, the requested one in time-and-count
- * mode.
+ * The detector read mode an ITC result was computed with, for the instruments whose recipe selects
+ * one: chosen by the ITC in signal-to-noise mode, the requested one in time-and-count mode.
  */
 enum ItcReadMode derives Eq:
   case Gnirs(readMode: GnirsReadMode)
@@ -19,5 +18,8 @@ enum ItcReadMode derives Eq:
 
 object ItcReadMode:
   // From the per-instrument fields of the JSON encoding, at most one of which is set.
-  def fromFields(gnirs: Option[GnirsReadMode], flamingos2: Option[Flamingos2ReadMode]): Option[ItcReadMode] =
+  def fromFields(
+    gnirs:      Option[GnirsReadMode],
+    flamingos2: Option[Flamingos2ReadMode]
+  ): Option[ItcReadMode] =
     gnirs.map(Gnirs.apply).orElse(flamingos2.map(Flamingos2.apply))

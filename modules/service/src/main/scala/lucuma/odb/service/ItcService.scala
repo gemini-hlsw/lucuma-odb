@@ -31,10 +31,12 @@ import lucuma.core.data.Zipper
 import lucuma.core.enums.AltairMode
 import lucuma.core.enums.Band
 import lucuma.core.enums.Flamingos2Filter
+import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.GnirsAcquisitionType
 import lucuma.core.enums.GnirsFilter
+import lucuma.core.enums.GnirsReadMode
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
@@ -47,6 +49,7 @@ import lucuma.itc.AltairParameters
 import lucuma.itc.AsterismIntegrationTimes
 import lucuma.itc.IntegrationTime
 import lucuma.itc.ItcGhostDetector
+import lucuma.itc.ItcReadMode
 import lucuma.itc.TargetIntegrationTime
 import lucuma.itc.client.ClientCalculationResult
 import lucuma.itc.client.ImagingInput
@@ -593,6 +596,13 @@ object ItcService {
         autoSignalToNoise: Boolean
       ): EitherT[F, OdbError, (Zipper[ItcResult], Option[GnirsAcquisitionType])] =
         def go(imInput: ImagingInput, min: TimeSpan, max: TimeSpan): EitherT[F, OdbError, Zipper[ItcResult]] =
+          // A target too bright for any exposure is imaged at the minimum, with the read
+          // mode that exposure calls for.
+          val tooBrightReadMode: Option[ItcReadMode] =
+            imInput.mode match
+              case InstrumentMode.GnirsImaging(filter = _)      => ItcReadMode.Gnirs(GnirsReadMode.forExposureTime(min)).some
+              case InstrumentMode.Flamingos2Imaging(filter = _) => ItcReadMode.Flamingos2(Flamingos2ReadMode.forExposureTime(min)).some
+              case _                                            => none
           EitherT:
             client
               .imaging(imInput, useCache = false)
@@ -603,7 +613,7 @@ object ItcService {
                       _.modifyValue:
                         case Left(lucuma.itc.Error.SourceTooBright(_))    =>
                           TargetIntegrationTime(
-                            Zipper.one(IntegrationTime(min, 1.refined)),
+                            Zipper.one(IntegrationTime(min, 1.refined, readMode = tooBrightReadMode)),
                             Band.R.asLeft, // Band is meaningless here, but we need to provide one
                             None, // Imaging doesn't return signal-to-noise at
                             Nil // No ccd data for this case

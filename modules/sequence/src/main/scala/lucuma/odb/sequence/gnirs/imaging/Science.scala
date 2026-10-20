@@ -19,8 +19,10 @@ import fs2.Stream
 import lucuma.core.data.Zipper
 import lucuma.core.enums.GnirsFilter
 import lucuma.core.enums.GnirsFpuOther.Acquisition
+import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.StepGuideState
+import lucuma.core.model.Observation
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.gnirs.GnirsDynamicConfig
@@ -55,19 +57,20 @@ object Science:
     def runSetup(config: Config): GnirsDynamicConfig =
       setup(config).runS(initialDynamicConfig).value
 
-    // The read mode: the explicit one if set, else the one the ITC reports (its choice in
-    // S/N mode, the requested default in time-and-count mode).
-    def setFilter(config: Config, filter: GnirsFilter, time: IntegrationTime): State[GnirsDynamicConfig, Unit] =
+    // The explicit read mode if set, else the ITC's (its choice in S/N mode, the requested
+    // default in time-and-count mode).
+    def setFilter(config: Config, filter: GnirsFilter, time: IntegrationTime, readMode: GnirsReadMode): State[GnirsDynamicConfig, Unit] =
       for
         _ <- GnirsDynamicConfig.filter   := filter
         _ <- GnirsDynamicConfig.exposure := time.exposureTime
         _ <- GnirsDynamicConfig.coadds   := time.coadds
-        _ <- GnirsDynamicConfig.readMode := config.explicitReadMode.orElse(time.gnirsReadMode).getOrElse(defaultReadMode(time.exposureTime))
+        _ <- GnirsDynamicConfig.readMode := config.explicitReadMode.getOrElse(readMode)
       yield ()
 
     def grouped(
       config:     Config,
       time:       NonEmptyMap[GnirsFilter, Zipper[Result]],
+      readModes:  NonEmptyMap[GnirsFilter, GnirsReadMode],
       offsets:    List[TelescopeConfig],
       skyOffsets: List[TelescopeConfig]
     )(using Order[GnirsFilter]): Stream[Pure, ProtoAtom[ProtoStep[GnirsDynamicConfig]]] =
@@ -75,7 +78,7 @@ object Science:
       def oneFilter(filter: GnirsFilter): State[GnirsDynamicConfig, Stream[Pure, ProtoAtom[ProtoStep[GnirsDynamicConfig]]]] =
         val integrationTime = time(filter).get.focus._2
         for
-          _   <- setFilter(config, filter, integrationTime)
+          _   <- setFilter(config, filter, integrationTime, readModes(filter).get)
           sky <- skyOffsets
                    .traverse: offset =>
                      scienceStep(offset, ObserveClass.Science)
@@ -98,6 +101,7 @@ object Science:
     def interleaved(
       config:     Config,
       time:       NonEmptyMap[GnirsFilter, Zipper[Result]],
+      readModes:  NonEmptyMap[GnirsFilter, GnirsReadMode],
       offsets:    List[TelescopeConfig],
       skyOffsets: List[TelescopeConfig]
     )(using Order[GnirsFilter]): Stream[Pure, ProtoAtom[ProtoStep[GnirsDynamicConfig]]] =
@@ -114,7 +118,7 @@ object Science:
       def skySteps(skyList: List[(GnirsFilter, TelescopeConfig)]): State[GnirsDynamicConfig, List[ProtoStep[GnirsDynamicConfig]]] =
         skyList.traverse: (filter, offset) =>
           for
-            _ <- setFilter(config, filter, filterTimes(filter))
+            _ <- setFilter(config, filter, filterTimes(filter), readModes(filter).get)
             s <- scienceStep(offset, ObserveClass.Science)
           yield s
 
@@ -134,7 +138,7 @@ object Science:
         filters
           .traverse: filter =>
             for
-              _ <- setFilter(config, filter, filterTimes(filter))
+              _ <- setFilter(config, filter, filterTimes(filter), readModes(filter).get)
               d <- State.get
             yield Stream.emits(List.fill(perFilterCounts(filter))(d))
           .map(lst => Stream.emits(lst).flatten)
@@ -170,14 +174,22 @@ object Science:
   object ScienceGenerator:
 
     def instantiate[F[_]: Sync](
-      estimator: StepTimeEstimateCalculator[GnirsStaticConfig, GnirsDynamicConfig],
-      static:    GnirsStaticConfig,
-      namespace: UUID,
-      config:    Config,
-      time:      Either[OdbError, NonEmptyMap[GnirsFilter, Zipper[Result]]]
+      observationId: Observation.Id,
+      estimator:     StepTimeEstimateCalculator[GnirsStaticConfig, GnirsDynamicConfig],
+      static:        GnirsStaticConfig,
+      namespace:     UUID,
+      config:        Config,
+      time:          Either[OdbError, NonEmptyMap[GnirsFilter, Zipper[Result]]]
     )(using Order[GnirsFilter]): F[Either[OdbError, SequenceGenerator[GnirsDynamicConfig]]] =
 
-      time.traverse: nem =>
+      // Every filter's ITC result carries the read mode its steps take.
+      val resolved: Either[OdbError, (NonEmptyMap[GnirsFilter, Zipper[Result]], NonEmptyMap[GnirsFilter, GnirsReadMode])] =
+        time.flatMap: nem =>
+          nem.toNel
+            .traverse((filter, zipper) => itcReadMode(zipper.focus._2).bimap(sequenceError(observationId, _), filter -> _))
+            .map(readModes => (nem, readModes.toNem))
+
+      resolved.traverse: (nem, readModes) =>
 
         // Pre-generate enough object and sky offsets to cover the sequence.
         def generateOffsets(
@@ -203,7 +215,7 @@ object Science:
             // The same pattern is repeated for each filter so we need enough
             // offsets to cover the filter with the most frames.
             generateOffsets(offsets, skyCount, skyOffsets)(_.max).map: (o, s) =>
-              ProtoSequences.grouped(config, nem, o, s)
+              ProtoSequences.grouped(config, nem, readModes, o, s)
 
           case Variant.Interleaved(offsets, skyCount, skyOffsets) =>
             // The offset pattern is applied to the sequence as a whole so we
@@ -211,24 +223,25 @@ object Science:
             // positions per filter.
             val sc = NonNegInt.unsafeFrom(skyCount.value * nem.length)
             generateOffsets(offsets, sc, skyOffsets)(_.sum).map: (o, s) =>
-              ProtoSequences.interleaved(config, nem, o, s)
+              ProtoSequences.interleaved(config, nem, readModes, o, s)
 
           case Variant.PreImaging(o1, o2, o3, o4)                 =>
             val offsets    = TelescopeConfigGenerator.Enumerated:
               NonEmptyList.of(o1, o2, o3, o4).map(o => TelescopeConfig(o, StepGuideState.Enabled))
             val skyOffsets = TelescopeConfigGenerator.NoGenerator
             generateOffsets(offsets, NonNegInt.MinValue, skyOffsets)(_.max).map: (o, s) =>
-              ProtoSequences.grouped(config, nem, o, s)
+              ProtoSequences.grouped(config, nem, readModes, o, s)
 
         protoAtoms.map: v =>
           ImagingSequence.makeGenerator(estimator, static, namespace, v)
 
   def gnirs[F[_]: Sync](
-    estimator: StepTimeEstimateCalculator[GnirsStaticConfig, GnirsDynamicConfig],
-    static:    GnirsStaticConfig,
-    namespace: UUID,
-    config:    Config,
-    time:      Either[OdbError, GnirsImaging]
+    observationId: Observation.Id,
+    estimator:     StepTimeEstimateCalculator[GnirsStaticConfig, GnirsDynamicConfig],
+    static:        GnirsStaticConfig,
+    namespace:     UUID,
+    config:        Config,
+    time:          Either[OdbError, GnirsImaging]
   ): F[Either[OdbError, SequenceGenerator[GnirsDynamicConfig]]] =
     given Order[GnirsFilter] = ImagingSequence.wavelengthOrder(config.variant)(_.centralWavelength)
-    ScienceGenerator.instantiate(estimator, static, namespace, config, time.map(_.science))
+    ScienceGenerator.instantiate(observationId, estimator, static, namespace, config, time.map(_.science))

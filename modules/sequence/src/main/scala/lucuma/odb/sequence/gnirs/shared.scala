@@ -5,6 +5,7 @@ package lucuma.odb.sequence.gnirs
 
 import cats.syntax.either.*
 import cats.syntax.eq.*
+import cats.syntax.option.*
 import lucuma.core.enums.GnirsAcquisitionType
 import lucuma.core.enums.GnirsCamera
 import lucuma.core.enums.GnirsFilter
@@ -13,13 +14,26 @@ import lucuma.core.enums.GnirsReadMode
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
+import lucuma.core.model.Observation
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
+import lucuma.itc.IntegrationTime
+import lucuma.odb.data.OdbError
 
 // Definitions that are shared across GNIRS modes.
 // The shortest exposure GNIRS allows is the VeryBright minimum exposure time.
 val MinAcquisitionExposureTime: TimeSpan = GnirsReadMode.VeryBright.minimumExposureTime
 val MaxAcquisitionExposureTime: TimeSpan = 60.secondTimeSpan
+
+def sequenceError(oid: Observation.Id, msg: String): OdbError =
+  OdbError.SequenceUnavailable(oid, s"Could not generate a sequence for $oid: $msg".some)
+
+/**
+ * The read mode the ITC computed a result with. Every GNIRS result carries one: the ITC
+ * reports it, and the results frozen before it did were backfilled (V1357).
+ */
+def itcReadMode(time: IntegrationTime): Either[String, GnirsReadMode] =
+  time.gnirsReadMode.toRight("the ITC result carries no GNIRS read mode")
 
 // The fixed, single-coadd exposure time for the initial "keyhole"/field image of an
 // acquisition, as a function of the camera: 15s for the long cameras (0.05"/pix) and

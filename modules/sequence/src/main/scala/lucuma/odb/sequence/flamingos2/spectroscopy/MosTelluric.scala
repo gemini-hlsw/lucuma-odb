@@ -70,18 +70,15 @@ object MosTelluric:
      * whose MOS decker would vignette the slit.
      */
     def compute(
-      config:  Config,
-      time:    IntegrationTime,
-      calRole: Option[CalibrationRole]
+      config:   Config,
+      time:     IntegrationTime,
+      readMode: Flamingos2ReadMode,
+      calRole:  Option[CalibrationRole]
     ): (NonEmptyList[ProtoStep[F2]], ProtoStep[F2]) =
 
-      // The explicit read mode if set, else the one the ITC reports (its choice in S/N
-      // mode, the requested one in time-and-count mode).
-      val readMode =
-        config
-          .explicitReadMode
-          .orElse(time.flamingos2ReadMode)
-          .getOrElse(Flamingos2ReadMode.forExposureTime(time.exposureTime))
+      // The explicit read mode if set, else the ITC's (its choice in S/N mode, the
+      // requested one in time-and-count mode).
+      val resolvedReadMode = config.explicitReadMode.getOrElse(readMode)
 
       val mask = Flamingos2FpuMask.builtin(config.equivalentFpu)
 
@@ -90,12 +87,12 @@ object MosTelluric:
           _  <- F2.exposure    := time.exposureTime
           _  <- F2.disperser   := config.disperser.some
           _  <- F2.filter      := config.filter
-          _  <- F2.readMode    := readMode
+          _  <- F2.readMode    := resolvedReadMode
           _  <- F2.lyotWheel   := Flamingos2LyotWheel.F16
           _  <- F2.fpu         := mask
           _  <- F2.decker      := mask.defaultDecker
           _  <- F2.readoutMode := config.readoutMode
-          _  <- F2.reads       := config.explicitReads.getOrElse(readMode.readCount)
+          _  <- F2.reads       := config.explicitReads.getOrElse(resolvedReadMode.readCount)
           ss <- config.telescopeConfigs.traverse(scienceStep(_, calRole.sciClass))
           r  <- arcStep(ss.last.telescopeConfig.copy(guiding = Disabled), calRole.gcalClass)
         yield (ss, r)
@@ -138,7 +135,8 @@ object MosTelluric:
                         _.exposureTime.toNonNegMicroseconds.value > 0,
                         zeroExposureTime(observationId, modeName)
                       )
-       (ss, arc)  = StepComputer.compute(config, t, calRole)
+       r         <- EitherT.fromEither[F](itcReadMode(t).leftMap(definitionError(observationId, _)))
+       (ss, arc)  = StepComputer.compute(config, t, r, calRole)
        d         <- expand(static, expander, ss, arc).leftMap(definitionError(observationId, _))
        c         <- EitherT.fromEither[F](d.cycleCount(t).leftMap(definitionError(observationId, _)))
      yield Generator(d, AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Science), c): SequenceGenerator[F2]).value

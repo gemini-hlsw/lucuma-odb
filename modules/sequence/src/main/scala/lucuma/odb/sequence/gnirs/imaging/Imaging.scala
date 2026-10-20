@@ -66,5 +66,5 @@ object Imaging:
       config,
       acquisitionItc,
       pinnedAcqType,
-      Science.gnirs(estimator, static, namespace, config, scienceItc)
+      Science.gnirs(observationId, estimator, static, namespace, config, scienceItc)
     )

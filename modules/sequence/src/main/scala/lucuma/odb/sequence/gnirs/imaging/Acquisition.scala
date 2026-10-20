@@ -97,18 +97,17 @@ object Acquisition:
       keyholeFilter:       GnirsFilter,
       keyholeExposureTime: TimeSpan,
       acqCoadds:           PosInt,
-      time:                IntegrationTime
+      time:                IntegrationTime,
+      acqReadMode:         GnirsReadMode
     ): Steps =
       val acqExposureTime: TimeSpan = time.exposureTime
-      // The ITC's read mode goes with its exposure; the fixed keyhole exposure derives its own.
-      val acqReadMode: GnirsReadMode = time.gnirsReadMode.getOrElse(GnirsReadMode.forExposureTime(acqExposureTime))
 
       // The field/keyhole image: filter, exposure, coadds and read mode depend on the
       // brightness type. Very Bright / Bright take it at the keyhole offset with the table's
-      // filter and fixed single-coadd exposure.  Faint instead doubles it as the sky frame
-      // for the on-target image, so it is taken at the sky offset and must match that
-      // image's filter, exposure and coadds -- the table would decouple the pair and cost
-      // the sky subtraction a faint target needs.
+      // filter and fixed single-coadd exposure, whose read mode follows from that exposure.
+      // Faint instead doubles it as the sky frame for the on-target image, so it is taken at
+      // the sky offset and must match that image's filter, exposure, coadds and read mode --
+      // the table would decouple the pair and cost the sky subtraction a faint target needs.
       val (fieldFilter: GnirsFilter, fieldExposureTime: TimeSpan, fieldCoadds: PosInt, fieldReadMode: GnirsReadMode, fieldOffset: Offset) =
         mode match
           case GnirsAcquisitionMode.VeryBright | GnirsAcquisitionMode.Bright =>
@@ -186,7 +185,8 @@ object Acquisition:
           _.exposureTime.toNonNegMicroseconds.value > 0,
           sequenceError("GNIRS Imaging requires a positive acquisition exposure time.")
         )
-        .flatMap: t =>
+        .flatMap(t => itcReadMode(t).bimap(sequenceError, (t, _)))
+        .flatMap: (t, acqReadMode) =>
           val mode           = config.acquisition.resolvedMode(t, GnirsAcquisitionMode.Faint.DefaultImagingSkyOffset, pinnedAcqType)
           val selFilter      = config.acquisition.selectedFilter(mode, firstFilter)
           val coadds: PosInt = config.acquisition.resolvedCoadds(t)
@@ -195,7 +195,7 @@ object Acquisition:
           firstStepFilterAndExposure(config.camera, selFilter)
             .leftMap(sequenceError)
             .map: (keyholeFilter, keyholeExposure) =>
-              val steps: Steps = StepComputer.compute(config.camera, mode, selFilter, keyholeFilter, keyholeExposure, coadds, t)
+              val steps: Steps = StepComputer.compute(config.camera, mode, selFilter, keyholeFilter, keyholeExposure, coadds, t, acqReadMode)
               Generator(builder, steps.initialAtom, steps.repeatingAtom)
 
     generator.pure[F]

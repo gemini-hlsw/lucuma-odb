@@ -7,6 +7,7 @@ package longslit
 
 import cats.Order.catsKernelOrderingForOrder
 import cats.data.NonEmptyList
+import cats.syntax.either.*
 import cats.syntax.option.*
 import cats.syntax.order.*
 import cats.syntax.traverse.*
@@ -126,19 +127,16 @@ object Acquisition:
         _.exposureTime.toNonNegMicroseconds.value > 0,
         OdbError.SequenceUnavailable(observationId, s"Could not generate a sequence for $observationId: Flamingos 2 Long Slit requires a positive exposure time.".some)
       )
-      .map: t =>
-        new Generator(
-          AtomBuilder.instantiate(
-            estimator,
-            static,
-            namespace,
-            SequenceType.Acquisition
-          ),
-          // The ITC's read mode goes with its exposure.
-          StepComputer.compute(
-            t.exposureTime,
-            t.flamingos2ReadMode.getOrElse(Flamingos2ReadMode.forExposureTime(t.exposureTime)),
-            config.acquisition,
-            config.fpu
-          )
-        )
+      .flatMap: t =>
+        itcReadMode(t)
+          .leftMap(msg => OdbError.SequenceUnavailable(observationId, s"Could not generate a sequence for $observationId: $msg.".some))
+          .map: readMode =>
+            new Generator(
+              AtomBuilder.instantiate(
+                estimator,
+                static,
+                namespace,
+                SequenceType.Acquisition
+              ),
+              StepComputer.compute(t.exposureTime, readMode, config.acquisition, config.fpu)
+            )

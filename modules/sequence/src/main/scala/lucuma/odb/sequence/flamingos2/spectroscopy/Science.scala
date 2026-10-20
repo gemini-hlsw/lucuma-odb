@@ -102,23 +102,19 @@ object Science:
     object PreDef:
 
       def apply(
-         config:  Config,
-         time:    IntegrationTime,
-         a0Off:   TelescopeConfig,
+         config:   Config,
+         time:     IntegrationTime,
+         readMode: Flamingos2ReadMode,
+         a0Off:    TelescopeConfig,
          b0Off:   TelescopeConfig,
          b1Off:   TelescopeConfig,
          a1Off:   TelescopeConfig,
          calRole: Option[CalibrationRole]
       ): PreDef =
 
-        // The explicit read mode if set, else the one the ITC reports (its choice in S/N
-        // mode, the requested one in time-and-count mode).
-        val readMode =
-          config
-            .explicitReadMode
-            .orElse(time.flamingos2ReadMode)
-            .getOrElse:
-              Flamingos2ReadMode.forExposureTime(time.exposureTime)
+        // The explicit read mode if set, else the ITC's (its choice in S/N mode, the
+        // requested one in time-and-count mode).
+        val resolvedReadMode = config.explicitReadMode.getOrElse(readMode)
 
         val sciClass = calRole.sciClass
 
@@ -127,12 +123,12 @@ object Science:
             _  <- F2.exposure    := time.exposureTime
             _  <- F2.disperser   := config.disperser.some
             _  <- F2.filter      := config.filter
-            _  <- F2.readMode    := readMode
+            _  <- F2.readMode    := resolvedReadMode
             _  <- F2.lyotWheel   := Flamingos2LyotWheel.F16
             _  <- F2.fpu         := config.fpuMask
             _  <- F2.decker      := config.decker
             _  <- F2.readoutMode := config.readoutMode
-            _  <- F2.reads       := config.explicitReads.getOrElse(readMode.readCount)
+            _  <- F2.reads       := config.explicitReads.getOrElse(resolvedReadMode.readCount)
             a0 <- f2ScienceStep(a0Off, sciClass)
             b0 <- f2ScienceStep(b0Off, sciClass)
             b1 <- f2ScienceStep(b1Off, sciClass)
@@ -151,9 +147,10 @@ object Science:
       calRole:   Option[CalibrationRole]
     ): EitherT[F, String, StepDefinition] =
       for
+        r <- EitherT.fromEither[F](itcReadMode(time))
         p <- EitherT.fromEither:
                config.telescopeConfigs match
-                 case NonEmptyList(a0, b0 :: b1 :: a1 :: Nil) => PreDef(config, time, a0, b0, b1, a1, calRole).asRight
+                 case NonEmptyList(a0, b0 :: b1 :: a1 :: Nil) => PreDef(config, time, r, a0, b0, b1, a1, calRole).asRight
                  // This case should be caught when validating arguments to the mode
                  // construction / update.  Nevertheless, we'll guarantee it here.
                  case _                    => s"Exactly 4 offset positions are needed for $modeName (${config.telescopeConfigs.size} provided).".asLeft
