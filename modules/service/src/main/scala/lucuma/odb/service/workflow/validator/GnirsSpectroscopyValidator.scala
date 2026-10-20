@@ -22,7 +22,7 @@ import lucuma.odb.service.workflow.ObservationValidator
 /**
  * GNIRS spectroscopy checks ported from the OCS p2checker `GnirsRule`.  They
  * need only the observing mode.  The read mode exposure time limits are
- * checked against the sequence steps by the `ExposureTimeValidator`.  Values
+ * checked against the sequence steps by the `StepViolationValidator`.  Values
  * the ODB derives itself can only be wrong when the user overrides them, so
  * the decker check fires on an explicit choice and the acquisition filter
  * check on an explicit filter.

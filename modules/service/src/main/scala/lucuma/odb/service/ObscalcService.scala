@@ -474,7 +474,7 @@ object ObscalcService:
         "c_acq_science_non_charged_time",
         "c_acq_science_program_time",
         "c_acq_execution_state",
-        "c_acq_exposure_time_violations",
+        "c_acq_step_violations",
 
         "c_sci_obs_class",
         "c_sci_non_charged_time",
@@ -499,7 +499,7 @@ object ObscalcService:
         "c_sci_science_non_charged_time",
         "c_sci_science_program_time",
         "c_sci_execution_state",
-        "c_sci_exposure_time_violations",
+        "c_sci_step_violations",
 
         "c_workflow_state",
         "c_workflow_transitions",
@@ -624,7 +624,7 @@ object ObscalcService:
         "c_acq_science_non_charged_time",
         "c_acq_science_program_time",
         "c_acq_execution_state",
-        "c_acq_exposure_time_violations",
+        "c_acq_step_violations",
 
         "c_sci_obs_class",
         "c_sci_non_charged_time",
@@ -649,7 +649,7 @@ object ObscalcService:
         "c_sci_science_non_charged_time",
         "c_sci_science_program_time",
         "c_sci_execution_state",
-        "c_sci_exposure_time_violations"
+        "c_sci_step_violations"
       )
 
     def selectManyExecutionDigest(
@@ -812,7 +812,7 @@ object ObscalcService:
         sql"c_acq_science_non_charged_time   = ${time_span.opt}"(r.digest.map(_.acquisition.steps.observing.time(ChargeClass.NonCharged))),
         sql"c_acq_science_program_time       = ${time_span.opt}"(r.digest.map(_.acquisition.steps.observing.time(ChargeClass.Program))),
         sql"c_acq_execution_state            = ${execution_state.opt}"(r.digest.map(_.acquisition.executionState)),
-        sql"c_acq_exposure_time_violations   = ${_exposure_time_violation.opt}"(r.digest.map(_.acquisition.exposureTimeViolations)),
+        sql"c_acq_step_violations   = ${_step_violation.opt}"(r.digest.map(_.acquisition.stepViolations)),
 
         // Science Digest
         sql"c_sci_obs_class                  = ${obs_class.opt}"(r.digest.map(_.science.observeClass)),
@@ -838,7 +838,7 @@ object ObscalcService:
         sql"c_sci_science_non_charged_time   = ${time_span.opt}"(r.digest.map(_.science.steps.observing.time(ChargeClass.NonCharged))),
         sql"c_sci_science_program_time       = ${time_span.opt}"(r.digest.map(_.science.steps.observing.time(ChargeClass.Program))),
         sql"c_sci_execution_state            = ${execution_state.opt}"(r.digest.map(_.science.executionState)),
-        sql"c_sci_exposure_time_violations   = ${_exposure_time_violation.opt}"(r.digest.map(_.science.exposureTimeViolations)),
+        sql"c_sci_step_violations   = ${_step_violation.opt}"(r.digest.map(_.science.stepViolations)),
 
         // Workflow
         sql"c_workflow_state       = ${observation_workflow_state}"(r.workflow.state),

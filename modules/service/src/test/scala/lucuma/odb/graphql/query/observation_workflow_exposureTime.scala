@@ -227,11 +227,11 @@ class observation_workflow_exposureTime
                             execution {
                               digest {
                                 value {
-                                  acquisition { exposureTimeViolations { severity } }
+                                  acquisition { stepViolations { code } }
                                   science {
-                                    exposureTimeViolations {
-                                      severity
-                                      description
+                                    stepViolations {
+                                      code
+                                      message
                                     }
                                   }
                                 }
@@ -246,16 +246,16 @@ class observation_workflow_exposureTime
                             "execution": {
                               "digest": {
                                 "value": {
-                                  "acquisition": { "exposureTimeViolations": [] },
+                                  "acquisition": { "stepViolations": [] },
                                   "science": {
-                                    "exposureTimeViolations": [
+                                    "stepViolations": [
                                       {
-                                        "severity": "ERROR",
-                                        "description": "Exposure times for GMOS North must be a whole number of seconds."
+                                        "code": "CONFIGURATION_ERROR",
+                                        "message": "Exposure times for GMOS North must be a whole number of seconds."
                                       },
                                       {
-                                        "severity": "ERROR",
-                                        "description": "Exposure times for GMOS North must be at least 1 s."
+                                        "code": "CONFIGURATION_ERROR",
+                                        "message": "Exposure times for GMOS North must be at least 1 s."
                                       }
                                     ]
                                   }

@@ -16,6 +16,7 @@ import io.circe.syntax.*
 import lucuma.core.enums.Breakpoint
 import lucuma.core.enums.ExecutionState
 import lucuma.core.enums.Instrument
+import lucuma.core.enums.ObservationValidationCode
 import lucuma.core.enums.ObserveClass
 import lucuma.core.math.Offset
 import lucuma.core.math.Wavelength
@@ -35,8 +36,8 @@ import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepDigest
 import lucuma.core.model.sequence.StepDigests
 import lucuma.core.model.sequence.StepEstimate
+import lucuma.core.model.sequence.StepViolation
 import lucuma.core.model.sequence.TelescopeConfig
-import lucuma.core.model.sequence.exposure.ExposureTimeViolation
 import lucuma.core.util.TimeSpan
 
 import scala.collection.immutable.SortedSet
@@ -134,18 +135,18 @@ trait SequenceCodec {
         "science" -> a.observing.asJson
       )
 
-  given Decoder[ExposureTimeViolation] =
+  given Decoder[StepViolation] =
     Decoder.instance: c =>
       for
-        v <- c.downField("severity").as[ExposureTimeViolation.Severity]
-        d <- c.downField("description").as[String]
-      yield ExposureTimeViolation(v, d)
+        d <- c.downField("code").as[ObservationValidationCode]
+        m <- c.downField("message").as[String]
+      yield StepViolation(d, m)
 
-  given Encoder[ExposureTimeViolation] =
-    Encoder.instance: (a: ExposureTimeViolation) =>
+  given Encoder[StepViolation] =
+    Encoder.instance: (a: StepViolation) =>
       Json.obj(
-        "severity"    -> a.severity.asJson,
-        "description" -> a.description.asJson
+        "code"    -> a.code.asJson,
+        "message" -> a.message.asJson
       )
 
   given Decoder[SequenceDigest] =
@@ -160,7 +161,7 @@ trait SequenceCodec {
         g  <- c.downField("gcalSets").as[Option[NonNegInt]].map(_.getOrElse(NonNegInt.MinValue))
         s  <- c.downField("steps").as[Option[StepDigests]].map(_.getOrElse(StepDigests.Zero.copy(observing = StepDigest(NonNegInt.MinValue, t))))
         e  <- c.downField("executionState").as[ExecutionState]
-        v  <- c.downField("exposureTimeViolations").as[Option[List[ExposureTimeViolation]]].map(_.fold(SortedSet.empty[ExposureTimeViolation])(SortedSet.from))
+        v  <- c.downField("stepViolations").as[Option[List[StepViolation]]].map(_.fold(SortedSet.empty[StepViolation])(SortedSet.from))
       yield SequenceDigest(o, t, tc, n, g, s, e, v)
 
   given (using Encoder[Offset], Encoder[TimeSpan]): Encoder[SequenceDigest] =
@@ -173,7 +174,7 @@ trait SequenceCodec {
         "gcalSets"         -> a.gcalSets.asJson,
         "steps"                  -> a.steps.asJson,
         "executionState"         -> a.executionState.asJson,
-        "exposureTimeViolations" -> a.exposureTimeViolations.toList.asJson
+        "stepViolations"         -> a.stepViolations.toList.asJson
       )
 
   given Decoder[CalibrationEstimate] =

@@ -607,5 +607,44 @@ class setObservationWorkflowState
       ) >>
       testTransitionsAs(pi, pid, oid, Defined, Inactive, Ready)
 
+  // sc-10811 GMOS spectroscopy reaching past twice the shortest wavelength
+  // reaching the grating is a dismissable second order overlap warning.  With
+  // no filter and R831 at 700 nm the coverage reaches 817.5 nm, past 720 nm.
+  val createPhaseTwoObservationWithSecondOrderOverlap: IO[(Program.Id, Observation.Id)] =
+    for
+      cfp <- createGeminiCallForProposalsAs(staff)
+      pid <- createProgramWithNonPartnerPi(pi, "Foo")
+      _   <- addProposal(pi, pid, Some(cfp), None)
+      _   <- addPartnerSplits(pi, pid)
+      _   <- addCoisAs(pi, pid)
+      tid <- createTargetWithProfileAs(pi, pid)
+      oid <- createObservationWithModeAs(pi, pid, List(tid),
+               """
+                 gmosNorthLongSlit: {
+                   grating: R831_G5302
+                   fpu: LONG_SLIT_1_00
+                   centralWavelength: { nanometers: 700 }
+                   explicitXBin: TWO
+                   explicitYBin: TWO
+                 }
+               """
+             )
+      _   <- createConfigurationRequestAs(pi, oid).flatMap(setConfigurationRequestStatusAs(staff, _, ConfigurationRequestStatus.Approved))
+      _   <- computeItcResultAs(pi, oid)
+      _   <- setProposalStatus(staff, pid, "ACCEPTED")
+      _   <- runObscalcUpdateAs(serviceUser, pid, oid)
+    yield (pid, oid)
+
+  test("[2nd Order]   Defined   <-> Inactive (pi)"):
+    createPhaseTwoObservationWithSecondOrderOverlap.flatMap: (pid, oid) =>
+      assertIO(queryObservationWorkflowState(oid), Defined) >>
+      testTransitionsAs(pi, pid, oid, Defined, Inactive)
+
+  test("[2nd Order]   Defined   <-> Inactive, Ready (pi, warning dismissed by staff)"):
+    createPhaseTwoObservationWithSecondOrderOverlap.flatMap: (pid, oid) =>
+      assertIO(queryObservationWorkflowState(oid), Defined) >>
+      setDismissedWarnings(pid, "SECOND_ORDER_OVERLAP") >>
+      testTransitionsAs(pi, pid, oid, Defined, Inactive, Ready)
+
 
 }

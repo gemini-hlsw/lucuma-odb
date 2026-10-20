@@ -7,7 +7,7 @@ import cats.syntax.monoid.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.SequenceDigest
-import lucuma.core.model.sequence.exposure.ExposureTimeViolation
+import lucuma.core.model.sequence.StepCheck
 import lucuma.core.model.sequence.exposure.PendingExposureRules
 
 trait ToSequenceDigestOps:
@@ -15,10 +15,10 @@ trait ToSequenceDigestOps:
   extension (self: SequenceDigest)
 
     /**
-     * Adds an atom to the digest, checking the exposure times of its steps
-     * (see `ExposureTimeViolation.check`) as it goes.
+     * Adds an atom to the digest, checking its steps (see `StepCheck`) as it
+     * goes.
      */
-    def add[D: PendingExposureRules](a: Atom[D], ctx: PendingExposureRules.Context): SequenceDigest =
+    def add[D: StepCheck](a: Atom[D], ctx: PendingExposureRules.Context): SequenceDigest =
       SequenceDigest(
         observeClass           = self.observeClass |+| a.observeClass,
         timeEstimate           = self.timeEstimate |+| a.timeEstimate,
@@ -29,8 +29,8 @@ trait ToSequenceDigestOps:
           else self.gcalSets,
         steps                  = a.steps.toList.foldLeft(self.steps)(_.add(_)),
         executionState         = self.executionState,
-        exposureTimeViolations =
-          self.exposureTimeViolations ++ a.steps.toList.flatMap(ExposureTimeViolation.check(_, ctx))
+        stepViolations         =
+          self.stepViolations ++ a.steps.toList.flatMap(StepCheck[D].violations(_, ctx))
       )
 
 object sequencedigest extends ToSequenceDigestOps

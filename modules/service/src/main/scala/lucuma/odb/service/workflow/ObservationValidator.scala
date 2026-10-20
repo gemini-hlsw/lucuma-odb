@@ -80,13 +80,13 @@ object ObservationValidator:
       OtherConfigErrorValidator                |+|
       ConditionsProbabilityValidator
 
-    // Checks downstream of the ITC.  The exposure times checked come from the
-    // sequence, which is generated from the ITC result.
+    // Checks downstream of the ITC.  The steps checked come from the sequence,
+    // which is generated from the ITC result.
     val scienceValidator2: ObservationValidator =
       ItcValidator(itcFor)                     |+|
       AcquisitionValidator(itcFor)             |+|
       TotalSignalToNoiseValidator(itcFor)      |+|
-      ExposureTimeValidator
+      StepViolationValidator
 
     // And our validation results
 

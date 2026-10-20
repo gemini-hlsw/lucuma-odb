@@ -38,6 +38,7 @@ import lucuma.core.model.sequence.ExecutionSequence
 import lucuma.core.model.sequence.InstrumentExecutionConfig
 import lucuma.core.model.sequence.SequenceDigest
 import lucuma.core.model.sequence.SetupTime
+import lucuma.core.model.sequence.StepCheck
 import lucuma.core.model.sequence.StepDigest
 import lucuma.core.model.sequence.StepDigests
 import lucuma.core.model.sequence.exposure.PendingExposureRules
@@ -319,10 +320,10 @@ object Generator:
         ctx: GeneratorContext
       )(using Transaction[F]): EitherT[F, OdbError, ExecutionDigest] =
 
-        // Exposure times are checked in the same pass over the steps.
+        // Steps are checked (see StepCheck) in the same pass over them.
         val exposure = PendingExposureRules.Context(ctx.constraints)
 
-        def digest[S, D: PendingExposureRules](
+        def digest[S, D: StepCheck](
           stream:    StreamingExecutionConfig[F, S, D],
           estimator: SetupTimeEstimateCalculator
         ): EitherT[F, OdbError, ExecutionDigest] =
