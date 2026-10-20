@@ -29,7 +29,6 @@ import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig as F2
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
 import lucuma.core.optics.syntax.lens.*
-import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.*
@@ -61,8 +60,6 @@ object Science:
    * The name of the nighttime cal atoms.
    */
   val NighttimeCalTitle: NonEmptyString = NonEmptyString.unsafeFrom("Nighttime Calibrations")
-
-  private val Interval: TimeSpan = CalibrationSetInterval.ShortWavelength
 
   case class StepDefinition(
     a0:   ProtoStep[F2],
@@ -177,9 +174,6 @@ object Science:
 
   end Generator
 
-  private def exposureTimeTooLong(oid: Observation.Id, estimate: TimeSpan): OdbError =
-    definitionError(oid, s"Estimated ABBA cycle time (${estimate.toRoundedMinutes} minutes) for $oid must be less than ${Interval.toRoundedMinutes} minutes.")
-
   /**
    * @param modeName observing mode name, for error messages
    */
@@ -199,15 +193,9 @@ object Science:
       EitherT.fromEither:
         time.filterOrElse(_.exposureTime.toNonNegMicroseconds.value > 0, zeroExposureTime(observationId, modeName))
 
-    def checkCycle(steps: StepDefinition): EitherT[F, OdbError, Unit] =
-      val estimate = StepTimeEstimateCalculator.runEmpty(estimator.estimateTotalNel(static, steps.abbaCycle))
-      EitherT.fromEither:
-        Either.cond(estimate < Interval, (), exposureTimeTooLong(observationId, estimate))
-
     val gen = for
       t <- posTime
       s <- StepDefinition.compute(modeName, config, t, static, expander, calRole).leftMap(m => definitionError(observationId, m))
-      _ <- checkCycle(s)
       c <- EitherT.fromEither(s.cycleCount(t).leftMap(m => definitionError(observationId, m)))
     yield Generator(
       s,
