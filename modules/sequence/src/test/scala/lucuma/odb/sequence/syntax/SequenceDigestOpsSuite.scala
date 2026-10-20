@@ -16,6 +16,7 @@ import lucuma.core.model.arb.ArbConstraintSet.given
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.SequenceDigest
 import lucuma.core.model.sequence.Step
+import lucuma.core.model.sequence.StepCheck
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepDigest
 import lucuma.core.model.sequence.StepViolation
@@ -26,10 +27,9 @@ import lucuma.core.model.sequence.exposure.ExposureRules
 import lucuma.core.model.sequence.exposure.PendingExposureRules
 import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.model.sequence.gmos.GmosGratingConfig
+import lucuma.core.model.sequence.gmos.SecondOrderOverlap
 import lucuma.core.model.sequence.gmos.arb.ArbDynamicConfig.given
 import lucuma.core.util.TimeSpan
-import lucuma.odb.sequence.StepCheck
-import lucuma.odb.sequence.gmos.SecondOrderOverlap
 import munit.ScalaCheckSuite
 import org.scalacheck.Arbitrary
 import org.scalacheck.Prop.forAll

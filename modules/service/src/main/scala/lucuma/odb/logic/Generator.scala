@@ -38,6 +38,7 @@ import lucuma.core.model.sequence.ExecutionSequence
 import lucuma.core.model.sequence.InstrumentExecutionConfig
 import lucuma.core.model.sequence.SequenceDigest
 import lucuma.core.model.sequence.SetupTime
+import lucuma.core.model.sequence.StepCheck
 import lucuma.core.model.sequence.StepDigest
 import lucuma.core.model.sequence.StepDigests
 import lucuma.core.model.sequence.exposure.PendingExposureRules
@@ -49,7 +50,6 @@ import lucuma.odb.data.ItcAcquisition
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.ObservingMode.Syntax.*
 import lucuma.odb.sequence.SetupTimeEstimateCalculator
-import lucuma.odb.sequence.StepCheck
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.ItcInput
 import lucuma.odb.sequence.data.StreamingExecutionConfig

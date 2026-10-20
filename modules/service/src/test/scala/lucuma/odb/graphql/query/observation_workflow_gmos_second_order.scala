@@ -27,8 +27,8 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.sequence.StepViolation
+import lucuma.core.model.sequence.gmos.SecondOrderOverlap
 import lucuma.odb.graphql.mutation.ReplaceGmosNorthSequenceOps
-import lucuma.odb.sequence.gmos.SecondOrderOverlap
 import lucuma.odb.service.Services
 import lucuma.odb.service.workflow.validator.StepViolationValidator
 import lucuma.odb.smartgcal.data.Gmos

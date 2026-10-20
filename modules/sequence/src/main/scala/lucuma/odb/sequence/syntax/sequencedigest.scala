@@ -7,8 +7,8 @@ import cats.syntax.monoid.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.SequenceDigest
+import lucuma.core.model.sequence.StepCheck
 import lucuma.core.model.sequence.exposure.PendingExposureRules
-import lucuma.odb.sequence.StepCheck
 
 trait ToSequenceDigestOps:
 
