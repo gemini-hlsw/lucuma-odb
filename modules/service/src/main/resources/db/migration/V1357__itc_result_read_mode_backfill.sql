@@ -6,7 +6,7 @@
 
 -- Adds the read mode under `key` to every ITC result in `j` (an object carrying an
 -- `exposureTime`) that has no read mode field yet, recursing through the result sets.
-CREATE OR REPLACE FUNCTION itc_backfill_read_mode(j jsonb, key text, rule text)
+CREATE OR REPLACE FUNCTION itc_backfill_read_mode(j jsonb, key text, rule text, imaging_default text)
   RETURNS jsonb AS $$
 DECLARE
   us   bigint;
@@ -28,18 +28,18 @@ BEGIN
                  WHEN us >= 21000000 THEN 'MEDIUM'
                  ELSE                     'BRIGHT'
             END
-          WHEN 'f2_imaging' THEN 'BRIGHT'
+          WHEN 'f2_imaging' THEN imaging_default
         END;
         RETURN j || jsonb_build_object(key, mode);
       ELSE
         RETURN (
-          SELECT COALESCE(jsonb_object_agg(e.k, itc_backfill_read_mode(e.v, key, rule)), '{}'::jsonb)
+          SELECT COALESCE(jsonb_object_agg(e.k, itc_backfill_read_mode(e.v, key, rule, imaging_default)), '{}'::jsonb)
             FROM jsonb_each(j) AS e(k, v)
         );
       END IF;
     WHEN 'array' THEN
       RETURN (
-        SELECT COALESCE(jsonb_agg(itc_backfill_read_mode(a.e, key, rule)), '[]'::jsonb)
+        SELECT COALESCE(jsonb_agg(itc_backfill_read_mode(a.e, key, rule, imaging_default)), '[]'::jsonb)
           FROM jsonb_array_elements(j) AS a(e)
       );
     ELSE
@@ -48,12 +48,14 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql IMMUTABLE STRICT;
 
--- The rule per observing mode. Imaging science took the (Bright) default read mode of
--- the configuration rather than deriving it; an explicit read mode overrides either way.
+-- The rule per observing mode. Flamingos 2 imaging science took the configuration's
+-- default read mode rather than deriving it (V1356 left executing observations on their
+-- old default); an explicit read mode overrides either way.
 UPDATE t_itc_result r SET
-  c_science_results     = itc_backfill_read_mode(r.c_science_results,     k.key, k.science_rule),
-  c_acquisition_results = itc_backfill_read_mode(r.c_acquisition_results, k.key, k.acquisition_rule)
+  c_science_results     = itc_backfill_read_mode(r.c_science_results,     k.key, k.science_rule,     COALESCE(upper(i.c_read_mode_default), '')),
+  c_acquisition_results = itc_backfill_read_mode(r.c_acquisition_results, k.key, k.acquisition_rule, COALESCE(upper(i.c_read_mode_default), ''))
 FROM t_observation o
+LEFT JOIN t_flamingos_2_imaging i ON i.c_observation_id = o.c_observation_id
 JOIN (VALUES
   ('gnirs_long_slit',       'gnirsReadMode',      'gnirs',           'gnirs'),
   ('gnirs_ifu',             'gnirsReadMode',      'gnirs',           'gnirs'),
@@ -66,4 +68,4 @@ WHERE r.c_is_frozen
   AND r.c_program_id     = o.c_program_id
   AND r.c_observation_id = o.c_observation_id;
 
-DROP FUNCTION itc_backfill_read_mode(jsonb, text, text);
+DROP FUNCTION itc_backfill_read_mode(jsonb, text, text, text);

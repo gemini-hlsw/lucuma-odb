@@ -34,7 +34,7 @@ import lucuma.itc.GraphType
 import lucuma.itc.ItcGhostDetector
 import lucuma.itc.ItcGraph
 import lucuma.itc.ItcGraphGroup
-import lucuma.itc.ItcReadMode
+import lucuma.itc.ItcResultReadMode
 import lucuma.itc.ItcSeries
 import lucuma.itc.ItcXAxis
 import lucuma.itc.SeriesDataType
@@ -662,12 +662,12 @@ private[legacy] object codecs:
             .toRight(DecodingFailure("Invalid SignalToNoise value", c.history))
 
   // The legacy ITC names the read mode by its enum constant, the tag the request carries.
-  given Decoder[ItcReadMode] = Decoder[String].emap: tag =>
+  given Decoder[ItcResultReadMode] = Decoder[String].emap: tag =>
     Enumerated[GnirsReadMode].all
       .find(_.ocs2Tag === tag)
-      .map(ItcReadMode.Gnirs.apply)
+      .map(ItcResultReadMode.Gnirs.apply)
       .orElse(
-        Enumerated[Flamingos2ReadMode].all.find(_.ocs2Tag === tag).map(ItcReadMode.Flamingos2.apply)
+        Enumerated[Flamingos2ReadMode].all.find(_.ocs2Tag === tag).map(ItcResultReadMode.Flamingos2.apply)
       )
       .toRight(s"Unknown read mode: $tag")
 
@@ -688,7 +688,7 @@ private[legacy] object codecs:
           .flatMap:
             refineV[Positive](_)
               .leftMap(e => DecodingFailure(e, c.downField("coadds").history))
-      rm     <- c.downField("readMode").as[Option[ItcReadMode]]
+      rm     <- c.downField("readMode").as[Option[ItcResultReadMode]]
     yield ExposureCalculation(time, count, coadds, rm)
 
   given Decoder[AllExposureCalculations] = (c: HCursor) =>

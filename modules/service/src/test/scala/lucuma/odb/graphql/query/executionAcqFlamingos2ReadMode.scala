@@ -18,7 +18,7 @@ import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
-import lucuma.itc.ItcReadMode
+import lucuma.itc.ItcResultReadMode
 import lucuma.itc.client.ImagingInput
 import lucuma.odb.sequence.flamingos2.longslit.Acquisition.RepeatingAtomCount
 
@@ -32,7 +32,7 @@ class executionAcqFlamingos2ReadMode extends ExecutionTestSupportForFlamingos2:
   override def fakeItcImagingResultFor(input: ImagingInput): Option[IntegrationTime] =
     input.mode.exposureTimeMode match
       case ExposureTimeMode.TimeAndCountMode(t, c, _) => IntegrationTime(t, c).some
-      case _                                          => IntegrationTime(ExposureTime, PosInt.unsafeFrom(1), readMode = ItcReadMode.Flamingos2(ItcChoice).some).some
+      case _                                          => IntegrationTime(ExposureTime, PosInt.unsafeFrom(1), readMode = ItcResultReadMode.Flamingos2(ItcChoice).some).some
 
   val AcqImage: Flamingos2DynamicConfig =
     Flamingos2AcqImage.copy(readMode = ItcChoice, reads = ItcChoice.readCount)

@@ -15,7 +15,7 @@ import lucuma.core.model.Observation
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
-import lucuma.itc.ItcReadMode
+import lucuma.itc.ItcResultReadMode
 
 // In S/N mode the science steps take the read mode the ITC chose: Faint here, where 20s
 // would derive Bright.
@@ -24,7 +24,7 @@ class executionSciFlamingos2ReadMode extends ExecutionTestSupportForFlamingos2:
   val ItcChoice:    Flamingos2ReadMode = Flamingos2ReadMode.Faint
 
   override def fakeItcSpectroscopyResult: IntegrationTime =
-    IntegrationTime(ExposureTime, PosInt.unsafeFrom(4), readMode = ItcReadMode.Flamingos2(ItcChoice).some)
+    IntegrationTime(ExposureTime, PosInt.unsafeFrom(4), readMode = ItcResultReadMode.Flamingos2(ItcChoice).some)
 
   test("science steps take the read mode the ITC chose"):
     val setup: IO[Observation.Id] =

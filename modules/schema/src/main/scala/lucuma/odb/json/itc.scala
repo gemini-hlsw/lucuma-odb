@@ -30,7 +30,7 @@ import lucuma.core.model.Target
 import lucuma.core.util.Enumerated
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
-import lucuma.itc.ItcReadMode
+import lucuma.itc.ItcResultReadMode
 import lucuma.itc.SignalToNoiseAt
 import lucuma.odb.data.Itc
 import lucuma.odb.data.ItcAcquisition
@@ -84,7 +84,7 @@ trait ItcCodec:
         peakPixel       <- c.downField("peakPixel").as[Option[ItcPeakPixel]]
       yield ItcResult(
         targetId,
-        IntegrationTime(exposureTime, frameCount, coadds, ItcReadMode.fromFields(gnirsReadMode, f2ReadMode)),
+        IntegrationTime(exposureTime, frameCount, coadds, ItcResultReadMode.fromFields(gnirsReadMode, f2ReadMode)),
         signalToNoiseAt,
         peakPixel
       )

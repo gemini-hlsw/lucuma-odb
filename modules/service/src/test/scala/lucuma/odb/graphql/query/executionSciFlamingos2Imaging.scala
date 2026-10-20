@@ -22,7 +22,7 @@ import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
-import lucuma.itc.ItcReadMode
+import lucuma.itc.ItcResultReadMode
 import lucuma.itc.client.ImagingInput
 import lucuma.itc.client.InstrumentMode
 import lucuma.refined.*
@@ -33,8 +33,8 @@ class executionSciFlamingos2Imaging extends ExecutionTestSupportForFlamingos2:
   // default, so a step can only have it from the ITC.
   private val ReadModeY = Flamingos2ReadMode.Faint
   private val ReadModeJ = Flamingos2ReadMode.Medium
-  private val TimeY     = IntegrationTime(10.secondTimeSpan, 2.refined, readMode = ItcReadMode.Flamingos2(ReadModeY).some)
-  private val TimeJ     = IntegrationTime(20.secondTimeSpan, 3.refined, readMode = ItcReadMode.Flamingos2(ReadModeJ).some)
+  private val TimeY     = IntegrationTime(10.secondTimeSpan, 2.refined, readMode = ItcResultReadMode.Flamingos2(ReadModeY).some)
+  private val TimeJ     = IntegrationTime(20.secondTimeSpan, 3.refined, readMode = ItcResultReadMode.Flamingos2(ReadModeJ).some)
 
   private def itcReadMode(filter: Flamingos2Filter): Flamingos2ReadMode =
     filter match

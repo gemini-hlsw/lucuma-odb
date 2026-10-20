@@ -20,7 +20,7 @@ import lucuma.core.syntax.string.*
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
-import lucuma.itc.ItcReadMode
+import lucuma.itc.ItcResultReadMode
 import lucuma.itc.client.SpectroscopyInput
 import lucuma.odb.graphql.ACursorOps
 
@@ -43,7 +43,7 @@ class executionSciGnirsLongSlit extends ExecutionTestSupportForGnirs:
   override def fakeItcSpectroscopyResultFor(input: SpectroscopyInput): Option[IntegrationTime] =
     input.mode.exposureTimeMode match
       case ExposureTimeMode.SignalToNoiseMode(_, _)   =>
-        Some(IntegrationTime(ExposureTime, PosInt.unsafeFrom(3), SignalToNoiseCoadds, ItcReadMode.Gnirs(SignalToNoiseReadMode).some))
+        Some(IntegrationTime(ExposureTime, PosInt.unsafeFrom(3), SignalToNoiseCoadds, ItcResultReadMode.Gnirs(SignalToNoiseReadMode).some))
       case ExposureTimeMode.TimeAndCountMode(_, _, _) => None
 
   // Default GNIRS observation:

@@ -43,7 +43,7 @@ import lucuma.core.model.sequence.gnirs.GnirsStaticConfig
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
-import lucuma.itc.ItcReadMode
+import lucuma.itc.ItcResultReadMode
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.ProtoStep
 import munit.FunSuite
@@ -117,7 +117,7 @@ class ScienceCadenceSuite extends FunSuite:
 
   // The ITC reports the read mode it computed with; the exposure time rule stands in for it.
   private def integrationTime(exposureTime: TimeSpan, frameCount: Int): IntegrationTime =
-    IntegrationTime(exposureTime, PosInt.unsafeFrom(frameCount), readMode = ItcReadMode.Gnirs(GnirsReadMode.forExposureTime(exposureTime)).some)
+    IntegrationTime(exposureTime, PosInt.unsafeFrom(frameCount), readMode = ItcResultReadMode.Gnirs(GnirsReadMode.forExposureTime(exposureTime)).some)
 
   private def generate(cycles: Int, ws: Wavelength*): Either[OdbError, List[Atom[GnirsDynamicConfig]]] =
     instantiate(NonEmptyList.fromListUnsafe(ws.toList).map(w => w -> integrationTime(ExposureTime, cycles * 4)))

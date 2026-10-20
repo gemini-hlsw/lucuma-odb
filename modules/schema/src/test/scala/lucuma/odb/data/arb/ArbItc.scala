@@ -28,7 +28,7 @@ import lucuma.core.util.arb.ArbEnumerated
 import lucuma.core.util.arb.ArbGid
 import lucuma.core.util.arb.ArbTimeSpan
 import lucuma.itc.IntegrationTime
-import lucuma.itc.ItcReadMode
+import lucuma.itc.ItcResultReadMode
 import lucuma.itc.SignalToNoiseAt
 import org.scalacheck.*
 import org.scalacheck.Arbitrary.arbitrary
@@ -43,14 +43,14 @@ trait ArbItc:
   import ArbZipper.given
 
   // This may exist elsewhere but I couldn't find it.
-  given Arbitrary[ItcReadMode] =
+  given Arbitrary[ItcResultReadMode] =
     Arbitrary:
       Gen.oneOf(
-        arbitrary[GnirsReadMode].map(ItcReadMode.Gnirs.apply),
-        arbitrary[Flamingos2ReadMode].map(ItcReadMode.Flamingos2.apply)
+        arbitrary[GnirsReadMode].map(ItcResultReadMode.Gnirs.apply),
+        arbitrary[Flamingos2ReadMode].map(ItcResultReadMode.Flamingos2.apply)
       )
 
-  given Cogen[ItcReadMode] =
+  given Cogen[ItcResultReadMode] =
     Cogen[String].contramap(_.toString)
 
   given Arbitrary[IntegrationTime] =
@@ -59,11 +59,11 @@ trait ArbItc:
         t <- arbitrary[TimeSpan]
         c <- arbitrary[PosInt]
         k <- arbitrary[PosInt]
-        r <- arbitrary[Option[ItcReadMode]]
+        r <- arbitrary[Option[ItcResultReadMode]]
       yield IntegrationTime(t, c, k, r)
 
   given Cogen[IntegrationTime] =
-    Cogen[(TimeSpan, PosInt, PosInt, Option[ItcReadMode])].contramap: a =>
+    Cogen[(TimeSpan, PosInt, PosInt, Option[ItcResultReadMode])].contramap: a =>
       (a.exposureTime, a.frameCount, a.coadds, a.readMode)
 
   // This may exist elsewhere but I couldn't find it.

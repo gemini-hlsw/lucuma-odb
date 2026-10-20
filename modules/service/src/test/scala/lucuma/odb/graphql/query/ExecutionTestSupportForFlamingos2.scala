@@ -187,16 +187,18 @@ trait ExecutionTestSupportForFlamingos2 extends ExecutionTestSupport:
   def flamingos2Science(exposureTime: TimeSpan): Flamingos2DynamicConfig =
     flamingos2Science(exposureTime, Flamingos2ReadMode.forExposureTime(exposureTime))
 
-  val Flamingos2Science: Flamingos2DynamicConfig =
+  // Lazy: `fakeItcSpectroscopyResult` is overridden by suites whose own values are not yet
+  // initialised while this trait is.
+  lazy val Flamingos2Science: Flamingos2DynamicConfig =
     flamingos2Science(fakeItcSpectroscopyResult.exposureTime)
 
-  val Flamingos2Arc: Flamingos2DynamicConfig =
+  lazy val Flamingos2Arc: Flamingos2DynamicConfig =
     flamingos2Science(f2_arc_JH1.instrumentConfig.exposureTime)
 
-  val Flamingos2Flat: Flamingos2DynamicConfig =
+  lazy val Flamingos2Flat: Flamingos2DynamicConfig =
     flamingos2Science(f2_flat_JH1.instrumentConfig.exposureTime)
 
-  val Flamingos2AcqImage: Flamingos2DynamicConfig =
+  lazy val Flamingos2AcqImage: Flamingos2DynamicConfig =
     Flamingos2Science.copy(
       disperser = none,
       filter    = Flamingos2Filter.J,
@@ -204,7 +206,7 @@ trait ExecutionTestSupportForFlamingos2 extends ExecutionTestSupport:
       decker    = Flamingos2Decker.Imaging
     )
 
-  val Flamingos2AcqSlit: Flamingos2DynamicConfig =
+  lazy val Flamingos2AcqSlit: Flamingos2DynamicConfig =
     Flamingos2AcqImage.copy(
       fpu       = Flamingos2FpuMask.Builtin(Flamingos2Fpu.LongSlit1),
       decker    = Flamingos2Decker.LongSlit

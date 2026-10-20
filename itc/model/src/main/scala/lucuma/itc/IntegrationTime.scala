@@ -25,15 +25,15 @@ case class IntegrationTime(
   exposureTime: TimeSpan,
   frameCount:   PosInt,
   coadds:       PosInt = PosInt.unsafeFrom(1),
-  readMode:     Option[ItcReadMode] = None
+  readMode:     Option[ItcResultReadMode] = None
 ):
   def gnirsReadMode: Option[GnirsReadMode] =
     readMode.collect:
-      case ItcReadMode.Gnirs(readMode = r) => r
+      case ItcResultReadMode.Gnirs(readMode = r) => r
 
   def flamingos2ReadMode: Option[Flamingos2ReadMode] =
     readMode.collect:
-      case ItcReadMode.Flamingos2(readMode = r) => r
+      case ItcResultReadMode.Flamingos2(readMode = r) => r
 
   /**
    * Single exposures over the whole result: every frame's coadds. Saturates rather than

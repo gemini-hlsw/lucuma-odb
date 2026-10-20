@@ -12,14 +12,14 @@ import lucuma.core.enums.GnirsReadMode
  * The detector read mode an ITC result was computed with, for the instruments whose recipe selects
  * one: chosen by the ITC in signal-to-noise mode, the requested one in time-and-count mode.
  */
-enum ItcReadMode derives Eq:
+enum ItcResultReadMode derives Eq:
   case Gnirs(readMode: GnirsReadMode)
   case Flamingos2(readMode: Flamingos2ReadMode)
 
-object ItcReadMode:
+object ItcResultReadMode:
   // From the per-instrument fields of the JSON encoding, at most one of which is set.
   def fromFields(
     gnirs:      Option[GnirsReadMode],
     flamingos2: Option[Flamingos2ReadMode]
-  ): Option[ItcReadMode] =
+  ): Option[ItcResultReadMode] =
     gnirs.map(Gnirs.apply).orElse(flamingos2.map(Flamingos2.apply))

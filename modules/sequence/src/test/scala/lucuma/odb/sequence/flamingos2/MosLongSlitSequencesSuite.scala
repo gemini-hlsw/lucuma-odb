@@ -40,7 +40,7 @@ import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
-import lucuma.itc.ItcReadMode
+import lucuma.itc.ItcResultReadMode
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.SmartGcalExpander
 import lucuma.odb.sequence.StepTimeEstimateCalculator
@@ -133,7 +133,7 @@ class MosLongSlitSequencesSuite extends FunSuite:
         StepEstimate.fromMax(List(ConfigChangeEstimate("test", "test", next.value.exposure)), Nil)
 
   private def itc(cycles: Int): Either[OdbError, IntegrationTime] =
-    IntegrationTime(ExposureTime, PosInt.unsafeFrom(cycles * 4), readMode = ItcReadMode.Flamingos2(Flamingos2ReadMode.forExposureTime(ExposureTime)).some).asRight
+    IntegrationTime(ExposureTime, PosInt.unsafeFrom(cycles * 4), readMode = ItcResultReadMode.Flamingos2(Flamingos2ReadMode.forExposureTime(ExposureTime)).some).asRight
 
   private def science(
     gen: Eval[Either[OdbError, StreamingExecutionConfig[Pure, Flamingos2StaticConfig, Flamingos2DynamicConfig]]]

@@ -21,7 +21,7 @@ import lucuma.core.model.ExposureTimeMode
 import lucuma.core.util.TimeSpan
 import lucuma.itc.AsterismIntegrationTimeOutcomes
 import lucuma.itc.IntegrationTime
-import lucuma.itc.ItcReadMode
+import lucuma.itc.ItcResultReadMode
 import lucuma.itc.ItcVersions
 import lucuma.itc.SignalToNoiseAt
 import lucuma.itc.TargetIntegrationTime
@@ -49,21 +49,21 @@ object TestItcClient {
   // OCS echoes the requested read mode back in time-and-count mode and selects its own in
   // S/N mode; the fake stands in for that selection with the exposure time rule, unless the
   // test's result already carries one.
-  private def fakeReadMode(mode: InstrumentMode, exposureTime: TimeSpan): Option[ItcReadMode] =
+  private def fakeReadMode(mode: InstrumentMode, exposureTime: TimeSpan): Option[ItcResultReadMode] =
     mode.exposureTimeMode match
       case ExposureTimeMode.TimeAndCountMode(_, _, _) =>
         mode match
-          case InstrumentMode.GnirsSpectroscopy(readMode = r)      => ItcReadMode.Gnirs(r).some
-          case InstrumentMode.GnirsImaging(readMode = r)           => ItcReadMode.Gnirs(r).some
-          case InstrumentMode.Flamingos2Spectroscopy(readMode = r) => ItcReadMode.Flamingos2(r).some
-          case InstrumentMode.Flamingos2Imaging(readMode = r)      => ItcReadMode.Flamingos2(r).some
+          case InstrumentMode.GnirsSpectroscopy(readMode = r)      => ItcResultReadMode.Gnirs(r).some
+          case InstrumentMode.GnirsImaging(readMode = r)           => ItcResultReadMode.Gnirs(r).some
+          case InstrumentMode.Flamingos2Spectroscopy(readMode = r) => ItcResultReadMode.Flamingos2(r).some
+          case InstrumentMode.Flamingos2Imaging(readMode = r)      => ItcResultReadMode.Flamingos2(r).some
           case _                                                   => None
       case ExposureTimeMode.SignalToNoiseMode(_, _)   =>
         mode match
           case InstrumentMode.GnirsSpectroscopy(readMode = _) | InstrumentMode.GnirsImaging(readMode = _)           =>
-            ItcReadMode.Gnirs(GnirsReadMode.forExposureTime(exposureTime)).some
+            ItcResultReadMode.Gnirs(GnirsReadMode.forExposureTime(exposureTime)).some
           case InstrumentMode.Flamingos2Spectroscopy(readMode = _) | InstrumentMode.Flamingos2Imaging(readMode = _) =>
-            ItcReadMode.Flamingos2(Flamingos2ReadMode.forExposureTime(exposureTime)).some
+            ItcResultReadMode.Flamingos2(Flamingos2ReadMode.forExposureTime(exposureTime)).some
           case _                                                                                                    =>
             None
 

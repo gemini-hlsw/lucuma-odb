@@ -49,7 +49,7 @@ import lucuma.itc.AltairParameters
 import lucuma.itc.AsterismIntegrationTimes
 import lucuma.itc.IntegrationTime
 import lucuma.itc.ItcGhostDetector
-import lucuma.itc.ItcReadMode
+import lucuma.itc.ItcResultReadMode
 import lucuma.itc.TargetIntegrationTime
 import lucuma.itc.client.ClientCalculationResult
 import lucuma.itc.client.ImagingInput
@@ -598,10 +598,10 @@ object ItcService {
         def go(imInput: ImagingInput, min: TimeSpan, max: TimeSpan): EitherT[F, OdbError, Zipper[ItcResult]] =
           // A target too bright for any exposure is imaged at the minimum, with the read
           // mode that exposure calls for.
-          val tooBrightReadMode: Option[ItcReadMode] =
+          val tooBrightReadMode: Option[ItcResultReadMode] =
             imInput.mode match
-              case InstrumentMode.GnirsImaging(filter = _)      => ItcReadMode.Gnirs(GnirsReadMode.forExposureTime(min)).some
-              case InstrumentMode.Flamingos2Imaging(filter = _) => ItcReadMode.Flamingos2(Flamingos2ReadMode.forExposureTime(min)).some
+              case InstrumentMode.GnirsImaging(filter = _)      => ItcResultReadMode.Gnirs(GnirsReadMode.forExposureTime(min)).some
+              case InstrumentMode.Flamingos2Imaging(filter = _) => ItcResultReadMode.Flamingos2(Flamingos2ReadMode.forExposureTime(min)).some
               case _                                            => none
           EitherT:
             client

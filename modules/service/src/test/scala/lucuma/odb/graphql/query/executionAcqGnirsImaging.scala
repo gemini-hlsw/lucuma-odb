@@ -18,7 +18,7 @@ import lucuma.core.syntax.string.*
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
-import lucuma.itc.ItcReadMode
+import lucuma.itc.ItcResultReadMode
 import lucuma.itc.client.ImagingInput
 import lucuma.itc.client.InstrumentMode
 import lucuma.odb.sequence.gnirs.imaging.Acquisition.RepeatingAtomCount
@@ -47,11 +47,11 @@ class executionAcqGnirsImaging extends ExecutionTestSupportForGnirs:
     input.mode match
       case InstrumentMode.GnirsImaging(exposureTimeMode = ExposureTimeMode.SignalToNoiseMode(_, _), filter = filter) =>
         filter match
-          case GnirsFilter.J      => IntegrationTime(2.secTimeSpan,  3.refined, readMode = ItcReadMode.Gnirs(GnirsReadMode.Faint).some).some
-          case GnirsFilter.K      => IntegrationTime(30.secTimeSpan, 1.refined, readMode = ItcReadMode.Gnirs(GnirsReadMode.VeryFaint).some).some
-          case GnirsFilter.Y      => IntegrationTime(300.msTimeSpan, 1.refined, readMode = ItcReadMode.Gnirs(GnirsReadMode.Bright).some).some
-          case GnirsFilter.H2     => IntegrationTime(2.secTimeSpan,  3.refined, readMode = ItcReadMode.Gnirs(GnirsReadMode.Faint).some).some
-          case GnirsFilter.Order4 => IntegrationTime(5.secTimeSpan,  1.refined, readMode = ItcReadMode.Gnirs(GnirsReadMode.Faint).some).some
+          case GnirsFilter.J      => IntegrationTime(2.secTimeSpan,  3.refined, readMode = ItcResultReadMode.Gnirs(GnirsReadMode.Faint).some).some
+          case GnirsFilter.K      => IntegrationTime(30.secTimeSpan, 1.refined, readMode = ItcResultReadMode.Gnirs(GnirsReadMode.VeryFaint).some).some
+          case GnirsFilter.Y      => IntegrationTime(300.msTimeSpan, 1.refined, readMode = ItcResultReadMode.Gnirs(GnirsReadMode.Bright).some).some
+          case GnirsFilter.H2     => IntegrationTime(2.secTimeSpan,  3.refined, readMode = ItcResultReadMode.Gnirs(GnirsReadMode.Faint).some).some
+          case GnirsFilter.Order4 => IntegrationTime(5.secTimeSpan,  1.refined, readMode = ItcResultReadMode.Gnirs(GnirsReadMode.Faint).some).some
           case _                  => none
       // Time-and-count echoes the user's request, as the real ITC does (OdbSuite adds
       // the requested read mode).

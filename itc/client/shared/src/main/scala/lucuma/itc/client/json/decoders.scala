@@ -22,7 +22,7 @@ import lucuma.itc.Error.given
 import lucuma.itc.IntegrationTime
 import lucuma.itc.ItcCcd
 import lucuma.itc.ItcGraph
-import lucuma.itc.ItcReadMode
+import lucuma.itc.ItcResultReadMode
 import lucuma.itc.ItcSeries
 import lucuma.itc.ItcWarning
 import lucuma.itc.SignalToNoiseAt
@@ -73,7 +73,7 @@ object decoders:
              .flatMap(k => PosInt.from(k).leftMap(m => DecodingFailure(m, c.history)))
       g <- c.downField("gnirsReadMode").as[Option[GnirsReadMode]]
       f <- c.downField("flamingos2ReadMode").as[Option[Flamingos2ReadMode]]
-    } yield IntegrationTime(t, n, k, ItcReadMode.fromFields(g, f))
+    } yield IntegrationTime(t, n, k, ItcResultReadMode.fromFields(g, f))
 
   given Decoder[SingleSN] = Decoder[SignalToNoise].map(SingleSN(_))
   given Decoder[TotalSN]  = Decoder[SignalToNoise].map(TotalSN(_))

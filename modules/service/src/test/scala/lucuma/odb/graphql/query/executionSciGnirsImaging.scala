@@ -18,7 +18,7 @@ import lucuma.core.syntax.string.*
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
-import lucuma.itc.ItcReadMode
+import lucuma.itc.ItcResultReadMode
 import lucuma.itc.client.ImagingInput
 import lucuma.itc.client.InstrumentMode
 import lucuma.refined.*
@@ -30,8 +30,8 @@ class executionSciGnirsImaging extends ExecutionTestSupportForGnirs:
   // the ITC.
   private val ReadModeJ = GnirsReadMode.Faint
   private val ReadModeH = GnirsReadMode.VeryFaint
-  private val TimeJ     = IntegrationTime(10.secondTimeSpan, 2.refined, readMode = ItcReadMode.Gnirs(ReadModeJ).some)
-  private val TimeH     = IntegrationTime(25.secondTimeSpan, 3.refined, readMode = ItcReadMode.Gnirs(ReadModeH).some)
+  private val TimeJ     = IntegrationTime(10.secondTimeSpan, 2.refined, readMode = ItcResultReadMode.Gnirs(ReadModeJ).some)
+  private val TimeH     = IntegrationTime(25.secondTimeSpan, 3.refined, readMode = ItcResultReadMode.Gnirs(ReadModeH).some)
 
   private def itcReadMode(filter: GnirsFilter): GnirsReadMode =
     filter match

@@ -94,12 +94,12 @@ given Pickler[ItcCcd]                  = generatePickler
 given Pickler[TotalSN]                 = transformPickler((s: SignalToNoise) => TotalSN(s))(_.value)
 given Pickler[SingleSN]                = transformPickler((s: SignalToNoise) => SingleSN(s))(_.value)
 given Pickler[SignalToNoiseAt]         = generatePickler
-given Pickler[ItcReadMode.Gnirs]       = generatePickler
-given Pickler[ItcReadMode.Flamingos2]  = generatePickler
-given Pickler[ItcReadMode]             =
-  compositePickler[ItcReadMode]
-    .addConcreteType[ItcReadMode.Gnirs]
-    .addConcreteType[ItcReadMode.Flamingos2]
+given Pickler[ItcResultReadMode.Gnirs]       = generatePickler
+given Pickler[ItcResultReadMode.Flamingos2]  = generatePickler
+given Pickler[ItcResultReadMode]             =
+  compositePickler[ItcResultReadMode]
+    .addConcreteType[ItcResultReadMode.Gnirs]
+    .addConcreteType[ItcResultReadMode.Flamingos2]
 given Pickler[IntegrationTime]         = generatePickler
 given Pickler[Zipper[IntegrationTime]] =
   transformPickler[
