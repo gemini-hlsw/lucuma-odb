@@ -120,6 +120,8 @@ object CalibrationCalcService:
 
       object Statements:
         // A telluric shares its calibration group with exactly one science observation.
+        // A user-defined telluric is left out: the PI owns its exposure time modes, so
+        // they are edited like science rather than derived from the science observation.
         def selectTelluricScience(oids: NonEmptyList[Observation.Id]): AppliedFragment =
           sql"""
             SELECT t.c_observation_id, s.c_observation_id, s.c_program_id
@@ -130,6 +132,7 @@ object CalibrationCalcService:
              AND   s.c_existence = 'present'
             WHERE  t.c_observation_id IN ${observation_id.list(oids.size).values}
               AND  t.c_calibration_role = 'telluric'
+              AND  NOT t.c_is_user_defined_telluric
           """.apply(oids.toList)
 
         val Invalidate: Command[(Observation.Id, Program.Id)] =

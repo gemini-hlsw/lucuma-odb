@@ -3806,6 +3806,28 @@ class perScienceObservationCalibrations
                   )
     yield ()
 
+  test("telluric etm override: a user-defined GNIRS telluric takes its own wavelengths, modes and coadds"):
+    // Three wavelengths where the science has two: the PI owns the list as well.
+    val entries: String =
+      List(1500, 1600, 1700).map: nm =>
+        s"""{ centralWavelength: { nanometers: $nm }
+              exposureTimeMode: { timeAndCount: { time: { seconds: 30 } count: 2 at: { nanometers: $nm } } }
+              coadds: 4 }"""
+      .mkString("\n")
+    for
+      pid      <- createProgramAs(pi)
+      (oid, _) <- createGnirsWithTelluric(pid)
+      _        <- setUserDefinedGnirsTellurics(oid, 1)
+      _        <- recalculateCalibrations(pid, when, oid)
+      tel      <- groupTellurics(oid).map(_.head)
+      _        <- setGnirsCentralWavelengths(tel, entries)
+      set      <- queryGnirsCentralWavelengths(tel)
+      _        <- recalculateCalibrations(pid, when, oid)
+      kept     <- queryGnirsCentralWavelengths(tel)
+    yield
+      assertEquals(set, List((1500, 2, 4), (1600, 2, 4), (1700, 2, 4)))
+      assertEquals(kept, set)
+
   test("telluric etm override: GNIRS null on a science observation is rejected"):
     for
       pid      <- createProgramAs(pi)
@@ -3920,6 +3942,46 @@ class perScienceObservationCalibrations
     ).map: json =>
       val c = json.hcursor.downField("target")
       (c.downField("calibrationRole").require[Option[CalibrationRole]], c.downField("disposition").require[TargetDisposition])
+
+  private def setUserDefinedGnirsTellurics(oid: Observation.Id, count: Int): IO[Unit] =
+    query(
+      pi,
+      s"""mutation {
+        updateObservations(input: {
+          WHERE: { id: { EQ: "$oid" } }
+          SET: { observingMode: { gnirsSpectroscopy: { telluricType: { tag: USER_DEFINED, count: $count } } } }
+        }) {
+          observations { id }
+        }
+      }"""
+    ).void
+
+  // (nanometers, exposure count, coadds) per current central wavelength row.
+  private def queryGnirsCentralWavelengths(oid: Observation.Id): IO[List[(Int, Int, Int)]] =
+    query(
+      pi,
+      s"""query {
+        observation(observationId: "$oid") {
+          observingMode {
+            gnirsSpectroscopy {
+              centralWavelengths {
+                centralWavelength { nanometers }
+                exposureTimeMode { timeAndCount { count } }
+                coadds
+              }
+            }
+          }
+        }
+      }"""
+    ).map: json =>
+      json.hcursor
+        .downFields("observation", "observingMode", "gnirsSpectroscopy", "centralWavelengths")
+        .values.toList.flatten.map: row =>
+          (
+            row.hcursor.downFields("centralWavelength", "nanometers").require[BigDecimal].toInt,
+            row.hcursor.downFields("exposureTimeMode", "timeAndCount", "count").require[Int],
+            row.hcursor.downField("coadds").require[Int]
+          )
 
   private def queryUserDefinedTelluric(oid: Observation.Id): IO[Boolean] =
     query(
