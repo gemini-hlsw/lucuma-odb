@@ -347,7 +347,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
           case _                                                                                                    =>
             None
 
-  private def withFakeReadMode(mode: InstrumentMode, result: IntegrationTime): IntegrationTime =
+  protected def withFakeReadMode(mode: InstrumentMode, result: IntegrationTime): IntegrationTime =
     result.copy(readMode = result.readMode.orElse(fakeReadMode(mode, result.exposureTime)))
 
   protected def itcClient: ItcClient[IO] =
