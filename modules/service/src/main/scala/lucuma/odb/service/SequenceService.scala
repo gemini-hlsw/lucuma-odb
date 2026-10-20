@@ -784,6 +784,12 @@ object SequenceService:
           case Some(i)                     => ResultT(OdbError.InvalidArgument(s"Observation $observationId is a ${i.longName} daytime calibration.".some).asFailureF)
           case None                        => select
 
+      private def ghostStaticFor(
+        observationId: Observation.Id
+      )(using Transaction[F]): ResultT[F, GhostStaticConfig] =
+        staticFor(observationId, Instrument.Ghost, DaytimeStatics.Ghost):
+          ResultT(selectOrComputeGhostStatic(observationId).map(e => Result.fromEither(e.leftMap(_.asProblem))))
+
       private def selectStatic[S](
         observationId: Observation.Id,
         expected:      String,
@@ -852,7 +858,7 @@ object SequenceService:
         namespace:      Option[UUID] = None
       )(using Transaction[F]): F[Result[Stream[Pure, Atom[GhostDynamicConfig]]]] =
         (for
-          s <- staticFor(observationId, Instrument.Ghost, DaytimeStatics.Ghost)(ResultT(selectOrComputeGhostStatic(observationId).map(e => Result.fromEither(e.leftMap(_.asProblem)))))
+          s <- ghostStaticFor(observationId)
           b <- ResultT.liftF(atomBuilder(sequenceType, s, namespace, estimator.ghostStep))
           r <- replaceSequence(
                  Instrument.Ghost,
@@ -1493,9 +1499,6 @@ object SequenceService:
               insertInstConfig
             )
 
-        val ghostStatic: ResultT[F, GhostStaticConfig] =
-          ResultT(selectOrComputeGhostStatic(observationId).map(e => Result.fromEither(e.leftMap(_.asProblem))))
-
         ResultT(session.option(Statements.SelectObsDescription)(observationId).map(o => Result.success(o.flatten)))
           .flatMap:
             case Some(o) =>
@@ -1503,7 +1506,7 @@ object SequenceService:
                 case Instrument.Flamingos2 =>
                   insert(o, selectStatic(observationId, "Flamingos 2", flamingos2SequenceService.selectStaticOrDefault), Statements.Flamingos2Table, estimator.flamingos2Step, expanders.flamingos2, Flamingos2SequenceService.Statements.insertDynamics)
                 case Instrument.Ghost      =>
-                  insert(o, ghostStatic, Statements.GhostTable, estimator.ghostStep, expanders.ghost, GhostSequenceService.Statements.insertDynamics)
+                  insert(o, ghostStaticFor(observationId), Statements.GhostTable, estimator.ghostStep, expanders.ghost, GhostSequenceService.Statements.insertDynamics)
                 case Instrument.GmosNorth  =>
                   insert(o, selectStatic(observationId, "GMOS North", gmosSequenceService.selectGmosNorthStaticOrDefault), Statements.GmosNorthTable, estimator.gmosNorthStep, expanders.gmosNorth, GmosSequenceService.Statements.insertNorthDynamics)
                 case Instrument.GmosSouth  =>
