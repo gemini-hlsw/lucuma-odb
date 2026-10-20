@@ -667,7 +667,9 @@ private[legacy] object codecs:
       .find(_.ocs2Tag === tag)
       .map(ItcResultReadMode.Gnirs.apply)
       .orElse(
-        Enumerated[Flamingos2ReadMode].all.find(_.ocs2Tag === tag).map(ItcResultReadMode.Flamingos2.apply)
+        Enumerated[Flamingos2ReadMode].all
+          .find(_.ocs2Tag === tag)
+          .map(ItcResultReadMode.Flamingos2.apply)
       )
       .toRight(s"Unknown read mode: $tag")
 
