@@ -52,8 +52,7 @@ import java.util.UUID
 
 /**
  * GNIRS runs each central wavelength as one segment closed by a single set of
- * its own flats and arcs.  A science cycle must be shorter than its
- * wavelength's calibration set interval: 90 minutes below 2.6 μm, an hour from it.
+ * its own flats and arcs, however long its science cycles run.
  */
 class ScienceCadenceSuite extends FunSuite:
 
@@ -135,19 +134,16 @@ class ScienceCadenceSuite extends FunSuite:
       assertEquals(titles(cycles, NearInfrared), List.fill(cycles)(Sci) :+ Cal, s"near infrared, $cycles cycles")
       assertEquals(titles(cycles, ThermalInfrared), List.fill(cycles)(Sci) :+ Cal, s"thermal infrared, $cycles cycles")
 
-  test("thermal infrared: a cycle longer than an hour is rejected"):
-    val long = instantiate(NonEmptyList.one(ThermalInfrared -> integrationTime(20.minTimeSpan, 4)))
-    assert(long.isLeft, "an 80 minute cycle should not fit the thermal infrared period")
-
-  test("a near infrared cycle may run past an hour beside a thermal infrared wavelength"):
-    // 80 minute cycles at 2200 nm, 20 minute cycles at 3500 nm: each wavelength
-    // is held to its own interval.
+  test("a cycle longer than the old calibration interval is accepted"):
+    // 80 minute cycles: nothing is inserted mid-sequence, so no cycle length is too long.
     val times = NonEmptyList.of(
       NearInfrared    -> integrationTime(20.minTimeSpan, 4),
-      ThermalInfrared -> integrationTime(ExposureTime, 4)
+      ThermalInfrared -> integrationTime(20.minTimeSpan, 4)
     )
-    val gen = instantiate(times)
-    assert(gen.isRight, s"expected per wavelength limits, got $gen")
+    assertEquals(
+      instantiate(times).map(_.generate.toList.map(_.description.fold("")(_.value))),
+      List(s"$Sci (2200 nm)", s"$Cal (2200 nm)", s"$Sci (3500 nm)", s"$Cal (3500 nm)").asRight
+    )
 
   test("mixed wavelengths: each runs contiguously and closes with its own calibrations"):
     val Sci2200 = s"$Sci (2200 nm)"
