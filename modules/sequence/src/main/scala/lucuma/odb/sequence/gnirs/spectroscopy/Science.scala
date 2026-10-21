@@ -35,7 +35,6 @@ import lucuma.core.model.sequence.gnirs.GnirsDynamicConfig
 import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.core.model.sequence.gnirs.GnirsGratingWavelength
 import lucuma.core.model.sequence.gnirs.GnirsStaticConfig
-import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.ProtoAtom
@@ -275,9 +274,6 @@ object Science:
     val a = f"${actual.toNanometers.value.value.toDouble}%.0f nm"
     definitionError(oid, s"ITC result wavelength $a does not match the configured ${nm(sw)}.")
 
-  private def exposureTimeTooLong(oid: Observation.Id, sw: CentralWavelengthConfig, estimate: TimeSpan, interval: TimeSpan): OdbError =
-    definitionError(oid, s"Estimated science cycle time (${estimate.toRoundedMinutes} minutes) at ${nm(sw)} for $oid must be less than ${interval.toRoundedMinutes} minutes.")
-
   /**
    * Generates the sequence for a daytime pinhole flat calibration: a single
    * smart (day baseline) GCAL flat taken with the pinhole FPU and the science
@@ -388,23 +384,13 @@ object Science:
                   _ <- Either.cond(t.exposureTime.toNonNegMicroseconds.value > 0, (), zeroExposureTime(observationId))
                 yield (sw, t)
 
-    // A science cycle must be shorter than the calibration set interval of its
-    // own wavelength; the error names the offending one.
-    def checkCycle(steps: StepDefinition): EitherT[F, OdbError, Unit] =
-      val estimate = StepTimeEstimateCalculator.runEmpty(estimator.estimateTotalNel(static, steps.scienceSteps))
-      val interval = CalibrationSetInterval.forWavelength(steps.wavelength.centralWavelength)
-      EitherT.fromEither:
-        Either.cond(estimate < interval, (), exposureTimeTooLong(observationId, steps.wavelength, estimate, interval))
-
     val gen = for
       ts <- pairs
       ds <- StepDefinition.computeAll(config, ts, static, expander, calRole).leftMap(m => definitionError(observationId, m))
       bs <- ds.zip(ts).zip(titleSuffixes(config.wavelengths, config.wavelengths.length > 1)).traverse: (dwt, suffix) =>
               val (d, wt) = dwt
-              for
-                _ <- checkCycle(d)
-                c <- EitherT.fromEither(d.cycleCount(wt._2).leftMap(m => definitionError(observationId, m)))
-              yield WavelengthBlock(d, c, suffix)
+              EitherT.fromEither(d.cycleCount(wt._2).leftMap(m => definitionError(observationId, m)))
+                .map(WavelengthBlock(d, _, suffix))
     yield Generator(
       bs.toNev,
       AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Science)
