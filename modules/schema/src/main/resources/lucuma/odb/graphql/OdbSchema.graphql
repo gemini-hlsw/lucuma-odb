@@ -18136,6 +18136,11 @@ type ObservationValidation {
   code: ObservationValidationCode!
 
   """
+  Whether the problem is an error or a warning, as determined by the code.
+  """
+  severity: ObservationValidationCodeSeverity!
+
+  """
   Particular errors for this validation type
   """
   messages: [String!]!
@@ -18152,6 +18157,22 @@ enum ObservationPriority {
   MEDIUM
 
   HIGH
+}
+
+"""
+The severity of an observation validation code.
+"""
+enum ObservationValidationCodeSeverity {
+  """
+  The observation cannot be executed until the problem is addressed.
+  """
+  ERROR
+
+  """
+  A non-fatal condition worth the submitter's attention.  It does not prevent
+  the observation from being executed.
+  """
+  WARNING
 }
 
 """
@@ -19977,6 +19998,9 @@ raises.
 type StepViolation {
   "The validation code reported for the problem."
   code: ObservationValidationCode!
+
+  "Whether the problem is an error or a warning, as determined by the code."
+  severity: ObservationValidationCodeSeverity!
 
   """
   The problem as a sentence, e.g. "Exposure times for GMOS North must be at

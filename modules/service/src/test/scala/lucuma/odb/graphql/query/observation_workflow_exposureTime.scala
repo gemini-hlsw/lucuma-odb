@@ -6,6 +6,7 @@ package query
 
 import cats.effect.IO
 import cats.syntax.all.*
+import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.ConfigurationRequestStatus
@@ -266,6 +267,86 @@ class observation_workflow_exposureTime
                         }
                       """.asRight
                     )
+    yield ()
+
+  // The severity is determined by the code, wherever the code is reported.
+  def severities(oid: Observation.Id): IO[Json] =
+    query(
+      pi,
+      s"""
+        query {
+          observation(observationId: ${oid.asJson}) {
+            workflow { value { validationErrors { code severity } } }
+            execution { digest { value { science { stepViolations { code severity } } } } }
+          }
+        }
+      """
+    ).map(_.hcursor.downField("observation").require[Json])
+
+  def inactiveSeverities(oid: Observation.Id): IO[Json] =
+    query(
+      pi,
+      s"""
+        mutation {
+          setObservationWorkflowState(input: {
+            observationId: ${oid.asJson}
+            state: INACTIVE
+          }) {
+            validationErrors { code severity }
+          }
+        }
+      """
+    ).map(_.hcursor.downFields("setObservationWorkflowState", "validationErrors").require[Json])
+
+  test("an exposure time error reports an ERROR severity"):
+    for
+      (pid, oid) <- setup
+      _          <- replaceSequence(oid, SequenceType.Science, 0.5)
+      _          <- runObscalcUpdate(pid, oid)
+      _          <- assertIO(
+                      severities(oid),
+                      json"""
+                        {
+                          "workflow": {
+                            "value": {
+                              "validationErrors": [
+                                { "code": "CONFIGURATION_ERROR", "severity": "ERROR" }
+                              ]
+                            }
+                          },
+                          "execution": {
+                            "digest": {
+                              "value": {
+                                "science": {
+                                  "stepViolations": [
+                                    { "code": "CONFIGURATION_ERROR", "severity": "ERROR" },
+                                    { "code": "CONFIGURATION_ERROR", "severity": "ERROR" }
+                                  ]
+                                }
+                              }
+                            }
+                          }
+                        }
+                      """
+                    )
+    yield ()
+
+  test("an exposure time warning reports a WARNING severity"):
+    val warning = json"""[{ "code": "EXPOSURE_TIME_WARNING", "severity": "WARNING" }]"""
+    for
+      (pid, oid) <- setup
+      _          <- replaceSequence(oid, SequenceType.Science, 1500)
+      _          <- runObscalcUpdate(pid, oid)
+      _          <- assertIO(
+                      severities(oid),
+                      json"""
+                        {
+                          "workflow": { "value": { "validationErrors": $warning } },
+                          "execution": { "digest": { "value": { "science": { "stepViolations": $warning } } } }
+                        }
+                      """
+                    )
+      _          <- assertIO(inactiveSeverities(oid), warning)
     yield ()
 
   test("a fractional GMOS exposure time is an error"):

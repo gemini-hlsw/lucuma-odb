@@ -4,6 +4,7 @@
 package lucuma.odb.graphql
 package mapping
 
+import io.circe.Json
 import lucuma.odb.graphql.table.ObscalcTable
 
 trait CalculatedObservationWorkflowMapping[F[_]] extends ObscalcTable[F]:
@@ -13,7 +14,12 @@ trait CalculatedObservationWorkflowMapping[F[_]] extends ObscalcTable[F]:
       SqlField("synthetic_id",     ObscalcTable.ObservationId, hidden = true, key = true),
       SqlField("state",            ObscalcTable.Workflow.State),
       SqlField("validTransitions", ObscalcTable.Workflow.Transitions),
-      SqlJson("validationErrors",  ObscalcTable.Workflow.Validations)
+      SqlField("validations",      ObscalcTable.Workflow.Validations, hidden = true),
+      CursorFieldJson(
+        "validationErrors",
+        _.fieldAs[Json]("validations").flatMap(ValidationSeverity.addAll),
+        List("validations")
+      )
     )
 
   private lazy val CalculatedObservationWorkflowMapping: TypeMapping =
