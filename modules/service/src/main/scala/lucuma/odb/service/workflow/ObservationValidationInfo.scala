@@ -260,8 +260,8 @@ object ObservationValidationInfo {
             configs.get(oid).fold(oid -> info): cfg =>
               oid -> info.copy(keckInstrument = cfg.keckInstrument, subaruInstrument = cfg.subaruInstrument)
 
-    // Whether a daytime calibration has stored science steps.  Only daytime
-    // calibrations are looked up.
+    // Whether a daytime calibration has stored science steps or Calibration
+    // Sets to generate them from.  Only daytime calibrations are looked up.
     def addDaytimeCalibrationInfos(input: Map[Observation.Id, ObservationValidationInfo]): F[Map[Observation.Id, ObservationValidationInfo]] =
       NonEmptyList.fromList(input.collect { case (oid, info) if info.isDaytimeCalibration => oid }.toList) match
         case None      => input.pure[F]
@@ -391,11 +391,22 @@ object ObservationValidationInfo {
 
     def WithScienceSteps[A <: NonEmptyList[Observation.Id]](enc: skunk.Encoder[A]): Query[A, Observation.Id] =
       sql"""
-        SELECT DISTINCT a.c_observation_id
-          FROM t_atom a
-          JOIN t_step s ON s.c_atom_id = a.c_atom_id
-         WHERE a.c_sequence_type = 'science'
-           AND a.c_observation_id IN ($enc)
+        SELECT o.c_observation_id
+          FROM t_observation o
+         WHERE o.c_observation_id IN ($enc)
+           AND (
+             EXISTS (
+               SELECT 1
+                 FROM t_atom a
+                 JOIN t_step s ON s.c_atom_id = a.c_atom_id
+                WHERE a.c_observation_id = o.c_observation_id
+                  AND a.c_sequence_type = 'science'
+             ) OR EXISTS (
+               SELECT 1
+                 FROM t_daytime_calibration_set c
+                WHERE c.c_observation_id = o.c_observation_id
+             )
+           )
       """.query(observation_id)
 
     def ObservationValidationInfosWithoutAsterisms[A <: NonEmptyList[Observation.Id]](enc: Encoder[A]): Query[A, ObservationValidationInfo] =
