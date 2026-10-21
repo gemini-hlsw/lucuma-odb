@@ -1,7 +1,7 @@
 {
-  "ocs_git_hash": "1a8d21fb04539cd06b62d9f87f3009add60c818e",
-  "ocs_git_branch": "structured-itc-json-errors",
-  "ocs_git_describe": "vpit-v2027A.1.1.1-44-g1a8d21fb0-dirty",
-  "local": true,
-  "build_timestamp": "2026-10-21T00:41:51Z"
+  "ocs_git_hash": "0bc1607406428405eae962ccdf0bc681ff7b6c5a",
+  "ocs_git_branch": "main",
+  "ocs_git_describe": "vpit-v2027A.1.1.1-46-g0bc160740",
+  "local": false,
+  "build_timestamp": "2026-10-21T14:51:39Z"
 }
