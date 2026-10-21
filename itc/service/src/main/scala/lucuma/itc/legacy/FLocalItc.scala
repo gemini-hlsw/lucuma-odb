@@ -20,9 +20,12 @@ import org.typelevel.otel4s.trace.Tracer
  */
 case class FLocalItc[F[_]: {Async as F, Tracer as T}](itcLocal: LocalItc[F]):
 
-  val TooBright =
-    """This target is too bright for this configuration."""
-  val HalfWell  = """The detector well is half filled in (\d*\.?\d*) seconds.""".r
+  private def raise[A](error: LegacyItcError, atWavelength: Wavelength): F[A] =
+    error match
+      case LegacyItcError.SourceTooBright(halfWellTime = t) => F.raiseError(SourceTooBright(t))
+      case LegacyItcError.WavelengthOutOfRange              =>
+        F.raiseError(WavelengthOutOfRange(atWavelength))
+      case LegacyItcError.General(message = m)              => F.raiseError(UpstreamException(List(m)))
 
   def calculateGraphs(
     jsonParams:   String,
@@ -35,13 +38,7 @@ case class FLocalItc[F[_]: {Async as F, Tracer as T}](itcLocal: LocalItc[F]):
     ).surround:
       (F.cede *> itcLocal.calculateGraphs(jsonParams).guarantee(F.cede)).flatMap {
         case Right(result) => F.pure(result)
-        case Left(msg)     =>
-          msg match {
-            case TooBright :: HalfWell(v) :: Nil => F.raiseError(SourceTooBright(BigDecimal(v)))
-            case List(LocalItc.OutOfRangeMsg)    =>
-              F.raiseError(WavelengthOutOfRange(atWavelength))
-            case _                               => F.raiseError(new UpstreamException(msg))
-          }
+        case Left(error)   => raise(error, atWavelength)
       }
 
   def calculateTimeAndGraphs(
@@ -56,13 +53,7 @@ case class FLocalItc[F[_]: {Async as F, Tracer as T}](itcLocal: LocalItc[F]):
     ).surround:
       (F.cede *> itcLocal.calculateTimeAndGraphs(jsonParams).guarantee(F.cede)).flatMap {
         case Right(result) => F.pure(result)
-        case Left(msg)     =>
-          msg match {
-            case TooBright :: HalfWell(v) :: Nil => F.raiseError(SourceTooBright(BigDecimal(v)))
-            case List(LocalItc.OutOfRangeMsg)    =>
-              F.raiseError(WavelengthOutOfRange(atWavelength))
-            case _                               => F.raiseError(new UpstreamException(msg))
-          }
+        case Left(error)   => raise(error, atWavelength)
       }
 
   def calculate(
@@ -75,15 +66,6 @@ case class FLocalItc[F[_]: {Async as F, Tracer as T}](itcLocal: LocalItc[F]):
            Attribute("ocs_git_hash", BuildInfo.ocsGitHash)
     ).surround:
       (F.cede *> itcLocal.calculate(jsonParams).guarantee(F.cede)).flatMap {
-        case Right(result) =>
-          F.pure(result)
-        case Left(msg)     =>
-          msg match {
-            case TooBright :: HalfWell(v) :: Nil =>
-              F.raiseError(SourceTooBright(BigDecimal(v)))
-            case List(LocalItc.OutOfRangeMsg)    =>
-              F.raiseError(WavelengthOutOfRange(atWavelength))
-            case _                               =>
-              F.raiseError(new UpstreamException(msg))
-          }
+        case Right(result) => F.pure(result)
+        case Left(error)   => raise(error, atWavelength)
       }

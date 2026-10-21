@@ -123,7 +123,7 @@ class LegacyITCGmosR150BlueSuite extends munit.CatsEffectSuite:
     localItc
       .calculateGraphs(params.asJson.noSpaces)
       .map: result =>
-        val graphs = result.fold(e => fail(s"legacy ITC failed: ${e.mkString(", ")}"), identity)
+        val graphs = result.fold(e => fail(s"legacy ITC failed: ${e.message}"), identity)
 
         val series = graphs.groups.toList.flatMap(_.graphs.toList).flatMap(_.series)
         assert(series.nonEmpty)
@@ -144,7 +144,7 @@ class LegacyITCGmosR150BlueSuite extends munit.CatsEffectSuite:
     localItc
       .calculateGraphs(params.asJson.noSpaces)
       .map: result =>
-        val remote = result.fold(e => fail(s"legacy ITC failed: ${e.mkString(", ")}"), identity)
+        val remote = result.fold(e => fail(s"legacy ITC failed: ${e.message}"), identity)
         val graphs =
           Conversions.targetGraphsFromLegacy(remote.ccds, remote.groups, exposureTimeMode.at)
 

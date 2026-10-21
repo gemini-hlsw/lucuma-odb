@@ -7,8 +7,8 @@ import cats.effect.Sync
 import cats.syntax.all.*
 import io.circe.Decoder
 import io.circe.Json
+import io.circe.parser.decode
 import io.circe.parser.parse
-import lucuma.itc.Error
 import lucuma.itc.legacy
 import lucuma.itc.legacy.codecs.given
 
@@ -25,12 +25,7 @@ import java.lang.reflect.Method
  * that may not be compatible. Instead we pass back and forth json encoded version of the params
  * essentially the same as if ITC were a server accepting json and responding json
  */
-object LocalItc:
-  val OutOfRangeMsg: String = Error.WavelengthAtOutOfRangeMessage
-
 case class LocalItc[F[_]: {Sync as F}](classLoader: ClassLoader):
-
-  import LocalItc.OutOfRangeMsg
 
   private def resultKey(json: io.circe.Json): Option[io.circe.ACursor] =
     val c = json.hcursor
@@ -83,17 +78,20 @@ case class LocalItc[F[_]: {Sync as F}](classLoader: ClassLoader):
 
   private def parseResult[A: Decoder](
     res:        String,
-    outOfRange: Json => Boolean,
-    leftErrors: String => List[String]
-  ): Either[List[String], A] =
+    outOfRange: Json => Boolean
+  ): Either[LegacyItcError, A] =
     unwrap(res, RightWrapper) match
       case Some(payload) =>
         parse(payload) match
-          case Left(e)                         => Left(List(e.getMessage))
-          case Right(json) if outOfRange(json) => Left(List(OutOfRangeMsg))
-          case Right(json)                     => json.as[A].leftMap(e => List(e.getMessage))
+          case Left(e)                         => LegacyItcError.General(e.getMessage).asLeft
+          case Right(json) if outOfRange(json) => LegacyItcError.WavelengthOutOfRange.asLeft
+          case Right(json)                     =>
+            json.as[A].leftMap(e => LegacyItcError.General(e.getMessage))
       case None          =>
-        unwrap(res, LeftWrapper).fold(List(res))(leftErrors).asLeft
+        unwrap(res, LeftWrapper)
+          .fold(LegacyItcError.General(res)): payload =>
+            decode[LegacyItcError](payload).getOrElse(LegacyItcError.General(payload))
+          .asLeft
 
   /**
    * This method does a call to the method ItcCalculation.calculation via reflection. This is done
@@ -106,33 +104,33 @@ case class LocalItc[F[_]: {Sync as F}](classLoader: ClassLoader):
    * that may not be compatible. Instead we pass back and forth json encoded version of the params
    * essentially the same as if ITC were a server accepting json and responding json
    */
-  def calculateGraphs(jsonParams: String): F[Either[List[String], GraphsRemoteResult]] =
+  def calculateGraphs(jsonParams: String): F[Either[LegacyItcError, GraphsRemoteResult]] =
     F.blocking:
       val res = calculateGraphsMethod
         .invoke(null, jsonParams) // null as it is a static method
         .asInstanceOf[String]
 
-      parseResult[legacy.GraphsRemoteResult](res, hasAllNullCcdSNRatios, List(_))
+      parseResult[legacy.GraphsRemoteResult](res, hasAllNullCcdSNRatios)
 
   def calculateTimeAndGraphs(
     jsonParams: String
-  ): F[Either[List[String], TimeAndGraphsRemoteResult]] =
+  ): F[Either[LegacyItcError, TimeAndGraphsRemoteResult]] =
     F.blocking:
       val res = calculateGraphsMethod
         .invoke(null, jsonParams) // null as it is a static method
         .asInstanceOf[String]
 
-      parseResult[legacy.TimeAndGraphsRemoteResult](res, hasAllNullCcdSNRatios, List(_))
+      parseResult[legacy.TimeAndGraphsRemoteResult](res, hasAllNullCcdSNRatios)
 
   /**
    * This method does a call to the method ItcCalculation.calculate via reflection.
    */
   def calculate(
     jsonParams: String
-  ): F[Either[List[String], IntegrationTimeRemoteResult]] =
+  ): F[Either[LegacyItcError, IntegrationTimeRemoteResult]] =
     Sync[F].blocking:
       val res = calculateMethod
         .invoke(null, jsonParams) // null as it is a static method
         .asInstanceOf[String]
 
-      parseResult[IntegrationTimeRemoteResult](res, hasAllNullExposureTimes, _.split("\n").toList)
+      parseResult[IntegrationTimeRemoteResult](res, hasAllNullExposureTimes)

@@ -36,8 +36,8 @@ class LegacyITCIgrins2WavelengthOutOfRangeSuite extends CommonITCLegacySuite:
       .calculate(baseParams.asJson.noSpaces)
     assertIO(
       result.map:
-        case Left(msgs) => msgs.contains(LocalItc.OutOfRangeMsg)
-        case Right(_)   => false
+        case Left(LegacyItcError.WavelengthOutOfRange) => true
+        case _                                         => false
       ,
       true
     )

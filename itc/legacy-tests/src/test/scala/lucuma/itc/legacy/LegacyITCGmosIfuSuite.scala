@@ -83,7 +83,7 @@ class LegacyITCGmosIfuSuite extends CommonITCLegacySuite:
     localItc
       .calculate(bodyConf(sourceDefinition, obs, mode, mode.analysisMethod).asJson.noSpaces)
       .map:
-        case Left(errs) => fail(s"${mode.description}: ${errs.mkString("; ")}")
+        case Left(errs) => fail(s"${mode.description}: ${errs.message}")
         case Right(r)   => r
 
   private def arcsec(v: BigDecimal): Angle =
@@ -155,7 +155,7 @@ class LegacyITCGmosIfuSuite extends CommonITCLegacySuite:
     localItc
       .calculateGraphs(bodyConf(sourceDefinition, obs, mode, mode.analysisMethod).asJson.noSpaces)
       .map:
-        case Left(errs) => fail(s"${mode.description}: ${errs.mkString("; ")}")
+        case Left(errs) => fail(s"${mode.description}: ${errs.message}")
         case Right(r)   =>
           val types = r.groups.toList.flatMap(_.graphs.toList).map(_.graphType)
           assert(types.contains(GraphType.SignalPixelGraph), s"got $types")
