@@ -20,7 +20,7 @@ val circeRefinedVersion          = "0.15.1"
 val cirisVersion                 = "3.15.2"
 val clueVersion                  = "0.60.0"
 val declineVersion               = "2.6.2"
-val flywayVersion                = "13.10.3"
+val flywayVersion                = "13.11.1"
 val fs2AwsVersion                = "6.2.0"
 val fs2Version                   = "3.14.0"
 val grackleVersion               = "0.30.0"
@@ -34,7 +34,7 @@ val keySemaphoreVersion          = "0.3.0"
 val kittensVersion               = "3.5.0"
 val logbackVersion               = "1.6.5"
 val log4catsVersion              = "2.8.0"
-val lucumaCoreVersion            = "0.270.0"
+val lucumaCoreVersion            = "0.270.1"
 val lucumaGraphQLRoutesVersion   = "0.16.2"
 val lucumaRefinedVersion         = "0.1.4"
 val monocleVersion               = "3.3.0"
@@ -86,7 +86,7 @@ ThisBuild / libraryDependencySchemes ++= Seq(
 ThisBuild / libraryDependencySchemes +=
   "edu.gemini" %% "clue-model" % VersionScheme.Always
 
-ThisBuild / tlBaseVersion      := "0.106"
+ThisBuild / tlBaseVersion      := "0.107"
 ThisBuild / scalaVersion       := "3.9.0"
 ThisBuild / crossScalaVersions := Seq("3.9.0")
 ThisBuild / scalacOptions     ++= Seq("-Xmax-inlines", "50") // Hash derivation fails with default of 32

@@ -827,10 +827,13 @@ trait MutationMapping[F[_]] extends AccessControl[F] with UserEnv {
                     Unique(Filter(Predicates.setGuideTargetNameResult.observationId.eql(oid), child))
 
   private lazy val SetObservationWorkflowState =
-    MutationField.encodable("setObservationWorkflowState", SetObservationWorkflowStateInput.Binding): input =>
+    MutationField.json("setObservationWorkflowState", SetObservationWorkflowStateInput.Binding): input =>
       services.useNonTransactionally:
         selectForUpdate(input).flatMap: res =>
-          res.flatTraverse(observationWorkflowService.setWorkflowState)
+          res.flatTraverse(observationWorkflowService.setWorkflowState).map: r =>
+            r.flatMap: wf =>
+              val json = wf.asJson
+              ValidationSeverity.addAllAt(json, json.hcursor.downField("validationErrors"))
 
   private lazy val SetProgramReference =
     MutationField("setProgramReference", SetProgramReferenceInput.Binding): (input, child) =>

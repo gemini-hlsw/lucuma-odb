@@ -133,7 +133,7 @@ class LegacyITCGnirsSpecSignalToNoiseSuite extends CommonITCLegacySuite:
           Some(AltairParameters.Ngs(separation, BrightnessValue.unsafeFrom(17.0), FieldLens.In))
         )
       ).asJson.noSpaces
-    assertIOBoolean(result.map(_.fold(_.exists(_.contains("guide star")), _ => false)))
+    assertIOBoolean(result.map(_.fold(_.message.contains("guide star"), _ => false)))
 
   // LGS+P1 goes out without Altair at the 20% image quality bin
   test("gnirs altair LGS+P1".tag(LegacyITCTest)):
