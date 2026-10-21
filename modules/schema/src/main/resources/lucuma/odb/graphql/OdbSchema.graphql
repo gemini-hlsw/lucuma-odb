@@ -6292,7 +6292,7 @@ enum CalibrationSetType {
 """
 One row of a daytime calibration: a kind, an exposure count, the GCAL
 configuration (flats and arcs only) and one instrument setup.  The generator
-expands it into `count` DAY_CAL steps, one atom each.
+expands it into one atom holding `count` identical DAY_CAL steps.
 """
 type CalibrationSet {
   kind: CalibrationSetType!

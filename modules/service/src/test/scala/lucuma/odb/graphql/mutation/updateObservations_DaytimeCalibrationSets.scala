@@ -9,6 +9,7 @@ import cats.effect.IO
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.util.CalculationState
 import lucuma.core.enums.SequenceType
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -336,3 +337,81 @@ class updateObservations_DaytimeCalibrationSets extends OdbSuite with DatabaseOp
         """.asRight
       )
     yield ()
+
+  test("an explicit null instrument is rejected on an edit"):
+    for
+      pid <- createProgramAs(staff)
+      oid <- createWithSets(pid, dark)
+      _   <- expectOdbError(
+        user     = staff,
+        query    = updateQuery(oid, "{ instrument: null }"),
+        expected = { case OdbError.InvalidArgument(_) => () }
+      )
+    yield ()
+
+  test("a GMOS South calibration with a daytime observe row"):
+    for
+      pid <- createProgramAs(staff)
+      _   <- expect(
+        user     = staff,
+        query    = createQuery(pid, "GMOS_SOUTH", s"{ kind: DAYTIME_OBSERVE, count: 2, $gmosSouthSetup }"),
+        expected = json"""
+          {
+            "createObservation": {
+              "observation": {
+                "observingMode": {
+                  "daytimeCalibration": {
+                    "calibrationSets": [
+                      { "kind": "DAYTIME_OBSERVE", "count": 2, "gcal": null, "gmosNorth": null, "gmosSouth": { "exposure": { "microseconds": 1000000 }, "roi": "FULL_FRAME" } }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+    yield ()
+
+  test("rows are editable again after deleteSequence"):
+    for
+      pid <- createProgramAs(staff)
+      oid <- createWithSets(pid, dark)
+      _   <- query(staff, s"""
+               mutation {
+                 replaceGmosNorthSequence(input: ${input(oid, SequenceType.Science, atomInput("Darks", gmosNorthDarkStep()))}) {
+                   sequence { id }
+                 }
+               }
+             """)
+      _   <- query(staff, s"mutation { deleteSequence(input: { observationId: ${oid.asJson} }) { observation { id } } }")
+      _   <- expect(
+        user     = staff,
+        query    = updateQuery(oid, s"{ calibrationSets: [$bias] }"),
+        expected = json"""
+          {
+            "updateObservations": {
+              "observations": [
+                {
+                  "observingMode": {
+                    "daytimeCalibration": {
+                      "instrument": "GMOS_NORTH",
+                      "calibrationSets": [ ${set("BIAS", 5, Json.Null, north(0, "CCD2"))} ]
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        """.asRight
+      )
+    yield ()
+
+  test("changing the rows invalidates obscalc"):
+    for
+      pid <- createProgramAs(staff)
+      oid <- createWithSets(pid, dark)
+      _   <- setObscalcState(oid, CalculationState.Ready)
+      _   <- query(staff, updateQuery(oid, s"{ calibrationSets: [$bias] }"))
+      row <- obscalcRow(oid)
+    yield assertEquals(row._1, CalculationState.Pending)

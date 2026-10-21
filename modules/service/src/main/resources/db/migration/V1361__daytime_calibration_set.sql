@@ -31,6 +31,7 @@ CREATE TABLE t_daytime_calibration_set (
   c_gcal_shutter   d_tag    REFERENCES t_gcal_shutter(c_tag)  ON DELETE CASCADE,
 
   UNIQUE (c_observation_id, c_position) DEFERRABLE INITIALLY DEFERRED,
+  UNIQUE (c_set_id, c_observation_id),
 
   -- A flat has a continuum lamp, an arc has at least one arc lamp, and
   -- neither has both.  Every other kind has no GCAL configuration at all.
@@ -65,10 +66,13 @@ FROM
 -- the dynamic config codec and mappings apply unchanged.
 CREATE TABLE t_gmos_north_daytime_calibration_setup (
 
-  c_set_id         int8             PRIMARY KEY
-    REFERENCES t_daytime_calibration_set(c_set_id) ON DELETE CASCADE,
+  c_set_id         int8             PRIMARY KEY,
   c_observation_id d_observation_id NOT NULL,
   c_instrument     d_tag            NOT NULL DEFAULT ('GmosNorth') CHECK (c_instrument = 'GmosNorth'),
+
+  -- The observation id feeds obscalc invalidation; the composite FK keeps it the set's.
+  FOREIGN KEY (c_set_id, c_observation_id)
+    REFERENCES t_daytime_calibration_set(c_set_id, c_observation_id) ON DELETE CASCADE,
 
   c_exposure_time  interval         NOT NULL,
 
@@ -102,10 +106,13 @@ CREATE TABLE t_gmos_north_daytime_calibration_setup (
 
 CREATE TABLE t_gmos_south_daytime_calibration_setup (
 
-  c_set_id         int8             PRIMARY KEY
-    REFERENCES t_daytime_calibration_set(c_set_id) ON DELETE CASCADE,
+  c_set_id         int8             PRIMARY KEY,
   c_observation_id d_observation_id NOT NULL,
   c_instrument     d_tag            NOT NULL DEFAULT ('GmosSouth') CHECK (c_instrument = 'GmosSouth'),
+
+  -- The observation id feeds obscalc invalidation; the composite FK keeps it the set's.
+  FOREIGN KEY (c_set_id, c_observation_id)
+    REFERENCES t_daytime_calibration_set(c_set_id, c_observation_id) ON DELETE CASCADE,
 
   c_exposure_time  interval         NOT NULL,
 

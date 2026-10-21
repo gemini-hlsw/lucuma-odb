@@ -13,9 +13,8 @@ import lucuma.odb.json.all.transport.given
 import lucuma.odb.sequence.util.HashBytes
 
 /**
- * One generator row of a daytime calibration
- * These are parameters that can produce an atome for a daytime calibration.
- * It will produce an atom with daytime calibration steps that could use this same setup.
+ * One generator row of a daytime calibration: the parameters that produce one
+ * atom of `count` identical DAY_CAL steps taken with this setup.
  */
 final case class CalibrationSet[D](
   kind:  CalibrationSetType,

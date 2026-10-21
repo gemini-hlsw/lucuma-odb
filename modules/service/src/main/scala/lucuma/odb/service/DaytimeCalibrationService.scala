@@ -89,13 +89,20 @@ object DaytimeCalibrationService:
         input: DaytimeCalibrationInput.Create,
         which: List[Observation.Id]
       )(using Transaction[F]): F[Result[Unit]] =
-        session.prepareR(Statements.Insert).use: ps =>
-          which
-            .traverse: oid =>
-              ps.execute((oid, input.instrument)).flatMap:
-                case Completion.Insert(1) => insertSets(oid, input.sets).as(Result.unit)
-                case other                => Result.failure(s"Expected single insert, got $other.").pure
-            .map(_.sequenceVoid)
+        val doInsert: F[Result[Unit]] =
+          session.prepareR(Statements.Insert).use: ps =>
+            which
+              .traverse: oid =>
+                ps.execute((oid, input.instrument)).flatMap:
+                  case Completion.Insert(1) => insertSets(oid, input.sets).as(Result.unit)
+                  case other                => Result.failure(s"Expected single insert, got $other.").pure
+              .map(_.sequenceVoid)
+
+        // A mode switch into a daytime calibration arrives here too; its rows
+        // may not land on an observation whose sequence is already materialized.
+        (NonEmptyList.fromList(which), input.sets) match
+          case (Some(oids), _ :: _) => checkNotMaterialized(oids).flatMap(_.traverse(_ => doInsert).map(_.flatten))
+          case _                    => doInsert
 
       override def delete(
         which: List[Observation.Id]
@@ -106,13 +113,13 @@ object DaytimeCalibrationService:
             session.prepareR(Statements.delete(nel)).use: ps =>
               ps.execute(nel).void
 
-      // Rows drive the sequence only until it is materialized; afterwards
-      // they are frozen.
+      // Rows drive the sequence only until it is materialized (first visit or
+      // a hand edit); afterwards they are frozen.
       private def checkNotMaterialized(oids: NonEmptyList[Observation.Id]): F[Result[Unit]] =
-        session.execute(Statements.selectWithAtoms(oids))(oids).map: withAtoms =>
-          if withAtoms.isEmpty then Result.unit
+        session.execute(Statements.selectMaterialized(oids))(oids).map: materialized =>
+          if materialized.isEmpty then Result.unit
           else OdbError.InvalidArgument(
-            s"Cannot change the calibration sets of a daytime calibration with a stored sequence (${withAtoms.mkString(", ")}). Delete the sequence first.".some
+            s"Cannot change the calibration sets of a daytime calibration with a stored sequence (${materialized.mkString(", ")}). Delete the sequence first.".some
           ).asFailure
 
       override def update(
@@ -307,9 +314,10 @@ object DaytimeCalibrationService:
         WHERE c_observation_id IN (${observation_id.nel(oids)})
       """(inst, oids)
 
-    def selectWithAtoms[A <: NonEmptyList[Observation.Id]](a: A): Query[a.type, Observation.Id] =
+    def selectMaterialized[A <: NonEmptyList[Observation.Id]](a: A): Query[a.type, Observation.Id] =
       sql"""
-        SELECT DISTINCT c_observation_id
-        FROM t_atom
-        WHERE c_observation_id IN (${observation_id.nel(a)})
+        SELECT c_observation_id
+        FROM t_sequence_materialization
+        WHERE c_sequence_type = 'science'
+          AND c_observation_id IN (${observation_id.nel(a)})
       """.query(observation_id)
