@@ -90,13 +90,13 @@ trait CommonITCLegacySuite extends CatsEffectSuite:
   // "Signal = 0" is GNIRS/Flamingos2; "Signal is <= 0" is the shared ExposureTimeCalculator.
   private val noSignalPatterns: List[String] = List("Signal = 0", "Signal is <= 0")
 
-  def allowedErrors(err: List[String]): Boolean =
+  def allowedErrors(err: LegacyItcError): Boolean =
     val patterns = notCalculablePatterns ++ noSignalPatterns ++ List("Redshifted SED", "Wavelength")
-    err.exists(e => patterns.exists(e.contains))
+    patterns.exists(err.message.contains)
 
-  def allowedErrorsWithLargeSN(err: List[String]): Boolean =
+  def allowedErrorsWithLargeSN(err: LegacyItcError): Boolean =
     val patterns = notCalculablePatterns :+ "Invalid SignalToNoise value"
-    err.exists(e => patterns.exists(e.contains))
+    patterns.exists(err.message.contains)
 
   /**
    * Runs `run` for every value and fails listing every value whose result was not acceptable, each
@@ -107,14 +107,14 @@ trait CommonITCLegacySuite extends CatsEffectSuite:
    */
   def assertAllValid[A](
     values:      List[A],
-    errorCheck:  List[String] => Boolean = allowedErrors,
+    errorCheck:  LegacyItcError => Boolean = allowedErrors,
     resultCheck: IntegrationTimeRemoteResult => Boolean = containsValidResults
-  )(run: A => IO[Either[List[String], IntegrationTimeRemoteResult]])(using Location): IO[Unit] =
+  )(run: A => IO[Either[LegacyItcError, IntegrationTimeRemoteResult]])(using Location): IO[Unit] =
     values
       .traverse: a =>
         run(a).map:
           case Left(errs) if !errorCheck(errs) =>
-            (a -> s"disallowed error: ${errs.mkString("; ")}").some
+            (a -> s"disallowed error: ${errs.message}").some
           case Right(r) if !resultCheck(r)     => (a -> s"unacceptable result: $r").some
           case _                               => none
       .map(_.flattenOption)
@@ -134,15 +134,15 @@ trait CommonITCLegacySuite extends CatsEffectSuite:
     )
   }
 
-  // Define the source profile for this test suite
-  def sourceDefinition = ItcSourceDefinition(
+  // An A0V point source of the given R magnitude
+  def pointSource(rMagnitude: BigDecimal): ItcSourceDefinition = ItcSourceDefinition(
     TargetData(
       SourceProfile.Point(
         SpectralDefinition.BandNormalized(
           UnnormalizedSED.StellarLibrary(StellarLibrarySpectrum.A0V).some,
           SortedMap(
             Band.R -> BrightnessValue
-              .unsafeFrom(12)
+              .unsafeFrom(rMagnitude)
               .withUnit[VegaMagnitude]
               .toMeasureTagged
           )
@@ -152,6 +152,9 @@ trait CommonITCLegacySuite extends CatsEffectSuite:
     ),
     Band.R.asLeft
   )
+
+  // Define the source profile for this test suite
+  def sourceDefinition: ItcSourceDefinition = pointSource(12)
 
   // Common analysis methods - these will be used in tests
   def lsAnalysisMethod = ItcObservationDetails.AnalysisMethod.Aperture.Auto(5)
@@ -558,7 +561,7 @@ trait CommonITCLegacySuite extends CatsEffectSuite:
   def testBrightnessUnits(
     name:       String,
     baseParams: ItcParameters,
-    errorCheck: List[String] => Boolean = allowedErrors
+    errorCheck: LegacyItcError => Boolean = allowedErrors
   ): Unit =
     test(s"$name - brightness integrated units".tag(LegacyITCTest)):
       assertAllValid(Brightness.Integrated.all.toList, errorCheck = errorCheck): f =>
