@@ -171,25 +171,34 @@ trait SequenceService[F[_]]:
     checked: CheckedWithId[(SequenceType, List[ProtoAtom[ProtoStep[GmosSouth]]]), Observation.Id]
   )(using Transaction[F]): F[Result[Stream[Pure, Atom[GmosSouth]]]]
 
+  /**
+   * Fails if a step of the sequence is executing, since an edit of the
+   * sequence would modify that step.
+   */
+  def requireNoOngoingStep(
+    observationId: Observation.Id,
+    sequenceType:  SequenceType
+  )(using Transaction[F]): F[Either[OdbError, Unit]]
+
   def resetFlamingos2Acquisition(
     observationId: Observation.Id,
     sequence:      Stream[F, Atom[Flamingos2DynamicConfig]]
-  )(using Transaction[F], Services.ServiceAccess): F[Unit]
+  )(using Transaction[F], Services.ServiceAccess): F[Either[OdbError, Unit]]
 
   def resetGmosNorthAcquisition(
     observationId: Observation.Id,
     sequence:      Stream[F, Atom[GmosNorth]]
-  )(using Transaction[F], Services.ServiceAccess): F[Unit]
+  )(using Transaction[F], Services.ServiceAccess): F[Either[OdbError, Unit]]
 
   def resetGmosSouthAcquisition(
     observationId: Observation.Id,
     sequence:      Stream[F, Atom[GmosSouth]]
-  )(using Transaction[F], Services.ServiceAccess): F[Unit]
+  )(using Transaction[F], Services.ServiceAccess): F[Either[OdbError, Unit]]
 
   def resetGnirsAcquisition(
     observationId: Observation.Id,
     sequence:      Stream[F, Atom[GnirsDynamicConfig]]
-  )(using Transaction[F], Services.ServiceAccess): F[Unit]
+  )(using Transaction[F], Services.ServiceAccess): F[Either[OdbError, Unit]]
 
   def insertFlamingos2Sequence(
     observationId: Observation.Id,
@@ -331,8 +340,9 @@ trait SequenceService[F[_]]:
 
   /**
    * Restarts a customized acquisition from a fresh copy of its edited steps:
-   * ongoing steps are abandoned, pending ones deleted and the latest batch of
-   * atoms re-inserted as pending steps.  Executed steps remain as history.
+   * pending steps are deleted and the latest batch of atoms re-inserted as
+   * pending steps.  Executed steps remain as history.  Fails while a step is
+   * executing.
    *
    * @return `true` if the acquisition was customized and reset, `false` if it
    *         is not customized (nothing is changed)
@@ -656,6 +666,20 @@ object SequenceService:
       )(using @unused t: Transaction[F]): F[Unit] =
         session.unique(Statements.LockObservationExecution)(observationId).void
 
+      override def requireNoOngoingStep(
+        observationId: Observation.Id,
+        sequenceType:  SequenceType
+      )(using Transaction[F]): F[Either[OdbError, Unit]] =
+        session.option(Statements.SelectOngoingStep)(observationId, sequenceType).map:
+          _.toLeft(()).leftMap: stepId =>
+            OdbError.InvalidArgument(s"The ${sequenceType.tag} sequence of observation $observationId cannot be edited while step $stepId is executing.".some)
+
+      private def checkNoOngoingStep(
+        observationId: Observation.Id,
+        sequenceType:  SequenceType
+      )(using Transaction[F]): ResultT[F, Unit] =
+        ResultT(requireNoOngoingStep(observationId, sequenceType).map(_.fold(_.asFailure, Result.success)))
+
       /**
        * Marks the sequence as materialized, or updates the timestamp of the
        * last materialization.  Either way, records whether the sequence is now
@@ -742,7 +766,7 @@ object SequenceService:
                   sequence.map: atom =>
                     atom.copy(steps = atom.steps.map(step => step.copy(telescopeConfig = step.telescopeConfig.copy(guiding = StepGuideState.Disabled))))
 
-        def doReplace(sequence: List[ProtoAtom[ProtoStep[D]]]): F[Stream[Pure, Atom[D]]] =
+        def doReplace(sequence: List[ProtoAtom[ProtoStep[D]]]): ResultT[F, Stream[Pure, Atom[D]]] =
           val atoms = atomBuilder.buildStream(Stream.emits(sequence))
 
           // Why take the execution lock only if the sequence is materialized?
@@ -757,15 +781,19 @@ object SequenceService:
           // that first visit inserts the materialization row and then takes
           // the execution lock.  If we held the execution lock while waiting
           // to insert the same row, each would wait on the other.
+          //
+          // The execution lock also keeps a step from starting between the
+          // ongoing step check and the write.
           for
-            m <- lockMaterialization(observationId, sequenceType)
-            _ <- lockObservationExecution(observationId).whenA(m)
-            _ <- markMaterializedOrUpdate(observationId, sequenceType, customized)
-            _ <- abandonAndDeleteUnexecuted(observationId, sequenceType)
-            _ <- insertSequence(instrument, observationId, sequenceType, atoms.covary[F], batch, insertInstConfig)
+            m <- ResultT.liftF(lockMaterialization(observationId, sequenceType))
+            _ <- ResultT.liftF(lockObservationExecution(observationId).whenA(m))
+            _ <- checkNoOngoingStep(observationId, sequenceType)
+            _ <- ResultT.liftF(markMaterializedOrUpdate(observationId, sequenceType, customized))
+            _ <- ResultT.liftF(abandonAndDeleteUnexecuted(observationId, sequenceType))
+            _ <- ResultT.liftF(insertSequence(instrument, observationId, sequenceType, atoms.covary[F], batch, insertInstConfig))
           yield atoms
 
-        checkAtomLength *> checkUnsplittable *> checkDaytime.flatMap(seq => ResultT.liftF(doReplace(seq)))
+        checkAtomLength *> checkUnsplittable *> checkDaytime.flatMap(doReplace)
 
       // A daytime calibration's instrument, when the observation is one.
       private def selectDaytimeCalibration(
@@ -1030,40 +1058,41 @@ object SequenceService:
         stream:        Stream[F, Atom[D]]
       )(
         insert: (Observation.Id, SequenceType, Stream[F, Atom[D]]) => F[Unit]
-      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
-        val reset = for
+      )(using Transaction[F], Services.ServiceAccess): F[Either[OdbError, Unit]] =
+        val reset: F[Unit] = for
           _ <- markMaterializedOrUpdate(observationId, SequenceType.Acquisition, customized = false)
           _ <- abandonAndDeleteUnexecuted(observationId, SequenceType.Acquisition)
           _ <- insert(observationId, SequenceType.Acquisition, stream)
         yield ()
 
         lockMaterialization(observationId, SequenceType.Acquisition).ifM(
-          lockObservationExecution(observationId) *> reset,
-          Applicative[F].unit
+          lockObservationExecution(observationId) *>
+            requireNoOngoingStep(observationId, SequenceType.Acquisition).flatMap(_.traverse(_ => reset)),
+          ().asRight[OdbError].pure[F]
         )
 
       override def resetFlamingos2Acquisition(
         observationId: Observation.Id,
         stream:        Stream[F, Atom[Flamingos2DynamicConfig]]
-      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
+      )(using Transaction[F], Services.ServiceAccess): F[Either[OdbError, Unit]] =
         resetAcquisition(observationId, stream)(insertFlamingos2Sequence)
 
       override def resetGmosNorthAcquisition(
         observationId: Observation.Id,
         stream:        Stream[F, Atom[GmosNorth]]
-      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
+      )(using Transaction[F], Services.ServiceAccess): F[Either[OdbError, Unit]] =
         resetAcquisition(observationId, stream)(insertGmosNorthSequence)
 
       override def resetGmosSouthAcquisition(
         observationId: Observation.Id,
         stream:        Stream[F, Atom[GmosSouth]]
-      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
+      )(using Transaction[F], Services.ServiceAccess): F[Either[OdbError, Unit]] =
         resetAcquisition(observationId, stream)(insertGmosSouthSequence)
 
       override def resetGnirsAcquisition(
         observationId: Observation.Id,
         stream:        Stream[F, Atom[GnirsDynamicConfig]]
-      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
+      )(using Transaction[F], Services.ServiceAccess): F[Either[OdbError, Unit]] =
         resetAcquisition(observationId, stream)(insertGnirsSequence)
 
       private def materializeExecutionConfig[S, D](
@@ -2038,7 +2067,7 @@ object SequenceService:
     /**
      * Selects the current batch of atoms (see V1349 for `c_batch`), executed
      * or not. Abandoned steps are left out: a replacement in the same batch
-     * supersedes them, and a reset copies a step while it is still ongoing.
+     * supersedes them.
      */
     def selectLatestSequence[D](
       table: DynamicTable[D]
@@ -2126,6 +2155,16 @@ object SequenceService:
       sql"""
         SELECT 1 FROM lock_observation_execution($observation_id)
       """.query(int4)
+
+    /** The executing step of the sequence, if any (at most one per observation). */
+    val SelectOngoingStep: Query[(Observation.Id, SequenceType), Step.Id] =
+      sql"""
+        SELECT c_step_id
+          FROM t_step_execution
+         WHERE c_observation_id  = $observation_id
+           AND c_sequence_type   = $sequence_type
+           AND c_execution_state = 'ongoing'
+      """.query(step_id)
 
     val MarkMaterializedOrDoNothing: Query[(Observation.Id, SequenceType), Boolean] =
       sql"""

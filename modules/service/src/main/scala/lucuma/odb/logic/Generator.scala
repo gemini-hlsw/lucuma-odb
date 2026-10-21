@@ -48,6 +48,7 @@ import lucuma.core.util.TimeSpan
 import lucuma.odb.data.Itc
 import lucuma.odb.data.ItcAcquisition
 import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.sequence.ObservingMode.Syntax.*
 import lucuma.odb.sequence.SetupTimeEstimateCalculator
 import lucuma.odb.sequence.data.GeneratorParams
@@ -690,10 +691,10 @@ object Generator:
           input: Option[ItcInput],
           gen:   F[Either[OdbError, StreamingExecutionConfig[F, S, D]]]
         )(
-          persist: (Observation.Id, Stream[F, Atom[D]]) => F[Unit]
+          persist: (Observation.Id, Stream[F, Atom[D]]) => F[Either[OdbError, Unit]]
         )(using Transaction[F]): EitherT[F, OdbError, Unit] =
           EitherT(gen)
-            .flatMap(s => EitherT.liftF(persist(observationId, s.acquisition)))
+            .flatMap(s => EitherT(persist(observationId, s.acquisition)))
             .flatMap(_ => EitherT.liftF(input.traverse_(itcService.updateAcquisition(observationId, _, acq))))
 
         def reset(ctx: GeneratorContext, freshAcq: ItcAcquisition)(using Transaction[F]): EitherT[F, OdbError, Unit] =
@@ -772,16 +773,18 @@ object Generator:
           yield ()
 
         // The edited steps do not depend on the ITC, so no remote call is made
-        // and the ITC snapshot is left alone.
+        // and the ITC snapshot is left alone.  A rejected edit (e.g., while a
+        // step is executing) is reported as is.
         val restartCustomizedAcquisition: EitherT[F, OdbError, Boolean] =
           transactionallyEitherT:
             EitherT:
               sequenceService.resetCustomizedAcquisition(observationId).map:
-                _.toEither.leftMap: failure =>
-                  GeneratorError.sequenceUnavailable(
-                    observationId,
-                    failure.fold(t => Option(t.getMessage).getOrElse(t.toString), _.toChain.toList.map(_.message).mkString("; "))
-                  )
+                _.toEither.leftMap:
+                  case Left(t)         =>
+                    GeneratorError.sequenceUnavailable(observationId, Option(t.getMessage).getOrElse(t.toString))
+                  case Right(problems) =>
+                    problems.collectFirstSome(_.asOdbError).getOrElse:
+                      GeneratorError.sequenceUnavailable(observationId, problems.toChain.toList.map(_.message).mkString("; "))
 
         if regenerate then regenerateAcquisition.value
         else restartCustomizedAcquisition.ifM(EitherT.pure(()), regenerateAcquisition).value

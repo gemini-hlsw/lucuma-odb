@@ -4050,7 +4050,7 @@ type Mutation {
   """
   Replaces the remaining steps in an execution sequence with the provided
   sequence.  Previously executed (or even partially executed) steps are not
-  deleted.  Any ongoing steps are abandoned.
+  deleted.  Fails while a step of the sequence is executing.
   """
   replaceFlamingos2Sequence(
     input: ReplaceFlamingos2SequenceInput!
@@ -4069,7 +4069,7 @@ type Mutation {
   """
   Replaces the remaining steps in an execution sequence with the provided
   sequence.  Previously executed (or even partially executed) steps are not
-  deleted.  Any ongoing steps are abandoned.
+  deleted.  Fails while a step of the sequence is executing.
   """
   replaceGmosNorthSequence(
     input: ReplaceGmosNorthSequenceInput!
@@ -4105,7 +4105,7 @@ type Mutation {
   """
   Replaces the remaining steps in an execution sequence with the provided
   sequence.  Previously executed (or even partially executed) steps are not
-  deleted.  Any ongoing steps are abandoned.
+  deleted.  Fails while a step of the sequence is executing.
   """
   replaceGmosSouthSequence(
     input: ReplaceGmosSouthSequenceInput!
@@ -4114,7 +4114,7 @@ type Mutation {
   """
   Replaces the remaining steps in an execution sequence with the provided
   sequence.  Previously executed (or even partially executed) steps are not
-  deleted.  Any ongoing steps are abandoned.
+  deleted.  Fails while a step of the sequence is executing.
   """
   replaceIgrins2Sequence(
     input: ReplaceIgrins2SequenceInput!
@@ -4123,7 +4123,7 @@ type Mutation {
   """
   Replaces the remaining steps in an execution sequence with the provided
   sequence.  Previously executed (or even partially executed) steps are not
-  deleted.  Any ongoing steps are abandoned.
+  deleted.  Fails while a step of the sequence is executing.
   """
   replaceGnirsSequence(
     input: ReplaceGnirsSequenceInput!
@@ -4132,7 +4132,7 @@ type Mutation {
   """
   Replaces the remaining steps in an execution sequence with the provided
   sequence.  Previously executed (or even partially executed) steps are not
-  deleted.  Any ongoing steps are abandoned.
+  deleted.  Fails while a step of the sequence is executing.
   """
   replaceGhostSequence(
     input: ReplaceGhostSequenceInput!
@@ -4154,7 +4154,8 @@ type Mutation {
   Resets the acquisition sequence to start from the initial step regardless of
   which acquisition steps may have been executed.  An acquisition customized
   via `replace*Sequence` restarts from a copy of its edited steps and stays
-  customized, unless `regenerate` is set.  Requires staff (or better) access.
+  customized, unless `regenerate` is set.  Fails while an acquisition step is
+  executing.  Requires staff (or better) access.
   """
   resetAcquisition(
     input: ResetAcquisitionInput!

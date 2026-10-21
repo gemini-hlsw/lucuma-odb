@@ -29,6 +29,7 @@ import io.circe.Json
 import io.circe.syntax.*
 import lucuma.catalog.clients.GaiaClient
 import lucuma.core.enums.ScienceBand
+import lucuma.core.enums.SequenceType
 import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.model.Attachment
 import lucuma.core.model.CallForProposals
@@ -984,6 +985,19 @@ trait MutationMapping[F[_]] extends AccessControl[F] with UserEnv {
             }).flatMap(_ => accum)
           }.value
 
+      // Editing the acquisition regenerates its sequence (see
+      // resetAcquisitionIfNecessary), which may not happen while an
+      // acquisition step is executing.  The check holds no execution lock,
+      // so a step that starts in the meantime just makes the reset fail.
+      def requireNoOngoingAcquisition(checked: AccessControl.CheckedWithIds[ObservationPropertiesInput.Edit, Observation.Id])(using Services[F], Transaction[F]): ResultT[F, Unit] =
+        ResultT:
+          checked.foldWithIds(Result.unit.pure[F]): (set, ids) =>
+            if set.updatesAcquisition then
+              ids.toList
+                .traverse(sequenceService.requireNoOngoingStep(_, SequenceType.Acquisition))
+                .map(_.sequence_.fold(_.asFailure, Result.success))
+            else Result.unit.pure[F]
+
       def resetAcquisitionIfNecessary(
         approval: Result[AccessControl.CheckedWithIds[ObservationPropertiesInput.Edit, Observation.Id]]
       ): F[Unit] =
@@ -1005,7 +1019,8 @@ trait MutationMapping[F[_]] extends AccessControl[F] with UserEnv {
           val resultQuery =
             services.useTransactionally:
               approval.flatTraverse: edit =>
-                  updateObservations(edit)
+                  requireNoOngoingAcquisition(edit)
+                    .flatMap(_ => updateObservations(edit))
                     .flatMap:
                       case (map, query) =>
                         Services.asSuperUser:

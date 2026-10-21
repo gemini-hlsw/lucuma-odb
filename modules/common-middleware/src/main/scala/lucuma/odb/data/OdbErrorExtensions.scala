@@ -34,3 +34,9 @@ object OdbErrorExtensions:
 
     def asWarningF[F[_]: Applicative, A](a: A): F[Result[A]] =
       asWarning(a).pure[F]
+
+  extension (p: Problem)
+
+    /** The ODB error that `asProblem` embedded, if any. */
+    def asOdbError: Option[OdbError] =
+      p.extensions.flatMap(_(Key)).flatMap(_.as[OdbError].toOption)
