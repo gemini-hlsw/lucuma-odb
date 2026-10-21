@@ -5,6 +5,7 @@ package lucuma.odb.graphql
 package mapping
 
 import cats.effect.Resource
+import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.traverse.*
 import eu.timepit.refined.cats.*
@@ -141,12 +142,16 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
           val json =
             digests.get(oid).fold(OdbError.SequenceUnavailable(oid).asWarning(Json.Null)):
               _.map: res =>
-                  res.map(_.asJson) match
+                  res.map(_.asJson).flatMap(withStepViolationSeverity) match
                     case Result.Failure(ps) => Result.Warning(ps, Json.Null)
                     case r                  => r
                 .sequence.map(_.asJson)
           oid -> json
         .toMap
+
+  private def withStepViolationSeverity(digest: Json): Result[Json] =
+    List("acquisition", "science").foldLeftM(digest): (json, sequence) =>
+      ValidationSeverity.addAllAt(json, json.hcursor.downFields(sequence, "stepViolations"))
 
   private lazy val timeChargeHandler: EffectHandler[F] =
     batchedEffectHandler: oids =>

@@ -33,6 +33,24 @@ sealed trait GroupTree extends Product with Serializable {
     go(List(this))
   }
 
+  /**
+   * The topmost branches whose ids are in `groupIds`: those with no such
+   * ancestor.  Their subtrees together cover every listed group in the tree.
+   */
+  def topmostBranches(groupIds: Set[Group.Id]): List[GroupTree.Branch] =
+    this match
+      case b: GroupTree.Branch if groupIds.contains(b.groupId) => List(b)
+      case b: GroupTree.Branch                                  => b.children.flatMap(_.topmostBranches(groupIds))
+      case GroupTree.Root(_, children)                          => children.flatMap(_.topmostBranches(groupIds))
+      case GroupTree.Leaf(_)                                    => Nil
+
+  /** Every observation in this tree, at any depth. */
+  def allObservations: List[Observation.Id] =
+    this match
+      case GroupTree.Leaf(oid)             => List(oid)
+      case GroupTree.Branch(children = cs) => cs.flatMap(_.allObservations)
+      case GroupTree.Root(_, cs)           => cs.flatMap(_.allObservations)
+
   def collectObservations(
     predicate: GroupTree.Branch => Boolean
   ): List[(Group.Id, List[(Observation.Id, NonNegShort)])] = {

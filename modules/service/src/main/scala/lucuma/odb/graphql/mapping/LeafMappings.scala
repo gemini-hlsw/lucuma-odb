@@ -16,6 +16,8 @@ import io.circe.refined.*
 import lucuma.core.data.EmailAddress
 import lucuma.core.enums.*
 import lucuma.core.enums.GmosMosAcquisitionType
+import lucuma.core.enums.GroupConstraintViolation
+import lucuma.core.enums.GroupStatus
 import lucuma.core.enums.ProposalSummaryGenerationState
 import lucuma.core.math.Epoch
 import lucuma.core.math.SignalToNoise
@@ -177,6 +179,8 @@ trait LeafMappings[F[_]] extends BaseMapping[F]:
       LeafMapping[GnirsWellDepth](GnirsWellDepthType),
       LeafMapping[ArchiveDuplication.State](ArchiveDuplicationStateType),
       LeafMapping[Group.Id](GroupIdType),
+      LeafMapping[GroupConstraintViolation](GroupConstraintViolationType),
+      LeafMapping[GroupStatus](GroupStatusType),
       LeafMapping[GuideProbe](GuideProbeType),
       LeafMapping[StepGuideState](GuideStateType),
       LeafMapping[IdempotencyKey](IdempotencyKeyType),

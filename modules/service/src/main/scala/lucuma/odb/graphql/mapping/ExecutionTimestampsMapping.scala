@@ -16,6 +16,7 @@ trait ExecutionTimestampsMapping[F[_]] extends ExecutionTimestampsView[F]:
     ObjectMapping(ExecutionTimestampsType)(
       SqlField("observationId", ExecutionTimestampsView.ObservationId, key = true, hidden = true),
       SqlField("firstEventTime", ExecutionTimestampsView.FirstEventTime),
+      SqlField("startTime",      ExecutionTimestampsView.StartTime),
       SqlField("lastEventTime",  ExecutionTimestampsView.LastEventTime),
       SqlField("completionTime", ExecutionTimestampsView.CompletionTime)
     )

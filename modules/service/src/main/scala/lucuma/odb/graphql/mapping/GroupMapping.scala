@@ -8,7 +8,7 @@ package mapping
 import cats.Monad
 import cats.effect.Resource
 import cats.implicits.catsKernelOrderingForOrder
-import cats.syntax.functor.*
+import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegShort
 import grackle.Query.Binding
 import grackle.Query.EffectHandler
@@ -22,6 +22,7 @@ import grackle.syntax.*
 import io.circe.syntax.*
 import lucuma.core.model.Group
 import lucuma.core.model.User
+import lucuma.core.model.group.GroupProgress
 import lucuma.core.model.sequence.BandedTime
 import lucuma.core.util.CalculatedValue
 import lucuma.itc.client.ItcClient
@@ -32,6 +33,7 @@ import lucuma.odb.graphql.table.GroupElementView
 import lucuma.odb.graphql.table.GroupView
 import lucuma.odb.graphql.table.ProgramView
 import lucuma.odb.json.calculatedValue.given
+import lucuma.odb.json.groupprogress.given
 import lucuma.odb.json.time.query.given
 import lucuma.odb.json.timeaccounting.given
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
@@ -67,8 +69,9 @@ trait GroupMapping[F[_]] extends GroupView[F] with ProgramView[F] with GroupElem
       SqlObject("elements", Join(GroupView.Id, GroupElementView.GroupId)),
       SqlObject("program", Join(GroupView.ProgramId, ProgramView.Id)),
 
-      EffectField(RangeField, estimateHandler, List("id")),
-      EffectField(BandedField, estimateHandler, List("id")),
+      EffectField(RangeField,    groupHandler, List("id")),
+      EffectField(BandedField,   groupHandler, List("id")),
+      EffectField(ProgressField, groupHandler, List("id")),
 
       SqlField("existence", GroupView.Existence),
       SqlField("system", GroupView.System),
@@ -90,26 +93,49 @@ trait GroupMapping[F[_]] extends GroupView[F] with ProgramView[F] with GroupElem
           )
       }
 
-  private val RangeField  = "timeEstimateRange"
-  private val BandedField = "timeEstimateBanded"
+  private val RangeField    = "timeEstimateRange"
+  private val BandedField   = "timeEstimateBanded"
+  private val ProgressField = "progress"
 
-  // One handler serves both estimate fields.  Grackle batches by handler, so it
-  // receives every group for both fields at once and each program is loaded
-  // only once.
-  private lazy val estimateHandler: EffectHandler[F] =
-    keyedBatchEffectHandler[Group.Id, TimeEstimateService.GroupEstimate](
+  // What the calculated group fields need for one group.  Only the parts for
+  // the fields requested are computed.
+  private case class GroupResults(
+    estimate: TimeEstimateService.GroupEstimate,
+    progress: Option[GroupProgress]
+  )
+
+  // One handler serves every calculated group field.  Grackle batches by
+  // handler, so it receives every requested group, for all of these fields,
+  // at once: each program's group tree is loaded only once and shared by the
+  // estimates and the progress.  Progress then evaluates only the requested
+  // groups' subtrees.  A deleted group has no progress.
+  private lazy val groupHandler: EffectHandler[F] =
+    keyedBatchEffectHandler[Group.Id, GroupResults](
       _.fieldAs[Group.Id]("id"),
       (gids, fields) =>
         services.useTransactionally:
-          timeEstimateService
-            .estimateGroups(gids, fields.contains(BandedField))
-            .map(_.view.mapValues(_.success).toMap),
+          for
+            trees    <- groupService.selectProgramTrees(gids)
+            estimate <- if fields.contains(RangeField) || fields.contains(BandedField)
+                        then timeEstimateService.estimateGroups(trees, fields.contains(BandedField))
+                        else Map.empty[Group.Id, TimeEstimateService.GroupEstimate].pure[F]
+            progress <- if fields.contains(ProgressField)
+                        then groupProgressService.selectProgress(trees)
+                        else Map.empty[Group.Id, GroupProgress].pure[F]
+          yield gids.map: gid =>
+            gid -> GroupResults(
+              estimate.getOrElse(gid, TimeEstimateService.GroupEstimate.Empty),
+              progress.get(gid)
+            ).success
+          .toMap,
       {
-        case (RangeField, e)  =>
-          e.range.asJson.success
-        case (BandedField, e) =>
-          e.banded.toList.sortBy(_._1).map((b, cv) => Monad[CalculatedValue].map(cv)(t => BandedTime(b, t))).asJson.success
-        case (field, _)       =>
-          Result.internalError(s"Unexpected group time estimate field: $field")
+        case (RangeField, r)    =>
+          r.estimate.range.asJson.success
+        case (BandedField, r)   =>
+          r.estimate.banded.toList.sortBy(_._1).map((b, cv) => Monad[CalculatedValue].map(cv)(t => BandedTime(b, t))).asJson.success
+        case (ProgressField, r) =>
+          r.progress.asJson.success
+        case (field, _)         =>
+          Result.internalError(s"Unexpected calculated group field: $field")
       }
     )

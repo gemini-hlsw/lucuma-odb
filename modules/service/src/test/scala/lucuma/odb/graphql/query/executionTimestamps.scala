@@ -6,6 +6,7 @@ package lucuma.odb.graphql.query
 import cats.effect.IO
 import cats.syntax.apply.*
 import cats.syntax.either.*
+import cats.syntax.eq.*
 import cats.syntax.foldable.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
@@ -29,9 +30,11 @@ class executionTimestamps extends ExecutionTestSupportForGmos:
 
   case class Times(
     first:      Option[Timestamp],
+    start:      Option[Timestamp],
     last:       Option[Timestamp],
     completion: Option[Timestamp],
-    events:     List[Timestamp]
+    events:     List[Timestamp],
+    nonSlew:    List[Timestamp]
   )
 
   def times(oid: Observation.Id): IO[Times] =
@@ -43,12 +46,14 @@ class executionTimestamps extends ExecutionTestSupportForGmos:
             execution {
               timestamps {
                 firstEventTime
+                startTime
                 lastEventTime
                 completionTime
               }
               events {
                 matches {
                   effectiveTime
+                  eventType
                 }
               }
             }
@@ -60,10 +65,12 @@ class executionTimestamps extends ExecutionTestSupportForGmos:
       val t = e.downField("timestamps")
       (for
         f  <- t.downField("firstEventTime").as[Option[Timestamp]]
+        s  <- t.downField("startTime").as[Option[Timestamp]]
         l  <- t.downField("lastEventTime").as[Option[Timestamp]]
         c  <- t.downField("completionTime").as[Option[Timestamp]]
-        es <- e.downFields("events", "matches").values.toList.flatten.traverse(_.hcursor.downField("effectiveTime").as[Timestamp])
-      yield Times(f, l, c, es)).leftMap(f => new RuntimeException(f.message)).liftTo[IO]
+        es <- e.downFields("events", "matches").values.toList.flatten.traverse: ev =>
+                (ev.hcursor.downField("effectiveTime").as[Timestamp], ev.hcursor.downField("eventType").as[String]).tupled
+      yield Times(f, s, l, c, es.map(_._1), es.collect { case (t, tpe) if tpe =!= "SLEW" => t })).leftMap(f => new RuntimeException(f.message)).liftTo[IO]
 
   def newObservation: IO[Observation.Id] =
     for
@@ -119,13 +126,14 @@ class executionTimestamps extends ExecutionTestSupportForGmos:
   // First and last event times always span the recorded events.
   def assertEventRange(t: Times): Unit =
     assertEquals(t.first, t.events.minimumOption, "firstEventTime")
+    assertEquals(t.start, t.nonSlew.minimumOption, "startTime")
     assertEquals(t.last,  t.events.maximumOption, "lastEventTime")
 
   test("no events: everything is null"):
     for
       oid <- newObservation
       t   <- times(oid)
-    yield assertEquals(t, Times(None, None, None, Nil))
+    yield assertEquals(t, Times(None, None, None, None, Nil, Nil))
 
   test("slew only: event times, but not complete"):
     for
@@ -135,7 +143,19 @@ class executionTimestamps extends ExecutionTestSupportForGmos:
     yield
       assertEquals(t.events.size, 1)
       assertEventRange(t)
+      assertEquals(t.start, None)
       assertEquals(t.completion, None)
+
+  test("start time is the first event other than a slew"):
+    for
+      oid <- newObservation
+      _   <- addSlewEventAs(serviceUser, oid, SlewStage.StartSlew)
+      _   <- startObservation(oid)
+      t   <- times(oid)
+    yield
+      assertEventRange(t)
+      assert(t.start.isDefined)
+      assertNotEquals(t.start, t.first)
 
   test("ongoing: event times, but not complete"):
     for
@@ -198,7 +218,7 @@ class executionTimestamps extends ExecutionTestSupportForGmos:
       oid <- newObservation
       _   <- declareCompleteDirectly(oid)
       t   <- times(oid)
-    yield assertEquals(t, Times(None, None, None, Nil))
+    yield assertEquals(t, Times(None, None, None, None, Nil, Nil))
 
   test("declared complete with events: completion time is the last event time"):
     for

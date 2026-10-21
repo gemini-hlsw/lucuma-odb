@@ -50,8 +50,10 @@ import lucuma.odb.service.ObservationWorkflowService.UserState
 import lucuma.odb.syntax.instrument.*
 import lucuma.odb.util.Codecs.*
 import skunk.Encoder
+import skunk.Fragment
 import skunk.Query
 import skunk.Transaction
+import skunk.Void
 import skunk.codec.boolean.bool
 import skunk.syntax.all.*
 
@@ -100,13 +102,7 @@ case class ObservationValidationInfo(
     declaredExecutionState === Some(CoreExecutionState.DeclaredComplete)
 
   def effectiveUserState: Option[UserState] =
-    // Per-observation calibrations (tellurics, daytime pinhole flats) inherit
-    // their science observation's user state.
-    // A telluric could be declined however, thus it can carrie its own Inactive state,
-    // which overrides that inheritance.
-    if calibrationRole.contains(CalibrationRole.Telluric) && userState.contains(ObservationWorkflowState.Inactive) then Some(ObservationWorkflowState.Inactive)
-    else if calibrationRole.exists(ObsExtract.PerObservationCalibrationRoles.contains) then associatedUserState
-    else userState
+    ObservationValidationInfo.effectiveUserState(calibrationRole, userState, associatedUserState)
 
   /* Has the proposal been accepted? */
   def isAccepted:Boolean =
@@ -185,6 +181,22 @@ case class CfpInfo(
 }
 
 object ObservationValidationInfo {
+
+  /**
+   * The user state that governs an observation.  Per-observation calibrations
+   * (tellurics, daytime pinhole flats) inherit their science observation's
+   * user state, except that a declined (inactive) telluric stays inactive.
+   * Everything else has its own.  The science observation's state is the one
+   * `Statements.AssociatedScienceObservation` joins.
+   */
+  def effectiveUserState(
+    calibrationRole:     Option[CalibrationRole],
+    userState:           Option[UserState],
+    associatedUserState: Option[UserState]
+  ): Option[UserState] =
+    if calibrationRole.contains(CalibrationRole.Telluric) && userState.contains(ObservationWorkflowState.Inactive) then Some(ObservationWorkflowState.Inactive)
+    else if calibrationRole.exists(ObsExtract.PerObservationCalibrationRoles.contains) then associatedUserState
+    else userState
 
   def fetch[F[_]: Concurrent](
     oids: List[Observation.Id]
@@ -351,6 +363,32 @@ object ObservationValidationInfo {
 
   object Statements {
 
+    /**
+     * Joins `s`, holding `c_workflow_user_state`: for an observation `o` that
+     * is a per-observation calibration (a telluric or daytime pinhole flat),
+     * the science observation in its group; otherwise no row.  At most one row
+     * per observation, chosen deterministically should a group hold more than
+     * one science observation.  The roles are `PerObservationCalibrationRoles`,
+     * the same ones `effectiveUserState` treats as inheriting.  They are
+     * written into the SQL as literals (enum tags, so constants), which keeps
+     * the fragment free of parameters for the queries that embed it.
+     */
+    val AssociatedScienceObservation: Fragment[Void] =
+      val roles: String =
+        ObsExtract.PerObservationCalibrationRoles.map(r => s"'${r.tag}'").mkString(",")
+      sql"""
+        LEFT JOIN LATERAL (
+          SELECT sci.c_workflow_user_state
+          FROM   t_observation sci
+          WHERE  o.c_calibration_role = ANY(ARRAY[#$roles]::e_calibration_role[])
+            AND  sci.c_calibration_role IS NULL
+            AND  sci.c_group_id  = o.c_group_id
+            AND  sci.c_existence = 'present'
+          ORDER BY sci.c_observation_id
+          LIMIT 1
+        ) s ON TRUE
+      """
+
     def WithScienceSteps[A <: NonEmptyList[Observation.Id]](enc: skunk.Encoder[A]): Query[A, Observation.Id] =
       sql"""
         SELECT DISTINCT a.c_observation_id
@@ -409,10 +447,7 @@ object ObservationValidationInfo {
         JOIN t_program p on p.c_program_id = o.c_program_id
         LEFT JOIN t_proposal x
           ON o.c_program_id = x.c_program_id
-        LEFT JOIN t_observation s
-          ON  o.c_calibration_role = ANY(ARRAY['telluric','daytime_pinhole']::e_calibration_role[])
-          AND s.c_calibration_role IS NULL
-          AND o.c_group_id = s.c_group_id
+        $AssociatedScienceObservation
         WHERE o.c_observation_id IN ($enc)
       """
       .query(
