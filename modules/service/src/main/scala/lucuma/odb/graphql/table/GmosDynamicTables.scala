@@ -7,16 +7,19 @@ package table
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
 import org.tpolecat.typename.TypeName
+import skunk.codec.numeric.int8
 
 trait GmosDynamicTables[F[_]] extends BaseMapping[F] {
 
-  class GmosDynamicTable[G, L, U](
+  class GmosDynamicTable[I, G, L, U](
     name:    String,
+    idName:  String,
+    id:      skunk.Codec[I],
     grating: skunk.Codec[G],
     filter:  skunk.Codec[L],
     fpu:     skunk.Codec[U]
-  )(implicit gratingName: TypeName[G], filterName: TypeName[L], fpuName: TypeName[U]) extends TableDef(name) {
-    val Id: ColumnRef            = col("c_step_id",           step_id)
+  )(implicit idTypeName: TypeName[I], gratingName: TypeName[G], filterName: TypeName[L], fpuName: TypeName[U]) extends TableDef(name) {
+    val Id: ColumnRef            = col(idName,                id)
     val Instrument: ColumnRef    = col("c_instrument",        instrument)
 
     val ExposureTime: ColumnRef  = col("c_exposure_time",     time_span)
@@ -34,7 +37,7 @@ trait GmosDynamicTables[F[_]] extends BaseMapping[F] {
 
     // Grating (if any)
     object Grating {
-      val SyntheticId: ColumnRef = col("c_grating_id",         step_id.embedded)
+      val SyntheticId: ColumnRef = col("c_grating_id",         id.embedded)
       val Disperser: ColumnRef   = col("c_grating_disperser",  grating.embedded)
       val Order: ColumnRef       = col("c_grating_order",      gmos_grating_order.embedded)
       val Wavelength: ColumnRef  = col("c_grating_wavelength", wavelength_pm.embedded)
@@ -44,9 +47,9 @@ trait GmosDynamicTables[F[_]] extends BaseMapping[F] {
 
     // FPU (custom or builtin or none)
     object Fpu {
-      val SyntheticId: ColumnRef   = col("c_fpu_id",                     step_id.embedded)
+      val SyntheticId: ColumnRef   = col("c_fpu_id",                     id.embedded)
       object CustomMask {
-        val SyntheticId: ColumnRef  = col("c_fpu_custom_mask_id",            step_id.embedded)
+        val SyntheticId: ColumnRef  = col("c_fpu_custom_mask_id",            id.embedded)
         val AttachmentId: ColumnRef = col("c_fpu_custom_mask_attachment_id", attachment_id.opt)
         val SlitWidth: ColumnRef    = col("c_fpu_custom_mask_slit_width",    gmos_custom_slit_width.embedded)
       }
@@ -54,7 +57,7 @@ trait GmosDynamicTables[F[_]] extends BaseMapping[F] {
     }
 
     object CentralWavelength {
-      val SyntheticId: ColumnRef = col("c_central_wavelength_id", step_id.embedded)
+      val SyntheticId: ColumnRef = col("c_central_wavelength_id", id.embedded)
       val Value: ColumnRef       = col("c_central_wavelength",    wavelength_pm.embedded)
     }
 
@@ -62,6 +65,8 @@ trait GmosDynamicTables[F[_]] extends BaseMapping[F] {
 
   object GmosNorthDynamicTable extends GmosDynamicTable(
     "v_gmos_north_dynamic",
+    "c_step_id",
+    step_id,
     gmos_north_grating,
     gmos_north_filter,
     gmos_north_fpu
@@ -69,6 +74,27 @@ trait GmosDynamicTables[F[_]] extends BaseMapping[F] {
 
   object GmosSouthDynamicTable extends GmosDynamicTable(
     "v_gmos_south_dynamic",
+    "c_step_id",
+    step_id,
+    gmos_south_grating,
+    gmos_south_filter,
+    gmos_south_fpu
+  )
+
+  // Calibration set setups: the same columns keyed by the set id.
+  object GmosNorthCalibrationSetupTable extends GmosDynamicTable(
+    "v_gmos_north_daytime_calibration_setup",
+    "c_set_id",
+    int8,
+    gmos_north_grating,
+    gmos_north_filter,
+    gmos_north_fpu
+  )
+
+  object GmosSouthCalibrationSetupTable extends GmosDynamicTable(
+    "v_gmos_south_daytime_calibration_setup",
+    "c_set_id",
+    int8,
     gmos_south_grating,
     gmos_south_filter,
     gmos_south_fpu

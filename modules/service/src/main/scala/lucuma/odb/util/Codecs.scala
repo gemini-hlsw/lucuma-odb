@@ -799,6 +799,9 @@ trait Codecs extends CoreCodecs {
   val calibration_role: Codec[CalibrationRole] =
     enumerated(Type("e_calibration_role"))
 
+  val calibration_set_type: Codec[CalibrationSetType] =
+    enumerated(Type("e_calibration_set_type"))
+
   val _calibration_role: Codec[List[CalibrationRole]] =
     _enumerated[CalibrationRole](Type("_e_calibration_role", List(Type("e_calibration_role"))))
 

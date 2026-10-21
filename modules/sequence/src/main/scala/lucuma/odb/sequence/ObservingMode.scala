@@ -122,74 +122,74 @@ object ObservingMode:
       // Exchange observations are not Gemini instruments and have no `Instrument`.
       def instrument: Option[Instrument] =
         m match
-          case d @ DaytimeCalibration(_) => d.instrument.some
-          case _: Exchange               => none
-          case _: Flamingos2Imaging      => Instrument.Flamingos2.some
-          case _: Flamingos2LongSlit     => Instrument.Flamingos2.some
-          case _: Flamingos2Mos          => Instrument.Flamingos2.some
-          case _: GhostIfu               => Instrument.Ghost.some
-          case _: GmosNorthIfu           => Instrument.GmosNorth.some
-          case _: GmosNorthImaging       => Instrument.GmosNorth.some
-          case _: GmosNorthLongSlit      => Instrument.GmosNorth.some
-          case _: GmosSouthIfu           => Instrument.GmosSouth.some
-          case _: GmosSouthImaging       => Instrument.GmosSouth.some
-          case _: GmosSouthLongSlit      => Instrument.GmosSouth.some
-          case _: GmosNorthMos           => Instrument.GmosNorth.some
-          case _: GmosSouthMos           => Instrument.GmosSouth.some
-          case _: GnirsImaging           => Instrument.Gnirs.some
-          case _: GnirsSpectroscopy      => Instrument.Gnirs.some
-          case _: Igrins2LongSlit        => Instrument.Igrins2.some
-          case v: Visitor                => v.mode.instrument.some
+          case DaytimeCalibration(instrument = i) => i.some
+          case _: Exchange                        => none
+          case _: Flamingos2Imaging               => Instrument.Flamingos2.some
+          case _: Flamingos2LongSlit              => Instrument.Flamingos2.some
+          case _: Flamingos2Mos                   => Instrument.Flamingos2.some
+          case _: GhostIfu                        => Instrument.Ghost.some
+          case _: GmosNorthIfu                    => Instrument.GmosNorth.some
+          case _: GmosNorthImaging                => Instrument.GmosNorth.some
+          case _: GmosNorthLongSlit               => Instrument.GmosNorth.some
+          case _: GmosSouthIfu                    => Instrument.GmosSouth.some
+          case _: GmosSouthImaging                => Instrument.GmosSouth.some
+          case _: GmosSouthLongSlit               => Instrument.GmosSouth.some
+          case _: GmosNorthMos                    => Instrument.GmosNorth.some
+          case _: GmosSouthMos                    => Instrument.GmosSouth.some
+          case _: GnirsImaging                    => Instrument.Gnirs.some
+          case _: GnirsSpectroscopy               => Instrument.Gnirs.some
+          case _: Igrins2LongSlit                 => Instrument.Igrins2.some
+          case v: Visitor                         => v.mode.instrument.some
 
       def name: String =
         m match
-          case DaytimeCalibration(_) => DaytimeCalibrationName
-          case _: Exchange           => ExchangeName
-          case _: Flamingos2Imaging  => Flamingos2ImagingName
-          case _: Flamingos2LongSlit => Flamingos2LongSlitName
-          case _: Flamingos2Mos      => Flamingos2MosName
-          case _: GhostIfu           => GhostIfuName
-          case _: GmosNorthIfu       => GmosNorthIfuName
-          case _: GmosNorthImaging   => GmosNorthImagingName
-          case _: GmosNorthLongSlit  => GmosNorthLongSlitName
-          case _: GmosSouthIfu       => GmosSouthIfuName
-          case _: GmosSouthImaging   => GmosSouthImagingName
-          case _: GmosSouthLongSlit  => GmosSouthLongSlitName
-          case _: GmosNorthMos       => GmosNorthMosName
-          case _: GmosSouthMos       => GmosSouthMosName
-          case _: GnirsImaging       => GnirsImagingName
-          case _: GnirsSpectroscopy  => GnirsSpectroscopyName
-          case _: Igrins2LongSlit    => Igrins2LongSlitName
-          case _: Visitor            => VisitorName
+          case DaytimeCalibration(_, _) => DaytimeCalibrationName
+          case _: Exchange              => ExchangeName
+          case _: Flamingos2Imaging     => Flamingos2ImagingName
+          case _: Flamingos2LongSlit    => Flamingos2LongSlitName
+          case _: Flamingos2Mos         => Flamingos2MosName
+          case _: GhostIfu              => GhostIfuName
+          case _: GmosNorthIfu          => GmosNorthIfuName
+          case _: GmosNorthImaging      => GmosNorthImagingName
+          case _: GmosNorthLongSlit     => GmosNorthLongSlitName
+          case _: GmosSouthIfu          => GmosSouthIfuName
+          case _: GmosSouthImaging      => GmosSouthImagingName
+          case _: GmosSouthLongSlit     => GmosSouthLongSlitName
+          case _: GmosNorthMos          => GmosNorthMosName
+          case _: GmosSouthMos          => GmosSouthMosName
+          case _: GnirsImaging          => GnirsImagingName
+          case _: GnirsSpectroscopy     => GnirsSpectroscopyName
+          case _: Igrins2LongSlit       => Igrins2LongSlitName
+          case _: Visitor               => VisitorName
 
       def modeType: ObservingModeType =
         m match
-          case d @ DaytimeCalibration(_) => d.mode
-          case e @ Exchange(_, _)        => e.mode
-          case _: Flamingos2Imaging      => ObservingModeType.Flamingos2Imaging
-          case _: Flamingos2LongSlit     => ObservingModeType.Flamingos2LongSlit
-          case _: Flamingos2Mos          => ObservingModeType.Flamingos2Mos
-          case _: GhostIfu               => ObservingModeType.GhostIfu
-          case _: GmosNorthIfu           => ObservingModeType.GmosNorthIfu
-          case _: GmosNorthImaging       => ObservingModeType.GmosNorthImaging
-          case _: GmosNorthLongSlit      => ObservingModeType.GmosNorthLongSlit
-          case _: GmosSouthIfu           => ObservingModeType.GmosSouthIfu
-          case _: GmosSouthImaging       => ObservingModeType.GmosSouthImaging
-          case _: GmosSouthLongSlit      => ObservingModeType.GmosSouthLongSlit
-          case _: GmosNorthMos           => ObservingModeType.GmosNorthMos
-          case _: GmosSouthMos           => ObservingModeType.GmosSouthMos
-          case _: GnirsImaging           => ObservingModeType.GnirsImaging
-          case a: GnirsSpectroscopy      =>
+          case d @ DaytimeCalibration(_, _) => d.mode
+          case e @ Exchange(_, _)           => e.mode
+          case _: Flamingos2Imaging         => ObservingModeType.Flamingos2Imaging
+          case _: Flamingos2LongSlit        => ObservingModeType.Flamingos2LongSlit
+          case _: Flamingos2Mos             => ObservingModeType.Flamingos2Mos
+          case _: GhostIfu                  => ObservingModeType.GhostIfu
+          case _: GmosNorthIfu              => ObservingModeType.GmosNorthIfu
+          case _: GmosNorthImaging          => ObservingModeType.GmosNorthImaging
+          case _: GmosNorthLongSlit         => ObservingModeType.GmosNorthLongSlit
+          case _: GmosSouthIfu              => ObservingModeType.GmosSouthIfu
+          case _: GmosSouthImaging          => ObservingModeType.GmosSouthImaging
+          case _: GmosSouthLongSlit         => ObservingModeType.GmosSouthLongSlit
+          case _: GmosNorthMos              => ObservingModeType.GmosNorthMos
+          case _: GmosSouthMos              => ObservingModeType.GmosSouthMos
+          case _: GnirsImaging              => ObservingModeType.GnirsImaging
+          case a: GnirsSpectroscopy         =>
             a.fpu match
               case _: GnirsFpu.Spectroscopy.Slit => ObservingModeType.GnirsLongSlit
               case _: GnirsFpu.Spectroscopy.Ifu  => ObservingModeType.GnirsIfu
-          case _: Igrins2LongSlit        => ObservingModeType.Igrins2LongSlit
-          case v: Visitor                => v.mode
+          case _: Igrins2LongSlit           => ObservingModeType.Igrins2LongSlit
+          case v: Visitor                   => v.mode
 
       def asDaytimeCalibration: Option[DaytimeCalibration] =
         m match
-          case a @ DaytimeCalibration(_) => a.some
-          case _                         => none
+          case a @ DaytimeCalibration(_, _) => a.some
+          case _                            => none
 
       def asExchange: Option[Exchange] =
         m match

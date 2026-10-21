@@ -12,7 +12,7 @@ trait GmosDynamicMapping[F[_]] extends GmosDynamicTables[F]:
 
   private def dynamicMappingAtPath[G, L, U](
     path: Path,
-    table:   GmosDynamicTable[G, L, U]
+    table:   GmosDynamicTable[?, G, L, U]
   ): ObjectMapping =
     ObjectMapping(path)(
       SqlField("id",       table.Id, key = true, hidden = true),
@@ -30,14 +30,16 @@ trait GmosDynamicMapping[F[_]] extends GmosDynamicTables[F]:
   // from being picked up in the context of a generated sequence.
   private def dynamicSwitchMapping[G, L, U](
     name:        String,
-    table:       GmosDynamicTable[G, L, U]
+    table:       GmosDynamicTable[?, G, L, U]
   ): List[TypeMapping] =
     List(
       dynamicMappingAtPath(StepRecordType / name, table)
     )
 
   lazy val GmosNorthDynamicMappings: List[TypeMapping] =
-    dynamicSwitchMapping("gmosNorth", GmosNorthDynamicTable)
+    dynamicSwitchMapping("gmosNorth", GmosNorthDynamicTable) :+
+      dynamicMappingAtPath(CalibrationSetType / "gmosNorth", GmosNorthCalibrationSetupTable)
 
   lazy val GmosSouthDynamicMappings: List[TypeMapping] =
-    dynamicSwitchMapping("gmosSouth", GmosSouthDynamicTable)
+    dynamicSwitchMapping("gmosSouth", GmosSouthDynamicTable) :+
+      dynamicMappingAtPath(CalibrationSetType / "gmosSouth", GmosSouthCalibrationSetupTable)

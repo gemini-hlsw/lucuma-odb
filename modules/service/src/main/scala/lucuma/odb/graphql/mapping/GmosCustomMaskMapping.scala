@@ -12,7 +12,7 @@ trait GmosCustomMaskMapping[F[_]] extends GmosDynamicTables[F] {
 
   private def customMaskMappingAtPath[G, L, U](
     path: Path,
-    table: GmosDynamicTable[G, L, U]
+    table: GmosDynamicTable[?, G, L, U]
   ): ObjectMapping =
     ObjectMapping(path)(
       SqlField("synthetic_id", table.Fpu.CustomMask.SyntheticId, key = true, hidden = true),
@@ -25,7 +25,9 @@ trait GmosCustomMaskMapping[F[_]] extends GmosDynamicTables[F] {
       customMaskMappingAtPath(StepRecordType / "gmosNorth" / "fpu" / "customMask", GmosNorthDynamicTable),
       customMaskMappingAtPath(StepRecordType / "gmosSouth" / "fpu" / "customMask", GmosSouthDynamicTable),
       customMaskMappingAtPath(GmosNorthStepType / "instrumentConfig" / "fpu" / "customMask", GmosNorthDynamicTable),
-      customMaskMappingAtPath(GmosSouthStepType / "instrumentConfig" / "fpu" / "customMask", GmosSouthDynamicTable)
+      customMaskMappingAtPath(GmosSouthStepType / "instrumentConfig" / "fpu" / "customMask", GmosSouthDynamicTable),
+      customMaskMappingAtPath(CalibrationSetType / "gmosNorth" / "fpu" / "customMask", GmosNorthCalibrationSetupTable),
+      customMaskMappingAtPath(CalibrationSetType / "gmosSouth" / "fpu" / "customMask", GmosSouthCalibrationSetupTable)
     )
 
 }

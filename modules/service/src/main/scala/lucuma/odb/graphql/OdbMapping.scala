@@ -197,6 +197,7 @@ object OdbMapping {
           with ElevationRangeMapping[F]
           with EmailMapping[F]
           with DaytimeCalibrationMapping[F]
+          with CalibrationSetMapping[F]
           with ExchangeMapping[F]
           with ExecutionMapping[F]
           with ExecutionTimestampsMapping[F]
@@ -472,6 +473,8 @@ object OdbMapping {
                 ElevationRangeMapping,
                 ExampleProgramReferenceMapping,
                 DaytimeCalibrationMapping,
+                CalibrationSetMapping,
+                CalibrationSetGcalMapping,
                 ExchangeMapping,
                 ExecutionEventAddedMapping,
                 ExecutionEventMapping,
@@ -712,6 +715,7 @@ object OdbMapping {
                 CallForProposalsElaborator,
                 ConstraintSetGroupElaborator,
                 DatasetElaborator,
+                DaytimeCalibrationElaborator,
                 EnumeratedOffsetElaborator,
                 ExecutionElaborator,
                 Flamingos2ImagingElaborator,

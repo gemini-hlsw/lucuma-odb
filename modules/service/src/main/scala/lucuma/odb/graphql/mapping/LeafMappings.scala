@@ -87,6 +87,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F]:
       LeafMapping[BigDecimal](BigDecimalType),
       LeafMapping[BlindOffsetType](BlindOffsetTypeType),
       LeafMapping[CalibrationRole](CalibrationRoleType),
+      LeafMapping[CalibrationSetType](CalibrationSetTypeType),
       LeafMapping[CallForProposals.Id](CallForProposalsIdType),
       LeafMapping[GeminiCallForProposalsType](GeminiCallForProposalsTypeType),
       LeafMapping[CassRotator](CassRotatorType),

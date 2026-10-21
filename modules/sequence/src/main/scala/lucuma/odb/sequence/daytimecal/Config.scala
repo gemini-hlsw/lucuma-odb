@@ -6,22 +6,37 @@ package lucuma.odb.sequence.daytimecal
 import cats.Eq
 import lucuma.core.enums.DaytimeCalibrationObservingModeType
 import lucuma.core.enums.Instrument
+import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.odb.sequence.util.HashBytes
 
 /**
- * Configuration for a daytime calibration.  The mode's only parameter is the instrument.
+ * Configuration for a daytime calibration: the instrument and the ordered
+ * calibration sets that generate its sequence.
  */
 final case class Config(
-  instrument: Instrument
+  instrument: Instrument,
+  sets:       List[CalibrationSet[InstrumentSetup]]
 ):
+
   def mode: DaytimeCalibrationObservingModeType =
     DaytimeCalibrationObservingModeType.DaytimeCalibration
+
+  def gmosNorthSets: List[CalibrationSet[DynamicConfig.GmosNorth]] =
+    sets.collect:
+      case s @ CalibrationSet(_, _, _, InstrumentSetup.GmosNorth(c)) => s.copy(setup = c)
+
+  def gmosSouthSets: List[CalibrationSet[DynamicConfig.GmosSouth]] =
+    sets.collect:
+      case s @ CalibrationSet(_, _, _, InstrumentSetup.GmosSouth(c)) => s.copy(setup = c)
 
 object Config:
 
   given Eq[Config] =
-    Eq.by(_.instrument)
+    Eq.by(c => (c.instrument, c.sets))
 
   given HashBytes[Config] with
     def hashBytes(c: Config): Array[Byte] =
-      HashBytes[Instrument].hashBytes(c.instrument)
+      Array.concat(
+        HashBytes[Instrument].hashBytes(c.instrument),
+        HashBytes[List[CalibrationSet[InstrumentSetup]]].hashBytes(c.sets)
+      )
