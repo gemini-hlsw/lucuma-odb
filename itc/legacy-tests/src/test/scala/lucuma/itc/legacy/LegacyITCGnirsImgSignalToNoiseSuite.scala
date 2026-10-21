@@ -54,6 +54,16 @@ class LegacyITCGnirsImgSignalToNoiseSuite extends CommonITCLegacySuite:
     val result = localItc.calculate(baseParams.asJson.noSpaces)
     assertIOBoolean(result.map(_.fold(_ => false, containsValidResults)))
 
+  // The ODB images a too-bright acquisition target at the minimum exposure, so the error must
+  // come back typed rather than as text.
+  test("gnirs imaging too bright source reports SourceTooBright".tag(LegacyITCTest)):
+    val result = localItc.calculate:
+      bodyConf(pointSource(0), obs, gnirs.copy(filter = GnirsFilter.Order4)).asJson.noSpaces
+    assertIOBoolean:
+      result.map:
+        case Left(LegacyItcError.SourceTooBright(halfWellTime = t)) => t > 0
+        case _                                                      => false
+
   test("gnirs imaging filter".tag(LegacyITCTest)):
     assertAllValid(Enumerated[GnirsFilter].all): f =>
       localItc.calculate:
