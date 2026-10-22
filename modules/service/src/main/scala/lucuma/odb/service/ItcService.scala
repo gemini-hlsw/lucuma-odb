@@ -707,7 +707,8 @@ object ItcService {
         EitherT:
           safeAcquisitionCall(oid, input, targets, autoClassify, autoSignalToNoise).value.map:
             case Right((z, t))                  => ItcAcquisition.Available(z, t).asRight
-            case Left(e @ OdbError.ItcError(_)) => ItcAcquisition.Failed(e.detail.getOrElse("")).asRight
+            // Clearly label an ITC failure as an acquisition failure.
+            case Left(e @ OdbError.ItcError(_)) => ItcAcquisition.Failed(s"Acquisition: ${e.detail.getOrElse("")}").asRight
             case Left(other)                    => other.asLeft
 
       private def toTargetResults(
