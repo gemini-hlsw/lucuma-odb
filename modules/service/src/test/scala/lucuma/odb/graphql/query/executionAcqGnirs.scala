@@ -735,3 +735,28 @@ class executionAcqGnirs extends ExecutionTestSupportForGnirs:
         assert(filters.nonEmpty, "expected acquisition steps")
         assertEquals(filters.distinct, List("ORDER4"))
         assertEquals(acquisitionCameras(json).distinct, List("LONG_BLUE"))
+
+  test("cross-dispersed acquisition uses the science decker"):
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGnirsLongSlitObservationAs(pi, p, t)
+        _ <- configureGnirsCrossDispersed(o, "LONG_BLUE")
+        _ <- setAcquisitionTimeAndCount(o, 5.0, 1, 1645)
+        _ <- setAcquisitionType(o, "BRIGHT")
+      yield o
+
+    setup.flatMap: oid =>
+      query(pi, gnirsAcqNarrowQuery(oid)).map: json =>
+        val deckers =
+          json.hcursor
+            .downField("executionConfig").downField("gnirs").downField("acquisition")
+            .downField("nextAtom").downField("steps")
+            .values.toList.flatten
+            .flatMap(_.hcursor.downField("instrumentConfig").downField("decker").as[String].toOption)
+
+        assertEquals(
+          deckers,
+          List("LONG_CAM_CROSS_DISPERSED", "ACQUISITION", "ACQUISITION", "LONG_CAM_CROSS_DISPERSED")
+        )

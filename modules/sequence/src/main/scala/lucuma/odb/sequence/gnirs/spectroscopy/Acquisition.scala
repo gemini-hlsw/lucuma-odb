@@ -22,7 +22,6 @@ import lucuma.core.enums.GnirsDecker
 import lucuma.core.enums.GnirsFilter
 import lucuma.core.enums.GnirsFpuIfu
 import lucuma.core.enums.GnirsFpuOther
-import lucuma.core.enums.GnirsPrism
 import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
@@ -129,10 +128,8 @@ object Acquisition:
       readMode:            GnirsReadMode
     ): Steps =
       val acqExposureTime: TimeSpan = time.exposureTime
-      // The science-aperture decker, from camera + prism (always Mirror) for the long
-      // slit.  (IFU acquisitions take the computeIfu path.)  The decker depends only on the
-      // pixel scale, which the acquisition camera shares, so it is the same either way.
-      val specDecker: GnirsDecker   = GnirsDecker.forCameraAndPrism(config.camera, GnirsPrism.Mirror)
+      // The science decker, so cross-dispersed acquisitions use the XD decker.
+      val specDecker: GnirsDecker   = config.decker
 
       // The FPU image (first step) uses a single coadd and the fixed filter/exposure from
       // firstStepFilterAndExposure; its read mode follows from that fixed exposure time.
