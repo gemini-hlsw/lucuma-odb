@@ -30,5 +30,5 @@ object WarningDismissalInput:
         ProgramReferenceBinding.Option("programReference", rProg),
         NonEmptyStringBinding("text", rText)
       ) =>
-        (rPid, rProp, rProg, rText).mapN(apply)
+        (rPid, rProp, rProg, rText).parMapN(apply)
     }

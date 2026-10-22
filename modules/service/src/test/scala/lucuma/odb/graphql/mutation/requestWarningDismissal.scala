@@ -7,9 +7,9 @@ package mutation
 
 import cats.data.Ior
 import cats.effect.IO
+import cats.effect.Ref
 import cats.effect.Resource
 import cats.syntax.all.*
-import java.util.concurrent.ConcurrentHashMap
 import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Json
 import io.circe.literal.*
@@ -41,13 +41,12 @@ class requestWarningDismissal extends OdbSuite with query.ObservingModeSetupOper
   val SystemSender = "explore@gpp.com"
 
   // The form most recently sent to the mail provider for each recipient.
-  val sentForms: ConcurrentHashMap[String, UrlForm] = new ConcurrentHashMap
+  val sentForms: Ref[IO, Map[String, UrlForm]] = Ref.unsafe(Map.empty)
 
   // Like `invitationEmailRequestHandler`, except that the mail provider rejects
   // any message addressed to a "bounce" recipient.
   override val httpRequestHandler: Request[IO] => Resource[IO, Response[IO]] = req =>
-    Resource.eval(req.as[UrlForm]).flatMap: form =>
-      form.getFirst("to").foreach(sentForms.put(_, form))
+    Resource.eval(req.as[UrlForm].flatTap(f => f.getFirst("to").traverse_(to => sentForms.update(_ + (to -> f))))).flatMap: form =>
       if form.getFirst("to").exists(_.startsWith("bounce")) then Resource.pure(Response[IO](Status.BadRequest))
       else invitationEmailRequestHandler(req)
 
@@ -424,7 +423,17 @@ class requestWarningDismissal extends OdbSuite with query.ObservingModeSetupOper
       pid  <- createProgramWithUsPi(pi)
       _    <- addProgramUserAs(admin, pid, SupportPrimary, "reply-to-check@jobs.com")
       _    <- query(pi, requestQuery(pid, List("senderEmail")))
-      form  = Option(sentForms.get("reply-to-check@jobs.com"))
+      form <- sentForms.get.map(_.get("reply-to-check@jobs.com"))
     yield
       assertEquals(form.flatMap(_.getFirst("from")), Some(SystemSender))
       assertEquals(form.flatMap(_.getFirst("h:Reply-To")), Some(defaultPiEmail.value))
+
+  test("reports every invalid input field"):
+    expectIor(
+      user = pi,
+      query = requestQueryWith("""programId: "not-a-pid", proposalReference: "not-a-ref"""", List("senderEmail")),
+      expected = Ior.left(List(
+        "Argument 'input.programId' is invalid: 'not-a-pid' is not a valid program id",
+        "Argument 'input.proposalReference' is invalid: 'not-a-ref' cannot be parsed as a valid ProposalReference."
+      ))
+    )
