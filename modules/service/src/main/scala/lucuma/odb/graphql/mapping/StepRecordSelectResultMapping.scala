@@ -16,5 +16,5 @@ trait StepRecordSelectResultMapping[F[_]]
     nestedSelectResultMapping(
       StepRecordSelectResultType,
       AtomRecordView.Id,
-      Join(AtomRecordView.Id, StepRecordView.AtomVisitId)
+      Join(AtomRecordView.Id, StepRecordView.AtomRunId)
     )

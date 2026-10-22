@@ -257,12 +257,13 @@ type AtomEvent implements ExecutionEvent {
 
   """
   Atom record associated with this event, if any.  Atom records only materialize
-  when the steps they contain execute.
+  when the steps they contain execute.  An atom with several runs matches
+  several atom records.
   """
-  atom: AtomRecord
+  atom: AtomRecord @deprecated(reason: "Atom events are no longer recorded.")
 
   "Atom execution stage."
-  atomStage: AtomStage!
+  atomStage: AtomStage! @deprecated(reason: "Atom events are no longer recorded.")
 
   """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
@@ -298,15 +299,27 @@ enum AtomStage {
   START_ATOM
 }
 
-"The portion of an atom that executed in a particular visit."
+"""
+A run of consecutive executed steps of one atom within one visit. An atom
+whose execution is interrupted by other steps (e.g., a reinserted acquisition)
+and then resumed, in the same visit or a later one, has one atom record per run.
+Listing a visit's atom records by `index`, and each record's steps by `index`,
+produces the steps in execution order.
+"""
 type AtomRecord {
-  "Atom ID."
+  """
+  Atom ID. It is not unique among atom records: every run of the same atom
+  shares it.
+  """
   id: AtomId!
 
   "Visit in which this atom executed."
   visit: Visit!
 
-  "Atom execution order -- the index of its first executed step."
+  """
+  Atom execution order -- the index of its first executed step. It uniquely
+  identifies the atom record within the observation.
+  """
   index: PosInt!
 
   "Description, if any."
@@ -1643,7 +1656,7 @@ enum ExecutionEventType {
   SLEW
 
   "Atom-level event type. NOTE: this is no longer used."
-  ATOM
+  ATOM @deprecated(reason: "Atom events are no longer recorded.")
 
   "Step-level event type."
   STEP

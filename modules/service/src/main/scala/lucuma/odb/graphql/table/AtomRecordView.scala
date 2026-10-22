@@ -9,7 +9,7 @@ import skunk.codec.text.text
 
 trait AtomRecordView[F[_]] extends BaseMapping[F]:
   object AtomRecordView extends TableDef("v_atom_record"):
-    val Id: ColumnRef             = col("c_atom_visit_id",    text)
+    val Id: ColumnRef             = col("c_atom_run_id",      text)
     val AtomId: ColumnRef         = col("c_atom_id",          atom_id)
     val VisitId: ColumnRef        = col("c_visit_id",         visit_id)
     val Instrument: ColumnRef     = col("c_instrument",       instrument)
