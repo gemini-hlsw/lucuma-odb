@@ -740,8 +740,8 @@ object PerScienceObservationCalibrationsService:
               case ObservingModeType.Flamingos2Mos => deriveMosTelluricMode
               case _                               => observingModeServices.clone(mode, sourceOid, targetOid)
 
-        // Reset any mode-specific telluric overrides on the cloned obs.
-        // At the moment only offsets but eventually other properties may need a reset,
+        // Reset any mode-specific overrides the cloned obs should not keep from the
+        // science: the offsets and, for a GNIRS telluric, the explicit read mode.
         def resetTelluricConfig(sm: Option[ObservingModeType]): F[Unit] =
           sm match
             case Some(ObservingModeType.Igrins2LongSlit) =>
@@ -750,7 +750,7 @@ object PerScienceObservationCalibrationsService:
               flamingos2LongSlitService.resetTelluricConfig(targetOid)
             case Some(ObservingModeType.Flamingos2Mos) =>
               flamingos2LongSlitService.resetMosTelluricConfig(targetOid)
-            case Some(ObservingModeType.GnirsLongSlit) =>
+            case Some(ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu) =>
               gnirsSpectroscopyService.resetTelluricConfig(targetOid)
             case _ =>
               F.unit

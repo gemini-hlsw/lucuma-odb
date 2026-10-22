@@ -82,11 +82,11 @@ trait GnirsSpectroscopyService[F[_]]:
   )(using Transaction[F]): F[Unit]
 
   /**
-   * Reset `oid`'s configuration by clearing any explicit slit offset override.
-   * The telluric offsets themselves now come from v_gnirs_spectroscopy's
-   * role-aware default, so this only clears an explicit override left over from
-   * a science configuration (or a stale telluric one); it no longer needs to
-   * compute the telluric pattern itself.
+   * Reset `oid`'s configuration by clearing, for a telluric, the explicit read
+   * mode and, for long slit, any explicit slit offset override.  The read mode
+   * then follows the telluric's own exposure time rather than the science's.
+   * The telluric offsets come from v_gnirs_spectroscopy's role-aware default;
+   * IFU has no such default, so its offsets are kept.
    */
   def resetTelluricConfig(oid: Observation.Id)(using Transaction[F]): F[Unit]
 
@@ -750,16 +750,17 @@ object GnirsSpectroscopyService:
           void"SET " |+| us.intercalate(void", ") |+| void" " |+|
           void"WHERE " |+| observationIdIn(oids)
 
-    // Reset `oid` to telluric slit-offset defaults by clearing any explicit
-    // override. v_gnirs_spectroscopy now computes the telluric pattern itself,
-    // role-aware, as the default for a telluric calibration, so there is nothing
-    // left to compute or store here.
+    // Reset `oid` to calibration defaults by clearing, for a telluric, the
+    // explicit read mode and, for long slit, any explicit offset override.
+    // v_gnirs_spectroscopy computes the long slit telluric pattern itself,
+    // role-aware; IFU offsets have no derived default, so they stay.
     def applyGnirsTelluricDefaults(oid: Observation.Id): AppliedFragment =
       sql"""
         UPDATE t_gnirs_spectroscopy
         SET
-          c_slit_offset_mode  = NULL,
-          c_telescope_configs = NULL
+          c_read_mode         = CASE WHEN NOT is_telluric_calibration(c_observation_id) THEN c_read_mode END,
+          c_slit_offset_mode  = CASE WHEN c_observing_mode_type = 'gnirs_ifu' THEN c_slit_offset_mode  END,
+          c_telescope_configs = CASE WHEN c_observing_mode_type = 'gnirs_ifu' THEN c_telescope_configs END
         WHERE c_observation_id = $observation_id
       """.apply(oid)
 

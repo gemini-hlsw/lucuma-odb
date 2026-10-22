@@ -109,6 +109,15 @@ trait TelluricCalibrationsTestSupport:
         .flatMap(_.hcursor.downField("observation").as[Option[ObsInfo]].toOption)
         .flatten
 
+  // The calibrations in the science observation's calibration group.
+  protected def calibrationObservationsFor(oid: Observation.Id, calibrationRole: CalibrationRole): IO[List[Observation.Id]] =
+    queryObservation(oid).flatMap: obs =>
+      obs.groupId.foldMapM: gid =>
+        queryObservationsInGroup(gid).map(_.filter(_.calibrationRole.exists(_ === calibrationRole)).map(_.id))
+
+  protected def calibrationObservationFor(oid: Observation.Id, calibrationRole: CalibrationRole): IO[Option[Observation.Id]] =
+    calibrationObservationsFor(oid, calibrationRole).map(_.headOption)
+
   protected def queryGroupExists(gid: Group.Id): IO[Boolean] =
     query(
       serviceUser,

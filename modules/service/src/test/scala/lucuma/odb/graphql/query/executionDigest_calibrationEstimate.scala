@@ -102,12 +102,6 @@ class executionDigest_calibrationEstimate
         """.query(text *: bool)
       )(oid)
 
-  private def telluricsOf(oid: Observation.Id): IO[List[Observation.Id]] =
-    queryObservation(oid).flatMap: obs =>
-      obs.groupId.fold(IO.pure(List.empty)): gid =>
-        queryObservationsInGroup(gid).map: obs =>
-          obs.filter(_.calibrationRole.contains(CalibrationRole.Telluric)).map(_.id)
-
   test("every predicted telluric is charged: the placeholder, then the tellurics' average"):
     for
       p         <- createProgramAs(pi)
@@ -116,7 +110,7 @@ class executionDigest_calibrationEstimate
       _         <- setExposureTime(o, 240, 12)
       e1        <- estimate(p, o)
       _         <- recalculateCalibrations(p, when, o)
-      tellurics <- telluricsOf(o)
+      tellurics <- calibrationObservationsFor(o, CalibrationRole.Telluric)
       e2        <- estimate(p, o)
       _         <- sleep >> resolveTelluricTargets
       totals    <- tellurics.traverse(estimate(p, _)).map(_.map(_.total))
@@ -150,7 +144,7 @@ class executionDigest_calibrationEstimate
       o         <- createFlamingos2LongSlitObservationAs(pi, p, List(t))
       _         <- setExposureTime(o, 240, 12)
       _         <- recalculateCalibrations(p, when, o)
-      tellurics <- telluricsOf(o)
+      tellurics <- calibrationObservationsFor(o, CalibrationRole.Telluric)
       _         <- sleep >> resolveTelluricTargets
       totals    <- tellurics.traverse(estimate(p, _)).map(_.map(_.total))
       _         <- recordVisitAs(serviceUser, tellurics.head)
@@ -171,7 +165,7 @@ class executionDigest_calibrationEstimate
       o         <- createFlamingos2LongSlitObservationAs(pi, p, List(t))
       _         <- setExposureTime(o, 240, 12)
       _         <- recalculateCalibrations(p, when, o)
-      tellurics <- telluricsOf(o)
+      tellurics <- calibrationObservationsFor(o, CalibrationRole.Telluric)
       _         <- sleep >> resolveTelluricTargets
       totals    <- tellurics.traverse(estimate(p, _)).map(_.map(_.total))
       _         <- addSlewEventAs(serviceUser, tellurics.head, SlewStage.StartSlew)
@@ -189,7 +183,7 @@ class executionDigest_calibrationEstimate
       o         <- createFlamingos2LongSlitObservationAs(pi, p, List(t))
       _         <- setExposureTime(o, 240, 12)
       _         <- recalculateCalibrations(p, when, o)
-      tellurics <- telluricsOf(o)
+      tellurics <- calibrationObservationsFor(o, CalibrationRole.Telluric)
       _         <- runObscalcUpdate(p, o) *> refreshCalibrationsAs(serviceUser)
       settled   <- obscalcStateAndStale(o)
       _         <- setObservationWorkflowState(pi, tellurics.head, Inactive)
@@ -216,7 +210,7 @@ class executionDigest_calibrationEstimate
       o            <- createFlamingos2LongSlitObservationAs(pi, p, List(t))
       _            <- setExposureTime(o, 240, 12)
       _            <- recalculateCalibrations(p, when, o)
-      tellurics    <- telluricsOf(o)
+      tellurics    <- calibrationObservationsFor(o, CalibrationRole.Telluric)
       _            <- setObservationWorkflowState(pi, tellurics.head, Inactive)
       e            <- estimate(p, o)
     yield
@@ -249,7 +243,7 @@ class executionDigest_calibrationEstimate
       o         <- createFlamingos2LongSlitObservationAs(pi, p, List(t))
       _         <- runObscalcUpdate(p, o)
       _         <- recalculateCalibrations(p, when, o)
-      tellurics <- telluricsOf(o)
+      tellurics <- calibrationObservationsFor(o, CalibrationRole.Telluric)
       e         <- estimate(p, tellurics.head)
     yield
       assertEquals(e.existingCount, 0)
