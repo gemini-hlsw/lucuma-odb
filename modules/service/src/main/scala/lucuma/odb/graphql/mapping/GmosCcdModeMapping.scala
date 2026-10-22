@@ -12,7 +12,7 @@ trait GmosCcdModeMapping[F[_]] extends GmosDynamicTables[F] {
 
   private def ccdModeMappingAtPath[G, L, U](
     path: Path,
-    table: GmosDynamicTable[G, L, U]
+    table: GmosDynamicTable[?, G, L, U]
   ): ObjectMapping =
     ObjectMapping(path)(
       SqlField("id", table.Id, key = true, hidden = true),
@@ -28,7 +28,9 @@ trait GmosCcdModeMapping[F[_]] extends GmosDynamicTables[F] {
       ccdModeMappingAtPath(StepRecordType / "gmosNorth" / "readout", GmosNorthDynamicTable),
       ccdModeMappingAtPath(StepRecordType / "gmosSouth" / "readout", GmosSouthDynamicTable),
       ccdModeMappingAtPath(GmosNorthStepType / "instrumentConfig" / "readout", GmosNorthDynamicTable),
-      ccdModeMappingAtPath(GmosSouthStepType / "instrumentConfig" / "readout", GmosSouthDynamicTable)
+      ccdModeMappingAtPath(GmosSouthStepType / "instrumentConfig" / "readout", GmosSouthDynamicTable),
+      ccdModeMappingAtPath(CalibrationSetType / "gmosNorth" / "readout", GmosNorthCalibrationSetupTable),
+      ccdModeMappingAtPath(CalibrationSetType / "gmosSouth" / "readout", GmosSouthCalibrationSetupTable)
     )
 
 }

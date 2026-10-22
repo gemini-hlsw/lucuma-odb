@@ -12,7 +12,7 @@ trait GmosFpuMapping[F[_]] extends GmosDynamicTables[F] {
 
   private def fpuMappingAtPath[G, L, U](
     path: Path,
-    table:   GmosDynamicTable[G, L, U]
+    table:   GmosDynamicTable[?, G, L, U]
   ): ObjectMapping =
     ObjectMapping(path)(
       SqlField("synthetic_id", table.Fpu.SyntheticId, key = true, hidden = true),
@@ -24,18 +24,20 @@ trait GmosFpuMapping[F[_]] extends GmosDynamicTables[F] {
   // from being picked up in the context of a generated sequence.
   private def fpuSwitchMapping[G, L, U](
     name:    String,
-    table:   GmosDynamicTable[G, L, U]
+    table:   GmosDynamicTable[?, G, L, U]
   ): List[TypeMapping] =
     List(
       fpuMappingAtPath( StepRecordType / name / "fpu", table)
     )
 
   lazy val GmosNorthFpuMappings: List[TypeMapping] =
-    fpuSwitchMapping("gmosNorth", GmosNorthDynamicTable)
+    fpuSwitchMapping("gmosNorth", GmosNorthDynamicTable) :+
+      fpuMappingAtPath(CalibrationSetType / "gmosNorth" / "fpu", GmosNorthCalibrationSetupTable)
 
 
   lazy val GmosSouthFpuMappings: List[TypeMapping] =
-    fpuSwitchMapping("gmosSouth", GmosSouthDynamicTable)
+    fpuSwitchMapping("gmosSouth", GmosSouthDynamicTable) :+
+      fpuMappingAtPath(CalibrationSetType / "gmosSouth" / "fpu", GmosSouthCalibrationSetupTable)
 
 
 }

@@ -92,6 +92,10 @@ trait WavelengthMapping[F[_]]
       wavelengthMappingAtPath(StepRecordType / "gmosSouth" / "centralWavelength", GmosSouthDynamicTable.CentralWavelength.Value, GmosSouthDynamicTable.CentralWavelength.SyntheticId),
       wavelengthMappingAtPath(StepRecordType / "gmosNorth" / "gratingConfig" / "wavelength", GmosNorthDynamicTable.Grating.Wavelength, GmosNorthDynamicTable.Id),
       wavelengthMappingAtPath(StepRecordType / "gmosSouth" / "gratingConfig" / "wavelength", GmosSouthDynamicTable.Grating.Wavelength, GmosSouthDynamicTable.Id),
+      wavelengthMappingAtPath(CalibrationSetType / "gmosNorth" / "centralWavelength", GmosNorthCalibrationSetupTable.CentralWavelength.Value, GmosNorthCalibrationSetupTable.CentralWavelength.SyntheticId),
+      wavelengthMappingAtPath(CalibrationSetType / "gmosSouth" / "centralWavelength", GmosSouthCalibrationSetupTable.CentralWavelength.Value, GmosSouthCalibrationSetupTable.CentralWavelength.SyntheticId),
+      wavelengthMappingAtPath(CalibrationSetType / "gmosNorth" / "gratingConfig" / "wavelength", GmosNorthCalibrationSetupTable.Grating.Wavelength, GmosNorthCalibrationSetupTable.Id),
+      wavelengthMappingAtPath(CalibrationSetType / "gmosSouth" / "gratingConfig" / "wavelength", GmosSouthCalibrationSetupTable.Grating.Wavelength, GmosSouthCalibrationSetupTable.Id),
       wavelengthMappingAtPath(TimeAndCountExposureTimeModeType / "at", ExposureTimeModeView.TimeAndCount.At, ExposureTimeModeView.TimeAndCount.SyntheticId),
       wavelengthMappingAtPath(VisitorType / "centralWavelength", VisitorTable.CentralWavelength, VisitorTable.ObservationId),
       wavelengthMappingAtPath(

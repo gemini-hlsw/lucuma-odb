@@ -140,7 +140,7 @@ _Avoid_: custom telluric S/N, pinned ETM, explicit telluric mode, manual telluri
 
 **Calibration Set**:
 The night-time calibrations one interval of science is expected to consume: a telluric (unless the Telluric Type is `NoTelluric`) and, depending on the instrument, a GCAL Set (flats and arcs) as well. An estimating unit, not a scheduling one — sets do not line up with visits (a visit can hold more or less than a set), so the Calibration Count and the setup count disagree by design.
-_Avoid_: calibration epoch (an epoch is a reference instant, as in coordinate epochs), visit (a scheduling unit), telluric interval.
+_Avoid_: calibration epoch (an epoch is a reference instant, as in coordinate epochs), visit (a scheduling unit), telluric interval, daytime calibration set (a row of a Daytime Calibration Mode, a different thing).
 
 **Calibration Set Interval**:
 How much science time one Calibration Set covers: 90 minutes when the science is shorter than the Long Wavelength Cutoff, 60 minutes at or beyond it. GNIRS is judged by the longest central wavelength in its configuration; Flamingos-2 and IGRINS-2 cannot reach the cutoff and always take the 90-minute interval. It also bounds a single science cycle, which must be shorter than it; there each GNIRS central wavelength is judged by its own interval. Distinct from the Multi-Telluric Threshold, which happens to share the 90-minute value.
@@ -279,9 +279,17 @@ A staff-created calibration observation with no target, no ITC, no guide star an
 _Avoid_: day cal (alone, the step-level class), baseline calibration (a Smart GCAL lookup kind), pinhole (one kind, not the concept), daytime flag (it is a role plus a mode, not a boolean), charged to the observatory (it is non-charged).
 
 **Daytime Calibration Mode**:
-A single observing mode holding the Gemini facility instrument of a Daytime Calibration and, once Calibration Sets exist, the ordered list of them. Staff-only. The sequence it generates follows the usual Materialized Sequence rule: generated until the first visit or a hand edit, stored and editable afterwards.
+A single observing mode holding the Gemini facility instrument of a Daytime Calibration and the ordered list of its Daytime Calibration Sets. Staff-only. The sequence it generates follows the usual Materialized Sequence rule: generated until the first visit or a hand edit, stored and editable afterwards.
 _Avoid_: daytime mode (ambiguous with the time of day), instrument-only mode, one mode per instrument (the instrument is a parameter, not a kind).
 
-**Calibration Set**:
-One row of a Daytime Calibration Mode: a kind (bias, dark, flat or arc), an exposure count, and a single instrument setup, which the generator expands into that many identical `DAY_CAL` steps, one atom each. Flats and arcs take their lamp from Smart GCAL unless given explicitly. Planned, not yet built.
-_Avoid_: configuration (clashes with Configuration Request and the observing configuration), step generator (the mechanism, not the thing), template.
+**Daytime Calibration Set**:
+One ordered row of a Daytime Calibration Mode: a kind (bias, dark, flat, arc or daytime observe), an exposure count, one Instrument Setup and, once Iterators exist, zero or more of them. Each row becomes exactly one atom of the science sequence, holding one identical `DAY_CAL` step per exposure; the Instrument Setup fills every field. Flats and arcs carry an explicit GCAL lamp configuration that must agree with the kind; biases, darks and daytime observes carry none. Rows drive the sequence only until it is materialized; afterwards they are frozen and edits are refused. GMOS-N and GMOS-S first; Smart GCAL rows are future work. Appears in the API as `CalibrationSet` under the daytime mode, where the context makes it unambiguous.
+_Avoid_: calibration set (alone, in prose: the night-time estimating unit), configuration (clashes with Configuration Request and the observing configuration), generator (the mechanism, not the thing), template, smart row (not yet a thing).
+
+**Instrument Setup**:
+The single instrument state a Daytime Calibration Set is taken in: exactly what one step's dynamic configuration holds for that instrument, exposure time included. A bias ignores the exposure time and takes zero. Once Iterators exist, a field an Iterator covers is still present here but ignored.
+_Avoid_: configuration, dynamic config (the storage shape, not the concept), base config.
+
+**Iterator**:
+One field of an Instrument Setup paired with an explicit, ordered list of values a Daytime Calibration Set is repeated over, such as every ROI or several exposure times; the set's atom then holds `count` steps per combination of its Iterators, taken in their order. Only fields on the instrument's iterable list may be used, and a field appears in at most one Iterator of a set. Values are always listed, never "all": which values exist is the client's knowledge, not the ODB's. Planned, not yet built.
+_Avoid_: sweep, loop, range, wildcard, all (the ODB never expands an enum by itself).

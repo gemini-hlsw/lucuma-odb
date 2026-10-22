@@ -52,6 +52,7 @@ object StartupDiagnostics:
           checkPostgresEnum(breakpoint),
           checkPostgresEnum(calculation_state),
           checkPostgresEnum(calibration_role),
+          checkPostgresEnum(calibration_set_type),
           checkPostgresEnum(calibration_work_type),
           checkPostgresEnum(catalog_name),
           checkPostgresEnum(charge_class),

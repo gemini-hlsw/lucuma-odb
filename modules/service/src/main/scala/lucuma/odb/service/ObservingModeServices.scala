@@ -255,7 +255,7 @@ object ObservingModeServices:
         which: List[Observation.Id]
       )(using Transaction[F], SuperUserAccess): F[Result[Unit]] =
         List(
-          input.daytimeCalibration.map(m => daytimeCalibrationService.update(m, which).map(_.success)),
+          input.daytimeCalibration.map(m => daytimeCalibrationService.update(m, which)),
           input.exchange.map(m => exchangeService.update(m, which).map(_.success)),
           input.flamingos2Imaging.map(m => flamingos2ImagingService.update(m, which)),
           input.flamingos2LongSlit.map(m => flamingos2LongSlitService.update(m, which)),

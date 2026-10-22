@@ -12,7 +12,7 @@ trait GmosGratingConfigMapping[F[_]] extends GmosDynamicTables[F] {
 
   private def gratingMappingAtPath[G, L, U](
     path: Path,
-    table:   GmosDynamicTable[G, L, U]
+    table:   GmosDynamicTable[?, G, L, U]
   ): ObjectMapping =
     ObjectMapping(path)(
       SqlField("synthetic_id", table.Grating.SyntheticId, key = true, hidden = true),
@@ -25,16 +25,18 @@ trait GmosGratingConfigMapping[F[_]] extends GmosDynamicTables[F] {
   // from being picked up in the context of a generated sequence.
   private def gratingSwitchMapping[G, L, U](
     name:              String,
-    table:             GmosDynamicTable[G, L, U]
+    table:             GmosDynamicTable[?, G, L, U]
   ): List[TypeMapping] =
     List(
       gratingMappingAtPath(StepRecordType / name / "gratingConfig", table)
     )
 
   lazy val GmosNorthGratingConfigMappings: List[TypeMapping] =
-    gratingSwitchMapping("gmosNorth", GmosNorthDynamicTable)
+    gratingSwitchMapping("gmosNorth", GmosNorthDynamicTable) :+
+      gratingMappingAtPath(CalibrationSetType / "gmosNorth" / "gratingConfig", GmosNorthCalibrationSetupTable)
 
   lazy val GmosSouthGratingConfigMappings: List[TypeMapping] =
-    gratingSwitchMapping("gmosSouth", GmosSouthDynamicTable)
+    gratingSwitchMapping("gmosSouth", GmosSouthDynamicTable) :+
+      gratingMappingAtPath(CalibrationSetType / "gmosSouth" / "gratingConfig", GmosSouthCalibrationSetupTable)
 
 }

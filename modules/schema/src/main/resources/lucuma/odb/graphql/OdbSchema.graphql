@@ -6249,6 +6249,12 @@ type DaytimeCalibration {
   Instrument of the calibration.
   """
   instrument: Instrument!
+
+  """
+  Ordered calibration sets that generate the sequence.  Empty until staff add
+  rows (or enter the sequence by hand).
+  """
+  calibrationSets: [CalibrationSet!]!
 }
 
 """
@@ -6257,9 +6263,117 @@ Daytime calibration mode input.  Staff only.
 input DaytimeCalibrationInput {
   """
   Instrument of the calibration: FLAMINGOS2, GHOST, GMOS_NORTH, GMOS_SOUTH,
-  GNIRS or IGRINS2.
+  GNIRS or IGRINS2.  Required on creation; on an edit it may be omitted to
+  keep the current instrument, but never set to null.
   """
-  instrument: Instrument!
+  instrument: Instrument
+
+  """
+  Calibration sets, in order.  On an edit the whole list is replaced; omit it
+  to keep the existing rows.  Rows may only be set for GMOS_NORTH and
+  GMOS_SOUTH, and are rejected once the sequence has been materialized (first
+  visit or a hand edit).
+  """
+  calibrationSets: [CalibrationSetInput!]
+}
+
+"""
+The kind of exposure a calibration set produces.  DAYTIME_OBSERVE is an
+exposure with the dome closed and no lamp, such as a pupil or bubble image.
+"""
+enum CalibrationSetType {
+  BIAS
+  DARK
+  FLAT
+  ARC
+  DAYTIME_OBSERVE
+}
+
+"""
+One row of a daytime calibration: a kind, an exposure count, the GCAL
+configuration (flats and arcs only) and one instrument setup.  The generator
+expands it into one atom holding `count` identical DAY_CAL steps.
+"""
+type CalibrationSet {
+  kind: CalibrationSetType!
+
+  """
+  Exposures taken with this setup.
+  """
+  count: PosInt!
+
+  """
+  GCAL lamp configuration, present for FLAT and ARC only.
+  """
+  gcal: CalibrationSetGcal
+
+  """
+  GMOS North setup, when the instrument is GMOS North.
+  """
+  gmosNorth: GmosNorthDynamic
+
+  """
+  GMOS South setup, when the instrument is GMOS South.
+  """
+  gmosSouth: GmosSouthDynamic
+}
+
+"""
+GCAL configuration of a flat or arc calibration set.
+"""
+type CalibrationSetGcal {
+  """
+  GCAL continuum, present for a flat
+  """
+  continuum: GcalContinuum
+
+  """
+  GCAL arcs, one or more present for an arc
+  """
+  arcs: [GcalArc!]!
+
+  filter: GcalFilter!
+
+  diffuser: GcalDiffuser!
+
+  shutter: GcalShutter!
+}
+
+"""
+Calibration set input.  Exactly one instrument setup must be given and it must
+match the mode's instrument.  A FLAT needs a `gcal` with a continuum lamp, an
+ARC one with at least one arc lamp; BIAS, DARK and DAYTIME_OBSERVE take none.
+A BIAS ignores the setup's exposure time and takes zero.
+"""
+input CalibrationSetInput {
+  kind: CalibrationSetType!
+
+  """
+  Exposures taken with this setup.
+  """
+  count: PosInt!
+
+  """
+  GCAL lamp configuration, required for FLAT and ARC, rejected otherwise.
+  """
+  gcal: CalibrationSetGcalInput
+
+  gmosNorth: GmosNorthDynamicInput
+
+  gmosSouth: GmosSouthDynamicInput
+}
+
+"""
+GCAL configuration input for a flat or arc calibration set.  Give either a
+continuum lamp or one or more arc lamps.  The diffuser defaults per instrument
+(VISIBLE for GMOS, IR for the infrared instruments) when omitted.
+"""
+input CalibrationSetGcalInput {
+  continuum: GcalContinuum
+  arcs: [GcalArc!]
+  filter: GcalFilter!
+  diffuser: GcalDiffuser
+  shutter: GcalShutter!
 }
 
 input ExchangeInput {
