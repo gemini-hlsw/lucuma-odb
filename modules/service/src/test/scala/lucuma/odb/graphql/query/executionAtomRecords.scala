@@ -621,5 +621,203 @@ class executionAtomRecords extends OdbSuite with ExecutionQuerySetupOperations
       )
     yield ()
 
+  test("atom interrupted within a visit"):
+    for
+      pid <- createProgramAs(pi)
+      tid <- createTargetWithProfileAs(pi, pid)
+      oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      sci <- scienceSequenceIds(serviceUser, oid).map(_.head)
+      acq <- acquisitionSequenceIds(serviceUser, oid).map(_.head)
+      (sciAid, ss)  = sci
+      (acqAid, as)  = acq
+
+      // A science step, then an acquisition step, then the science atom resumes
+      vid <- recordVisitAs(serviceUser, oid)
+      _   <- addEndStepEvent(ss(0), vid)
+      _   <- addEndStepEvent(as(0), vid)
+      _   <- addEndStepEvent(ss(1), vid)
+
+      _   <- expect(
+        user  = serviceUser,
+        query = s"""
+          query {
+            observation(observationId: "$oid") {
+              execution {
+                atomRecords {
+                  matches {
+                    id
+                    index
+                    steps {
+                      matches {
+                        id
+                        atom { index }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "observation": {
+              "execution": {
+                "atomRecords": {
+                  "matches": [
+                    {
+                      "id": ${sciAid.asJson},
+                      "index": 1,
+                      "steps": {
+                        "matches": [
+                          {
+                            "id": ${ss(0).asJson},
+                            "atom": { "index": 1 }
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "id": ${acqAid.asJson},
+                      "index": 2,
+                      "steps": {
+                        "matches": [
+                          {
+                            "id": ${as(0).asJson},
+                            "atom": { "index": 2 }
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "id": ${sciAid.asJson},
+                      "index": 3,
+                      "steps": {
+                        "matches": [
+                          {
+                            "id": ${ss(1).asJson},
+                            "atom": { "index": 3 }
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+
+      // Each step event resolves the atom record of its own run
+      _   <- expect(
+        user  = serviceUser,
+        query = s"""
+          query {
+            observation(observationId: "$oid") {
+              execution {
+                events {
+                  matches {
+                    ... on StepEvent {
+                      step { id }
+                      atom { index }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "observation": {
+              "execution": {
+                "events": {
+                  "matches": [
+                    {
+                      "step": { "id": ${ss(0).asJson} },
+                      "atom": { "index": 1 }
+                    },
+                    {
+                      "step": { "id": ${as(0).asJson} },
+                      "atom": { "index": 2 }
+                    },
+                    {
+                      "step": { "id": ${ss(1).asJson} },
+                      "atom": { "index": 3 }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+    yield ()
+
+  test("consecutive steps of an atom share an atom record"):
+    for
+      pid <- createProgramAs(pi)
+      tid <- createTargetWithProfileAs(pi, pid)
+      oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      sci <- scienceSequenceIds(serviceUser, oid).map(_.head)
+      (sciAid, ss)  = sci
+
+      vid <- recordVisitAs(serviceUser, oid)
+      _   <- addEndStepEvent(ss(0), vid)
+      _   <- addEndStepEvent(ss(1), vid)
+
+      _   <- expect(
+        user  = serviceUser,
+        query = s"""
+          query {
+            observation(observationId: "$oid") {
+              execution {
+                atomRecords {
+                  matches {
+                    id
+                    index
+                    instrument
+                    steps {
+                      matches {
+                        id
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "observation": {
+              "execution": {
+                "atomRecords": {
+                  "matches": [
+                    {
+                      "id": ${sciAid.asJson},
+                      "index": 1,
+                      "instrument": "GMOS_NORTH",
+                      "steps": {
+                        "matches": [
+                          {
+                            "id": ${ss(0).asJson}
+                          },
+                          {
+                            "id": ${ss(1).asJson}
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+    yield ()
+
 
  }
