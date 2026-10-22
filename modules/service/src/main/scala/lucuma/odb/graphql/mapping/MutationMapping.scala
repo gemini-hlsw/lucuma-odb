@@ -29,6 +29,7 @@ import io.circe.Json
 import io.circe.syntax.*
 import lucuma.catalog.clients.GaiaClient
 import lucuma.core.enums.ScienceBand
+import lucuma.core.enums.SequenceType
 import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.model.Attachment
 import lucuma.core.model.CallForProposals
@@ -408,7 +409,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] with UserEnv {
               checked.foldWithId(OdbError.InvalidArgument().asFailureF): (_, oid) =>
                 Services.asSuperUser:
                   generator
-                    .resetAcquisition(oid, input.regenerate)
+                    .resetAcquisition(oid, input.regenerate, input.abandonOngoingStep)
                     .map(_.fold(_.asFailure, _ => oid.success))
                     .nestMap: oid =>
                       Filter(Predicates.resetAcquisitionResult.observation.id.eql(oid), child)
@@ -592,7 +593,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] with UserEnv {
           res.flatTraverse: checked =>
             services.useTransactionally:
               sequenceService
-                .replaceFlamingos2Sequence(checked)
+                .replaceFlamingos2Sequence(checked, input.abandonOngoingStep)
                 .nestMap: s =>
                   Json.obj("sequence" -> s.compile.toList.asJson)
 
@@ -604,7 +605,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] with UserEnv {
           res.flatTraverse: checked =>
             services.useTransactionally:
               sequenceService
-                .replaceGmosNorthSequence(checked)
+                .replaceGmosNorthSequence(checked, input.abandonOngoingStep)
                 .nestMap: s =>
                   Json.obj("sequence" -> s.compile.toList.asJson)
 
@@ -616,7 +617,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] with UserEnv {
           res.flatTraverse: checked =>
             services.useTransactionally:
               sequenceService
-                .replaceGmosSouthSequence(checked)
+                .replaceGmosSouthSequence(checked, input.abandonOngoingStep)
                 .nestMap: s =>
                   Json.obj("sequence" -> s.compile.toList.asJson)
 
@@ -628,7 +629,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] with UserEnv {
           res.flatTraverse: checked =>
             services.useTransactionally:
               sequenceService
-                .replaceIgrins2Sequence(checked)
+                .replaceIgrins2Sequence(checked, input.abandonOngoingStep)
                 .nestMap: s =>
                   Json.obj("sequence" -> s.compile.toList.asJson)
 
@@ -640,7 +641,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] with UserEnv {
           res.flatTraverse: checked =>
             services.useTransactionally:
               sequenceService
-                .replaceGnirsSequence(checked)
+                .replaceGnirsSequence(checked, input.abandonOngoingStep)
                 .nestMap: s =>
                   Json.obj("sequence" -> s.compile.toList.asJson)
 
@@ -652,7 +653,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] with UserEnv {
           res.flatTraverse: checked =>
             services.useTransactionally:
               sequenceService
-                .replaceGhostSequence(checked)
+                .replaceGhostSequence(checked, input.abandonOngoingStep)
                 .nestMap: s =>
                   Json.obj("sequence" -> s.compile.toList.asJson)
 
@@ -984,6 +985,19 @@ trait MutationMapping[F[_]] extends AccessControl[F] with UserEnv {
             }).flatMap(_ => accum)
           }.value
 
+      // Editing the acquisition regenerates its sequence (see
+      // resetAcquisitionIfNecessary), which may not happen while an
+      // acquisition step is executing.  The check holds no execution lock,
+      // so a step that starts in the meantime just makes the reset fail.
+      def requireNoOngoingAcquisition(checked: AccessControl.CheckedWithIds[ObservationPropertiesInput.Edit, Observation.Id])(using Services[F], Transaction[F]): ResultT[F, Unit] =
+        ResultT:
+          checked.foldWithIds(Result.unit.pure[F]): (set, ids) =>
+            if set.updatesAcquisition then
+              ids.toList
+                .traverse(sequenceService.requireNoOngoingStep(_, SequenceType.Acquisition))
+                .map(_.sequence_.fold(_.asFailure, Result.success))
+            else Result.unit.pure[F]
+
       def resetAcquisitionIfNecessary(
         approval: Result[AccessControl.CheckedWithIds[ObservationPropertiesInput.Edit, Observation.Id]]
       ): F[Unit] =
@@ -995,7 +1009,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] with UserEnv {
           .useNonTransactionally:
             Services.asSuperUser:
               // An edited acquisition stays the source of truth over the observing mode.
-              ids.traverse(id => generator.resetAcquisition(id, regenerate = false)).void
+              ids.traverse(id => generator.resetAcquisition(id, regenerate = false, abandonOngoingStep = false)).void
           .whenA(updatesAcquisition)
 
       // Put it all together
@@ -1005,7 +1019,8 @@ trait MutationMapping[F[_]] extends AccessControl[F] with UserEnv {
           val resultQuery =
             services.useTransactionally:
               approval.flatTraverse: edit =>
-                  updateObservations(edit)
+                  requireNoOngoingAcquisition(edit)
+                    .flatMap(_ => updateObservations(edit))
                     .flatMap:
                       case (map, query) =>
                         Services.asSuperUser:

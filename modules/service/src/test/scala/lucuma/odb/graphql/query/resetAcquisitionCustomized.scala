@@ -9,7 +9,6 @@ import cats.syntax.all.*
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.SequenceType
-import lucuma.core.enums.StepStage
 import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.core.model.sequence.Step
@@ -191,19 +190,6 @@ class resetAcquisitionCustomized
       _         <- stepIds(copy).traverse_(addEndStepEvent(_, v))
       _         <- resetAcquisitionAs(serviceUser, oid)
       _         <- acquisition(oid).map(atoms => assertEquals(exposures(atoms), run))
-    yield ()
-
-  test("an edit while a step is ongoing supersedes that step"):
-    for
-      p         <- createProgramAs(pi)
-      t         <- createTargetWithProfileAs(pi, p)
-      oid       <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-      v         <- recordVisitAs(serviceUser, oid)
-      generated <- acquisition(oid)
-      _         <- addStepEventAs(serviceUser, generated.head._2.head._1, v, StepStage.StartStep)
-      _         <- replaceAcquisition(serviceUser, oid, EditedExposures*)
-      _         <- resetAcquisitionAs(serviceUser, oid)
-      _         <- expectEdited(oid)
     yield ()
 
   test("deleting the sequence restores the generated acquisition"):

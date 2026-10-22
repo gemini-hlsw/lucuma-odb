@@ -127,7 +127,7 @@ class executionAcqFlamingos2_WithoutSkySubtraction extends ExecutionTestSupportF
         expected = InitialAcquisition.asRight
       )
 
-  test("start first step only, reset"):
+  test("start first step only, abort, reset"):
     val setup: IO[Observation.Id] =
       for
         p  <- createProgram
@@ -135,9 +135,10 @@ class executionAcqFlamingos2_WithoutSkySubtraction extends ExecutionTestSupportF
         o  <- createFlamingos2LongSlitObservationAs(pi, p, List(t))
         v  <- recordVisitAs(serviceUser, o)
 
-        // Start the first step.
+        // Start the first step and abort it, since an executing step blocks the reset.
         s  <- firstAcquisitionStepId(serviceUser, o)
         _  <- addStepEventAs(serviceUser, s, v, StepStage.StartStep)
+        _  <- addStepEventAs(serviceUser, s, v, StepStage.Abort)
         _  <- resetAcquisitionAs(serviceUser, o)
       yield o
 
@@ -156,9 +157,10 @@ class executionAcqFlamingos2_WithoutSkySubtraction extends ExecutionTestSupportF
         o  <- createFlamingos2LongSlitObservationAs(pi, p, List(t))
         v  <- recordVisitAs(serviceUser, o)
 
-        // Start the first step.
+        // Start the first step and abort it, since an executing step blocks the reset.
         i0 <- acquisitionSequenceIds(serviceUser, o)
         _  <- addStepEventAs(serviceUser, i0.head._2.head, v, StepStage.StartStep)
+        _  <- addStepEventAs(serviceUser, i0.head._2.head, v, StepStage.Abort)
         _  <- resetAcquisitionAs(serviceUser, o)
         i1 <- acquisitionSequenceIds(serviceUser, o)
       yield (i0.keySet, i1.keySet)
