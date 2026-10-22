@@ -74,6 +74,63 @@ class ShortCut_10966
           val c = s.hcursor.downField("instrumentConfig")
           (c.downFields("exposure", "seconds").require[BigDecimal], c.downField("readMode").require[String])
 
+  private def setIfuTelescopeConfigs(oid: Observation.Id, qs: List[Int]): IO[Unit] =
+    val configs = qs.map(q => s"{ offset: { p: { arcseconds: 0 } q: { arcseconds: $q } } }").mkString(" ")
+    query(
+      pi,
+      s"""
+        mutation {
+          updateObservations(input: {
+            SET: {
+              observingMode: {
+                gnirsSpectroscopy: {
+                  ifu: { telescopeConfigs: [ $configs ] }
+                }
+              }
+            }
+            WHERE: { id: { EQ: "$oid" } }
+          }) {
+            observations { id }
+          }
+        }
+      """
+    ).void
+
+  private def explicitReadMode(oid: Observation.Id): IO[Option[String]] =
+    query(
+      pi,
+      s"""
+        query {
+          observation(observationId: "$oid") {
+            observingMode { gnirsSpectroscopy { explicitReadMode } }
+          }
+        }
+      """
+    ).map(_.hcursor.downFields("observation", "observingMode", "gnirsSpectroscopy", "explicitReadMode").require[Option[String]])
+
+  // The q offsets, in arcseconds, of an IFU observation's telescope configs.
+  private def ifuOffsetsQ(oid: Observation.Id): IO[List[BigDecimal]] =
+    query(
+      pi,
+      s"""
+        query {
+          observation(observationId: "$oid") {
+            observingMode { gnirsSpectroscopy { ifu { telescopeConfigs { offset { q { arcseconds } } } } } }
+          }
+        }
+      """
+    ).map:
+      _.hcursor
+        .downFields("observation", "observingMode", "gnirsSpectroscopy", "ifu", "telescopeConfigs")
+        .values.toList.flatten
+        .map(_.hcursor.downFields("offset", "q", "arcseconds").require[BigDecimal])
+
+  private def assertTelluricSteps(steps: List[(BigDecimal, String)]): Unit =
+    assert(steps.nonEmpty, "expected telluric science steps")
+    steps.foreach: (exposure, readMode) =>
+      assertEquals(exposure, TelluricExposure.toSeconds)
+      assertEquals(readMode, GnirsReadMode.forExposureTime(TelluricExposure).tag.toScreamingSnakeCase)
+
   test("a telluric's read mode follows its own exposure time, not the science's explicit read mode"):
     for
       pid   <- createProgramAs(pi)
@@ -85,8 +142,42 @@ class ShortCut_10966
       tel   <- calibrationObservationFor(oid, CalibrationRole.Telluric).map(_.get)
       _     <- sleep >> resolveTelluricTargets
       steps <- scienceSteps(tel)
+    yield assertTelluricSteps(steps)
+
+  test("a resync clears a read mode set on the science after its telluric was created"):
+    for
+      pid    <- createProgramAs(pi)
+      tid    <- createTargetWithProfileAs(pi, pid)
+      oid    <- createGnirsLongSlitObservationAs(pi, pid, tid)
+      _      <- runObscalcUpdate(pid, oid)
+      _      <- recalculateCalibrations(pid, when, oid)
+      before <- calibrationObservationFor(oid, CalibrationRole.Telluric)
+      _      <- setExplicitReadMode(oid, GnirsReadMode.VeryFaint)
+      _      <- recalculateCalibrations(pid, when, oid)
+      tel    <- calibrationObservationFor(oid, CalibrationRole.Telluric).map(_.get)
+      sciRm  <- explicitReadMode(oid)
+      telRm  <- explicitReadMode(tel)
+      _      <- sleep >> resolveTelluricTargets
+      steps  <- scienceSteps(tel)
     yield
-      assert(steps.nonEmpty, "expected telluric science steps")
-      steps.foreach: (exposure, readMode) =>
-        assertEquals(exposure, TelluricExposure.toSeconds)
-        assertEquals(readMode, GnirsReadMode.forExposureTime(TelluricExposure).tag.toScreamingSnakeCase)
+      // The same telluric, resynced rather than recreated.
+      assertEquals(before, tel.some)
+      assertEquals(sciRm, "VERY_FAINT".some)
+      assertEquals(telRm, none)
+      assertTelluricSteps(steps)
+
+  test("an IFU telluric drops the science's explicit read mode but keeps its offsets"):
+    for
+      pid    <- createProgramAs(pi)
+      tid    <- createTargetWithProfileAs(pi, pid)
+      oid    <- createGnirsIfuObservationAs(pi, pid, tid)
+      _      <- setExplicitReadMode(oid, GnirsReadMode.VeryFaint)
+      _      <- setIfuTelescopeConfigs(oid, List(1, -1))
+      _      <- runObscalcUpdate(pid, oid)
+      _      <- recalculateCalibrations(pid, when, oid)
+      tel    <- calibrationObservationFor(oid, CalibrationRole.Telluric).map(_.get)
+      telRm  <- explicitReadMode(tel)
+      telQs  <- ifuOffsetsQ(tel)
+    yield
+      assertEquals(telRm, none)
+      assertEquals(telQs, List(BigDecimal(1), BigDecimal(-1)))
