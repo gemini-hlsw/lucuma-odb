@@ -750,7 +750,7 @@ object PerScienceObservationCalibrationsService:
               flamingos2LongSlitService.resetTelluricConfig(targetOid)
             case Some(ObservingModeType.Flamingos2Mos) =>
               flamingos2LongSlitService.resetMosTelluricConfig(targetOid)
-            case Some(ObservingModeType.GnirsLongSlit) =>
+            case Some(ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu) =>
               gnirsSpectroscopyService.resetTelluricConfig(targetOid)
             case _ =>
               F.unit
