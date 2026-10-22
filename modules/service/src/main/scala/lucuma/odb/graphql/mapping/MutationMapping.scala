@@ -409,7 +409,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] with UserEnv {
               checked.foldWithId(OdbError.InvalidArgument().asFailureF): (_, oid) =>
                 Services.asSuperUser:
                   generator
-                    .resetAcquisition(oid, input.regenerate)
+                    .resetAcquisition(oid, input.regenerate, input.abandonOngoingStep)
                     .map(_.fold(_.asFailure, _ => oid.success))
                     .nestMap: oid =>
                       Filter(Predicates.resetAcquisitionResult.observation.id.eql(oid), child)
@@ -593,7 +593,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] with UserEnv {
           res.flatTraverse: checked =>
             services.useTransactionally:
               sequenceService
-                .replaceFlamingos2Sequence(checked)
+                .replaceFlamingos2Sequence(checked, input.abandonOngoingStep)
                 .nestMap: s =>
                   Json.obj("sequence" -> s.compile.toList.asJson)
 
@@ -605,7 +605,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] with UserEnv {
           res.flatTraverse: checked =>
             services.useTransactionally:
               sequenceService
-                .replaceGmosNorthSequence(checked)
+                .replaceGmosNorthSequence(checked, input.abandonOngoingStep)
                 .nestMap: s =>
                   Json.obj("sequence" -> s.compile.toList.asJson)
 
@@ -617,7 +617,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] with UserEnv {
           res.flatTraverse: checked =>
             services.useTransactionally:
               sequenceService
-                .replaceGmosSouthSequence(checked)
+                .replaceGmosSouthSequence(checked, input.abandonOngoingStep)
                 .nestMap: s =>
                   Json.obj("sequence" -> s.compile.toList.asJson)
 
@@ -629,7 +629,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] with UserEnv {
           res.flatTraverse: checked =>
             services.useTransactionally:
               sequenceService
-                .replaceIgrins2Sequence(checked)
+                .replaceIgrins2Sequence(checked, input.abandonOngoingStep)
                 .nestMap: s =>
                   Json.obj("sequence" -> s.compile.toList.asJson)
 
@@ -641,7 +641,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] with UserEnv {
           res.flatTraverse: checked =>
             services.useTransactionally:
               sequenceService
-                .replaceGnirsSequence(checked)
+                .replaceGnirsSequence(checked, input.abandonOngoingStep)
                 .nestMap: s =>
                   Json.obj("sequence" -> s.compile.toList.asJson)
 
@@ -653,7 +653,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] with UserEnv {
           res.flatTraverse: checked =>
             services.useTransactionally:
               sequenceService
-                .replaceGhostSequence(checked)
+                .replaceGhostSequence(checked, input.abandonOngoingStep)
                 .nestMap: s =>
                   Json.obj("sequence" -> s.compile.toList.asJson)
 
@@ -1009,7 +1009,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] with UserEnv {
           .useNonTransactionally:
             Services.asSuperUser:
               // An edited acquisition stays the source of truth over the observing mode.
-              ids.traverse(id => generator.resetAcquisition(id, regenerate = false)).void
+              ids.traverse(id => generator.resetAcquisition(id, regenerate = false, abandonOngoingStep = false)).void
           .whenA(updatesAcquisition)
 
       // Put it all together

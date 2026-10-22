@@ -4050,7 +4050,8 @@ type Mutation {
   """
   Replaces the remaining steps in an execution sequence with the provided
   sequence.  Previously executed (or even partially executed) steps are not
-  deleted.  Fails while a step of the sequence is executing.
+  deleted.  Fails while a step of the sequence is executing, unless
+  `abandonOngoingStep` is set.
   """
   replaceFlamingos2Sequence(
     input: ReplaceFlamingos2SequenceInput!
@@ -4069,7 +4070,8 @@ type Mutation {
   """
   Replaces the remaining steps in an execution sequence with the provided
   sequence.  Previously executed (or even partially executed) steps are not
-  deleted.  Fails while a step of the sequence is executing.
+  deleted.  Fails while a step of the sequence is executing, unless
+  `abandonOngoingStep` is set.
   """
   replaceGmosNorthSequence(
     input: ReplaceGmosNorthSequenceInput!
@@ -4105,7 +4107,8 @@ type Mutation {
   """
   Replaces the remaining steps in an execution sequence with the provided
   sequence.  Previously executed (or even partially executed) steps are not
-  deleted.  Fails while a step of the sequence is executing.
+  deleted.  Fails while a step of the sequence is executing, unless
+  `abandonOngoingStep` is set.
   """
   replaceGmosSouthSequence(
     input: ReplaceGmosSouthSequenceInput!
@@ -4114,7 +4117,8 @@ type Mutation {
   """
   Replaces the remaining steps in an execution sequence with the provided
   sequence.  Previously executed (or even partially executed) steps are not
-  deleted.  Fails while a step of the sequence is executing.
+  deleted.  Fails while a step of the sequence is executing, unless
+  `abandonOngoingStep` is set.
   """
   replaceIgrins2Sequence(
     input: ReplaceIgrins2SequenceInput!
@@ -4123,7 +4127,8 @@ type Mutation {
   """
   Replaces the remaining steps in an execution sequence with the provided
   sequence.  Previously executed (or even partially executed) steps are not
-  deleted.  Fails while a step of the sequence is executing.
+  deleted.  Fails while a step of the sequence is executing, unless
+  `abandonOngoingStep` is set.
   """
   replaceGnirsSequence(
     input: ReplaceGnirsSequenceInput!
@@ -4132,7 +4137,8 @@ type Mutation {
   """
   Replaces the remaining steps in an execution sequence with the provided
   sequence.  Previously executed (or even partially executed) steps are not
-  deleted.  Fails while a step of the sequence is executing.
+  deleted.  Fails while a step of the sequence is executing, unless
+  `abandonOngoingStep` is set.
   """
   replaceGhostSequence(
     input: ReplaceGhostSequenceInput!
@@ -4155,7 +4161,7 @@ type Mutation {
   which acquisition steps may have been executed.  An acquisition customized
   via `replace*Sequence` restarts from a copy of its edited steps and stays
   customized, unless `regenerate` is set.  Fails while an acquisition step is
-  executing.  Requires staff (or better) access.
+  executing, unless `abandonOngoingStep` is set.  Requires staff (or better) access.
   """
   resetAcquisition(
     input: ResetAcquisitionInput!
@@ -6027,6 +6033,13 @@ input ResetAcquisitionInput {
   via `replace*Sequence`, clearing the customization.
   """
   regenerate: Boolean = false
+
+  """
+  Reset even while an acquisition step is executing.  The executing step is
+  then marked abandoned, although Observe keeps running it.  Defaults to false,
+  in which case the mutation fails while an acquisition step is executing.
+  """
+  abandonOngoingStep: Boolean = false
 }
 
 """
@@ -26321,6 +26334,14 @@ input ReplaceFlamingos2SequenceInput {
   one execution event was received, are preserved.
   """
   sequence: [Flamingos2AtomInput!]
+
+  """
+  Replace the sequence even while one of its steps is executing.  The executing
+  step is then marked abandoned, although Observe keeps running it, and the
+  steps of the new sequence run after it.  Defaults to false, in which case the
+  mutation fails while a step of the sequence is executing.
+  """
+  abandonOngoingStep: Boolean = false
 }
 
 """
@@ -26349,6 +26370,14 @@ input ReplaceGmosNorthSequenceInput {
   one execution event was received, are preserved.
   """
   sequence: [GmosNorthAtomInput!]
+
+  """
+  Replace the sequence even while one of its steps is executing.  The executing
+  step is then marked abandoned, although Observe keeps running it, and the
+  steps of the new sequence run after it.  Defaults to false, in which case the
+  mutation fails while a step of the sequence is executing.
+  """
+  abandonOngoingStep: Boolean = false
 }
 
 """
@@ -26377,6 +26406,14 @@ input ReplaceGmosSouthSequenceInput {
   one execution event was received, are preserved.
   """
   sequence: [GmosSouthAtomInput!]
+
+  """
+  Replace the sequence even while one of its steps is executing.  The executing
+  step is then marked abandoned, although Observe keeps running it, and the
+  steps of the new sequence run after it.  Defaults to false, in which case the
+  mutation fails while a step of the sequence is executing.
+  """
+  abandonOngoingStep: Boolean = false
 }
 
 """
@@ -26405,6 +26442,14 @@ input ReplaceIgrins2SequenceInput {
   one execution event was received, are preserved.
   """
   sequence: [Igrins2AtomInput!]
+
+  """
+  Replace the sequence even while one of its steps is executing.  The executing
+  step is then marked abandoned, although Observe keeps running it, and the
+  steps of the new sequence run after it.  Defaults to false, in which case the
+  mutation fails while a step of the sequence is executing.
+  """
+  abandonOngoingStep: Boolean = false
 }
 
 """
@@ -26433,6 +26478,14 @@ input ReplaceGnirsSequenceInput {
   one execution event was received, are preserved.
   """
   sequence: [GnirsAtomInput!]
+
+  """
+  Replace the sequence even while one of its steps is executing.  The executing
+  step is then marked abandoned, although Observe keeps running it, and the
+  steps of the new sequence run after it.  Defaults to false, in which case the
+  mutation fails while a step of the sequence is executing.
+  """
+  abandonOngoingStep: Boolean = false
 }
 
 """
@@ -26461,6 +26514,14 @@ input ReplaceGhostSequenceInput {
   one execution event was received, are preserved.
   """
   sequence: [GhostAtomInput!]
+
+  """
+  Replace the sequence even while one of its steps is executing.  The executing
+  step is then marked abandoned, although Observe keeps running it, and the
+  steps of the new sequence run after it.  Defaults to false, in which case the
+  mutation fails while a step of the sequence is executing.
+  """
+  abandonOngoingStep: Boolean = false
 }
 
 """

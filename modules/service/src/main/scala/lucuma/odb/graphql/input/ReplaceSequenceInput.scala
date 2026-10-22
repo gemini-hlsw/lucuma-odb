@@ -20,10 +20,11 @@ import lucuma.odb.sequence.data.ProtoStep
 
 
 case class ReplaceSequenceInput[D](
-  observationId:  Option[Observation.Id],
-  observationRef: Option[ObservationReference],
-  sequenceType:   SequenceType,
-  sequence:       List[ProtoAtom[ProtoStep[D]]]
+  observationId:      Option[Observation.Id],
+  observationRef:     Option[ObservationReference],
+  sequenceType:       SequenceType,
+  sequence:           List[ProtoAtom[ProtoStep[D]]],
+  abandonOngoingStep: Boolean
 )
 
 object ReplaceSequenceInput:
@@ -36,9 +37,10 @@ object ReplaceSequenceInput:
         ObservationIdBinding.Option("observationId", rObservationId),
         ObservationReferenceBinding.Option("observationReference", rObservationRef),
         SequenceTypeBinding("sequenceType", rSequenceType),
-        atomBinding.List("sequence", rSequence)
-      ) => (rObservationId, rObservationRef, rSequenceType, rSequence).parMapN: (oid, ref, seqType, seq) =>
-        ReplaceSequenceInput(oid, ref, seqType, seq)
+        atomBinding.List("sequence", rSequence),
+        BooleanBinding.Option("abandonOngoingStep", rAbandonOngoingStep)
+      ) => (rObservationId, rObservationRef, rSequenceType, rSequence, rAbandonOngoingStep.map(_.getOrElse(false))).parMapN: (oid, ref, seqType, seq, abandon) =>
+        ReplaceSequenceInput(oid, ref, seqType, seq, abandon)
 
   val ReplaceFlamingos2Binding: Matcher[ReplaceSequenceInput[Flamingos2DynamicConfig]] =
     binding(AtomInput.Flamingos2Binding)

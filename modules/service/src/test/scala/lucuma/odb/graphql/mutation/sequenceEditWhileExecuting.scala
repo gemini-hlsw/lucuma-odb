@@ -15,7 +15,11 @@ import lucuma.core.enums.StepStage
 import lucuma.core.model.Observation
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Step
+import lucuma.odb.data.StepExecutionState
+import lucuma.odb.util.Codecs.*
 import munit.Location
+import skunk.*
+import skunk.implicits.*
 
 // Editing a sequence while one of its steps is executing would modify that
 // step, so the edit is rejected until the step ends.  The check is not
@@ -63,6 +67,32 @@ class sequenceEditWhileExecuting
       }
     """
     errors.fold(query(serviceUser, q).void)(es => expect(serviceUser, q, es.asLeft))
+
+  private def replaceAbandoning(oid: Observation.Id, sequenceType: SequenceType): IO[Unit] =
+    val in = input(oid, sequenceType, atomInput("Edited", stepInput(GmosNorthFilter.GPrime)))
+      .replace("sequence:", "abandonOngoingStep: true\n        sequence:")
+    query(staff, mutation(Instrument.GmosNorth, in)).void
+
+  private def resetAbandoning(oid: Observation.Id): IO[Unit] =
+    query(
+      serviceUser,
+      s"""
+        mutation {
+          resetAcquisition(input: {
+            observationId: ${oid.asJson}
+            abandonOngoingStep: true
+          }) {
+            observation { id }
+          }
+        }
+      """
+    ).void
+
+  private val SelectStepExecutionState: Query[Step.Id, StepExecutionState] =
+    sql"SELECT c_execution_state FROM t_step_execution WHERE c_step_id = $step_id".query(step_execution_state)
+
+  private def expectAbandoned(sid: Step.Id)(using Location): IO[Unit] =
+    withSession(_.unique(SelectStepExecutionState)(sid)).map(assertEquals(_, StepExecutionState.Abandoned))
 
   private def editAcquisition(oid: Observation.Id, errors: Option[List[String]])(using Location): IO[Unit] =
     val q = updateObservationsMutation(
@@ -147,4 +177,30 @@ class sequenceEditWhileExecuting
       (o, v) <- setup
       s      <- startStep(o, SequenceType.Science, v)
       _      <- insertAs(staff, o, List(SmartGcalType.Arc), after = s.some)
+    yield ()
+
+  test("abandonOngoingStep replaces the sequence anyway, abandoning the executing step"):
+    for
+      (o, v) <- setup
+      s      <- startStep(o, SequenceType.Science, v)
+      _      <- replaceAbandoning(o, SequenceType.Science)
+      _      <- expectAbandoned(s)
+      ids    <- scienceSequenceIds(pi, o)
+    yield assert(!ids.values.flatten.toList.contains(s))
+
+  test("abandonOngoingStep resets the acquisition anyway, abandoning the executing step"):
+    for
+      (o, v) <- setup
+      s      <- startStep(o, SequenceType.Acquisition, v)
+      _      <- resetAbandoning(o)
+      _      <- expectAbandoned(s)
+    yield ()
+
+  test("abandonOngoingStep resets a customized acquisition anyway, abandoning the executing step"):
+    for
+      (o, v) <- setup
+      _      <- replace(o, SequenceType.Acquisition, none)
+      s      <- startStep(o, SequenceType.Acquisition, v)
+      _      <- resetAbandoning(o)
+      _      <- expectAbandoned(s)
     yield ()

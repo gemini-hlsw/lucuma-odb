@@ -119,8 +119,9 @@ sealed trait Generator[F[_]]:
    * customization cleared.
    */
   def resetAcquisition(
-    observationId: Observation.Id,
-    regenerate:    Boolean
+    observationId:      Observation.Id,
+    regenerate:         Boolean,
+    abandonOngoingStep: Boolean
   )(using NoTransaction[F], Services.ServiceAccess): F[Either[OdbError, Unit]]
 
   def materialize(
@@ -682,8 +683,9 @@ object Generator:
           instrumentExecutionConfig(ctx).flatMap(c => EitherT.fromEither[F](altairChecked(ctx, c)))
 
       override def resetAcquisition(
-        observationId: Observation.Id,
-        regenerate:    Boolean
+        observationId:      Observation.Id,
+        regenerate:         Boolean,
+        abandonOngoingStep: Boolean
       )(using NoTransaction[F], Services.ServiceAccess): F[Either[OdbError, Unit]] =
 
         def go[S, D](
@@ -691,10 +693,10 @@ object Generator:
           input: Option[ItcInput],
           gen:   F[Either[OdbError, StreamingExecutionConfig[F, S, D]]]
         )(
-          persist: (Observation.Id, Stream[F, Atom[D]]) => F[Either[OdbError, Unit]]
+          persist: (Observation.Id, Stream[F, Atom[D]], Boolean) => F[Either[OdbError, Unit]]
         )(using Transaction[F]): EitherT[F, OdbError, Unit] =
           EitherT(gen)
-            .flatMap(s => EitherT(persist(observationId, s.acquisition)))
+            .flatMap(s => EitherT(persist(observationId, s.acquisition, abandonOngoingStep)))
             .flatMap(_ => EitherT.liftF(input.traverse_(itcService.updateAcquisition(observationId, _, acq))))
 
         def reset(ctx: GeneratorContext, freshAcq: ItcAcquisition)(using Transaction[F]): EitherT[F, OdbError, Unit] =
@@ -778,7 +780,7 @@ object Generator:
         val restartCustomizedAcquisition: EitherT[F, OdbError, Boolean] =
           transactionallyEitherT:
             EitherT:
-              sequenceService.resetCustomizedAcquisition(observationId).map:
+              sequenceService.resetCustomizedAcquisition(observationId, abandonOngoingStep).map:
                 _.toEither.leftMap:
                   case Left(t)         =>
                     GeneratorError.sequenceUnavailable(observationId, Option(t.getMessage).getOrElse(t.toString))
