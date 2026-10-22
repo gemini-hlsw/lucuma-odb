@@ -276,14 +276,6 @@ class perScienceObservationCalibrations
                      )""".command
       )(oid).void
 
-  private def selectTelluricObservationFor(oid: Observation.Id): IO[Option[Observation.Id]] =
-    queryObservation(oid).flatMap: obs =>
-      obs.groupId.flatTraverse: gid =>
-        queryObservationsInGroup(gid).map: infos =>
-          infos
-            .find(_.calibrationRole.exists(_ === CalibrationRole.Telluric))
-            .map(_.id)
-
   private def queryObservationWithTarget(oid: Observation.Id): IO[ObsWithTarget] =
     query(
       serviceUser,
@@ -686,7 +678,7 @@ class perScienceObservationCalibrations
       _    <- runObscalcUpdate(pid, oid)
 
       _    <- recalculateCalibrations(pid, when, oid)
-      toid <- selectTelluricObservationFor(oid).map(_.get)
+      toid <- calibrationObservationFor(oid, CalibrationRole.Telluric).map(_.get)
       _    <- runObscalcUpdate(pid, toid)
 
       _    <- editSequence(toid)
@@ -702,7 +694,7 @@ class perScienceObservationCalibrations
       _    <- runObscalcUpdate(pid, oid)
 
       _    <- recalculateCalibrations(pid, when, oid)
-      toid <- selectTelluricObservationFor(oid).map(_.get)
+      toid <- calibrationObservationFor(oid, CalibrationRole.Telluric).map(_.get)
       _    <- runObscalcUpdate(pid, toid)
 
       _    <- editSequence(toid)
@@ -724,7 +716,7 @@ class perScienceObservationCalibrations
       _    <- runObscalcUpdate(pid, oid)
 
       _    <- recalculateCalibrations(pid, when, oid)
-      toid <- selectTelluricObservationFor(oid).map(_.get)
+      toid <- calibrationObservationFor(oid, CalibrationRole.Telluric).map(_.get)
       _    <- runObscalcUpdate(pid, toid)
 
       _    <- editSequence(toid)
@@ -1526,7 +1518,7 @@ class perScienceObservationCalibrations
       oid  <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
       _    <- runObscalcUpdate(pid, oid)
       _    <- recalculateCalibrations(pid, when, oid)
-      toid <- selectTelluricObservationFor(oid).map(_.get)
+      toid <- calibrationObservationFor(oid, CalibrationRole.Telluric).map(_.get)
       _    <- sleep >> resolveTelluricTargets
       meta <- selectMeta(toid)
       _    <- runObscalcUpdate(pid, toid)
@@ -1958,7 +1950,7 @@ class perScienceObservationCalibrations
       _      <- runObscalcUpdate(pid, oid)
       _      <- staleItcHash(oid)
       _      <- recalculateCalibrations(pid, when, oid)
-      telOpt <- selectTelluricObservationFor(oid)
+      telOpt <- calibrationObservationFor(oid, CalibrationRole.Telluric)
       sns    <- telOpt.traverse(scienceEtmSignalToNoise)
     } yield
       assertEquals(sns.map(_.distinct), List(SignalToNoise.unsafeFromBigDecimalExact(232).some).some)
@@ -1972,7 +1964,7 @@ class perScienceObservationCalibrations
       oid    <- createGnirsMixedEtmObservationAs(pi, pid, tid)
       _      <- runObscalcUpdate(pid, oid)
       _      <- recalculateCalibrations(pid, when, oid)
-      telOpt <- selectTelluricObservationFor(oid)
+      telOpt <- calibrationObservationFor(oid, CalibrationRole.Telluric)
       sns    <- telOpt.traverse(scienceEtmSignalToNoise)
     } yield
       // The requested leg asks for 200 (2 x 100), the measured leg for 232 (2 x 116).
@@ -1991,7 +1983,7 @@ class perScienceObservationCalibrations
       _      <- deepenInitialScienceEtm(oid)
       _      <- runObscalcUpdate(pid, oid)
       _      <- recalculateCalibrations(pid, when, oid)
-      telOpt <- selectTelluricObservationFor(oid)
+      telOpt <- calibrationObservationFor(oid, CalibrationRole.Telluric)
       sns    <- telOpt.traverse(scienceEtmSignalToNoise)
     } yield
       // 2 x the live S/N 10 raised to the floor, not 2 x the superseded 500.
@@ -2015,7 +2007,7 @@ class perScienceObservationCalibrations
                        exposureTimeMode: { signalToNoise: { value: 10 at: { nanometers: 1700 } } } }""")
       _      <- runObscalcUpdate(pid, oid)
       _      <- recalculateCalibrations(pid, when, oid)
-      telOpt <- selectTelluricObservationFor(oid)
+      telOpt <- calibrationObservationFor(oid, CalibrationRole.Telluric)
       rows   <- telOpt.traverse(gnirsWavelengthRows)
     } yield
       // The cloned initial 1650 row carries the current 1700 row's floored 100, not the
@@ -2038,7 +2030,7 @@ class perScienceObservationCalibrations
       oid    <- createGnirsXdObservationAs(pi, pid, tid, wavelengthsNm = List(1100))
       _      <- runObscalcUpdate(pid, oid)
       _      <- recalculateCalibrations(pid, when, oid)
-      telOpt <- selectTelluricObservationFor(oid)
+      telOpt <- calibrationObservationFor(oid, CalibrationRole.Telluric)
       before <- telOpt.traverse(gnirsWavelengthRows)
       _      <- setGnirsCentralWavelengths(oid,
                   """{ centralWavelength: { nanometers: 1100 }
@@ -2067,7 +2059,7 @@ class perScienceObservationCalibrations
       oid    <- createGnirsRepeatedWavelengthObservationAs(pi, pid, tid)
       _      <- runObscalcUpdate(pid, oid)
       _      <- recalculateCalibrations(pid, when, oid)
-      telOpt <- selectTelluricObservationFor(oid)
+      telOpt <- calibrationObservationFor(oid, CalibrationRole.Telluric)
       rows   <- telOpt.traverse(gnirsWavelengthRows)
     } yield
       // One 1650 row per version, renumbered: 2 x the deeper leg (measured 50 over
@@ -2088,7 +2080,7 @@ class perScienceObservationCalibrations
       _            <- setScienceRequirements(oid, DefaultSnAt, 30.0)
       _            <- runObscalcUpdate(pid, oid)
       _            <- recalculateCalibrations(pid, when, oid)
-      telluricOid  <- selectTelluricObservationFor(oid).map(_.get)
+      telluricOid  <- calibrationObservationFor(oid, CalibrationRole.Telluric).map(_.get)
       telluricEtms <- queryAllEtms(telluricOid)
     } yield
       // 2 x 30 is 60, raised to the floor.
@@ -2102,7 +2094,7 @@ class perScienceObservationCalibrations
       oid    <- createGnirsXdObservationAs(pi, pid, tid, wavelengthsNm = List(1550))
       _      <- runObscalcUpdate(pid, oid)
       _      <- recalculateCalibrations(pid, when, oid)
-      telOpt <- selectTelluricObservationFor(oid)
+      telOpt <- calibrationObservationFor(oid, CalibrationRole.Telluric)
       sns    <- telOpt.traverse(scienceEtmSignalToNoise)
     } yield
       // The ITC measures 30 at 1550nm; 2 x 30 is 60, raised to the floor.
@@ -2123,7 +2115,7 @@ class perScienceObservationCalibrations
                        exposureTimeMode: { timeAndCount: { time: { seconds: 30.0 } count: 3 at: { nanometers: 1600 } } } }""")
       _      <- runObscalcUpdate(pid, oid)
       _      <- recalculateCalibrations(pid, when, oid)
-      telOpt <- selectTelluricObservationFor(oid)
+      telOpt <- calibrationObservationFor(oid, CalibrationRole.Telluric)
       rows   <- telOpt.traverse(gnirsWavelengthRows)
     } yield
       // The deepest 1650 leg asks for 20; 2 x 20 is 40, raised to the floor.
@@ -2140,7 +2132,7 @@ class perScienceObservationCalibrations
       oid    <- createGnirsShallowSnObservationAs(pi, pid, tid)
       _      <- runObscalcUpdate(pid, oid)
       _      <- recalculateCalibrations(pid, when, oid)
-      pinOpt <- selectDaytimePinholeObservationFor(oid)
+      pinOpt <- calibrationObservationFor(oid, CalibrationRole.DaytimePinhole)
       sns    <- pinOpt.traverse(scienceEtmSignalToNoise)
     } yield
       // Not 2 x the requested 10: a pinhole's exposure comes from SmartGcal.
@@ -2154,9 +2146,9 @@ class perScienceObservationCalibrations
       oid    <- createGnirsXdObservationAs(pi, pid, tid, wavelengthsNm = List(2200))
       _      <- runObscalcUpdate(pid, oid)
       _      <- recalculateCalibrations(pid, when, oid)
-      telOpt <- selectTelluricObservationFor(oid)
+      telOpt <- calibrationObservationFor(oid, CalibrationRole.Telluric)
       tSns   <- telOpt.traverse(scienceEtmSignalToNoise)
-      pinOpt <- selectDaytimePinholeObservationFor(oid)
+      pinOpt <- calibrationObservationFor(oid, CalibrationRole.DaytimePinhole)
       pSns   <- pinOpt.traverse(scienceEtmSignalToNoise)
     } yield
       val hundred = List(SignalToNoise.unsafeFromBigDecimalExact(100).some).some
@@ -2281,7 +2273,7 @@ class perScienceObservationCalibrations
       oid     <- createIgrins2LongSlitObservationAs(pi, pid, List(tid)*)
       _       <- runObscalcUpdate(pid, oid)
       _       <- recalculateCalibrations(pid, when, oid)
-      toidOpt <- selectTelluricObservationFor(oid)
+      toidOpt <- calibrationObservationFor(oid, CalibrationRole.Telluric)
       toid    =  toidOpt.get
       _       <- runObscalcUpdate(pid, toid)
       _       <- sleep >> resolveTelluricTargets
@@ -2394,7 +2386,7 @@ class perScienceObservationCalibrations
       _           <- runObscalcUpdate(pid, oid)
       _           <- recalculateCalibrations(pid, when, oid)
       sciSet      <- queryIgrins2OffsetSettings(oid)
-      toidOpt     <- selectTelluricObservationFor(oid)
+      toidOpt     <- calibrationObservationFor(oid, CalibrationRole.Telluric)
       toid        =  toidOpt.get
       telSet      <- queryIgrins2OffsetSettings(toid)
       telExplicit <- queryIgrins2ExplicitTelescopeConfigs(toid)
@@ -2443,7 +2435,7 @@ class perScienceObservationCalibrations
       oid     <- createIgrins2LongSlitObservationAs(pi, pid, Some(CustomScienceOffsets), tid)
       _       <- runObscalcUpdate(pid, oid)
       _       <- recalculateCalibrations(pid, when, oid)
-      toid    <- selectTelluricObservationFor(oid).map(_.get)
+      toid    <- calibrationObservationFor(oid, CalibrationRole.Telluric).map(_.get)
       tel1    <- queryIgrins2OffsetSettings(toid)
       // Change the science offsets.
       _       <- updateIgrins2ScienceOffsets(oid)
@@ -2465,7 +2457,7 @@ class perScienceObservationCalibrations
       _       <- runObscalcUpdate(pid, oid)
       _       <- recalculateCalibrations(pid, when, oid)
       sciNull <- queryIgrins2SvcIsNull(oid)
-      toid    <- selectTelluricObservationFor(oid).map(_.get)
+      toid    <- calibrationObservationFor(oid, CalibrationRole.Telluric).map(_.get)
       telNull <- queryIgrins2SvcIsNull(toid)
     } yield {
       // Science keeps its SVC configuration.
@@ -2482,7 +2474,7 @@ class perScienceObservationCalibrations
       _       <- enableIgrins2Svc(oid)
       _       <- runObscalcUpdate(pid, oid)
       _       <- recalculateCalibrations(pid, when, oid)
-      toid    <- selectTelluricObservationFor(oid).map(_.get)
+      toid    <- calibrationObservationFor(oid, CalibrationRole.Telluric).map(_.get)
       tel1    <- queryIgrins2SvcIsNull(toid)
       // Edit the science SVC configuration.
       _       <- enableIgrins2Svc(oid, explicitExposureSeconds = Some(BigDecimal(10)))
@@ -2526,7 +2518,7 @@ class perScienceObservationCalibrations
       _       <- runObscalcUpdate(pid, oid)
       _       <- recalculateCalibrations(pid, when, oid)
       sci     <- queryF2TelescopeConfigs(oid)
-      toidOpt <- selectTelluricObservationFor(oid)
+      toidOpt <- calibrationObservationFor(oid, CalibrationRole.Telluric)
       toid    = toidOpt.get
       tel     <- queryF2TelescopeConfigs(toid)
     } yield {
@@ -2597,7 +2589,7 @@ class perScienceObservationCalibrations
       oid     <- createGnirsLongSlitObservationAs(pi, pid, tid)
       _       <- runObscalcUpdate(pid, oid)
       _       <- recalculateCalibrations(pid, when, oid)
-      toidOpt <- selectTelluricObservationFor(oid)
+      toidOpt <- calibrationObservationFor(oid, CalibrationRole.Telluric)
       toid    =  toidOpt.get
       _       <- runObscalcUpdate(pid, toid)
       _       <- sleep >> resolveTelluricTargets
@@ -2616,7 +2608,7 @@ class perScienceObservationCalibrations
       _                        <- runObscalcUpdate(pid, oid)
       _                        <- recalculateCalibrations(pid, when, oid)
       (sciEff, sciDef, sciExp) <- queryGnirsSlitTelescopeConfigs(oid)
-      toidOpt                  <- selectTelluricObservationFor(oid)
+      toidOpt                  <- calibrationObservationFor(oid, CalibrationRole.Telluric)
       toid                     =  toidOpt.get
       (telEff, telDef, telExp) <- queryGnirsSlitTelescopeConfigs(toid)
     } yield {
@@ -2876,14 +2868,6 @@ class perScienceObservationCalibrations
           .query(text *: int4 *: int4 *: int4 *: lucuma.odb.util.Codecs.signal_to_noise *: int4)
       )(oid).map(_.map((v, i, w, c, sn, at) => (v, i, w, c, sn.toBigDecimal.toInt, at)))
 
-  private def selectDaytimePinholeObservationFor(oid: Observation.Id): IO[Option[Observation.Id]] =
-    queryObservation(oid).flatMap: obs =>
-      obs.groupId.flatTraverse: gid =>
-        queryObservationsInGroup(gid).map: infos =>
-          infos
-            .find(_.calibrationRole.exists(_ === CalibrationRole.DaytimePinhole))
-            .map(_.id)
-
   test("gnirs cross-dispersed observation gets a daytime pinhole flat in the obs calibration group"):
     for {
       pid    <- createProgramAs(pi)
@@ -2892,8 +2876,8 @@ class perScienceObservationCalibrations
       oid    <- createGnirsXdObservationAs(pi, pid, tid)
       _      <- runObscalcUpdate(pid, oid)
       _      <- recalculateCalibrations(pid, when, oid)
-      pinOpt <- selectDaytimePinholeObservationFor(oid)
-      telOpt <- selectTelluricObservationFor(oid)
+      pinOpt <- calibrationObservationFor(oid, CalibrationRole.DaytimePinhole)
+      telOpt <- calibrationObservationFor(oid, CalibrationRole.Telluric)
       sciObs <- queryObservation(oid)
       pinObs <- pinOpt.traverse(queryObservation)
       grp    <- sciObs.groupId.traverse(queryGroup)
@@ -2918,7 +2902,7 @@ class perScienceObservationCalibrations
       oid    <- createGnirsXdObservationAs(pi, pid, tid)
       _      <- runObscalcUpdate(pid, oid)
       _      <- recalculateCalibrations(pid, when, oid)
-      pinOid <- selectDaytimePinholeObservationFor(oid).map(_.get)
+      pinOid <- calibrationObservationFor(oid, CalibrationRole.DaytimePinhole).map(_.get)
       _      <- expect(
                   user     = pi,
                   query    = executionConfigQuery(pinOid, "gnirs", "science", atomShapeQuery, None),
@@ -2959,7 +2943,7 @@ class perScienceObservationCalibrations
       oid    <- createGnirsXdObservationAs(pi, pid, tid, explicitReadMode = "VERY_FAINT".some)
       _      <- runObscalcUpdate(pid, oid)
       _      <- recalculateCalibrations(pid, when, oid)
-      pinOid <- selectDaytimePinholeObservationFor(oid).map(_.get)
+      pinOid <- calibrationObservationFor(oid, CalibrationRole.DaytimePinhole).map(_.get)
       _      <- runObscalcUpdate(pid, pinOid)
       _      <- expect(
                   user     = pi,
@@ -3037,7 +3021,7 @@ class perScienceObservationCalibrations
       oid    <- createGnirsXdObservationAs(pi, pid, tid, wavelengthsNm = List(1650, 1650))
       _      <- runObscalcUpdate(pid, oid)
       _      <- recalculateCalibrations(pid, when, oid)
-      pinOid <- selectDaytimePinholeObservationFor(oid).map(_.get)
+      pinOid <- calibrationObservationFor(oid, CalibrationRole.DaytimePinhole).map(_.get)
       _      <- expect(
                   user     = pi,
                   query    = executionConfigQuery(pinOid, "gnirs", "science", atomShapeQuery, None),
@@ -3072,7 +3056,7 @@ class perScienceObservationCalibrations
       oid    <- createGnirsLongSlitObservationAs(pi, pid, tid) // MIRROR prism
       _      <- runObscalcUpdate(pid, oid)
       _      <- recalculateCalibrations(pid, when, oid)
-      pinOpt <- selectDaytimePinholeObservationFor(oid)
+      pinOpt <- calibrationObservationFor(oid, CalibrationRole.DaytimePinhole)
     } yield assert(pinOpt.isEmpty, "expected no daytime pinhole for a non-cross-dispersed config")
 
   // The daytime pinhole flat reacts like the telluric: when the science obs is
@@ -3085,8 +3069,8 @@ class perScienceObservationCalibrations
       oid         <- createGnirsXdObservationAs(pi, pid, tid)
       _           <- runObscalcUpdate(pid, oid)
       _           <- recalculateCalibrations(pid, when, oid)
-      pinOid      <- selectDaytimePinholeObservationFor(oid).map(_.get)
-      telOid      <- selectTelluricObservationFor(oid).map(_.get)
+      pinOid      <- calibrationObservationFor(oid, CalibrationRole.DaytimePinhole).map(_.get)
+      telOid      <- calibrationObservationFor(oid, CalibrationRole.Telluric).map(_.get)
       groupId     <- queryObservation(oid).map(_.groupId.get)
       _           <- setObservationInactive(oid)
       _           <- recalculateCalibrations(pid, when, oid)
@@ -3132,7 +3116,7 @@ class perScienceObservationCalibrations
       oid      <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
       _        <- runObscalcUpdate(pid, oid)
       _        <- recalculateCalibrations(pid, when, oid)
-      telluric <- selectTelluricObservationFor(oid).map(_.get)
+      telluric <- calibrationObservationFor(oid, CalibrationRole.Telluric).map(_.get)
       before   <- obsUserStateTag(telluric)
       s1       <- setObservationWorkflowState(pi, telluric, ObservationWorkflowState.Inactive)
       u1       <- obsUserStateTag(telluric)
@@ -3154,7 +3138,7 @@ class perScienceObservationCalibrations
       oid      <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
       _        <- runObscalcUpdate(pid, oid)
       _        <- recalculateCalibrations(pid, when, oid)
-      telluric <- selectTelluricObservationFor(oid).map(_.get)
+      telluric <- calibrationObservationFor(oid, CalibrationRole.Telluric).map(_.get)
       // Put the science obs in Ready so the telluric inherits it.
       _        <- forceObsUserState(oid, Some(ObservationWorkflowState.Ready))
       s1       <- setObservationWorkflowState(pi, telluric, ObservationWorkflowState.Inactive)
@@ -3175,7 +3159,7 @@ class perScienceObservationCalibrations
       oid    <- createGnirsXdObservationAs(pi, pid, tid)
       _      <- runObscalcUpdate(pid, oid)
       _      <- recalculateCalibrations(pid, when, oid)
-      pinOid <- selectDaytimePinholeObservationFor(oid).map(_.get)
+      pinOid <- calibrationObservationFor(oid, CalibrationRole.DaytimePinhole).map(_.get)
       result <- attemptSetObservationWorkflowState(pi, pinOid, ObservationWorkflowState.Inactive)
     yield
       assert(result.isLeft, "a daytime pinhole must not be declinable")
@@ -3225,7 +3209,7 @@ class perScienceObservationCalibrations
       oid      <- createFlamingos2MosObservationAs(pi, pid, List(tid))
       _        <- runObscalcUpdate(pid, oid)
       _        <- recalculateCalibrations(pid, when, oid)
-      telluric <- selectTelluricObservationFor(oid).map(_.get)
+      telluric <- calibrationObservationFor(oid, CalibrationRole.Telluric).map(_.get)
       result   <- longSlitTelluric(telluric)
     yield
       val (mode, fpu, qs, defaultQs, explicitQs) = result
@@ -3276,14 +3260,14 @@ class perScienceObservationCalibrations
       oid  <- createFlamingos2MosObservationAs(pi, pid, List(tid))
       _    <- runObscalcUpdate(pid, oid)
       _    <- recalculateCalibrations(pid, when, oid)
-      toid <- selectTelluricObservationFor(oid).map(_.get)
+      toid <- calibrationObservationFor(oid, CalibrationRole.Telluric).map(_.get)
       fpu1 <- queryObservationFpu(toid)
       // 1 pix, not 4: the suite only seeds smart gcal for LongSlit1 and LongSlit2,
       // and without a mapping the science sequence -- and so the telluric -- is gone.
       _    <- updateFlamingos2MosSlitWidth(oid, "CUSTOM_WIDTH_1_PIX")
       _    <- runObscalcUpdate(pid, oid)
       _    <- sleep >> recalculateCalibrations(pid, when, oid)
-      toid2 <- selectTelluricObservationFor(oid).map(_.get)
+      toid2 <- calibrationObservationFor(oid, CalibrationRole.Telluric).map(_.get)
       fpu2 <- queryObservationFpu(toid2)
     yield
       assertEquals(fpu1, Flamingos2Fpu.LongSlit2.some)
@@ -3296,12 +3280,12 @@ class perScienceObservationCalibrations
       oid  <- createFlamingos2MosObservationAs(pi, pid, List(tid))
       _    <- runObscalcUpdate(pid, oid)
       _    <- recalculateCalibrations(pid, when, oid)
-      toid <- selectTelluricObservationFor(oid).map(_.get)
+      toid <- calibrationObservationFor(oid, CalibrationRole.Telluric).map(_.get)
       mos  <- longSlitTelluric(toid)
       _    <- switchToFlamingos2LongSlit(oid)
       _    <- runObscalcUpdate(pid, oid)
       _    <- sleep >> recalculateCalibrations(pid, when, oid)
-      toid2 <- selectTelluricObservationFor(oid).map(_.get)
+      toid2 <- calibrationObservationFor(oid, CalibrationRole.Telluric).map(_.get)
       ls   <- longSlitTelluric(toid2)
     yield
       val mosTelluricQs = List(60L, 40L, 20L, -20L, -40L, -60L).map(_ * 1_000_000L)
@@ -3348,7 +3332,7 @@ class perScienceObservationCalibrations
       _            <- runObscalcUpdate(pid, oid)
       _            <- recalculateCalibrations(pid, when, oid)
       groupId      <- queryObservation(oid).map(_.groupId.get)
-      telluricOid  <- selectTelluricObservationFor(oid).map(_.get)
+      telluricOid  <- calibrationObservationFor(oid, CalibrationRole.Telluric).map(_.get)
       _            <- setTelluricType(oid, "flamingos2LongSlit", "NO_TELLURIC")
       _            <- recalculateCalibrations(pid, when, oid)
       groupExists  <- queryGroupExists(groupId)
@@ -3357,7 +3341,7 @@ class perScienceObservationCalibrations
       _            <- setTelluricType(oid, "flamingos2LongSlit", "HOT")
       _            <- recalculateCalibrations(pid, when, oid)
       obsOn        <- queryObservation(oid)
-      telluricOid2 <- selectTelluricObservationFor(oid)
+      telluricOid2 <- calibrationObservationFor(oid, CalibrationRole.Telluric)
     yield
       assert(!groupExists, "obs calibration group should be deleted")
       assert(!telExists,   "telluric should be deleted")
@@ -3386,7 +3370,7 @@ class perScienceObservationCalibrations
       _          <- runObscalcUpdate(pid, oid)
       _          <- recalculateCalibrations(pid, when, oid)
       _          <- sleep >> resolveTelluricTargets
-      spent      <- selectTelluricObservationFor(oid).map(_.get)
+      spent      <- calibrationObservationFor(oid, CalibrationRole.Telluric).map(_.get)
       _          <- recordVisitAs(serviceUser, spent)
       _          <- setTelluricType(oid, "flamingos2LongSlit", "A0V")
       (added, _) <- recalculateCalibrations(pid, when, oid)
@@ -3406,7 +3390,7 @@ class perScienceObservationCalibrations
       _           <- recalculateCalibrations(pid, when, oid)
       _           <- sleep >> resolveTelluricTargets
       groupId     <- queryObservation(oid).map(_.groupId.get)
-      telluricOid <- selectTelluricObservationFor(oid).map(_.get)
+      telluricOid <- calibrationObservationFor(oid, CalibrationRole.Telluric).map(_.get)
       _           <- recordVisitAs(serviceUser, telluricOid)
       _           <- setTelluricType(oid, "flamingos2LongSlit", "NO_TELLURIC")
       _           <- recalculateCalibrations(pid, when, oid)
@@ -3425,13 +3409,13 @@ class perScienceObservationCalibrations
       _           <- runObscalcUpdate(pid, oid)
       _           <- recalculateCalibrations(pid, when, oid)
       groupId     <- queryObservation(oid).map(_.groupId.get)
-      telluricOid <- selectTelluricObservationFor(oid).map(_.get)
-      pinholeOid  <- selectDaytimePinholeObservationFor(oid).map(_.get)
+      telluricOid <- calibrationObservationFor(oid, CalibrationRole.Telluric).map(_.get)
+      pinholeOid  <- calibrationObservationFor(oid, CalibrationRole.DaytimePinhole).map(_.get)
       _           <- setTelluricType(oid, "gnirsSpectroscopy", "NO_TELLURIC")
       _           <- recalculateCalibrations(pid, when, oid)
       groupExists <- queryGroupExists(groupId)
       telExists   <- queryObservationExists(telluricOid)
-      telAfter    <- selectTelluricObservationFor(oid)
+      telAfter    <- calibrationObservationFor(oid, CalibrationRole.Telluric)
       pinExists   <- queryObservationExists(pinholeOid)
     yield
       assert(!telExists,  "telluric should be deleted")
@@ -3449,7 +3433,7 @@ class perScienceObservationCalibrations
       oid     <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
       _       <- runObscalcUpdate(pid, oid)
       _       <- recalculateCalibrations(pid, when, oid)
-      toid    <- selectTelluricObservationFor(oid).map(_.get)
+      toid    <- calibrationObservationFor(oid, CalibrationRole.Telluric).map(_.get)
       // Claim the row the way a daemon worker does (pending -> calculating)
       pending <- sleep >> loadObs(toid).map(_.get)
       // A concurrent obscalc write for the science observation re-invalidates
@@ -3474,7 +3458,7 @@ class perScienceObservationCalibrations
       oid    <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
       _      <- runObscalcUpdate(pid, oid)
       _      <- recalculateCalibrations(pid, when, oid)
-      toid   <- selectTelluricObservationFor(oid).map(_.get)
+      toid   <- calibrationObservationFor(oid, CalibrationRole.Telluric).map(_.get)
       _      <- sleep >> resolveTelluricTargets
       before <- selectMeta(toid).map(_.get)
       _      <- recordVisitAs(serviceUser, toid)
@@ -3530,7 +3514,7 @@ class perScienceObservationCalibrations
       _   <- setScienceRequirements(oid, DefaultSnAt, 60.0)
       _   <- runObscalcUpdate(pid, oid)
       _   <- recalculateCalibrations(pid, when, oid)
-      tel <- selectTelluricObservationFor(oid)
+      tel <- calibrationObservationFor(oid, CalibrationRole.Telluric)
     yield (oid, tel.get)
 
   private def calibrationCalcState(oid: Observation.Id): IO[Option[String]] =
@@ -3707,7 +3691,7 @@ class perScienceObservationCalibrations
       oid <- createGnirsXdObservationAs(pi, pid, tid, wavelengthsNm = List(1600, 1650))
       _   <- runObscalcUpdate(pid, oid)
       _   <- recalculateCalibrations(pid, when, oid)
-      tel <- selectTelluricObservationFor(oid)
+      tel <- calibrationObservationFor(oid, CalibrationRole.Telluric)
     yield (oid, tel.get)
 
   test("telluric etm override: GNIRS overrides one wavelength row and keeps the rest derived"):
@@ -3871,7 +3855,7 @@ class perScienceObservationCalibrations
                     )
       _          <- runObscalcUpdate(pid, oid)
       _          <- recalculateCalibrations(pid, when, oid)
-      telAfter   <- selectTelluricObservationFor(oid)
+      telAfter   <- calibrationObservationFor(oid, CalibrationRole.Telluric)
       explicit   <- telAfter.traverse(scienceEtmIsExplicit)
     yield
       assertEquals(telAfter, Some(tel))
@@ -4070,7 +4054,7 @@ class perScienceObservationCalibrations
       _       <- runObscalcUpdate(pid, oid)
       _       <- recalculateCalibrations(pid, when, oid)
       _       <- sleep >> resolveTelluricTargets
-      tel     <- selectTelluricObservationFor(oid).map(_.get)
+      tel     <- calibrationObservationFor(oid, CalibrationRole.Telluric).map(_.get)
       before  <- queryObservationWithTarget(tel)
       _       <- setUserDefinedTellurics(oid, 1)
       _       <- recalculateCalibrations(pid, when, oid)
@@ -4108,7 +4092,7 @@ class perScienceObservationCalibrations
       oid      <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
       _        <- runObscalcUpdate(pid, oid)
       _        <- recalculateCalibrations(pid, when, oid)
-      tel      <- selectTelluricObservationFor(oid).map(_.get)
+      tel      <- calibrationObservationFor(oid, CalibrationRole.Telluric).map(_.get)
       standard <- createTargetWithProfileAs(pi, pid)
       _        <- editAsterismAs(pi, tel, List(standard), Nil)
       obs      <- queryObservationWithTarget(tel)
@@ -4167,7 +4151,7 @@ class perScienceObservationCalibrations
       _        <- runObscalcUpdate(pid, oid)
       _        <- recalculateCalibrations(pid, when, oid)
       _        <- sleep >> resolveTelluricTargets
-      tel      <- selectTelluricObservationFor(oid).map(_.get)
+      tel      <- calibrationObservationFor(oid, CalibrationRole.Telluric).map(_.get)
       _        <- setUserDefinedTellurics(oid, 1)
       _        <- recalculateCalibrations(pid, when, oid)
       star     <- queryObservationWithTarget(tel).map(_.targetId.get)

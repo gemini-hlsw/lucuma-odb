@@ -153,12 +153,6 @@ class calibrations_gnirs_altair
       """
     ).map(_.hcursor.downFields("observation", "targetEnvironment", "altair").focus.getOrElse(Json.Null))
 
-  private def calibrationObservationFor(oid: Observation.Id, role: CalibrationRole): IO[Option[Observation.Id]] =
-    queryObservation(oid).flatMap: obs =>
-      obs.groupId.flatTraverse: gid =>
-        queryObservationsInGroup(gid).map: infos =>
-          infos.find(_.calibrationRole.exists(_ === role)).map(_.id)
-
   // A cross-dispersed (SXD prism) GNIRS observation.
   private def createGnirsXdObservationAs(user: User, pid: Program.Id, tid: Target.Id): IO[Observation.Id] =
     query(
