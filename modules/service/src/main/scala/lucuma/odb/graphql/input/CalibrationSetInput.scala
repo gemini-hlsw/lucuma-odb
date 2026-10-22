@@ -4,8 +4,8 @@
 package lucuma.odb.graphql
 package input
 
-import cats.syntax.all.*
 import cats.data.NonEmptySet
+import cats.syntax.all.*
 import grackle.Result
 import grackle.syntax.*
 import lucuma.core.enums.CalibrationSetType

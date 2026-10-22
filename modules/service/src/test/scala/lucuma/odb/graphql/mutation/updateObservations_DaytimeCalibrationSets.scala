@@ -4,15 +4,15 @@
 package lucuma.odb.graphql
 package mutation
 
-import cats.syntax.either.*
 import cats.effect.IO
+import cats.syntax.either.*
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
-import lucuma.core.util.CalculationState
 import lucuma.core.enums.SequenceType
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.util.CalculationState
 import lucuma.odb.data.OdbError
 
 class updateObservations_DaytimeCalibrationSets extends OdbSuite with DatabaseOperations with DaytimeCalibrationOps:
