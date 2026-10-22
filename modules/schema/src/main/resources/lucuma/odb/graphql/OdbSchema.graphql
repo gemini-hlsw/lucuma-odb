@@ -299,9 +299,8 @@ enum AtomStage {
   START_ATOM
 }
 
-"The portion of an atom that executed in a particular visit."
 """
-A run of consecutive executed steps of one atom within one visit.  An atom
+A run of consecutive executed steps of one atom within one visit. An atom
 whose execution is interrupted by other steps (e.g., a reinserted acquisition)
 and then resumed, in the same visit or a later one, has one atom record per run.
 Listing a visit's atom records by `index`, and each record's steps by `index`,
