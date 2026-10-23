@@ -9,14 +9,16 @@ import grackle.skunk.SkunkMapping
 import lucuma.odb.util.Codecs.*
 
 trait EmailTable[F[_]] extends BaseMapping[F]:
-  object EmailTable extends TableDef("t_email"):
+  object EmailTable extends TableDef("v_email"):
     val EmailId        = col("c_email_id", email_id)
     val ProgramId      = col("c_program_id", program_id)
     val SenderEmail    = col("c_sender_email", email_address)
     val RecipientEmail = col("c_recipient_email", email_address)
+    val ReplyToEmail   = col("c_reply_to_email", email_address.opt)
     val Subject        = col("c_subject", text_nonempty)
     val TextMessage    = col("c_text_message", text_nonempty)
     val HtmlMessage    = col("c_html_message", text_nonempty.opt)
     val OriginalTime   = col("c_original_time", core_timestamp)
     val Status         = col("c_status", email_status)
     val StatusTime     = col("c_status_time", core_timestamp)
+    val PiUserId       = col("c_pi_user_id", user_id.opt)

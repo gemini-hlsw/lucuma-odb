@@ -3,16 +3,22 @@
 
 package lucuma.odb.service
 
+import cats.Parallel
+import cats.data.NonEmptyChain
+import cats.data.NonEmptyList
 import cats.effect.Async
 import cats.implicits.*
+import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
 import grackle.ResultT
+import lucuma.core.data.EmailAddress
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.DeclaredExecutionState
 import lucuma.core.enums.ExecutionState as CoreExecutionState
 import lucuma.core.enums.ObservationValidationCode
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.enums.ProgramUserRole
 import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.model.Access
 import lucuma.core.model.Observation
@@ -20,18 +26,25 @@ import lucuma.core.model.ObservationWorkflow
 import lucuma.core.model.Program
 import lucuma.core.model.StandardRole.*
 import lucuma.core.model.Target
+import lucuma.core.model.User
 import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.core.util.CalculationState
+import lucuma.odb.Config
+import lucuma.odb.data.EmailId
 import lucuma.odb.data.Itc
 import lucuma.odb.data.ObservationValidationMap
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
+import lucuma.odb.graphql.input.WarningDismissalInput
 import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.service.Services.SuperUserAccess
+import lucuma.odb.service.Services.asSuperUser
 import lucuma.odb.util.Codecs.*
+import org.typelevel.log4cats.Logger
 import skunk.*
 import skunk.codec.boolean.*
+import skunk.codec.text.varchar
 import skunk.implicits.*
 
 import Services.Syntax.*
@@ -91,6 +104,10 @@ sealed trait ObservationWorkflowService[F[_]] {
     states: Set[ObservationWorkflowState]
   )(using NoTransaction[F], SuperUserAccess): F[Result[List[Target.Id]]]
 
+  def requestWarningDismissal(
+    input: AccessControl.CheckedWithId[WarningDismissalInput, Program.Id]
+  )(using NoTransaction[F]): F[Result[List[EmailId]]]
+
 }
 
 object ObservationWorkflowService {
@@ -124,7 +141,7 @@ object ObservationWorkflowService {
       case ((ls, rs), (a, Right(c))) => (ls, rs + (a -> c))
 
   /* Construct an instance. */
-  def instantiate[F[_]: Async](using Services[F]): ObservationWorkflowService[F] =
+  def instantiate[F[_]: Async: Parallel: Logger](emailConfig: Config.Email)(using Services[F]): ObservationWorkflowService[F] =
     new ObservationWorkflowService[F] {
 
       private def lookupCachedItcResults(
@@ -543,6 +560,103 @@ object ObservationWorkflowService {
                             OdbError.InvalidTarget(tid, msg.some)
                               .asProblemNec
 
+      def requestWarningDismissal(
+        input: AccessControl.CheckedWithId[WarningDismissalInput, Program.Id]
+      )(using NoTransaction[F]): F[Result[List[EmailId]]] =
+        input.foldWithId(OdbError.InvalidArgument().asFailureF): (input, pid) =>
+
+          // Our user info, filtered down to usable entries
+          case class Info(role: ProgramUserRole, userId: Option[User.Id], email: EmailAddress)
+
+          import ProgramUserRole.*
+
+          // The program's label (see `SelectLabel`) and the participants. The
+          // current user is the sender and the support users are the recipients.
+          val participants: F[Result[(String, Info, NonEmptyList[Info])]] =
+            services.transactionally:
+              (
+                session.unique(Statements.SelectLabel)(pid),
+                session.execute(Statements.SelectProgramUsers)(pid)
+              ).mapN: (label, list) =>
+                val infos: List[Info] =
+                  list.flatMap: (role, oUid, oStr) =>
+                    oStr.flatMap: str =>
+                      EmailAddress
+                        .from(str)
+                        .toOption
+                        .map(Info(role, oUid, _))
+
+                val isMember   = list.exists(_._2 === Some(user.id))
+                val sender     = infos.find(_.userId === Some(user.id))
+                val recipients = infos.filter(i => i.role === SupportPrimary || i.role === SupportSecondary).distinctBy(_.email)
+
+                (sender, NonEmptyList.fromList(recipients)) match
+                  case _ if !isMember      => OdbError.NotAuthorized(user.id, "Only users of the program may request that warnings be dismissed.".some).asFailure
+                  case (None, _)           => OdbError.EmailSendError(s"Current user ${user.id} email address is missing or invalid.".some).asFailure
+                  case (_, None)           => OdbError.EmailSendError(s"Both $SupportPrimary and $SupportSecondary email addresses are missing or invalid.".some).asFailure
+                  case (Some(s), Some(rs)) => Result((label, s, rs))
+
+          // The email names the program by its label and links to it in Explore.
+          case class Message(subject: NonEmptyString, text: NonEmptyString, html: NonEmptyString)
+
+          def message(label: String): Message =
+            val url           = (emailConfig.exploreUrl / label).renderString
+            val name          = user.displayName
+            val justification = input.justification.value
+            val request       = "has requested review for dismissal of the warnings in program"
+            Message(
+              subject = NonEmptyString.unsafeFrom(s"$label: request to review warnings"),
+              text    = NonEmptyString.unsafeFrom(
+                s"$name $request $label ($url).\n\n$justification"
+              ),
+              html    = NonEmptyString.unsafeFrom(
+                s"""${ProposalService.escapeHtml(name)} $request <a href="$url">$label</a>.<br/>\n<br/>\n""" ++
+                justification.linesIterator.map(ProposalService.escapeHtml).mkString("<br/>\n")
+              )
+            )
+
+          // Send without holding a transaction open, turning any failure into an
+          // error that names the recipient. Unexpected errors are logged rather
+          // than shown to the user.
+          def sendTo(msg: Message, sender: Info, recipient: Info): F[Result[EmailId]] =
+            val failure = s"Could not send the request to ${recipient.role} ${recipient.email.value.value}"
+
+            def failed(detail: Option[String]): Result[EmailId] =
+              OdbError.EmailSendError(detail.fold(s"$failure.")(d => s"$failure: $d").some).asFailure
+
+            def unexpected(t: Throwable): F[Result[EmailId]] =
+              Logger[F].warn(t)(s"$failure for program $pid.").as(failed(none))
+
+            emailService
+              .sendToProvider(emailConfig.invitationFrom, recipient.email, msg.subject, msg.text, msg.html.some, sender.email.some)
+              .flatMap:
+                case Result.Failure(ps)      => failed(ps.map(_.message).mkString_("; ").some).pure[F]
+                case Result.InternalError(t) => unexpected(t)
+                case r                       => r.pure[F]
+              .handleErrorWith(unexpected)
+
+          // Keep the emails that were sent, along with errors for any that were not.
+          def accumulate(results: NonEmptyList[(Info, Result[EmailId])]): Result[List[(Info, EmailId)]] =
+            val sent     = results.toList.flatMap((i, r) => r.toOption.tupleLeft(i))
+            val problems = results.toList.foldMap(_._2.toProblems)
+            NonEmptyChain.fromChain(problems) match
+              case None                     => Result(sent)
+              case Some(ps) if sent.isEmpty => Result.Failure(ps)
+              case Some(ps)                 => Result.Warning(ps, sent)
+
+          (for
+            (label, sender, recipients) <- ResultT(participants)
+            msg                          = message(label)
+            results                   <- ResultT.liftF(recipients.parTraverse(r => sendTo(msg, sender, r).tupleLeft(r)))
+            sent                      <- ResultT.fromResult(accumulate(results))
+            _                         <- ResultT:
+                                           services.transactionally:
+                                             asSuperUser:
+                                               sent.traverse_ : (r, id) =>
+                                                 ResultT(emailService.recordEmail(id, pid, emailConfig.invitationFrom, r.email, msg.subject, msg.text, msg.html.some, sender.email.some))
+                                               .value
+          yield sent.map(_._2)).value
+
   }
 
   object Statements {
@@ -585,6 +699,29 @@ object ObservationWorkflowService {
         ON t.c_target_id = a.c_target_id
         WHERE t.c_target_id IN (""" |+| whichTargets |+| void""")
         """
+
+    // How emails name a program: its program reference, else its proposal
+    // reference, else its id.
+    val SelectLabel: Query[Program.Id, String] =
+      sql"""
+        SELECT c_program_reference, c_proposal_reference, c_program_id
+        FROM t_program
+        WHERE c_program_id = $program_id
+      """.query(program_reference.opt *: proposal_reference.opt *: program_id)
+         .map: (prog, prop, pid) =>
+           prog.map(_.label).orElse(prop.map(_.label)).getOrElse(pid.toString)
+
+    val SelectProgramUsers: Query[Program.Id, (ProgramUserRole, Option[User.Id], Option[String])] =
+        sql"""
+          SELECT
+            c_role,
+            c_user_id,
+            c_email
+          FROM
+            v_program_user
+          WHERE
+            c_program_id = $program_id
+        """.query(program_user_role *: user_id.opt *: varchar.opt)
 
   }
 

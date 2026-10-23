@@ -429,7 +429,7 @@ object Services:
       lazy val groupService = GroupService.instantiate
       lazy val groupProgressService = GroupProgressService.instantiate
       lazy val programService = ProgramService.instantiate
-      lazy val observationWorkflowService = ObservationWorkflowService.instantiate
+      lazy val observationWorkflowService = ObservationWorkflowService.instantiate(emailConfig)
       lazy val visitorService = VisitorService.instantiate
 
       // A few services require additional arguments for instantiation that may not always be

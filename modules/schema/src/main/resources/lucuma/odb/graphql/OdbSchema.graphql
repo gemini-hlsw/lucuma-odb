@@ -1544,6 +1544,9 @@ type Email {
   "Recipient email address"
   recipientEmail: EmailAddress!
 
+  "Address that replies should go to, if different from the sender"
+  replyToEmail: EmailAddress
+
   "Email subject"
   subject: NonEmptyString!
 
@@ -2999,6 +3002,30 @@ input GmosSouthLongSlitAcquisitionInput {
 
 }
 
+input WarningDismissalInput {
+
+  """
+  One of programId, proposalReference, and programReference must be supplied.
+  """
+  programId: ProgramId
+  
+  """
+  One of programId, proposalReference, and programReference must be supplied.
+  """
+  proposalReference: ProposalReferenceLabel
+  
+  """
+  One of programId, proposalReference, and programReference must be supplied.
+  """
+  programReference: ProgramReferenceLabel
+
+  """
+  Why the warnings should be dismissed.  It is included in the body of the email
+  sent to the support staff.
+  """
+  justification: NonEmptyString!
+}
+
 """
 Edit or create GMOS South Long Slit advanced configuration
 """
@@ -4373,6 +4400,16 @@ type Mutation {
   setObservationWorkflowState(
     input: SetObservationWorkflowStateInput!
   ): ObservationWorkflow
+
+  """
+  Sends an email to each of the program's primary and secondary support contacts, on behalf of the current user
+  (who must be a user of the program with write access), asking them to review the program's warnings for
+  dismissal.  The emails come from the system address with the current user as the Reply-To.
+  """
+  requestWarningDismissal(
+    input: WarningDismissalInput!
+  ): [Email!]!
+
 }
 
 input SetObservationWorkflowStateInput {
@@ -18752,6 +18789,11 @@ type Program {
   `UNCONSTRAINED` if it has none.  A summary of what the observations ask for.
   """
   maxSchedulingMode: SchedulingMode!
+
+  """
+  List of related emails sent by the system.
+  """
+  emails: [Email!]!
 
 }
 

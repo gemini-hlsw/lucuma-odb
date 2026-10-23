@@ -68,6 +68,7 @@ import lucuma.odb.graphql.input.UpdateObservationsTimesInput
 import lucuma.odb.graphql.input.UpdateProgramNotesInput
 import lucuma.odb.graphql.input.UpdateProgramsInput
 import lucuma.odb.graphql.input.UpdateTargetsInput
+import lucuma.odb.graphql.input.WarningDismissalInput
 import lucuma.odb.graphql.mapping.AccessControl.CheckedWithId
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
@@ -685,6 +686,19 @@ trait AccessControl[F[_]] extends Predicates[F] {
         .map: pid =>
           Services.asSuperUser:
             AccessControl.unchecked(input.allocations, pid, program_id)
+        .value
+
+  def selectForWarningDismissal(
+    input: WarningDismissalInput
+  )(using Services[F]): F[Result[AccessControl.CheckedWithId[WarningDismissalInput, Program.Id]]] =
+    requirePiAccess: // guest can't do this
+      ResultT(resolvePidWritable(input.programId, input.proposalReference, input.programReference))
+        .flatMap:
+          case None =>
+              ResultT.failure(OdbError.NotAuthorized(user.id, s"No such program, or user ${user.id} is not authorized to perform this action.".some).asProblem)
+          case Some(pid) =>
+            Services.asSuperUser:
+              ResultT.success(AccessControl.unchecked(input, pid, program_id))
         .value
 
   def selectForUpdate(
