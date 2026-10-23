@@ -24,7 +24,8 @@ trait EmailMapping[F[_]]
       SqlField("htmlMessage", EmailTable.HtmlMessage),
       SqlField("originalTime", EmailTable.OriginalTime),
       SqlField("status", EmailTable.Status),
-      SqlField("statusTime", EmailTable.StatusTime)
+      SqlField("statusTime", EmailTable.StatusTime),
+      SqlField("piUserId", EmailTable.PiUserId, hidden = true)
     )
   
 }

@@ -4402,8 +4402,9 @@ type Mutation {
   ): ObservationWorkflow
 
   """
-  Sends emails from the current user (who must have write access to the referenced program) to the primary and
-  secondary support staff, requesting review of warnings for potential dismissal.
+  Sends an email to each of the program's primary and secondary support contacts, on behalf of the current user
+  (who must be a user of the program with write access), asking them to review the program's warnings for
+  dismissal.  The emails come from the system address with the current user as the Reply-To.
   """
   requestWarningDismissal(
     input: WarningDismissalInput!

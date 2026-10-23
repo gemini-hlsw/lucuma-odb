@@ -24,7 +24,6 @@ import lucuma.core.model.Access
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationWorkflow
 import lucuma.core.model.Program
-import lucuma.core.model.ProgramReference
 import lucuma.core.model.StandardRole.*
 import lucuma.core.model.Target
 import lucuma.core.model.User
@@ -42,6 +41,7 @@ import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.service.Services.asSuperUser
 import lucuma.odb.util.Codecs.*
+import org.typelevel.log4cats.Logger
 import skunk.*
 import skunk.codec.boolean.*
 import skunk.codec.text.varchar
@@ -141,7 +141,7 @@ object ObservationWorkflowService {
       case ((ls, rs), (a, Right(c))) => (ls, rs + (a -> c))
 
   /* Construct an instance. */
-  def instantiate[F[_]: Async: Parallel](emailConfig: Config.Email)(using Services[F]): ObservationWorkflowService[F] =
+  def instantiate[F[_]: Async: Parallel: Logger](emailConfig: Config.Email)(using Services[F]): ObservationWorkflowService[F] =
     new ObservationWorkflowService[F] {
 
       private def lookupCachedItcResults(
@@ -570,14 +570,14 @@ object ObservationWorkflowService {
 
           import ProgramUserRole.*
 
-          // The program reference, if any, and the participants. The current user
-          // is the sender and the support users are the recipients.
-          val participants: F[Result[(Option[ProgramReference], Info, NonEmptyList[Info])]] =
+          // The program's label (see `SelectLabel`) and the participants. The
+          // current user is the sender and the support users are the recipients.
+          val participants: F[Result[(String, Info, NonEmptyList[Info])]] =
             services.transactionally:
               (
-                session.unique(Statements.SelectProgramReference)(pid),
+                session.unique(Statements.SelectLabel)(pid),
                 session.execute(Statements.SelectProgramUsers)(pid)
-              ).mapN: (ref, list) =>
+              ).mapN: (label, list) =>
                 val infos: List[Info] =
                   list.flatMap: (role, oUid, oStr) =>
                     oStr.flatMap: str =>
@@ -586,20 +586,20 @@ object ObservationWorkflowService {
                         .toOption
                         .map(Info(role, oUid, _))
 
+                val isMember   = list.exists(_._2 === Some(user.id))
                 val sender     = infos.find(_.userId === Some(user.id))
-                val recipients = infos.filter(i => i.role === SupportPrimary || i.role === SupportSecondary)
+                val recipients = infos.filter(i => i.role === SupportPrimary || i.role === SupportSecondary).distinctBy(_.email)
 
                 (sender, NonEmptyList.fromList(recipients)) match
+                  case _ if !isMember      => OdbError.NotAuthorized(user.id, "Only users of the program may request that warnings be dismissed.".some).asFailure
                   case (None, _)           => OdbError.EmailSendError(s"Current user ${user.id} email address is missing or invalid.".some).asFailure
                   case (_, None)           => OdbError.EmailSendError(s"Both $SupportPrimary and $SupportSecondary email addresses are missing or invalid.".some).asFailure
-                  case (Some(s), Some(rs)) => Result((ref, s, rs))
+                  case (Some(s), Some(rs)) => Result((label, s, rs))
 
-          // The email names the program by its reference, falling back to its id,
-          // and links to it in Explore.
+          // The email names the program by its label and links to it in Explore.
           case class Message(subject: NonEmptyString, text: NonEmptyString, html: NonEmptyString)
 
-          def message(ref: Option[ProgramReference]): Message =
-            val label         = ref.fold(pid.toString)(_.label)
+          def message(label: String): Message =
             val url           = (emailConfig.exploreUrl / label).renderString
             val name          = user.displayName
             val justification = input.justification.value
@@ -616,18 +616,24 @@ object ObservationWorkflowService {
             )
 
           // Send without holding a transaction open, turning any failure into an
-          // error that names the recipient.
+          // error that names the recipient. Unexpected errors are logged rather
+          // than shown to the user.
           def sendTo(msg: Message, sender: Info, recipient: Info): F[Result[EmailId]] =
-            def failed(detail: String): Result[EmailId] =
-              OdbError.EmailSendError(s"Could not send the request to ${recipient.role} ${recipient.email.value.value}: $detail".some).asFailure
+            val failure = s"Could not send the request to ${recipient.role} ${recipient.email.value.value}"
+
+            def failed(detail: Option[String]): Result[EmailId] =
+              OdbError.EmailSendError(detail.fold(s"$failure.")(d => s"$failure: $d").some).asFailure
+
+            def unexpected(t: Throwable): F[Result[EmailId]] =
+              Logger[F].warn(t)(s"$failure for program $pid.").as(failed(none))
 
             emailService
               .sendToProvider(emailConfig.invitationFrom, recipient.email, msg.subject, msg.text, msg.html.some, sender.email.some)
-              .map:
-                case Result.Failure(ps)      => failed(ps.map(_.message).mkString_("; "))
-                case Result.InternalError(t) => failed(t.getMessage)
-                case r                       => r
-              .handleError(t => failed(t.getMessage))
+              .flatMap:
+                case Result.Failure(ps)      => failed(ps.map(_.message).mkString_("; ").some).pure[F]
+                case Result.InternalError(t) => unexpected(t)
+                case r                       => r.pure[F]
+              .handleErrorWith(unexpected)
 
           // Keep the emails that were sent, along with errors for any that were not.
           def accumulate(results: NonEmptyList[(Info, Result[EmailId])]): Result[List[(Info, EmailId)]] =
@@ -639,8 +645,8 @@ object ObservationWorkflowService {
               case Some(ps)                 => Result.Warning(ps, sent)
 
           (for
-            (ref, sender, recipients) <- ResultT(participants)
-            msg                        = message(ref)
+            (label, sender, recipients) <- ResultT(participants)
+            msg                          = message(label)
             results                   <- ResultT.liftF(recipients.parTraverse(r => sendTo(msg, sender, r).tupleLeft(r)))
             sent                      <- ResultT.fromResult(accumulate(results))
             _                         <- ResultT:
@@ -694,12 +700,16 @@ object ObservationWorkflowService {
         WHERE t.c_target_id IN (""" |+| whichTargets |+| void""")
         """
 
-    val SelectProgramReference: Query[Program.Id, Option[ProgramReference]] =
+    // How emails name a program: its program reference, else its proposal
+    // reference, else its id.
+    val SelectLabel: Query[Program.Id, String] =
       sql"""
-        SELECT c_program_reference
+        SELECT c_program_reference, c_proposal_reference, c_program_id
         FROM t_program
         WHERE c_program_id = $program_id
-      """.query(program_reference.opt)
+      """.query(program_reference.opt *: proposal_reference.opt *: program_id)
+         .map: (prog, prop, pid) =>
+           prog.map(_.label).orElse(prop.map(_.label)).getOrElse(pid.toString)
 
     val SelectProgramUsers: Query[Program.Id, (ProgramUserRole, Option[User.Id], Option[String])] =
         sql"""

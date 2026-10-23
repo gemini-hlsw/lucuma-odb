@@ -421,9 +421,12 @@ trait MutationMapping[F[_]] extends AccessControl[F] with UserEnv {
         selectForWarningDismissal(input).flatMap: res =>
           res.flatTraverse: checked =>
             observationWorkflowService.requestWarningDismissal(checked).nestMap: ids =>
-              Filter(
-                Predicates.email.id.in(ids),
-                child
+              OrderBy(
+                Predicates.email.order,
+                Filter(
+                  Predicates.email.id.in(ids),
+                  child
+                )
               )
 
   private lazy val CloneTarget: MutationField =

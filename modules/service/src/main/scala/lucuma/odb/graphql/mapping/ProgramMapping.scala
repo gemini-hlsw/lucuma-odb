@@ -234,6 +234,11 @@ trait ProgramMapping[F[_]]
           )
         }
 
+    case (ProgramType, "emails", Nil) =>
+      UserEnv.elab: user =>
+        Elab.transformChild: child =>
+          OrderBy(Predicates.email.order, Filter(Predicates.email.isVisibleTo(user), child))
+
     case (ProgramType, "attachments", Nil) =>
       Elab.transformChild { child =>
         OrderBy(OrderSelections(List(OrderSelection[Attachment.Id](AttachmentType / "id"))), child)

@@ -218,22 +218,23 @@ class requestWarningDismissal extends OdbSuite with query.ObservingModeSetupOper
   test(s"can send request with both"):
     for
       pid  <- createProgramAs(pi)
-      subj  = s"$pid: request to review warnings"
       puid <- piProgramUserIdAs(pi, pid)
       _    <- setEmailAddressAs(pi, puid, "bob@dobbs.com")
-      _    <- List(SupportPrimary, SupportSecondary).traverse(r => addProgramUserAs(admin, pid, r, s"$r@roles.com"))
+      _    <- List(SupportSecondary, SupportPrimary).traverse(r => addProgramUserAs(admin, pid, r, s"$r@roles.com"))
       _    <-
         expect(
           user = pi,
-          query = requestQuery(pid, List("replyToEmail")),
+          query = requestQuery(pid, List("replyToEmail", "recipientEmail")),
           expected = Right(json"""
             {
               "requestWarningDismissal" : [
                 {
-                  "replyToEmail" : "bob@dobbs.com"
+                  "replyToEmail" : "bob@dobbs.com",
+                  "recipientEmail" : "SupportPrimary@roles.com"
                 },
                 {
-                  "replyToEmail" : "bob@dobbs.com"
+                  "replyToEmail" : "bob@dobbs.com",
+                  "recipientEmail" : "SupportSecondary@roles.com"
                 }
               ]
             }
@@ -243,12 +244,12 @@ class requestWarningDismissal extends OdbSuite with query.ObservingModeSetupOper
 
   test("can send request with a proposal reference"):
     for
-      (pid, ref) <- submittedProgram
-      _          <-
+      (_, ref) <- submittedProgram
+      _        <-
         expect(
           user = pi,
           query = requestQuery(ref, List("senderEmail", "replyToEmail", "recipientEmail", "subject", "textMessage")),
-          expected = expectedSingleEmail(pid.toString) // no program reference until accepted
+          expected = expectedSingleEmail(ref.label) // no program reference until accepted
         )
     yield ()
 
@@ -468,4 +469,52 @@ class requestWarningDismissal extends OdbSuite with query.ObservingModeSetupOper
             }
           """)
         )
+    yield ()
+
+  test("staff who are not users of the program can't send a request"):
+    val ExpectedError = "Only users of the program may request that warnings be dismissed."
+    for
+      pid  <- createProgramWithUsPi(pi)
+      _    <- addProgramUserAs(admin, pid, SupportPrimary, "steve@jobs.com")
+      _    <-
+        expectOdbError(
+          user = staff,
+          query = requestQuery(pid, List("senderEmail")),
+          expected =
+            case OdbError.NotAuthorized(uid, Some(ExpectedError)) if uid === staff.id => ()
+        )
+    yield ()
+
+  test("sends one email to a support address shared by both roles"):
+    for
+      pid  <- createProgramWithUsPi(pi)
+      _    <- addProgramUserAs(admin, pid, SupportPrimary, "desk@jobs.com")
+      _    <- addProgramUserAs(admin, pid, SupportSecondary, "desk@jobs.com")
+      _    <-
+        expect(
+          user = pi,
+          query = requestQuery(pid, List("recipientEmail")),
+          expected = Right(json"""
+            {
+              "requestWarningDismissal" : [
+                {
+                  "recipientEmail" : "desk@jobs.com"
+                }
+              ]
+            }
+          """)
+        )
+    yield ()
+
+  test("program emails are visible to the PI and staff but not to other program users"):
+    val oneEmail = json"""{ "program" : { "emails" : [ { "recipientEmail" : "steve@jobs.com" } ] } }"""
+    for
+      pid  <- createProgramWithUsPi(pi)
+      _    <- addProgramUserAs(admin, pid, SupportPrimary, "steve@jobs.com")
+      coi  <- addProgramUserAs(pi, pid, Coi, "coi@jobs.com")
+      _    <- linkUserAs(staff, coi, pi2.id)
+      _    <- query(pi, requestQuery(pid, List("senderEmail")))
+      _    <- expect(pi, programEmailsQuery(pid, List("recipientEmail")), Right(oneEmail))
+      _    <- expect(staff, programEmailsQuery(pid, List("recipientEmail")), Right(oneEmail))
+      _    <- expect(pi2, programEmailsQuery(pid, List("recipientEmail")), Right(json"""{ "program" : { "emails" : [] } }"""))
     yield ()
