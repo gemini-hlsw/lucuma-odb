@@ -30,6 +30,7 @@ import lucuma.odb.Config
 import lucuma.odb.graphql.binding.BooleanBinding
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.GroupElementView
+import lucuma.odb.graphql.table.GroupStandingView
 import lucuma.odb.graphql.table.GroupView
 import lucuma.odb.graphql.table.ProgramView
 import lucuma.odb.json.calculatedValue.given
@@ -45,7 +46,7 @@ import org.http4s.client.Client
 import Services.Syntax.*
 
 
-trait GroupMapping[F[_]] extends GroupView[F] with ProgramView[F] with GroupElementView[F] with KeyValueEffectHandler[F] with Predicates[F]:
+trait GroupMapping[F[_]] extends GroupView[F] with ProgramView[F] with GroupElementView[F] with GroupStandingView[F] with KeyValueEffectHandler[F] with Predicates[F]:
 
   def itcClient: ItcClient[F]
   def services(using User): Resource[F, Services[F]]
@@ -72,6 +73,7 @@ trait GroupMapping[F[_]] extends GroupView[F] with ProgramView[F] with GroupElem
       EffectField(RangeField,    groupHandler, List("id")),
       EffectField(BandedField,   groupHandler, List("id")),
       EffectField(ProgressField, groupHandler, List("id")),
+      SqlObject("standing", Join(GroupView.Id, GroupStandingView.GroupId)),
 
       SqlField("existence", GroupView.Existence),
       SqlField("system", GroupView.System),

@@ -296,6 +296,7 @@ trait BaseMapping[F[_]]
   lazy val GroupConstraintViolationType            = schema.ref("GroupConstraintViolation")
   lazy val GroupIdType                             = schema.ref("GroupId")
   lazy val GroupStatusType                         = schema.ref("GroupStatus")
+  lazy val GroupStandingStatusType                 = schema.ref("GroupStandingStatus")
   lazy val GroupEditType                           = schema.ref("GroupEdit")
   lazy val GroupElementType                        = schema.ref("GroupElement")
   lazy val GuideProbeType                          = schema.ref("GuideProbe")

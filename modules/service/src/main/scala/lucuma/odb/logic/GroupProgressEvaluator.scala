@@ -18,6 +18,7 @@ import lucuma.core.model.Group
 import lucuma.core.model.LocalObservingNight
 import lucuma.core.model.Observation
 import lucuma.core.model.group.GroupProgress
+import lucuma.core.model.group.GroupStanding
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
@@ -87,6 +88,35 @@ object GroupProgressEvaluator:
     now:   Timestamp
   ): Map[Group.Id, GroupProgress] =
     trees.flatMap(evaluateBranch(_, facts, now)._2).toMap
+
+  /**
+   * The standing of every group in `trees`, each a top-level group with all
+   * of its subgroups, given their progress (from `evaluate`).  A group's
+   * standing is decided by the outermost group that is complete or
+   * unschedulable among the group itself and the groups containing it.  If
+   * there is none the group is viable.  A top-level group, which no group
+   * contains, is decided by its own progress alone.  An observation stands as
+   * its group does.
+   */
+  def standings(
+    trees:    List[GroupTree.Branch],
+    progress: Map[Group.Id, GroupProgress]
+  ): Map[Group.Id, GroupStanding] =
+    def own(b: GroupTree.Branch): GroupStanding =
+      progress.get(b.groupId) match
+        case Some(_: GroupProgress.Complete)      => GroupStanding.Complete(b.groupId)
+        case Some(_: GroupProgress.Unschedulable) => GroupStanding.Unschedulable(b.groupId)
+        case _                                    => GroupStanding.Viable
+
+    def go(b: GroupTree.Branch, outer: GroupStanding): List[(Group.Id, GroupStanding)] =
+      val standing = outer match
+        case GroupStanding.Viable => own(b)
+        case decided              => decided
+      (b.groupId -> standing) :: b.children.flatMap:
+        case c: GroupTree.Branch => go(c, standing)
+        case _: GroupTree.Leaf   => Nil
+
+    trees.flatMap(go(_, GroupStanding.Viable)).toMap
 
   // A group element as its parent sees it: an observation, or a subgroup
   // summarized.  `excluded` elements are left out of the group entirely.

@@ -51,6 +51,13 @@ sealed trait GroupTree extends Product with Serializable {
       case GroupTree.Branch(children = cs) => cs.flatMap(_.allObservations)
       case GroupTree.Root(_, cs)           => cs.flatMap(_.allObservations)
 
+  /** Every group in this tree, at any depth, this one included if it is a group. */
+  def allGroupIds: List[Group.Id] =
+    this match
+      case GroupTree.Leaf(_)               => Nil
+      case b: GroupTree.Branch             => b.groupId :: b.children.flatMap(_.allGroupIds)
+      case GroupTree.Root(_, cs)           => cs.flatMap(_.allGroupIds)
+
   def collectObservations(
     predicate: GroupTree.Branch => Boolean
   ): List[(Group.Id, List[(Observation.Id, NonNegShort)])] = {

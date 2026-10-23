@@ -141,6 +141,7 @@ object OdbMapping {
           with AtomRecordMapping[F]
           with AtomRecordSelectResultMapping[F]
           with CalculatedObservationWorkflowMapping[F]
+          with GroupStandingMapping[F]
           with CallForProposalsMapping[F]
           with CallsForProposalsSelectResultMapping[F]
           with CatalogInfoMapping[F]
@@ -645,6 +646,7 @@ object OdbMapping {
                 ArcMappings,
                 AtomRecordSelectResultMappings,
                 CalculatedObservationWorkflowMappings,
+                GroupStandingMappings,
                 CallForProposalsMappings,
                 CategorizedTimeMappings,
                 ConfigurationMappings,

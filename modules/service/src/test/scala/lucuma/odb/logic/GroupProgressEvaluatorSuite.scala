@@ -15,6 +15,7 @@ import lucuma.core.enums.Site
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.group.GroupProgress
+import lucuma.core.model.group.GroupStanding
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
@@ -473,3 +474,54 @@ class GroupProgressEvaluatorSuite extends FunSuite:
 
   test("a minimum of zero requires every element"):
     assertEquals(eval(branch(1, List(done(1, t0), leaf(2)), min = Some(0))), ongoing(1, 2))
+
+  // Standing
+
+  def standings(n: Node): Map[Group.Id, GroupStanding] =
+    GroupProgressEvaluator.standings(List(n.branch), evalAll(n))
+
+  // Complete: one of two required, and it's done.
+  def complete(n: Long, o: Long): Node =
+    branch(n, List(done(o, t0), leaf(o + 1)), min = Some(1))
+
+  // Unschedulable: two required, but one of the two is inactive.
+  def unschedulable(n: Long, o: Long): Node =
+    branch(n, List(leaf(o), leaf(o + 1, inactive = true)), min = Some(2))
+
+  test("standing: a group that is neither complete nor unschedulable is viable"):
+    assertEquals(standings(branch(1, List(leaf(1), leaf(2)))), Map(gid(1) -> GroupStanding.Viable))
+
+  test("standing: a complete group decides for itself and its subgroups"):
+    val g = branch(1, List(done(1, t0), branch(2, List(leaf(2)))), min = Some(1))
+    assertEquals(
+      standings(g),
+      Map(gid(1) -> GroupStanding.Complete(gid(1)), gid(2) -> GroupStanding.Complete(gid(1)))
+    )
+
+  test("standing: a complete subgroup of a viable group decides only for itself"):
+    val g = branch(1, List(complete(2, 1), leaf(3)))
+    assertEquals(
+      standings(g),
+      Map(gid(1) -> GroupStanding.Viable, gid(2) -> GroupStanding.Complete(gid(2)))
+    )
+
+  test("standing: a viable group under an unschedulable parent is unschedulable"):
+    // The parent needs both subgroups, and one of them can no longer complete.
+    val g = branch(1, List(branch(2, List(done(1, t0), leaf(2))), unschedulable(3, 3)))
+    assertEquals(evalAll(g)(gid(2)).status, GroupStatus.Ongoing)
+    assertEquals(
+      standings(g),
+      Map(
+        gid(1) -> GroupStanding.Unschedulable(gid(1)),
+        gid(2) -> GroupStanding.Unschedulable(gid(1)),
+        gid(3) -> GroupStanding.Unschedulable(gid(1))
+      )
+    )
+
+  test("standing: the outer group decides when a complete group holds an unschedulable one"):
+    val g = branch(1, List(done(1, t0), unschedulable(2, 2)), min = Some(1))
+    assertEquals(standings(g)(gid(2)), GroupStanding.Complete(gid(1)))
+
+  test("standing: the outer group decides when an unschedulable group holds a complete one"):
+    val g = branch(1, List(complete(2, 1), leaf(3), leaf(4, inactive = true)), min = Some(3))
+    assertEquals(standings(g)(gid(2)), GroupStanding.Unschedulable(gid(1)))

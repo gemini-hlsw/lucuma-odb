@@ -182,6 +182,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F]:
       LeafMapping[Group.Id](GroupIdType),
       LeafMapping[GroupConstraintViolation](GroupConstraintViolationType),
       LeafMapping[GroupStatus](GroupStatusType),
+      LeafMapping[GroupStandingStatus](GroupStandingStatusType),
       LeafMapping[GuideProbe](GuideProbeType),
       LeafMapping[StepGuideState](GuideStateType),
       LeafMapping[IdempotencyKey](IdempotencyKeyType),

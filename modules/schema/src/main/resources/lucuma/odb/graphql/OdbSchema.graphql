@@ -15801,6 +15801,14 @@ type Group {
   """
   progress: GroupProgress
 
+  """
+  Whether the groups around this one, itself included, still want work in it.
+  Calculated in the background when something relevant changes (or when time
+  passing may change it), so it may briefly lag `progress`: see
+  `CalculatedGroupStanding`.  Null for a deleted group.
+  """
+  standing: CalculatedGroupStanding
+
   existence: Existence!
 
   """
@@ -15932,6 +15940,90 @@ type GroupProgress {
   own `progress`.
   """
   violations: [GroupConstraintViolation!]!
+}
+
+"""
+Whether the groups an observation or group belongs to still want work in it.
+For a group these are the group itself and the groups containing it; an
+observation stands as its group does.
+"""
+enum GroupStandingStatus {
+  "None of those groups is complete or unschedulable."
+  VIABLE
+
+  "One of those groups is complete, so the work is no longer needed."
+  COMPLETE
+
+  """
+  One of those groups can no longer be completed, so the work can no longer
+  help without human intervention.
+  """
+  UNSCHEDULABLE
+}
+
+"""
+Whether the groups a group or observation belongs to still want work in it.
+For a group these are the group itself and the groups containing it; an
+observation stands as its group does.  When any of them is complete or
+unschedulable, the outermost of them decides.  This can differ from a group's
+own progress: a group that is ongoing inside a group that can no longer be
+completed is itself unschedulable.
+"""
+type GroupStanding {
+  status: GroupStandingStatus!
+
+  "The group that decided the status, unless viable."
+  groupId: GroupId
+}
+
+"""
+A group standing, as last calculated in the background.
+
+The standing is recalculated whenever something that may change it happens:
+a change to the group or one of its observations, an observation in its tree
+starting or completing, or the time for observing a group's next element
+running out.  Until then `calculationState` is `PENDING` (or `RETRY`, after a
+failed calculation), and `value` is the standing last calculated, which may be
+out of date in either direction.  It is `READY` once the standing reflects
+everything recorded.
+"""
+type CalculatedGroupStanding {
+  "The current state of the background calculation."
+  calculationState: CalculationState!
+
+  "The standing, as last calculated."
+  value: GroupStanding!
+}
+
+"""
+Filters on equality (or not) of a group standing status and the supplied
+criteria.  All supplied criteria must match, but usually only one is selected.
+"""
+input WhereEqGroupStandingStatus {
+  "Matches if the status is exactly the supplied value."
+  EQ: GroupStandingStatus
+
+  "Matches if the status is not the supplied value."
+  NEQ: GroupStandingStatus
+
+  "Matches if the status is any of the supplied options."
+  IN: [GroupStandingStatus!]
+
+  "Matches if the status is none of the supplied values."
+  NIN: [GroupStandingStatus!]
+}
+
+"""
+Matches a group standing.  The status alone matches the value last
+calculated, which may be out of date while a recalculation is pending.  To
+match only up-to-date standings, also match `calculationState` `READY`.
+"""
+input WhereCalculatedGroupStanding {
+  "Matches the current state of the background calculation."
+  calculationState: WhereOrderCalculationState
+
+  "Matches the standing status."
+  status: WhereEqGroupStandingStatus
 }
 
 "Groups contain observations and other groups. Exactly one will be defined."
@@ -17404,6 +17496,14 @@ type Observation {
   whether a pending update is expected.
   """
   workflow: CalculatedObservationWorkflow
+
+  """
+  Whether the groups around the observation still want it: its group's
+  standing, or viable outside any group.  Independent of the workflow state.
+  Calculated in the background, like the group's: see
+  `CalculatedGroupStanding`.
+  """
+  groupStanding: CalculatedGroupStanding!
 
   """
   Result of the Archive Duplication Search: what the Gemini Observatory Archive
@@ -23693,6 +23793,11 @@ input WhereObservation {
   Matches on the observation workflow state.
   """
   workflow: WhereCalculatedObservationWorkflow
+
+  """
+  Matches on the observation's group standing.
+  """
+  groupStanding: WhereCalculatedGroupStanding
 
   """
   Matches the calibration role.

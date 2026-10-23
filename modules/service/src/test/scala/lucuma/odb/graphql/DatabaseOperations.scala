@@ -140,6 +140,13 @@ trait DatabaseOperations { this: OdbSuite =>
       requireServiceAccessOrThrow:
         services.transactionally(ObscalcService.instantiate[IO].refreshCalibrations(1024))
 
+  // Runs the obscalc daemon's group standing refresh on demand.
+  def refreshGroupStandingsAs(user: ServiceUser): IO[Int] =
+    withServicesForObscalc(user): services =>
+      given Services[IO] = services
+      requireServiceAccessOrThrow:
+        services.groupStandingService.refresh(1024)
+
   // Obscalc state and last invalidation, for tests that check whether an edit
   // invalidated the calculation.
   def obscalcRow(oid: Observation.Id): IO[(CalculationState, Timestamp)] =

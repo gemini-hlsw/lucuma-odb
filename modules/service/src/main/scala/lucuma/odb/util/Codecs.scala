@@ -569,6 +569,9 @@ trait Codecs extends CoreCodecs {
   val group_id: Codec[Group.Id] =
     gid[Group.Id]
 
+  val group_standing_status: Codec[GroupStandingStatus] =
+    enumerated(Type("e_group_standing"))
+
   val observation_reference: Codec[ObservationReference] =
     text.eimap(
       s => ObservationReference.fromString.getOption(s).toRight(s"Invalid observation reference: $s"))(
