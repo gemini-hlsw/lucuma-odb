@@ -40,3 +40,9 @@ BEGIN
   END LOOP;
 END;
 $$;
+
+-- A calibration set expands eagerly into count steps, so an unbounded count
+-- could exhaust memory or write an absurd sequence.  The binding caps it at
+-- 1000; this is the backstop.
+ALTER TABLE t_daytime_calibration_set
+  ADD CONSTRAINT t_daytime_calibration_set_count_cap CHECK (c_count <= 1000);

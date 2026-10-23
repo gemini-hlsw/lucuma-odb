@@ -18,8 +18,6 @@ import lucuma.core.math.Offset
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.TelescopeConfig
-import lucuma.core.model.sequence.gmos.DynamicConfig
-import lucuma.core.model.sequence.gmos.StaticConfig
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.SequenceGenerator
 import lucuma.odb.sequence.StepTimeEstimateCalculator
@@ -71,7 +69,7 @@ object DaytimeCalibration:
             .instantiate(estimator, static, namespace, SequenceType.Science)
             .buildStream(Stream.emits(atoms))
 
-  private def executionConfig[S, D](
+  def executionConfig[S, D](
     oid:       Observation.Id,
     estimator: StepTimeEstimateCalculator[S, D],
     static:    S,
@@ -80,19 +78,3 @@ object DaytimeCalibration:
   ): Either[OdbError, StreamingExecutionConfig[Pure, S, D]] =
     generator(oid, estimator, static, namespace, sets).map: g =>
       StreamingExecutionConfig(static, SequenceGenerator.empty.generate, g.generate)
-
-  def gmosNorth(
-    oid:       Observation.Id,
-    estimator: StepTimeEstimateCalculator[StaticConfig.GmosNorth, DynamicConfig.GmosNorth],
-    namespace: UUID,
-    config:    Config
-  ): Either[OdbError, StreamingExecutionConfig[Pure, StaticConfig.GmosNorth, DynamicConfig.GmosNorth]] =
-    executionConfig(oid, estimator, StaticConfigs.GmosNorth, namespace, config.gmosNorthSets)
-
-  def gmosSouth(
-    oid:       Observation.Id,
-    estimator: StepTimeEstimateCalculator[StaticConfig.GmosSouth, DynamicConfig.GmosSouth],
-    namespace: UUID,
-    config:    Config
-  ): Either[OdbError, StreamingExecutionConfig[Pure, StaticConfig.GmosSouth, DynamicConfig.GmosSouth]] =
-    executionConfig(oid, estimator, StaticConfigs.GmosSouth, namespace, config.gmosSouthSets)

@@ -8,6 +8,7 @@ import cats.data.NonEmptySet
 import cats.syntax.all.*
 import grackle.Result
 import grackle.syntax.*
+import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.CalibrationSetType
 import lucuma.core.enums.GcalArc
 import lucuma.core.enums.GcalContinuum
@@ -71,11 +72,18 @@ object CalibrationSetInput:
       case InstrumentSetup.GmosNorth(c) => InstrumentSetup.GmosNorth(c.copy(exposure = TimeSpan.Zero))
       case InstrumentSetup.GmosSouth(c) => InstrumentSetup.GmosSouth(c.copy(exposure = TimeSpan.Zero))
 
+  val MaxCount: Int = 1000
+
+  private val CountBinding: Matcher[PosInt] =
+    PosIntBinding.rmap: n =>
+      if n.value <= MaxCount then n.success
+      else Result.failure(s"A calibration set may have at most $MaxCount exposures.")
+
   val Binding: Matcher[CalibrationSet[InstrumentSetup]] =
     ObjectFieldsBinding.rmap:
       case List(
         CalibrationSetTypeBinding("kind", rKind),
-        PosIntBinding("count", rCount),
+        CountBinding("count", rCount),
         GcalBinding.Option("gcal", rGcal),
         GmosNorthDynamicInput.Binding.Option("gmosNorth", rNorth),
         GmosSouthDynamicInput.Binding.Option("gmosSouth", rSouth)

@@ -326,3 +326,55 @@ class daytimeCalibrationSets_generation extends OdbSuite with DatabaseOperations
                }
              """)
     yield ()
+
+  test("count is capped"):
+    for
+      pid <- createProgramAs(staff)
+      _   <- expectOdbError(
+        user     = staff,
+        query    = s"""
+          mutation {
+            createObservation(input: {
+              programId: ${pid.asJson}
+              SET: { observingMode: { daytimeCalibration: { instrument: GMOS_NORTH, calibrationSets: [{ kind: DARK, count: 1001, ${setup(1)} }] } } }
+            }) { observation { id } }
+          }
+        """,
+        expected = { case OdbError.InvalidArgument(Some(m)) if m.contains("at most 1000") => () }
+      )
+    yield ()
+
+  test("an empty hand-entered sequence wins over the sets and leaves the observation Undefined"):
+    for
+      pid <- createProgramAs(staff)
+      oid <- createWithSets(pid, mockupSets)
+      _   <- query(staff, s"""
+               mutation {
+                 replaceGmosNorthSequence(input: { observationId: ${oid.asJson}, sequenceType: SCIENCE, sequence: [] }) {
+                   sequence { id }
+                 }
+               }
+             """)
+      _   <- expect(
+        user     = staff,
+        query    = executionQuery(oid),
+        expected = json"""{ "executionConfig": { "gmosNorth": { "science": null } } }""".asRight
+      )
+      _   <- runObscalcUpdateAs(serviceUser, pid, oid)
+      _   <- expect(
+        user     = staff,
+        query    = workflowQuery(oid),
+        expected = json"""
+          {
+            "observation": {
+              "workflow": {
+                "value": {
+                  "state": "UNDEFINED",
+                  "validationErrors": [ { "messages": [ "No sequence has been defined." ] } ]
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+    yield ()

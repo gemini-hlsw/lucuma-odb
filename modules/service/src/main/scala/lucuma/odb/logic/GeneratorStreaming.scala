@@ -36,6 +36,7 @@ import lucuma.odb.data.ItcAcquisition
 import lucuma.odb.data.ItcScience
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.ObservingMode
+import lucuma.odb.sequence.StepTimeEstimateCalculator
 import lucuma.odb.sequence.ObservingMode.Syntax.*
 import lucuma.odb.sequence.data.StreamingExecutionConfig
 import lucuma.odb.sequence.daytimecal.StaticConfigs as DaytimeStatics
@@ -355,36 +356,50 @@ object GeneratorStreaming:
       )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, GhostStatic, GhostDynamic]]] =
         selectOrEmpty(DaytimeStatics.Ghost, sequenceService.selectGhostSequence(context.oid, _, _))
 
-      override def selectDaytimeGmosNorth(
-        context: GeneratorContext
-      )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, GmosNorthStatic, GmosNorthDynamic]]] =
-        selectOrGenerate(DaytimeStatics.GmosNorth, sequenceService.selectGmosNorthSequence(context.oid, _, _), generateDaytimeGmosNorth(context))
+      // Daytime calibrations have no acquisition, so a stored science sequence
+      // alone decides: generating from the sets only when none is stored.  The
+      // atoms are never collapsed; one atom per set is the documented shape.
+      private def selectDaytime[S, D](
+        context: GeneratorContext,
+        static:  S,
+        lookup:  (SequenceType, S) => (Transaction[F]) ?=> F[Option[Stream[F, Atom[D]]]],
+        gen:     => F[Either[OdbError, StreamingExecutionConfig[F, S, D]]]
+      )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, S, D]]] =
+        lookup(SequenceType.Science, static).flatMap:
+          case Some(s) => StreamingExecutionConfig(static, Stream.empty, s).asRight[OdbError].pure[F]
+          case None    => gen
 
-      // Generated from the Calibration Sets generators
-      override def generateDaytimeGmosNorth(
-        context: GeneratorContext
-      ): F[Either[OdbError, StreamingExecutionConfig[F, GmosNorthStatic, GmosNorthDynamic]]] =
+      private def generateDaytime[S, D](
+        context:   GeneratorContext,
+        estimator: StepTimeEstimateCalculator[S, D],
+        static:    S,
+        sets:      lucuma.odb.sequence.daytimecal.Config => List[lucuma.odb.sequence.daytimecal.CalibrationSet[D]]
+      ): F[Either[OdbError, StreamingExecutionConfig[F, S, D]]] =
         import lucuma.odb.sequence.daytimecal.DaytimeCalibration
         (for
           cfg <- extractMode(ObservingMode.DaytimeCalibrationName, context)(_.asDaytimeCalibration)
-          gen <- EitherT.fromEither[F](DaytimeCalibration.gmosNorth(context.oid, calculator.gmosNorthStep, context.namespace, cfg))
-          res <- collapseIfNecessary(context, gen)
-        yield res).value
+          gen <- EitherT.fromEither[F](DaytimeCalibration.executionConfig(context.oid, estimator, static, context.namespace, sets(cfg)))
+        yield gen.covary[F]).value
+
+      override def selectDaytimeGmosNorth(
+        context: GeneratorContext
+      )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, GmosNorthStatic, GmosNorthDynamic]]] =
+        selectDaytime(context, DaytimeStatics.GmosNorth, sequenceService.selectGmosNorthSequence(context.oid, _, _), generateDaytimeGmosNorth(context))
+
+      override def generateDaytimeGmosNorth(
+        context: GeneratorContext
+      ): F[Either[OdbError, StreamingExecutionConfig[F, GmosNorthStatic, GmosNorthDynamic]]] =
+        generateDaytime(context, calculator.gmosNorthStep, DaytimeStatics.GmosNorth, _.gmosNorthSets)
 
       override def selectDaytimeGmosSouth(
         context: GeneratorContext
       )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, GmosSouthStatic, GmosSouthDynamic]]] =
-        selectOrGenerate(DaytimeStatics.GmosSouth, sequenceService.selectGmosSouthSequence(context.oid, _, _), generateDaytimeGmosSouth(context))
+        selectDaytime(context, DaytimeStatics.GmosSouth, sequenceService.selectGmosSouthSequence(context.oid, _, _), generateDaytimeGmosSouth(context))
 
       override def generateDaytimeGmosSouth(
         context: GeneratorContext
       ): F[Either[OdbError, StreamingExecutionConfig[F, GmosSouthStatic, GmosSouthDynamic]]] =
-        import lucuma.odb.sequence.daytimecal.DaytimeCalibration
-        (for
-          cfg <- extractMode(ObservingMode.DaytimeCalibrationName, context)(_.asDaytimeCalibration)
-          gen <- EitherT.fromEither[F](DaytimeCalibration.gmosSouth(context.oid, calculator.gmosSouthStep, context.namespace, cfg))
-          res <- collapseIfNecessary(context, gen)
-        yield res).value
+        generateDaytime(context, calculator.gmosSouthStep, DaytimeStatics.GmosSouth, _.gmosSouthSets)
 
       override def selectDaytimeGnirs(
         context: GeneratorContext
