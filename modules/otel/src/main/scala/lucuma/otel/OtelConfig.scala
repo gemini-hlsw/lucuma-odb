@@ -32,7 +32,7 @@ object OtelConfig:
         (envOrProp(endpointKey), envOrProp(keyKey), environment).parMapN: (endpoint, key, env) =>
           OtelConfig(endpoint, key, env).some
       else
-        (envOrProp(endpointKey).option, envOrProp(keyKey).option, environment).parTupled.map:
+        (envOrProp(endpointKey).option, envOrProp(keyKey).option, environment).parMapN:
           case (Some(endpoint), Some(key), env) if endpoint.trim.nonEmpty && key.trim.nonEmpty =>
             OtelConfig(endpoint, key, env).some
           case _ =>

@@ -43,7 +43,7 @@ object NonsiderealInput {
         UserSuppliedEphemerisInput.Binding.Option("ephemeris", rEphemeris),
       ) =>
         val rEphemerisKey = (rKeyType, rDes, rKey).parTupled.flatMap(resolveKey)
-        (rEphemerisKey, rEphemeris).parTupled.flatMap:
+        (rEphemerisKey, rEphemeris).parFlatMapN:
           case (None, Some(eph)) => Result.success(Create.UserSupplied(eph))
           case (Some(k: Ephemeris.Key.Horizons), None) => Result.success(Create.Horizons(k))
           case (Some(k: Ephemeris.Key.Horizons), Some(_)) => Result.failure("Cannot specify a Horizons key with a user-supplied ephemeris.")
@@ -60,7 +60,7 @@ object NonsiderealInput {
         UserSuppliedEphemerisInput.Binding.Option("ephemeris", rEphemeris),
       ) =>
         val rEphemerisKey = (rKeyType, rDes, rKey).parTupled.flatMap(resolveKey)
-        (rEphemerisKey, rEphemeris).parTupled.flatMap:
+        (rEphemerisKey, rEphemeris).parFlatMapN:
           case (Some(k: Ephemeris.Key.Horizons), None) => Result.success(Edit.Horizons(k))
           case (Some(k: Ephemeris.Key.Horizons), Some(_)) => Result.failure("Cannot specify a Horizons key with a user-supplied ephemeris.")
           case (Some(k: Ephemeris.Key.UserSupplied), Some(eph)) => Result.success(Edit.UserSupplied(k, eph))

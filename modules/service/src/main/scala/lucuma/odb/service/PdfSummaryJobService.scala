@@ -129,7 +129,7 @@ object PdfSummaryJobService:
           c.downField("observations").downField("matches").as[List[Json]].leftMap(_.message),
           complete(c.downField("observations")),
           complete(c.downField("program").downField("observations"))
-        ).tupled.map: (program, obs, _, _) =>
+        ).mapN: (program, obs, _, _) =>
           val ref =
             program
               .hcursor

@@ -64,7 +64,7 @@ object SiderealInput {
         ParallaxModelInput.Binding.Option("parallax", rParallax),
         CatalogInfoInput.Binding.Option("catalogInfo", rCatalogInfo)
       ) =>
-        (rRa, rDec, rEpoch, rProperMotion, rRadialVelocity, rParallax, rCatalogInfo).parTupled.flatMap {
+        (rRa, rDec, rEpoch, rProperMotion, rRadialVelocity, rParallax, rCatalogInfo).parFlatMapN {
           (ra, dec, epoch, pm, rv, px, ci) =>
             (ra, dec, epoch) match {
               case (Some(r), Some(d), Some(e)) => Result(Create(r, d, e, pm, rv, px, ci))

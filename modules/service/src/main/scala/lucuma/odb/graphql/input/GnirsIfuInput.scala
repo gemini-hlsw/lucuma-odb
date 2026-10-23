@@ -43,7 +43,7 @@ object GnirsIfuInput:
       ) =>
         (rCentralWavelengths, rFilter, rFpu, rTelescopeConfigs, rCamera, rGrating, rPrism,
          rDecker, rExplGrating, rExplPrism,
-         rFocus, rReadMode, rWellDepth, rAcq, rTelluricType).parTupled.flatMap:
+         rFocus, rReadMode, rWellDepth, rAcq, rTelluricType).parFlatMapN:
           (centralWavelengths, filter, fpu, telescopeConfigs, camera, grating, prism,
            decker, explGrating, explPrism,
            focus, readMode, wellDepth, acq, telluricType) =>

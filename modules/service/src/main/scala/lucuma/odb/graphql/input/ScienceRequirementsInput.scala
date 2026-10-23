@@ -35,10 +35,9 @@ object ScienceRequirementsInput:
         SpectroscopyScienceRequirementsInput.Binding.Option("spectroscopy", rSpectroscopy),
         ImagingScienceRequirementsInput.Binding.Option("imaging", rImaging)
       ) =>
-        (rExposureTimeMode, rSpectroscopy, rImaging).parTupled.flatMap:
-          case (expTimeMode, spec, img) =>
-            atMostOne(
-              spec -> "spectroscopy",
-              img  -> "imaging"
-            ).as(ScienceRequirementsInput(expTimeMode, spec, img))
+        (rExposureTimeMode, rSpectroscopy, rImaging).parFlatMapN: (expTimeMode, spec, img) =>
+          atMostOne(
+            spec -> "spectroscopy",
+            img  -> "imaging"
+          ).as(ScienceRequirementsInput(expTimeMode, spec, img))
 

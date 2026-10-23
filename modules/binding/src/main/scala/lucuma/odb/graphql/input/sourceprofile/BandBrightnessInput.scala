@@ -35,7 +35,7 @@ object BandBrightnessInput {
         BrightnessValueBinding.Option("value", rValue),
         unitsBinding.Option("units", rUnits),
         BrightnessValueBinding.Option("error", rError)
-      ) => (rBand, rValue, rUnits, rError).parTupled.flatMap {
+      ) => (rBand, rValue, rUnits, rError).parFlatMapN {
         case (band, Some(value), Some(units), error) =>
           Result((band, units.withValueTagged(value, error)))
         case _ =>

@@ -198,9 +198,8 @@ object TimeEstimateService:
       )(using Transaction[F]): F[Map[Option[ScienceBand], CalculatedValue[CategorizedTime]]] =
         (observationService.selectBands(pid),
          obscalcService.selectProgramCategorizedTime(pid)
-        ).tupled
-         .map: (bandMap, valueMap) =>
-           bandedTime(bandMap.keys, bandMap, valueMap)
+        ).mapN: (bandMap, valueMap) =>
+          bandedTime(bandMap.keys, bandMap, valueMap)
 
       override def estimateGroups(
         trees:         List[GroupService.ProgramTree],

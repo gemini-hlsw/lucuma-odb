@@ -66,7 +66,7 @@ class tooTriggerEdit extends OdbSuite with SubscriptionUtils with TooTriggerSetu
     """
 
   test("triggering then declining emits creation and update events"):
-    (Deferred[IO, Observation.Id], Deferred[IO, TooTrigger.Id]).tupled.flatMap: (oidRef, ridRef) =>
+    (Deferred[IO, Observation.Id], Deferred[IO, TooTrigger.Id]).flatMapN: (oidRef, ridRef) =>
       subscriptionExpectF(
         user      = pi,
         query     = subscription,
@@ -103,7 +103,7 @@ class tooTriggerEdit extends OdbSuite with SubscriptionUtils with TooTriggerSetu
     """
 
   test("a supersession arrives as a closing update and a fresh creation"):
-    (Deferred[IO, Observation.Id], Deferred[IO, TooTrigger.Id], Deferred[IO, TooTrigger.Id]).tupled.flatMap: (oidRef, firstRef, secondRef) =>
+    (Deferred[IO, Observation.Id], Deferred[IO, TooTrigger.Id], Deferred[IO, TooTrigger.Id]).flatMapN: (oidRef, firstRef, secondRef) =>
       subscriptionExpectF(
         user      = pi,
         query     = subscription,
@@ -133,7 +133,7 @@ class tooTriggerEdit extends OdbSuite with SubscriptionUtils with TooTriggerSetu
       )
 
   test("the activation filter selects which events arrive"):
-    (Deferred[IO, Observation.Id], Deferred[IO, TooTrigger.Id]).tupled.flatMap: (oidRef, ridRef) =>
+    (Deferred[IO, Observation.Id], Deferred[IO, TooTrigger.Id]).flatMapN: (oidRef, ridRef) =>
       subscriptionExpectF(
         user      = pi,
         query     = subscriptionWith("{ EQ: RAPID }"),
@@ -159,7 +159,7 @@ class tooTriggerEdit extends OdbSuite with SubscriptionUtils with TooTriggerSetu
       )
 
   test("an ordered activation filter follows only the disruptive requests"):
-    (Deferred[IO, Observation.Id], Deferred[IO, TooTrigger.Id], Deferred[IO, TooTrigger.Id]).tupled.flatMap: (oidRef, firstRef, thirdRef) =>
+    (Deferred[IO, Observation.Id], Deferred[IO, TooTrigger.Id], Deferred[IO, TooTrigger.Id]).flatMapN: (oidRef, firstRef, thirdRef) =>
       subscriptionExpectF(
         user      = pi,
         // The whole point of matching in memory rather than in SQL: a subscription

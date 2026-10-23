@@ -168,7 +168,7 @@ object GnirsSpectroscopyInput:
         ) =>
           (rCentralWavelengths, rFilter, rSlit, rIfu, rCamera, rGrating, rPrism,
            rDecker, rExplGrating, rExplPrism,
-           rFocus, rReadMode, rWellDepth, rAcq, rTelluricType).parTupled.flatMap:
+           rFocus, rReadMode, rWellDepth, rAcq, rTelluricType).parFlatMapN:
             (centralWavelengths, filter, slit, ifu, camera, grating, prism,
              decker, explGrating, explPrism,
              focus, readMode, wellDepth, acq, telluricType) =>
@@ -257,7 +257,7 @@ object GnirsSpectroscopyInput:
         ) =>
           (rCentralWavelengths, rFilter, rSlit, rIfu, rCamera, rGrating, rPrism,
            rDecker, rExplGrating, rExplPrism,
-           rFocus, rReadMode, rWellDepth, rAcq, rTelluricType).parTupled.flatMap:
+           rFocus, rReadMode, rWellDepth, rAcq, rTelluricType).parFlatMapN:
             (centralWavelengths, filter, slit, ifu, camera, grating, prism,
              decker, explGrating, explPrism,
              focus, readMode, wellDepth, acq, telluricType) =>

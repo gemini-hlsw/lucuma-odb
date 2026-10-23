@@ -31,7 +31,7 @@ object PartnerLinkInput:
         PartnerBinding.Option("geminiPartner", rPartner),
         ExchangePartnerBinding.Option("exchangePartner", rExchange)
       ) =>
-        (rLinkType, rPartner, rExchange).parTupled.flatMap:
+        (rLinkType, rPartner, rExchange).parFlatMapN:
           case (None,    Some(p), None)    => PartnerLink.HasGeminiPartner(p).success
           case (None,    None,    Some(e)) => PartnerLink.HasExchangePartner(e).success
           case (None,    None,    None)    => InvalidResult

@@ -34,7 +34,7 @@ object GoaPropertiesInput:
           NonNegIntBinding.Option("proprietaryMonths", rProprietary),
           BooleanBinding.Option("shouldNotify", rShouldNotify),
           BooleanBinding.Option("privateHeader", rPrivateHeader)
-        ) => (rProprietary, rShouldNotify, rPrivateHeader).parTupled.map:
+        ) => (rProprietary, rShouldNotify, rPrivateHeader).parMapN:
           (proprietary, shouldNotify, headerPrivate) => Create(
             proprietary.getOrElse(DefaultProprietaryMonths),
             shouldNotify.getOrElse(DefaultShouldNotify),
@@ -57,4 +57,4 @@ object GoaPropertiesInput:
           NonNegIntBinding.Option("proprietaryMonths", rProprietary),
           BooleanBinding.Option("shouldNotify", rShouldNotify),
           BooleanBinding.Option("privateHeader", rPrivateHeader)
-        ) => (rProprietary, rShouldNotify, rPrivateHeader).parTupled.map(Edit.apply)
+        ) => (rProprietary, rShouldNotify, rPrivateHeader).parMapN(Edit.apply)

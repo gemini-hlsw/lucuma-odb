@@ -24,8 +24,7 @@ trait RoleCodec {
   }
 
   implicit val DecoderStandardRole: Decoder[StandardRole] = hc =>
-    (hc.downField("type").as[String], hc.downField("id").as[Id], hc.downField("partner").as[Option[Partner]])
-      .tupled.flatMap {
+    (hc.downField("type").as[String], hc.downField("id").as[Id], hc.downField("partner").as[Option[Partner]]).flatMapN {
         case ("pi",    id, None)    => Pi(id).asRight
         case ("ngo",   id, Some(p)) => Ngo(id, p).asRight
         case ("staff", id, None)    => Staff(id).asRight

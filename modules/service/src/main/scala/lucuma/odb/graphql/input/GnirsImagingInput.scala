@@ -77,7 +77,7 @@ object GnirsImagingInput extends ImagingFilterCheck:
             rReadMode,
             rWellDepth,
             rAcq
-          ).parTupled.flatMap: (variant, filters, camera, readMode, wellDepth, acq) =>
+          ).parFlatMapN: (variant, filters, camera, readMode, wellDepth, acq) =>
             camera.fold(OdbError.InvalidArgument("A 'camera' is required on creation.".some).asFailure): c =>
               Create(filters, c, readMode, wellDepth, variant.getOrElse(DefaultVariant), acq).success
 

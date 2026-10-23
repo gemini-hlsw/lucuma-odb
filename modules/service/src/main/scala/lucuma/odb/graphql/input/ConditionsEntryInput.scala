@@ -22,7 +22,7 @@ object ConditionsEntryInput {
         ConditionsMeasurementInput.Binding.Option("measurement", rMeasurement),
         ConditionsIntuitionInput.Binding.Option("intuition", rIntuition),
       ) =>
-        (rMeasurement, rIntuition).parTupled.flatMap { (o1, o2) =>
+        (rMeasurement, rIntuition).parFlatMapN { (o1, o2) =>
           Result.fromOption(
             Ior.fromOptions(o1, o2).map(ConditionsEntryInput.apply), 
             "At least one of measurement and intuition must be specified."

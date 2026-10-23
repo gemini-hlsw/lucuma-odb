@@ -18,5 +18,5 @@ object Flamingos2CustomMaskInput:
       case List(
         AttachmentIdBinding.Option("attachmentId", rAttachmentId),
         Flamingos2CustomSlitWidthBinding("slitWidth", rSlitWidth)
-      ) => (rAttachmentId, rSlitWidth).parTupled.flatMap: (attachmentId, slitWidth) =>
+      ) => (rAttachmentId, rSlitWidth).parFlatMapN: (attachmentId, slitWidth) =>
         Result(Custom(attachmentId.fold[MaskDefinition](ToBeDefined)(Defined(_)), slitWidth))

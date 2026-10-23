@@ -39,8 +39,7 @@ object ImagingScienceRequirementsInput:
         BooleanBinding.Nullable("broadFilters", rBroadFilter),
         BooleanBinding.Nullable("combinedFilters", rCombinedFilter)
       ) =>
-        (rMinimumFov, rNarrowFilter, rBroadFilter, rCombinedFilter)
-          .parTupled.map(
+        (rMinimumFov, rNarrowFilter, rBroadFilter, rCombinedFilter).parMapN(
             (minimumFov, narrowFilter, broadFilter, combinedFilter) =>
               ImagingScienceRequirementsInput(
                 minimumFov,

@@ -71,6 +71,6 @@ class LegacyITCFlamingos2SpecSignalToNoiseSuite extends LegacyITCFlamingos2Suite
     Enumerated[Flamingos2CustomSlitWidth].all
       .flatMap(w => w.fpu.tupleLeft(w))
       .traverse_ : (w, fpu) =>
-        (calculate(observingModeWithCustomMask(w)), calculate(observingModeWithFpu(fpu))).tupled
-          .map: (custom, builtin) =>
+        (calculate(observingModeWithCustomMask(w)), calculate(observingModeWithFpu(fpu)))
+          .mapN: (custom, builtin) =>
             assertEquals(custom, builtin, s"$w should match $fpu")

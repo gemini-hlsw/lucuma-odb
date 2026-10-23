@@ -19,7 +19,7 @@ object GaussianInput {
         AngleInput.Binding.Option("fwhm", rFwhm),
         SpectralDefinitionInput.Integrated.CreateBinding.Option("spectralDefinition", rSpectralDefinition)
       ) =>
-        (rFwhm, rSpectralDefinition).parTupled.flatMap {
+        (rFwhm, rSpectralDefinition).parFlatMapN {
           case (Some(fwhm), Some(spectralDefinition)) => Result(SourceProfile.Gaussian(fwhm, spectralDefinition))
           case _ => Result.failure("Both fwhm and spectralDefinition must be provided on creation")
         }

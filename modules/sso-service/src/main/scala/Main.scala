@@ -93,7 +93,7 @@ object Main extends CommandIOApp(
     Command(
       name   = "serve",
       header = "Run the SSO service.",
-    )((ResetDatabase.opt, SkipMigration.opt).tupled.map { case (reset, skipMigration) =>
+    )((ResetDatabase.opt, SkipMigration.opt).mapN { (reset, skipMigration) =>
       for
         _ <- IO.whenA(reset.isRequested)(IO.println("Resetting database."))
         _ <- IO.whenA(skipMigration.isRequested)(IO.println("Skipping migration.  Ensure that your database is up-to-date."))

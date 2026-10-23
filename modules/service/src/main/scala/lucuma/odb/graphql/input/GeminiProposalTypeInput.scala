@@ -119,7 +119,7 @@ object GeminiProposalTypeInput:
           AeonMultiFacilityInput.Create.Binding.Option("aeonMultiFacility", rAeon),
           BooleanBinding.Option("jwstSynergy", rJwst),
           BooleanBinding.Option("usLongTerm", rUsLong)
-        ) => (rMin, rSplits, rExchange, rAeon, rJwst, rUsLong).parTupled.flatMap { case (min, splits, exchange, aeon, jwst, usLong) =>
+        ) => (rMin, rSplits, rExchange, rAeon, rJwst, rUsLong).parFlatMapN { (min, splits, exchange, aeon, jwst, usLong) =>
           exchangeXorSplits(exchange, splits).as(
             Create(ScienceSubtype.Classical).update(
               for
@@ -191,8 +191,8 @@ object GeminiProposalTypeInput:
           AeonMultiFacilityInput.Create.Binding.Option("aeonMultiFacility", rAeon),
           BooleanBinding.Option("jwstSynergy", rJwst),
           BooleanBinding.Option("usLongTerm", rUsLong)
-        ) => (rMin, rSplits, rExchange, rBand3, rAeon, rJwst, rUsLong).parTupled.flatMap:
-          case (min, splits, exchange, band3, aeon, jwst, usLong) =>
+        ) => (rMin, rSplits, rExchange, rBand3, rAeon, rJwst, rUsLong).parFlatMapN: 
+          (min, splits, exchange, band3, aeon, jwst, usLong) =>
             exchangeXorSplits(exchange, splits).as(
               DefaultFor(ScienceSubtype.Queue).update(
                 for
@@ -279,7 +279,7 @@ object GeminiProposalTypeInput:
           AeonMultiFacilityInput.Edit.Binding.Nullable("aeonMultiFacility", rAeon),
           BooleanBinding.Option("jwstSynergy", rJwst),
           BooleanBinding.Option("usLongTerm", rUsLong)
-        ) => (rMin, rSplits, rExchange, rAeon, rJwst, rUsLong).parTupled.flatMap { case (min, splits, exchange, aeon, jwst, usLong) =>
+        ) => (rMin, rSplits, rExchange, rAeon, rJwst, rUsLong).parFlatMapN { (min, splits, exchange, aeon, jwst, usLong) =>
           exchangeXorSplits(exchange.toOption, splits.toOption).as(
             Edit(ScienceSubtype.Classical, minPercentTime = min, partnerSplits = splits, exchangePartner = exchange, aeonMultiFacility = aeonFlag(aeon), aeonRequiredInstruments = aeonInstruments(aeon), jwstSynergy = jwst, usLongTerm = usLong)
           )
@@ -327,7 +327,7 @@ object GeminiProposalTypeInput:
           AeonMultiFacilityInput.Edit.Binding.Nullable("aeonMultiFacility", rAeon),
           BooleanBinding.Option("jwstSynergy", rJwst),
           BooleanBinding.Option("usLongTerm", rUsLong)
-        ) => (rMin, rSplits, rExchange, rBand3, rAeon, rJwst, rUsLong).parTupled.flatMap { case (min, splits, exchange, band3, aeon, jwst, usLong) =>
+        ) => (rMin, rSplits, rExchange, rBand3, rAeon, rJwst, rUsLong).parFlatMapN { (min, splits, exchange, band3, aeon, jwst, usLong) =>
           exchangeXorSplits(exchange.toOption, splits.toOption).as(
             Edit(ScienceSubtype.Queue, minPercentTime = min, partnerSplits = splits, exchangePartner = exchange, considerForBand3 = band3, aeonMultiFacility = aeonFlag(aeon), aeonRequiredInstruments = aeonInstruments(aeon), jwstSynergy = jwst, usLongTerm = usLong)
           )

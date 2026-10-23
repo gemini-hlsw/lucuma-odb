@@ -559,7 +559,7 @@ object AsterismService {
             (oDes, oEphemKeyType).mapN((des, keyType) => Ephemeris.Key.fromTypeAndDes.getOption((keyType, des))).flatten
 
           if isOpportunity then
-            (oSourceProfile, oRaArcType, oDecArcType).tupled.flatMap: (sourceProfile, raArcType, decArcType) =>
+            (oSourceProfile, oRaArcType, oDecArcType).flatMapN: (sourceProfile, raArcType, decArcType) =>
 
               val oRaArc: Option[Arc[RightAscension]] =
                 (raArcType, oRaArcStart, oRaArcEnd) match

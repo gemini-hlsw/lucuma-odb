@@ -216,7 +216,7 @@ object configurationrequest:
       (
         hc.downField("coordinates").as[Option[Coordinates]],
         hc.downField("region").as[Option[Region]]
-      ).tupled.flatMap:
+      ).flatMapN:
         case (Some(c), None)    => Left(c).some.asRight
         case (None, Some(r))    => Right(r).some.asRight
         case (None, None)       => None.asRight
@@ -230,7 +230,7 @@ object configurationrequest:
         hc.downField("observingMode").as[Option[ObservingMode]],
         hc.downField("altairMode").as[Option[AltairMode]], // may be missing
         hc.downField("schedulingMode").as[SchedulingMode]
-      ).tupled.flatMap:
+      ).flatMapN:
         case (conds, Some(coords), Some(mode), altair, sm) => Right(Configuration(conds, coords, mode, altair, sm))
         case (conds, None, _, _, _)                        => Left(DecodingFailures.NoReferenceCoordinates)
         case (conds, _, None, _, _)                        => Left(DecodingFailures.NoObservingMode)

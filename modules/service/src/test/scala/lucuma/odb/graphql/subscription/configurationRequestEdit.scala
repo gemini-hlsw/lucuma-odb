@@ -264,28 +264,27 @@ class configurationRequestEdit extends OdbSuite with SubscriptionUtils with Obse
         """.asRight
       )
 
-    (Deferred[IO, ConfigurationRequest.Id], Deferred[IO, ConfigurationRequest.Id]).tupled.flatMap: 
-      case (ref1, ref2) =>
-        subscriptionExpectF(
-          user      = pi,
-          query     = subscription,
-          mutations =
-            Right(
-              for
-                (pid, oid) <- setup
-                _          <- createConfigurationRequestAs(pi, oid).flatMap(ref1.complete)
-                _          <- IO.sleep(2.seconds) // give the client time to receive the event … CI seems to need more time
-                _          <- updateWaterVapor(oid, WaterVapor.Dry)
-                _          <- createConfigurationRequestAs(pi, oid).flatMap((ref2.complete))
-              yield ()
-            ),
-          expectedF = 
-            (ref1.get, ref2.get).mapN: (rid1, rid2) =>
-              List(
-                configurationRequestEdit(rid1, EditType.Created, ConfigurationRequestStatus.Requested),
-                configurationRequestEdit(rid2, EditType.Created, ConfigurationRequestStatus.Requested)
-            )
-          )    
+    (Deferred[IO, ConfigurationRequest.Id], Deferred[IO, ConfigurationRequest.Id]).flatMapN: (ref1, ref2) =>
+      subscriptionExpectF(
+        user      = pi,
+        query     = subscription,
+        mutations =
+          Right(
+            for
+              (pid, oid) <- setup
+              _          <- createConfigurationRequestAs(pi, oid).flatMap(ref1.complete)
+              _          <- IO.sleep(2.seconds) // give the client time to receive the event … CI seems to need more time
+              _          <- updateWaterVapor(oid, WaterVapor.Dry)
+              _          <- createConfigurationRequestAs(pi, oid).flatMap((ref2.complete))
+            yield ()
+          ),
+        expectedF = 
+          (ref1.get, ref2.get).mapN: (rid1, rid2) =>
+            List(
+              configurationRequestEdit(rid1, EditType.Created, ConfigurationRequestStatus.Requested),
+              configurationRequestEdit(rid2, EditType.Created, ConfigurationRequestStatus.Requested)
+          )
+        )    
       }
 
 }

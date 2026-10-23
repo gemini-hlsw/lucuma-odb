@@ -48,7 +48,7 @@ object BandNormalizedInput {
         UnnormalizedSedInput.Binding.Option("sed", rSed),
         brightnesses.Option("brightnesses", rBrightnesses),
       ) =>
-        (rSed, rBrightnesses).parTupled.flatMap {
+        (rSed, rBrightnesses).parFlatMapN {
           case (sed, Some(brightnesses)) => Result(BandNormalized(sed, brightnesses))
           case _                         => Result.failure("Brightness is required.")
         }
@@ -62,13 +62,12 @@ object BandNormalizedInput {
         UnnormalizedSedInput.Binding.Nullable("sed", rSed),
         brightnesses.Option("brightnesses", rBrightnesses),
       ) =>
-        (rSed, rBrightnesses).parTupled.flatMap {
-          case (sed, brightnesses) =>
-            Result { a0 =>
-              val a1 = sed.fold(a0.copy(sed = none), a0, b => a0.copy(sed = b.some))
-              val a2 = brightnesses.foldLeft(a1)((a, b) => a.copy(brightnesses = b))
-              Result(a2)
-            }
+        (rSed, rBrightnesses).parFlatMapN { (sed, brightnesses) =>
+          Result { a0 =>
+            val a1 = sed.fold(a0.copy(sed = none), a0, b => a0.copy(sed = b.some))
+            val a2 = brightnesses.foldLeft(a1)((a, b) => a.copy(brightnesses = b))
+            Result(a2)
+          }
         }
     }
 }

@@ -401,7 +401,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations with M
     ObservingModeType.values.toList.filter(_.isImplemented).traverse { obsMode =>
       createProgramAs(pi).flatMap { pid =>
         val t = createTargetAs(pi, pid)
-        (t, t).tupled.flatMap { (tid1, tid2) =>
+        (t, t).flatMapN { (tid1, tid2) =>
           createObservationAs(pi, pid, Some(obsMode), tid1, tid2).flatMap { oid =>
             load(oid).flatMap { orig =>
               query(
@@ -573,7 +573,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations with M
   test("clones should have different ids") {
     createProgramAs(pi).flatMap { pid =>
       val t = createTargetAs(pi, pid)
-      (t, t).tupled.flatMap { (tid1, tid2) =>
+      (t, t).flatMapN { (tid1, tid2) =>
         createObservationAs(pi, pid, tid1, tid2).flatMap { oid =>
           query(
             user = pi,
@@ -2389,7 +2389,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations with M
   test("clone preserves exposure time modes"):
     createProgramAs(pi).flatMap: pid =>
       val t = createTargetAs(pi, pid)
-      (t, t).tupled.flatMap: (tid1, tid2) =>
+      (t, t).flatMapN: (tid1, tid2) =>
         createObservationWithModeAs(
           pi,
           pid,

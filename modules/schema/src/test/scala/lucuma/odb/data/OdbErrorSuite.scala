@@ -66,7 +66,7 @@ class OdbErrorSuite extends DisciplineSuite with ArbitraryInstances:
 
   given Arbitrary[OdbError] =
     Arbitrary:
-      (arbitrary[OdbError.Tag], arbitrary[Option[String]]).tupled.flatMap: (tag, detail) =>
+      (arbitrary[OdbError.Tag], arbitrary[Option[String]]).flatMapN: (tag, detail) =>
         tag match
           case Tag.InvalidArgument           => OdbError.InvalidArgument(detail).pure[Gen]
           case Tag.NoAction                  => OdbError.NoAction(detail).pure[Gen]

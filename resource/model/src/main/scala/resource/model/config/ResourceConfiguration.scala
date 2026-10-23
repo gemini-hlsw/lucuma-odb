@@ -53,7 +53,7 @@ object ResourceConfiguration:
       (otelEndpoint, otelKey, environment).parMapN((endpoint, key, env) =>
         OtelConfig(endpoint, key, env.stringValue).some
       ),
-      (otelEndpoint.option, otelKey.option, environment).parTupled.map:
+      (otelEndpoint.option, otelKey.option, environment).parMapN:
         // Otherwise otel is optional
         case (Some(endpoint), Some(key), env) if endpoint.trim.nonEmpty && key.trim.nonEmpty =>
           OtelConfig(endpoint, key, env.stringValue).some

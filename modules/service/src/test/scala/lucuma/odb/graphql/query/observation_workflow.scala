@@ -961,7 +961,7 @@ class observation_workflow
         _   <- runObscalcUpdateAs(serviceUser, pid, oid)
       yield oid
 
-    (oid1, oid2).tupled.flatMap: (oid1, oid2) =>
+    (oid1, oid2).flatMapN: (oid1, oid2) =>
       expect(
         pi,
         workflowQuery(oid1, oid2),

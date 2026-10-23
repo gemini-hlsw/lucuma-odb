@@ -125,7 +125,7 @@ class observingModeGroup extends OdbSuite:
         (create2(ImageQuality.Preset.OnePointFive, GmosNorthGrating.B1200_G5301),
          create2(ImageQuality.Preset.PointOne, GmosNorthGrating.R400_G5310),
          create2(ImageQuality.Preset.PointOne, GmosNorthGrating.R831_G5302)
-        ).parTupled.flatMap: (g1, g2, g3) =>
+        ).parFlatMapN: (g1, g2, g3) =>
           expect(
             user = pi,
             query = s"""
