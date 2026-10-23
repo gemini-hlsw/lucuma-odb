@@ -11,7 +11,7 @@ import lucuma.catalog.clients.TelluricTargetsClientMock
 import lucuma.catalog.telluric.TelluricStar
 import lucuma.catalog.telluric.TelluricTargetsClient
 import lucuma.core.enums.Band
-import lucuma.core.enums.TelluricCalibrationOrder
+import lucuma.core.enums.TelluricSlot
 import lucuma.core.math.BrightnessUnits.BrightnessMeasure
 import lucuma.core.math.BrightnessUnits.Integrated
 import lucuma.core.math.BrightnessValue
@@ -36,7 +36,7 @@ object TelluricMocks:
     distance = 100.5,
     hmag = 7.5,
     score = 0.95,
-    order = TelluricCalibrationOrder.Before,
+    slot = TelluricSlot.Before,
     sed = None
   )
 
@@ -47,7 +47,7 @@ object TelluricMocks:
     distance = 98.2,
     hmag = 7.8,
     score = 0.92,
-    order = TelluricCalibrationOrder.After,
+    slot = TelluricSlot.After,
     sed = None
   )
 
@@ -79,7 +79,7 @@ object TelluricMocks:
       "Distance" -> star.distance.asJson,
       "Hmag" -> star.hmag.asJson,
       "Score" -> star.score.asJson,
-      "Order" -> Json.fromString(star.order.tag)
+      "Order" -> Json.fromString(star.slot.tag)
     )
 
   val searchJson: Json =

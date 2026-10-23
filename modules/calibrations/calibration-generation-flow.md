@@ -172,7 +172,7 @@ flowchart TD
 
     J --> K
     J2 --> K
-    K["findGroupTellurics: id, order, recorded duration, has visit (one query)"] --> L[Split: spent = has a visit, unobserved = the rest]
+    K["findGroupTellurics: id, slot, recorded duration, has visit, completed (one query)"] --> L[Split: spent = has a visit, unobserved = the rest]
     L --> M[telluricDuration: obsDuration, else science time]
 
     M --> N{Duration?}
@@ -180,8 +180,9 @@ flowchart TD
     N -->|<= 1.5 hours| P[Required: After]
     N -->|None| Q[Required: nothing]
 
-    O --> R{Unobserved orders match required orders?}
-    P --> R
+    O --> O2["currentVisitSlots: drop slots a spent telluric fills for the visit in progress (visit ends when its After completes)"]
+    P --> O2
+    O2 --> R{Unobserved slots match required slots?}
     Q --> R
 
     R -->|No, with a duration| S[Delete all unobserved tellurics]
@@ -198,11 +199,11 @@ flowchart TD
     X --> Y["S/N = max(science_S/N x 2, 100)"]
 ```
 
-Spent tellurics are never deleted or counted: the next visit gets its own set, so an observation can accumulate more tellurics than one visit needs. The unobserved ones are replaced as a set rather than reused one by one, so every telluric of a visit shares one recorded duration.
+Spent tellurics are never deleted. One still fills its slot (before or after the science) for the visit in progress, and once the visit's After telluric has been visited nothing more is required for that visit. The visit ends when its After telluric completes (execution state `completed` or `declared_complete`); the boundary is that After's first visit, so a later return to it changes nothing. Only then does the next visit get its own set, so an observation can accumulate more tellurics than one visit needs. The completion itself enqueues the science recalculation (`V1364`: a telluric's `t_obscalc.c_sci_execution_state` reaching `completed`, or its `c_declared_state` becoming `declared_complete`, calls `invalidate_calibration_calc` for the science), since the stale-estimate refresh does not. The unobserved ones are replaced as a set rather than reused one by one, so every telluric of a visit shares one recorded duration.
 
 ### User-Defined Tellurics
 
-A science telluric type of `USER_DEFINED` (`TelluricType.UserDefined(count)`, count 1 or 2) hands the tellurics to the user. `syncUserDefinedTellurics` reconciles the unobserved set by order against the count, instead of the duration-driven rebuild above: a generated telluric of a required order is converted in place (`TelluricTargetsService.markUserDefined`: `t_observation.c_is_user_defined_telluric` set, its resolution row bumped so a search in flight is discarded: the search links its star and marks the row ready in one transaction guarded by the invalidation it read, rolling the link back on a mismatch, and the daemon's startup reset sends a user-defined `calculating` row to `ready` rather than `pending`) and keeps its star, still a calibration target the PI may now edit; a missing order is cloned, star and configuration included, from the most recently observed user-defined telluric of that order, so each visit gets the PI's standard again, and starts empty when none was observed yet; an extra one is deleted. The planned-time estimate predicts tellurics per span of remaining science time as for generated ones. User-defined tellurics are never resynced from the science observation, never searched for (`LoadPending` and `invalidate_telluric_resolution` skip them), and are editable like science observations: `AccessControl.writableOids` admits them for `updateObservations` and `updateAsterisms`, and the workflow runs the science validators and the ITC on them (`v_generator_params.c_is_user_defined_telluric`), so an empty one reports a missing target. Switching back to a generated type rebuilds the unobserved set.
+A science telluric type of `USER_DEFINED` (`TelluricType.UserDefined(count)`, count 1 or 2) hands the tellurics to the user. `syncUserDefinedTellurics` reconciles the unobserved set by slot against the count, instead of the duration-driven rebuild above: a generated telluric of a required slot is converted in place (`TelluricTargetsService.markUserDefined`: `t_observation.c_is_user_defined_telluric` set, its resolution row bumped so a search in flight is discarded: the search links its star and marks the row ready in one transaction guarded by the invalidation it read, rolling the link back on a mismatch, and the daemon's startup reset sends a user-defined `calculating` row to `ready` rather than `pending`) and keeps its star, still a calibration target the PI may now edit; a missing slot is cloned, star and configuration included, from the most recently observed user-defined telluric of that slot once the visit it served is over, so each visit gets the PI's standard again, and starts empty when none was observed yet; an extra one is deleted. The planned-time estimate predicts tellurics per span of remaining science time as for generated ones. User-defined tellurics are never resynced from the science observation, never searched for (`LoadPending` and `invalidate_telluric_resolution` skip them), and are editable like science observations: `AccessControl.writableOids` admits them for `updateObservations` and `updateAsterisms`, and the workflow runs the science validators and the ITC on them (`v_generator_params.c_is_user_defined_telluric`), so an empty one reports a missing target. Switching back to a generated type rebuilds the unobserved set.
 
 ### Telluric Observation Details
 
@@ -221,7 +222,7 @@ The telluric's effective workflow state is **inherited from its parent science o
 
 ### Telluric Target Resolution
 
-After a telluric observation is created, `TelluricTargetsService` asynchronously resolves its target star from HIP catalog data. The search reads `c_science_duration` from `t_telluric_resolution`: it sizes the search window (capped at the max telluric duration) and picks the selection rule (over 1.5 hours match the telluric's order, otherwise the RA vs twilight LST rule). When the sync keeps a telluric whose recorded duration is outdated, `updateScienceDuration` writes the new one and requeues the search like `invalidate_telluric_resolution`; a row still `calculating` keeps its state and is requeued when its stale result fails to match `c_last_invalidation`. Brightness limits (`c_hmin_hot`, `c_hmin_solar`) are loaded at startup into an `HminBrightnessCache` keyed by `HminBrightnessKey.F2(disperser, filter, fpu)` or `HminBrightnessKey.Igrins2`. For F2 the key comes from the instrument config; IGRINS2 has a single entry because it has no per-config variation.
+After a telluric observation is created, `TelluricTargetsService` asynchronously resolves its target star from HIP catalog data. The search reads `c_science_duration` from `t_telluric_resolution`: it sizes the search window (capped at the max telluric duration) and picks the selection rule (over 1.5 hours match the telluric's slot, otherwise the RA vs twilight LST rule). When the sync keeps a telluric whose recorded duration is outdated, `updateScienceDuration` writes the new one and requeues the search like `invalidate_telluric_resolution`; a row still `calculating` keeps its state and is requeued when its stale result fails to match `c_last_invalidation`. Brightness limits (`c_hmin_hot`, `c_hmin_solar`) are loaded at startup into an `HminBrightnessCache` keyed by `HminBrightnessKey.F2(disperser, filter, fpu)` or `HminBrightnessKey.Igrins2`. For F2 the key comes from the instrument config; IGRINS2 has a single entry because it has no per-config variation.
 
 ### Deletion Protection
 
@@ -247,7 +248,7 @@ flowchart TD
     F -->|NotStarted / NotDefined| E[YES - safe to delete]
 ```
 
-The parent state is resolved by `selectTelluricScienceExecutionStates`, which joins `t_observation` to itself by `c_group_id` (picking the row with `c_calibration_role IS NULL`) and then to `v_generator_params` for the execution state. `cleanupOrphanedObsCalibrationGroup` uses this filter. `syncTelluricObservation` uses it only when there is no duration; with a duration it deletes every unobserved telluric when the required orders change, including those of an ongoing science, since the replacements carry the current duration. Spent tellurics are never deleted.
+The parent state is resolved by `selectTelluricScienceExecutionStates`, which joins `t_observation` to itself by `c_group_id` (picking the row with `c_calibration_role IS NULL`) and then to `v_generator_params` for the execution state. `cleanupOrphanedObsCalibrationGroup` uses this filter. `syncTelluricObservation` uses it only when there is no duration; with a duration it deletes every unobserved telluric when the required slots change, including those of an ongoing science, since the replacements carry the current duration. Spent tellurics are never deleted.
 
 ## Strategy 2: Per-Program-Per-Config Calibrations (GMOS SpectroPhotometric + Twilight)
 

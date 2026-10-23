@@ -120,7 +120,7 @@ object StartupDiagnostics:
           checkPostgresEnum(summary_generation_state),
           checkPostgresEnum(summary_style),
           checkPostgresEnum(target_disposition),
-          checkPostgresEnum(telluric_calibration_order),
+          checkPostgresEnum(telluric_slot),
           checkPostgresEnum(tg_op),
           checkPostgresEnum(time_charge_correction_op),
           checkPostgresEnum(time_charge_discount_type),

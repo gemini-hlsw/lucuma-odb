@@ -8,7 +8,7 @@ import lucuma.catalog.CatalogTargetResult
 import lucuma.catalog.telluric.TelluricSearchInput
 import lucuma.catalog.telluric.TelluricStar
 import lucuma.catalog.telluric.TelluricTargetsClient
-import lucuma.core.enums.TelluricCalibrationOrder
+import lucuma.core.enums.TelluricSlot
 import lucuma.core.math.Coordinates
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -39,7 +39,7 @@ class TelluricStaleSearchSuite extends TelluricTargetsServiceSuiteSupport:
       distance    = 1.0,
       hmag        = 7.0,
       score       = 1.0,
-      order       = TelluricCalibrationOrder.After,
+      slot       = TelluricSlot.After,
       sed         = None
     )
 

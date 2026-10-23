@@ -3,7 +3,7 @@
 
 package lucuma.odb.data
 
-import lucuma.core.enums.TelluricCalibrationOrder
+import lucuma.core.enums.TelluricSlot
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
@@ -32,7 +32,7 @@ object TelluricTargets:
     resolvedTargetId:     Option[Target.Id],
     errorMessage:         Option[String],
     scienceDuration:      TimeSpan,
-    calibrationOrder:     TelluricCalibrationOrder
+    slot:     TelluricSlot
   )
 
   /**
@@ -46,5 +46,5 @@ object TelluricTargets:
     failureCount:         Int,
     scienceDuration:      TimeSpan,
     paramsHash:           Option[Md5Hash],
-    calibrationOrder:     TelluricCalibrationOrder
+    slot:     TelluricSlot
   )

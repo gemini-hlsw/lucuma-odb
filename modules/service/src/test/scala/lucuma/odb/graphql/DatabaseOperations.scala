@@ -3681,6 +3681,14 @@ trait DatabaseOperations { this: OdbSuite =>
       WHERE c_observation_id = ${observation_id}
     """.command)(state, oid)).void
 
+  // declare execution complete directly, as setObservationWorkflowState would
+  def declareExecutionComplete(oid: Observation.Id): IO[Unit] =
+    session.use(_.execute(sql"""
+      UPDATE t_observation
+      SET c_declared_state = 'declared_complete'
+      WHERE c_observation_id = ${observation_id}
+    """.command)(oid)).void
+
   def queryObservationWorkflowState(user: User, oid: Observation.Id): IO[ObservationWorkflowState] =
     query(
       user,

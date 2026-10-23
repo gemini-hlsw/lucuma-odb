@@ -6,7 +6,7 @@ package lucuma.odb.service
 import lucuma.catalog.telluric.TelluricSearchInput
 import lucuma.catalog.telluric.TelluricStar
 import lucuma.core.enums.Site
-import lucuma.core.enums.TelluricCalibrationOrder
+import lucuma.core.enums.TelluricSlot
 import lucuma.core.enums.TwilightType
 import lucuma.core.math.Coordinates
 import lucuma.core.math.Declination
@@ -44,7 +44,7 @@ class SelectSingleByLstRuleSuite extends FunSuite:
   private def coordsAtRa(raHours: Double): Coordinates =
     Coordinates(raFromHours(raHours), dec)
 
-  private def star(order: TelluricCalibrationOrder, score: Double, id: String): TelluricStar =
+  private def star(slot: TelluricSlot, score: Double, id: String): TelluricStar =
     TelluricStar(
       id          = id,
       spType      = TelluricType.Hot,
@@ -52,12 +52,12 @@ class SelectSingleByLstRuleSuite extends FunSuite:
       distance    = 1.0,
       hmag        = 7.0,
       score       = score,
-      order       = order,
+      slot        = slot,
       sed         = None
     )
 
-  private val beforeStar = star(TelluricCalibrationOrder.Before, 0.5, "1")
-  private val afterStar  = star(TelluricCalibrationOrder.After,  0.9, "2")
+  private val beforeStar = star(TelluricSlot.Before, 0.5, "1")
+  private val afterStar  = star(TelluricSlot.After,  0.9, "2")
 
   private val pair: List[(TelluricStar, Unit)] =
     List((beforeStar, ()), (afterStar, ()))
