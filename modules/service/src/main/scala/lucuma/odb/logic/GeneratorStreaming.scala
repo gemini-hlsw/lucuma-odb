@@ -360,7 +360,6 @@ object GeneratorStreaming:
       // alone decides: generating from the sets only when none is stored.  The
       // atoms are never collapsed; one atom per set is the documented shape.
       private def selectDaytime[S, D](
-        context: GeneratorContext,
         static:  S,
         lookup:  (SequenceType, S) => (Transaction[F]) ?=> F[Option[Stream[F, Atom[D]]]],
         gen:     => F[Either[OdbError, StreamingExecutionConfig[F, S, D]]]
@@ -384,7 +383,7 @@ object GeneratorStreaming:
       override def selectDaytimeGmosNorth(
         context: GeneratorContext
       )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, GmosNorthStatic, GmosNorthDynamic]]] =
-        selectDaytime(context, DaytimeStatics.GmosNorth, sequenceService.selectGmosNorthSequence(context.oid, _, _), generateDaytimeGmosNorth(context))
+        selectDaytime(DaytimeStatics.GmosNorth, sequenceService.selectGmosNorthSequence(context.oid, _, _), generateDaytimeGmosNorth(context))
 
       override def generateDaytimeGmosNorth(
         context: GeneratorContext
@@ -394,7 +393,7 @@ object GeneratorStreaming:
       override def selectDaytimeGmosSouth(
         context: GeneratorContext
       )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, GmosSouthStatic, GmosSouthDynamic]]] =
-        selectDaytime(context, DaytimeStatics.GmosSouth, sequenceService.selectGmosSouthSequence(context.oid, _, _), generateDaytimeGmosSouth(context))
+        selectDaytime(DaytimeStatics.GmosSouth, sequenceService.selectGmosSouthSequence(context.oid, _, _), generateDaytimeGmosSouth(context))
 
       override def generateDaytimeGmosSouth(
         context: GeneratorContext
