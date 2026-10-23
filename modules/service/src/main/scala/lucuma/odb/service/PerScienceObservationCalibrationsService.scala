@@ -71,10 +71,30 @@ object PerScienceObservationCalibrationsService:
     order:       Option[TelluricCalibrationOrder],
     duration:    Option[TimeSpan],
     lastVisit:   Option[Timestamp],
-    userDefined: IsUserDefinedTelluric
+    userDefined: IsUserDefinedTelluric,
+    completed:   Boolean
   ):
     def visited: Boolean =
       lastVisit.isDefined
+
+  /**
+   * Slots (before or after the science) that the current visit has already
+   * observed a telluric for. Those tellurics are spent but not yet replaceable.
+   *
+   * A visit is over once its After telluric completes, so the boundary is the
+   * visit time of the most recently completed After. Any telluric visited after
+   * that boundary belongs to the current visit; with no completed After yet,
+   * every visited telluric does.
+   */
+  private def currentVisitSlots(tellurics: List[GroupTelluric]): List[TelluricCalibrationOrder] =
+    val visitEnd = tellurics
+      .filter(t => t.completed && t.order.contains(TelluricCalibrationOrder.After))
+      .flatMap(_.lastVisit)
+      .maximumOption
+    tellurics
+      .filter(t => t.visited && visitEnd.forall(end => t.lastVisit.exists(_ > end)))
+      .flatMap(_.order)
+      .distinct
 
   def instantiate[F[_]: {Concurrent as F, Tracer as T, Logger, Services as S}]: PerScienceObservationCalibrationsService[F] =
     new PerScienceObservationCalibrationsService[F] with CalibrationObservations with WorkflowStateQueries[F]:
@@ -248,9 +268,10 @@ object PerScienceObservationCalibrationsService:
         pid:        Program.Id,
         scienceOid: Observation.Id,
         groupId:    Group.Id,
-        duration:   TimeSpan
+        duration:   TimeSpan,
+        orders:     List[TelluricCalibrationOrder]
       )(using Transaction[F], SuperUserAccess): F[List[Observation.Id]] =
-        createTelluricCalibrations(pid, scienceOid, groupId, requiredOrders(duration))(
+        createTelluricCalibrations(pid, scienceOid, groupId, orders)(
           (tid, order) => telluricTargetsService.requestTelluricTarget(pid, tid, scienceOid, duration, order),
           (tid, _)     => syncConfiguration(pid, scienceOid, tid, CalibrationRole.Telluric)
         )
@@ -287,7 +308,7 @@ object PerScienceObservationCalibrationsService:
           tellurics    <- findGroupTellurics(gid)
           unobserved    = tellurics.filterNot(_.visited)
           spent         = tellurics.filter(t => t.visited && t.userDefined.value)
-          required      = ordersFor(count.value.value)
+          required      = ordersFor(count.value.value).filterNot(currentVisitSlots(tellurics).contains)
           (keep, drop)  = unobserved.partition(_.order.exists(required.contains))
           toDelete      = drop.map(_.oid)
           toConvert     = keep.filterNot(_.userDefined.value).map(_.oid)
@@ -363,7 +384,8 @@ object PerScienceObservationCalibrationsService:
                                 else Option.empty[TimeSpan].pure[F]
           _                  <- warn"No execution digest duration for ${obs.id}, requiring 0 tellurics".whenA(requiresTelluric && duration.isEmpty)
           _                  <- info"Observation ${obs.id} does not request tellurics".unlessA(requiresTelluric)
-          required           =  duration.toList.flatMap(requiredOrders)
+          // Slots filled by the visit in progress are not required again until it ends.
+          required           =  duration.toList.flatMap(requiredOrders).filterNot(currentVisitSlots(tellurics).contains)
           // A user-defined telluric left behind by a type change is rebuilt as a generated one.
           complete           =  unobserved.forall(t => t.order.isDefined && !t.userDefined.value) &&
                                   unobserved.flatMap(_.order).map(_.tag).sorted ==
@@ -378,7 +400,7 @@ object PerScienceObservationCalibrationsService:
                                   for
                                     _ <- NonEmptyList.fromList(toDelete)
                                           .traverse_(observationService.deleteCalibrationObservations)
-                                    c <- duration.traverse(createGeneratedTellurics(pid, obs.id, gid, _))
+                                    c <- duration.traverse(createGeneratedTellurics(pid, obs.id, gid, _, required))
                                   yield (c.orEmpty, toDelete)
           // Only sync existing tellurics that are not deleted or recreated. A spent one
           // keeps the configuration it was observed with, telluric type included.
@@ -1019,14 +1041,16 @@ object PerScienceObservationCalibrationsService:
                    r.c_calibration_order,
                    r.c_science_duration,
                    (SELECT max(v.c_effective_time) FROM t_visit v WHERE v.c_observation_id = o.c_observation_id),
-                   o.c_is_user_defined_telluric
+                   o.c_is_user_defined_telluric,
+                   s.c_execution_state IN ('completed', 'declared_complete')
             FROM   t_observation o
             LEFT JOIN t_telluric_resolution r ON r.c_observation_id = o.c_observation_id
+            JOIN   v_execution_state s ON s.c_observation_id = o.c_observation_id
             WHERE  o.c_group_id         = $group_id
               AND  o.c_calibration_role = $calibration_role
             ORDER BY o.c_group_index
           """.query(
-            observation_id *: telluric_calibration_order.opt *: time_span.opt *: core_timestamp.opt *: is_user_defined_telluric
+            observation_id *: telluric_calibration_order.opt *: time_span.opt *: core_timestamp.opt *: is_user_defined_telluric *: skunk.codec.boolean.bool
           ).to[GroupTelluric]
 
         val selectScienceObservationIndex: Query[Observation.Id, NonNegShort] =
