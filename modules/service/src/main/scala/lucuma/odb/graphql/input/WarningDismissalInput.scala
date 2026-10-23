@@ -17,7 +17,7 @@ case class WarningDismissalInput(
   programId:         Option[Program.Id],
   proposalReference: Option[ProposalReference],
   programReference:  Option[ProgramReference],
-  text:              NonEmptyString
+  justification:     NonEmptyString
 )
 
 object WarningDismissalInput:
@@ -28,7 +28,7 @@ object WarningDismissalInput:
         ProgramIdBinding.Option("programId", rPid),
         ProposalReferenceBinding.Option("proposalReference", rProp),
         ProgramReferenceBinding.Option("programReference", rProg),
-        NonEmptyStringBinding("text", rText)
+        NonEmptyStringBinding("justification", rJustification)
       ) =>
-        (rPid, rProp, rProg, rText).parMapN(apply)
+        (rPid, rProp, rProg, rJustification).parMapN(apply)
     }

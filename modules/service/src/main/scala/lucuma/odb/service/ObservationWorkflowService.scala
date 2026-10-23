@@ -24,6 +24,7 @@ import lucuma.core.model.Access
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationWorkflow
 import lucuma.core.model.Program
+import lucuma.core.model.ProgramReference
 import lucuma.core.model.StandardRole.*
 import lucuma.core.model.Target
 import lucuma.core.model.User
@@ -569,38 +570,59 @@ object ObservationWorkflowService {
 
           import ProgramUserRole.*
 
-          // The current user is the sender and the support users are the recipients.
-          val participants: F[Result[(Info, NonEmptyList[Info])]] =
+          // The program reference, if any, and the participants. The current user
+          // is the sender and the support users are the recipients.
+          val participants: F[Result[(Option[ProgramReference], Info, NonEmptyList[Info])]] =
             services.transactionally:
-              session.prepareR(Statements.SelectProgramUsers).use: pq =>
-                pq.stream(pid, 1024).compile.toList.map: list =>
-                  val infos: List[Info] =
-                    list.flatMap: (role, oUid, oStr) =>
-                      oStr.flatMap: str =>
-                        EmailAddress
-                          .from(str)
-                          .toOption
-                          .map(Info(role, oUid, _))
+              (
+                session.unique(Statements.SelectProgramReference)(pid),
+                session.execute(Statements.SelectProgramUsers)(pid)
+              ).mapN: (ref, list) =>
+                val infos: List[Info] =
+                  list.flatMap: (role, oUid, oStr) =>
+                    oStr.flatMap: str =>
+                      EmailAddress
+                        .from(str)
+                        .toOption
+                        .map(Info(role, oUid, _))
 
-                  val sender     = infos.find(_.userId === Some(user.id))
-                  val recipients = infos.filter(i => i.role === SupportPrimary || i.role === SupportSecondary)
+                val sender     = infos.find(_.userId === Some(user.id))
+                val recipients = infos.filter(i => i.role === SupportPrimary || i.role === SupportSecondary)
 
-                  (sender, NonEmptyList.fromList(recipients)) match
-                    case (None, _)           => OdbError.EmailSendError(s"Current user ${user.id} email address is missing or invalid.".some).asFailure
-                    case (_, None)           => OdbError.EmailSendError(s"Both $SupportPrimary and $SupportSecondary email addresses are missing or invalid.".some).asFailure
-                    case (Some(s), Some(rs)) => Result((s, rs))
+                (sender, NonEmptyList.fromList(recipients)) match
+                  case (None, _)           => OdbError.EmailSendError(s"Current user ${user.id} email address is missing or invalid.".some).asFailure
+                  case (_, None)           => OdbError.EmailSendError(s"Both $SupportPrimary and $SupportSecondary email addresses are missing or invalid.".some).asFailure
+                  case (Some(s), Some(rs)) => Result((ref, s, rs))
 
-          val subject: NonEmptyString =
-            NonEmptyString.unsafeFrom(s"$pid: request to review warnings")
+          // The email names the program by its reference, falling back to its id,
+          // and links to it in Explore.
+          case class Message(subject: NonEmptyString, text: NonEmptyString, html: NonEmptyString)
+
+          def message(ref: Option[ProgramReference]): Message =
+            val label         = ref.fold(pid.toString)(_.label)
+            val url           = (emailConfig.exploreUrl / label).renderString
+            val name          = user.displayName
+            val justification = input.justification.value
+            val request       = "has requested review for dismissal of the warnings in program"
+            Message(
+              subject = NonEmptyString.unsafeFrom(s"$label: request to review warnings"),
+              text    = NonEmptyString.unsafeFrom(
+                s"$name $request $label ($url).\n\n$justification"
+              ),
+              html    = NonEmptyString.unsafeFrom(
+                s"""${ProposalService.escapeHtml(name)} $request <a href="$url">$label</a>.<br/>\n<br/>\n""" ++
+                justification.linesIterator.map(ProposalService.escapeHtml).mkString("<br/>\n")
+              )
+            )
 
           // Send without holding a transaction open, turning any failure into an
           // error that names the recipient.
-          def sendTo(sender: Info, recipient: Info): F[Result[EmailId]] =
+          def sendTo(msg: Message, sender: Info, recipient: Info): F[Result[EmailId]] =
             def failed(detail: String): Result[EmailId] =
               OdbError.EmailSendError(s"Could not send the request to ${recipient.role} ${recipient.email.value.value}: $detail".some).asFailure
 
             emailService
-              .sendToProvider(emailConfig.invitationFrom, recipient.email, subject, input.text, replyTo = sender.email.some)
+              .sendToProvider(emailConfig.invitationFrom, recipient.email, msg.subject, msg.text, msg.html.some, sender.email.some)
               .map:
                 case Result.Failure(ps)      => failed(ps.map(_.message).mkString_("; "))
                 case Result.InternalError(t) => failed(t.getMessage)
@@ -617,15 +639,16 @@ object ObservationWorkflowService {
               case Some(ps)                 => Result.Warning(ps, sent)
 
           (for
-            (sender, recipients) <- ResultT(participants)
-            results              <- ResultT.liftF(recipients.parTraverse(r => sendTo(sender, r).tupleLeft(r)))
-            sent                 <- ResultT.fromResult(accumulate(results))
-            _                    <- ResultT:
-                                      services.transactionally:
-                                        asSuperUser:
-                                          sent.traverse_ : (r, id) =>
-                                            ResultT(emailService.recordEmail(id, pid, emailConfig.invitationFrom, r.email, subject, input.text, replyTo = sender.email.some))
-                                          .value
+            (ref, sender, recipients) <- ResultT(participants)
+            msg                        = message(ref)
+            results                   <- ResultT.liftF(recipients.parTraverse(r => sendTo(msg, sender, r).tupleLeft(r)))
+            sent                      <- ResultT.fromResult(accumulate(results))
+            _                         <- ResultT:
+                                           services.transactionally:
+                                             asSuperUser:
+                                               sent.traverse_ : (r, id) =>
+                                                 ResultT(emailService.recordEmail(id, pid, emailConfig.invitationFrom, r.email, msg.subject, msg.text, msg.html.some, sender.email.some))
+                                               .value
           yield sent.map(_._2)).value
 
   }
@@ -670,6 +693,13 @@ object ObservationWorkflowService {
         ON t.c_target_id = a.c_target_id
         WHERE t.c_target_id IN (""" |+| whichTargets |+| void""")
         """
+
+    val SelectProgramReference: Query[Program.Id, Option[ProgramReference]] =
+      sql"""
+        SELECT c_program_reference
+        FROM t_program
+        WHERE c_program_id = $program_id
+      """.query(program_reference.opt)
 
     val SelectProgramUsers: Query[Program.Id, (ProgramUserRole, Option[User.Id], Option[String])] =
         sql"""

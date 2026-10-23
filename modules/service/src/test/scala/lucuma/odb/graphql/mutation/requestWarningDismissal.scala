@@ -78,13 +78,20 @@ class requestWarningDismissal extends OdbSuite with query.ObservingModeSetupOper
   def requestQuery(ref: ProgramReference, fields: List[String]): String =
     requestQueryWith(s"""programReference: "${ref.label}"""", fields)
 
-  def requestQueryWith(programSelector: String, fields: List[String]): String =
+  val Justification = "These warnings are expected for this target."
+
+  // The plain text body we expect for a request from `user` about the program
+  // identified by `label` (its reference, or its id if it has no reference).
+  def expectedText(user: User, label: String): String =
+    s"${user.displayName} has requested review for dismissal of the warnings in program $label (https://explore.gemini.edu/$label).\n\n$Justification"
+
+  def requestQueryWith(programSelector: String, fields: List[String], justification: String = Justification): String =
     s"""
         mutation {
           requestWarningDismissal(
             input: {
               $programSelector
-              text: "Sample text."
+              justification: ${Json.fromString(justification).noSpaces}
             }
           ) {
             ${fields.mkString(" ")}
@@ -122,8 +129,9 @@ class requestWarningDismissal extends OdbSuite with query.ObservingModeSetupOper
       ref  <- submitProposal(pi, pid)
     yield (pid, ref)
 
-  def expectedSingleEmail(pid: Program.Id): Either[List[String], Json] =
-    val subj = s"$pid: request to review warnings"
+  def expectedSingleEmail(label: String): Either[List[String], Json] =
+    val subj = s"$label: request to review warnings"
+    val text = expectedText(pi, label)
     Right(json"""
       {
         "requestWarningDismissal" : [
@@ -132,7 +140,7 @@ class requestWarningDismissal extends OdbSuite with query.ObservingModeSetupOper
             "replyToEmail" : ${defaultPiEmail.value},
             "recipientEmail" : "steve@jobs.com",
             "subject": $subj,
-            "textMessage" : "Sample text."
+            "textMessage" : $text
           }
         ]
       }
@@ -199,7 +207,7 @@ class requestWarningDismissal extends OdbSuite with query.ObservingModeSetupOper
                     "replyToEmail" : "bob@dobbs.com",
                     "recipientEmail" : "steve@jobs.com",
                     "subject": $subj,
-                    "textMessage" : "Sample text."
+                    "textMessage" : ${expectedText(pi, pid.toString)}
                   }
                 ]
               }
@@ -240,7 +248,7 @@ class requestWarningDismissal extends OdbSuite with query.ObservingModeSetupOper
         expect(
           user = pi,
           query = requestQuery(ref, List("senderEmail", "replyToEmail", "recipientEmail", "subject", "textMessage")),
-          expected = expectedSingleEmail(pid)
+          expected = expectedSingleEmail(pid.toString) // no program reference until accepted
         )
     yield ()
 
@@ -252,7 +260,7 @@ class requestWarningDismissal extends OdbSuite with query.ObservingModeSetupOper
         expect(
           user = pi,
           query = requestQuery(ref.get, List("senderEmail", "replyToEmail", "recipientEmail", "subject", "textMessage")),
-          expected = expectedSingleEmail(pid)
+          expected = expectedSingleEmail(ref.get.label)
         )
     yield ()
 
@@ -333,7 +341,7 @@ class requestWarningDismissal extends OdbSuite with query.ObservingModeSetupOper
                     "replyToEmail" : ${defaultPiEmail.value},
                     "recipientEmail" : "steve@jobs.com",
                     "subject" : $subj,
-                    "textMessage" : "Sample text.",
+                    "textMessage" : ${expectedText(pi, pid.toString)},
                     "status" : ${EmailStatus.Queued}
                   }
                 ]
@@ -437,3 +445,27 @@ class requestWarningDismissal extends OdbSuite with query.ObservingModeSetupOper
         "Argument 'input.proposalReference' is invalid: 'not-a-ref' cannot be parsed as a valid ProposalReference."
       ))
     )
+
+  test("html message links to the program and escapes the justification"):
+    val justification = "Line one <b>is</b> fine.\nLine two & more."
+    for
+      (pid, _) <- submittedProgram
+      ref      <- acceptProposal(staff, pid).map(_.get)
+      label     = ref.label
+      _        <-
+        expect(
+          user = pi,
+          query = requestQueryWith(s"""programReference: "$label"""", List("subject", "textMessage", "htmlMessage"), justification),
+          expected = Right(json"""
+            {
+              "requestWarningDismissal" : [
+                {
+                  "subject" : ${s"$label: request to review warnings"},
+                  "textMessage" : ${s"${pi.displayName} has requested review for dismissal of the warnings in program $label (https://explore.gemini.edu/$label).\n\n$justification"},
+                  "htmlMessage" : ${s"""${pi.displayName} has requested review for dismissal of the warnings in program <a href="https://explore.gemini.edu/$label">$label</a>.<br/>\n<br/>\nLine one &lt;b&gt;is&lt;/b&gt; fine.<br/>\nLine two &amp; more."""}
+                }
+              ]
+            }
+          """)
+        )
+    yield ()

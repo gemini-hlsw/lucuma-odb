@@ -3020,9 +3020,10 @@ input WarningDismissalInput {
   programReference: ProgramReferenceLabel
 
   """
-  Email text to be sent. User interfaces should provide a default.
+  Why the warnings should be dismissed.  It is included in the body of the email
+  sent to the support staff.
   """
-  text: NonEmptyString!
+  justification: NonEmptyString!
 }
 
 """
