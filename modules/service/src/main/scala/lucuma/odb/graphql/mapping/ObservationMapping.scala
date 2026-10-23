@@ -39,6 +39,7 @@ import skunk.Transaction
 
 import table.AttachmentTable
 import table.ArchiveDuplicationView
+import table.GroupStandingView
 import table.ObsAttachmentAssignmentTable
 import table.ObscalcTable
 import table.ObservationQaView
@@ -56,6 +57,7 @@ trait ObservationMapping[F[_]]
      with ArchiveDuplicationView[F]
      with ObscalcTable[F]
      with ObservationQaView[F]
+     with GroupStandingView[F]
      with ObservationReferenceView[F] {
 
   def itcClient: ItcClient[F]
@@ -98,6 +100,7 @@ trait ObservationMapping[F[_]]
       SqlObject("configuration"),
       EffectField("configurationRequests", configurationRequestsQueryHandler, List("id", "programId")),
       SqlObject("workflow", Join(ObservationView.Id, ObscalcTable.ObservationId)),
+      SqlObject("groupStanding", Join(ObservationView.Id, ObservationGroupStandingView.ObservationId)),
       SqlObject("archiveDuplication", Join(ObservationView.Id, ArchiveDuplicationView.ObservationId)),
       SqlObject("qa", Join(ObservationView.Id, ObservationQaView.ObservationId))
     )

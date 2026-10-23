@@ -265,6 +265,23 @@ object CalcMain extends MainParams:
               .handleErrorWith: t =>
                 Logger[F].warn(t)("Visitor visit time accounting sweep failed")
 
+    // Recalculates the stored standing of group trees that edits marked
+    // pending, or that time passing may have changed.  A failure is logged
+    // and retried on the next poll rather than stopping the daemon.
+    val refreshGroupStandingsStream: Stream[F, Unit] =
+      Stream
+        .awakeEvery(pollPeriod)
+        .evalMap: _ =>
+          T.noopScope:
+            services
+              .useNonTransactionally:
+                requireServiceAccessOrThrow:
+                  groupStandingService.refresh(1024)
+              .flatMap: n =>
+                Logger[F].debug(s"Recalculated the group standing of $n group trees.").whenA(n > 0)
+              .handleErrorWith: t =>
+                Logger[F].warn(t)("Group standing refresh failed")
+
     for
       _ <- Resource.eval(Logger[F].info("Processing PendingCalc"))
       _ <- Resource.eval:
@@ -275,6 +292,7 @@ object CalcMain extends MainParams:
       o <- calcAndUpdateStream
              .merge(refreshCalibrationsStream)
              .merge(visitorTimeAccountingStream)
+             .merge(refreshGroupStandingsStream)
              .compile
              .drain
              .background

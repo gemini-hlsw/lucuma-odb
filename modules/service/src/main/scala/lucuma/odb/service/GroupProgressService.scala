@@ -83,12 +83,14 @@ object GroupProgressService:
        lucuma.odb.util.Codecs.site.opt      *:
        instrument.opt
       ).map: (oid, state, role, sci, own, science, ownSuspended, scienceSuspended, qa, start, completion, visitSite, inst) =>
-        // Inactive as the workflow decides it: set inactive, or suspended by staff.
-        val inactive =
-          ObservationValidationInfo.effectiveUserState(role, own, science).contains(ObservationWorkflowState.Inactive) ||
-          ObservationValidationInfo.effectiveSuspended(role, ownSuspended, scienceSuspended)
         // Where it was observed, if it has been; otherwise its instrument's site.
-        oid -> ObservationFacts(state, role, sci, inactive, qa, start, completion, visitSite.orElse(inst.map(_.site)))
+        val f = ObservationFacts(state, role, sci, false, qa, start, completion, visitSite.orElse(inst.map(_.site)))
+        // Inactive as the workflow decides it: set inactive before it started
+        // (execution overrides the user state), or suspended by staff.
+        val inactive =
+          (!f.isStarted && ObservationValidationInfo.effectiveUserState(role, own, science).contains(ObservationWorkflowState.Inactive)) ||
+          ObservationValidationInfo.effectiveSuspended(role, ownSuspended, scienceSuspended)
+        oid -> f.copy(inactive = inactive)
 
     // A visitor instrument visit has only slews, and time accounting charges
     // it until the next visit at the site starts or the night ends (see

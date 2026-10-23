@@ -4,10 +4,7 @@
 package lucuma.odb.graphql.query
 
 import cats.effect.IO
-import cats.syntax.either.*
-import cats.syntax.traverse.*
-import eu.timepit.refined.types.numeric.NonNegShort
-import eu.timepit.refined.types.numeric.PosInt
+import cats.syntax.foldable.*
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
@@ -18,25 +15,17 @@ import lucuma.core.enums.SlewStage
 import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
-import lucuma.core.model.Program
 import lucuma.core.syntax.string.*
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
-import lucuma.itc.IntegrationTime
 import lucuma.odb.graphql.ACursorOps
 import lucuma.odb.util.Codecs.observation_id
 import skunk.syntax.all.*
 
 // The rules are tested in lucuma.odb.logic.GroupProgressEvaluatorSuite.  These
 // tests check that the facts reach the evaluator and the result reaches the API.
-class groupProgress extends ExecutionTestSupportForGmos:
-
-  override def fakeItcSpectroscopyResult: IntegrationTime =
-    IntegrationTime(
-      20.minTimeSpan,
-      PosInt.unsafeFrom(2)
-    )
+class groupProgress extends GroupTestSupport:
 
   def progressQuery(gid: Group.Id): String =
     s"""
@@ -56,47 +45,15 @@ class groupProgress extends ExecutionTestSupportForGmos:
   def progress(gid: Group.Id): IO[Json] =
     query(pi, progressQuery(gid)).map(_.hcursor.downFields("group", "progress").focus.getOrElse(Json.Null))
 
-  def newObservation(pid: Program.Id): IO[Observation.Id] =
-    createTargetWithProfileAs(pi, pid).flatMap(t => createGmosNorthLongSlitObservationAs(pi, pid, List(t)))
-
-  def completeObservation(oid: Observation.Id): IO[Unit] =
-    for
-      ss <- scienceStepIds(serviceUser, oid)
-      v  <- recordVisitAs(serviceUser, oid)
-      _  <- ss.traverse(sid => addEndStepEvent(sid, v))
-    yield ()
-
   def completionTime(oid: Observation.Id): IO[Timestamp] =
     query(pi, s"""query { observation(observationId: "$oid") { execution { timestamps { completionTime } } } }""")
       .map(_.hcursor.downFields("observation", "execution", "timestamps", "completionTime").require[Timestamp])
 
-  def group(
-    pid:      Program.Id,
-    oids:     List[Observation.Id],
-    min:      Option[Int]      = None,
-    minI:     Option[TimeSpan] = None,
-    maxI:     Option[TimeSpan] = None,
-    parent:   Option[Group.Id] = None
-  ): IO[Group.Id] =
-    createGroupAs(
-      pi,
-      pid,
-      parentGroupId   = parent,
-      minRequired     = min.map(m => NonNegShort.unsafeFrom(m.toShort)),
-      minimumInterval = minI,
-      maximumInterval = maxI,
-      initialContents = Some(oids.map(_.asRight))
-    )
-
-  def startObservation(oid: Observation.Id): IO[Unit] =
-    for
-      v  <- recordVisitAs(serviceUser, oid)
-      ss <- firstScienceAtomStepIds(serviceUser, oid)
-      _  <- ss.take(1).traverse(sid => addEndStepEvent(sid, v))
-    yield ()
-
   def setSameNight(gid: Group.Id): IO[Unit] =
     query(pi, s"""mutation { updateGroups(input: { SET: { sameNight: true }, WHERE: { id: { EQ: "$gid" } } }) { groups { id } } }""").void
+
+  def setOrdered(gid: Group.Id): IO[Unit] =
+    query(pi, s"""mutation { updateGroups(input: { SET: { ordered: true }, WHERE: { id: { EQ: "$gid" } } }) { groups { id } } }""").void
 
   def setVisitSiteDirectly(oid: Observation.Id, site: String): IO[Unit] =
     withFreshSession: s =>
@@ -312,6 +269,48 @@ class groupProgress extends ExecutionTestSupportForGmos:
       assertEquals(summary(sp), ("PENDING", 0, 1))
       assertEquals(summary(xp), ("COMPLETE", 1, 1))
 
+  test("staff suspending an executing observation leaves it out, and the group stays ongoing"):
+    for
+      p  <- createProgram
+      o1 <- newObservation(p)
+      o2 <- newObservation(p)
+      g  <- group(p, List(o1, o2))
+      _  <- startObservation(o1)
+      _  <- runObscalcUpdate(p, o1)
+      _  <- setObservationWorkflowState(staff, o1, ObservationWorkflowState.Suspended)
+      js <- progress(g)
+    yield assertEquals(statusAndRequired(js), ("ONGOING", 1))
+
+  test("with no minimum, staff suspending an executing observation lets the group complete"):
+    for
+      p  <- createProgram
+      o1 <- newObservation(p)
+      o2 <- newObservation(p)
+      g  <- group(p, List(o1, o2))
+      _  <- completeObservation(o2)
+      _  <- startObservation(o1)
+      _  <- runObscalcUpdate(p, o1)
+      b  <- progress(g)
+      _  <- setObservationWorkflowState(staff, o1, ObservationWorkflowState.Suspended)
+      a  <- progress(g)
+    yield
+      assertEquals(statusAndRequired(b), ("ONGOING", 2))
+      assertEquals(statusAndRequired(a), ("COMPLETE", 1))
+
+  test("an observation set inactive and then executed anyway counts, as its workflow is ongoing"):
+    for
+      p  <- createProgram
+      o1 <- newObservation(p)
+      o2 <- newObservation(p)
+      g  <- group(p, List(o1, o2))
+      _  <- setObservationWorkflowState(pi, o1, ObservationWorkflowState.Inactive)
+      b  <- progress(g)
+      _  <- startObservation(o1)
+      a  <- progress(g)
+    yield
+      assertEquals(statusAndRequired(b), ("PENDING", 1))
+      assertEquals(statusAndRequired(a), ("ONGOING", 2))
+
   def inactivateDirectly(oid: Observation.Id): IO[Unit] =
     withFreshSession: s =>
       s.execute(
@@ -366,6 +365,29 @@ class groupProgress extends ExecutionTestSupportForGmos:
         js.hcursor.downField("violations").focus.get,
         json"""["MINIMUM_INTERVAL"]"""
       )
+
+  // An ordered group requiring one of two observations, the first `completed`
+  // in turn.
+  def orderedOneOfTwo(completed: (Observation.Id, Observation.Id) => List[Observation.Id]): IO[Json] =
+    for
+      p  <- createProgram
+      o1 <- newObservation(p)
+      o2 <- newObservation(p)
+      g  <- group(p, List(o1, o2), min = Some(1))
+      _  <- setOrdered(g)
+      _  <- completed(o1, o2).traverse_(completeObservation)
+      js <- progress(g)
+    yield js
+
+  test("an ordered group's observation past its minimum, completed before the first, is out of order"):
+    orderedOneOfTwo((_, o2) => List(o2)).map: js =>
+      assertEquals(js.hcursor.downField("status").require[String], "UNSCHEDULABLE")
+      assertEquals(js.hcursor.downField("violations").focus.get, json"""["ORDER"]""")
+
+  test("an ordered group's observation past its minimum, completed after the first, is extra"):
+    orderedOneOfTwo((o1, o2) => List(o1, o2)).map: js =>
+      assertEquals(js.hcursor.downField("status").require[String], "COMPLETE")
+      assertEquals(js.hcursor.downField("violations").focus.get, json"""[]""")
 
   test("a completed observation's site is where its visit was, not its instrument's"):
     for
