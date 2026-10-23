@@ -12222,7 +12222,7 @@ input Igrins2LongSlitInput {
 
   """
   The telluricType field must be either specified or skipped altogether. It cannot be unset with a null value.
-  On create the default is HOT.
+  On create the default is A0V.
   """
   telluricType: TelluricTypeInput
 
