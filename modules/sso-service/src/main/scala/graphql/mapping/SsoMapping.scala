@@ -221,7 +221,7 @@ object SsoMapping {
           )) =>
             Elab.envE[StandardUser](UserContext.EnvKey).flatMap: user =>
               Elab.transformChild { child =>
-                (rWHERE, rOFFSET, rLIMIT, rIncludeDisabled).parTupled.flatMap { (WHERE, OFFSET, LIMIT, includeDisabled) =>
+                (rWHERE, rOFFSET, rLIMIT, rIncludeDisabled).parFlatMapN { (WHERE, OFFSET, LIMIT, includeDisabled) =>
                   val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
                   ResultMapping.selectResult(child, limit) { q =>
                     FilterOrderByOffsetLimit(
@@ -290,8 +290,8 @@ object SsoMapping {
                       case EnumValue(name) => Result.fromOption(Partner.values.find(_.tag.equalsIgnoreCase(name)), s"Not a valid partner: $name").map(_.some)
                       case AbsentValue | NullValue => Result.success(None)
                       case _ => Result.internalError("Unpossible; validation should disallow these cases.")                
-                  ) .parTupled
-                    .flatMap:
+                  )
+                    .parFlatMapN:
                       case (uid, RT.Pi, None)                        => Result.success((uid, RoleRequest.Pi))
                       case (uid, RT.Staff, None)                     => Result.success((uid, RoleRequest.Staff))
                       case (uid, RT.Admin, None)                     => Result.success((uid, RoleRequest.Admin))

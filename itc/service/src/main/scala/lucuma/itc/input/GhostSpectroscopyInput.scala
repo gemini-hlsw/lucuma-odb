@@ -56,8 +56,8 @@ object GhostSpectroscopyInput:
             ItcGhostDetectorInput.Binding("redDetector", redDetector),
             ItcGhostDetectorInput.Binding("blueDetector", blueDetector)
           ) =>
-        (oNumSkyMicrolens, stepCount, resolutionMode, redDetector, blueDetector).parTupled
-          .flatMap: (oNumSky, sc, rm, rd, bd) =>
+        (oNumSkyMicrolens, stepCount, resolutionMode, redDetector, blueDetector)
+          .parFlatMapN: (oNumSky, sc, rm, rd, bd) =>
             validateNumSkyMicrolens(oNumSky, rm)
               .map(numSky => GhostSpectroscopyInput(numSky, sc, rm, rd, bd))
     }

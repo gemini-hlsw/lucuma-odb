@@ -33,7 +33,7 @@ object EmissionLineInput {
         LineWidthBinding.Option("lineWidth", rLineWidth),
         lineFlux.Option("lineFlux", rLineFlux),
       ) =>
-        (rWavelength, rLineWidth, rLineFlux).parTupled.flatMap {
+        (rWavelength, rLineWidth, rLineFlux).parFlatMapN {
           case (wavelength, Some(lineWidth), Some(lineFlux)) => Result((wavelength, EmissionLine(lineWidth, lineFlux)))
           case _ => Result.failure("All fields are required on creation.")
         }

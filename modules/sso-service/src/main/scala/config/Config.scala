@@ -125,7 +125,7 @@ object Config {
           HerokuConfig.config.option,
           otelConfig(envi),
           envOrProp("LUCUMA_ODB_HOSTNAME"),
-        ).parTupled.flatMap { case (port, dbc, orc, pkey, text, pass, domain, host, heroku, otel, odb) =>
+        ).parFlatMapN { (port, dbc, orc, pkey, text, pass, domain, host, heroku, otel, odb) =>
           for {
             skey <- default(text).as[PrivateKey](using privateKey(pass))
           } yield Config(envi, dbc, orc, pkey, skey, port, domain, Uri.Scheme.https, host, heroku, otel, odb)

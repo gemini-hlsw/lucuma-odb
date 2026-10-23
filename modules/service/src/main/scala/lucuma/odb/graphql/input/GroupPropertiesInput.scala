@@ -125,7 +125,7 @@ object GroupPropertiesInput {
         val rMinimumRequiredʹ = rMinimumRequired.flatMap: m =>
           if m.toOption.exists(_.value < 1) then Result.failure(MinimumRequiredTooSmall)
           else m.success
-        (rName, rDescription, rMinimumRequiredʹ, rOrdered, rMinimumInterval, rMaximumInterval, rSameNight, rParentGroup, rParentGroupIndex, rExistence).parTupled.flatMap {
+        (rName, rDescription, rMinimumRequiredʹ, rOrdered, rMinimumInterval, rMaximumInterval, rSameNight, rParentGroup, rParentGroupIndex, rExistence).parFlatMapN {
           (name, description, minimumRequired, ordered, minimumInterval, maximumInterval, sameNight, parentGroup, parentGroupIndex, existence) =>
             (minimumInterval.toOption, maximumInterval.toOption) match // Scala can't typecheck it if we match Nullable.NonNull for some reason :-\
               case (Some(min), Some(max)) if max < min => Result.failure("Minimum interval must be less than or equal maximum interval.")

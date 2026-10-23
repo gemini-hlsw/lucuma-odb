@@ -23,7 +23,7 @@ object ConditionsIntuitionInput:
             ConditionsExpectationInput.Binding.Option("expectation", rExpectation),
             SeeingTrendBinding.Option("seeingTrend", rSeeingTrend)
          ) =>
-            (rExpectation, rSeeingTrend).parTupled.flatMap { case (o1, o2) =>
+            (rExpectation, rSeeingTrend).parFlatMapN { (o1, o2) =>
                Result.fromOption(
                   Ior.fromOptions(o1, o2).map(ConditionsIntuitionInput.apply),
                   "At least one of expectation and seeingTrend must be specified."

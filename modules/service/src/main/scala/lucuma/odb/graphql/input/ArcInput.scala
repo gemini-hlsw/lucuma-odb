@@ -24,7 +24,7 @@ object ArcInput:
         ElementBinding.Option("start", rStart),
         ElementBinding.Option("end", rEnd)
       ) =>
-        (rTpe, rStart, rEnd).parTupled.flatMap:
+        (rTpe, rStart, rEnd).parFlatMapN:
           case (ArcType.Empty, None, None) => Result(Arc.Empty())
           case (ArcType.Full, None, None) => Result(Arc.Full())
           case (ArcType.Partial, Some(s), Some(e)) => Result(Arc.Partial(s, e))

@@ -62,7 +62,7 @@ object EmissionLinesInput {
         line.List.Option("lines", rLines),
         fluxDensityContinuum.Option("fluxDensityContinuum", rFluxDensityContinuum),
       ) =>
-        (rLines, rFluxDensityContinuum).parTupled.flatMap {
+        (rLines, rFluxDensityContinuum).parFlatMapN {
           case (Some(lines), Some(fluxDensityContinuum)) => Result(EmissionLines(lines.to(TreeMap), fluxDensityContinuum))
           case _                                         => Result.failure("Both lines and fluxDensityContinuum are required on creation.")
         }

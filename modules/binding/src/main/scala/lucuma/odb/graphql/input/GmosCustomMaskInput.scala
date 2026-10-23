@@ -19,7 +19,7 @@ object GmosCustomMaskInput {
       case List(
         AttachmentIdBinding.Option("attachmentId", rAttachmentId),
         GmosCustomSlitWidthBinding("slitWidth", rSlitWidth)
-      ) => (rAttachmentId, rSlitWidth).parTupled.flatMap { (attachmentId, slitWidth) =>
+      ) => (rAttachmentId, rSlitWidth).parFlatMapN { (attachmentId, slitWidth) =>
         Result(Custom(attachmentId.fold[MaskDefinition](ToBeDefined)(Defined(_)), slitWidth))
       }
     }

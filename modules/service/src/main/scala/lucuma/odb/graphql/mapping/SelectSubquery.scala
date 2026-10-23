@@ -32,7 +32,7 @@ trait SelectSubquery {
     UserEnv.elab: user =>
       Elab.transformChild { child =>
         val rOffset: Result[Predicate] = PagingOffset.predicate(offsetPredicate, rOFFSET, rOFFSET_AT, rOFFSET_AFTER)
-        (rOffset, rLIMIT).parTupled.flatMap { (offset, LIMIT) =>
+        (rOffset, rLIMIT).parFlatMapN { (offset, LIMIT) =>
           val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
           ResultMapping.selectResult(child, limit) { q =>
             FilterOrderByOffsetLimit(

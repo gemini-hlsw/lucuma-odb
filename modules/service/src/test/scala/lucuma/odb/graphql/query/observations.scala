@@ -292,8 +292,7 @@ class observations extends OdbSuite with ObservingModeSetupOperations {
   test("select observations with science requirements containing null and non-null embeds") {
     createProgramAs(pi).flatMap { pid =>
       (createObservationWithDefinedSpecRequirements(pi, pid), createObservationWithNullSpecRequirements(pi, pid))
-        .tupled
-        .flatMap { (oid1, oid2) =>
+        .flatMapN { (oid1, oid2) =>
           expect(
             user = pi,
             query = s"""

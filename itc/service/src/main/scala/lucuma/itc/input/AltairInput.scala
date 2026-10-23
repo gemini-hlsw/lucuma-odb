@@ -24,7 +24,7 @@ object AltairInput:
             BrightnessValueBinding.Option("guideStarBrightness", rBrightness),
             FieldLensBinding.Option("fieldLens", rFieldLens)
           ) =>
-        (rMode, rSeparation, rBrightness, rFieldLens).parTupled.flatMap(create)
+        (rMode, rSeparation, rBrightness, rFieldLens).parFlatMapN(create)
 
   private def signedArcsec(a: Angle): BigDecimal =
     Angle.signedDecimalArcseconds.get(a)

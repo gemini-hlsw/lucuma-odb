@@ -58,7 +58,7 @@ class constraintSetGroup extends OdbSuite with query.ObservingModeSetupOperation
           create2(ImageQuality.Preset.OnePointFive, SkyBackground.Bright),
           create2(ImageQuality.Preset.PointOne, SkyBackground.Bright),
           create2(ImageQuality.Preset.PointOne, SkyBackground.Dark)
-        ).parTupled.flatMap { (g1, g2, g3) =>
+        ).parFlatMapN { (g1, g2, g3) =>
           expect(
             user = user,
             query =
@@ -134,7 +134,7 @@ class constraintSetGroup extends OdbSuite with query.ObservingModeSetupOperation
           create2(ImageQuality.Preset.OnePointFive, SkyBackground.Bright),
           create2(ImageQuality.Preset.PointOne, SkyBackground.Bright),
           create2(ImageQuality.Preset.PointOne, SkyBackground.Dark)
-        ).parTupled.flatMap { (g1, g2, g3) =>
+        ).parFlatMapN { (g1, g2, g3) =>
           createGeminiCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A")).flatMap { cid =>
            addDemoScienceProposal(user, pid, cid)
           } *>

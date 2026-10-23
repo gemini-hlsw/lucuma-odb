@@ -1344,13 +1344,13 @@ object ConfigurationService {
                 arc(decArcType, decArcStart, decArcEnd)
 
               val region: Either[String, Option[Region]] =
-                (raArc, decArc).tupled.flatMap:
+                (raArc, decArc).flatMapN:
                   case (Some(ra), Some(dec)) => Right(Some(Region(ra, dec)))
                   case (None, None) => Right(None)
                   case _ => Left("Malformed region.")
 
               val target: Either[String, Either[Coordinates, Region]] =
-                (refCoords, region).tupled.flatMap:
+                (refCoords, region).flatMapN:
                   case (Some(rc), None) => Right(Left(rc))
                   case (None, Some(r))  => Right(Right(r))
                   case _ => Left("Malformed configuration target.")
@@ -1666,13 +1666,13 @@ object ConfigurationService {
                 arc(decArcType, decArcStart, decArcEnd)
 
               val region: Either[String, Option[Region]] =
-                (raArc, decArc).tupled.flatMap:
+                (raArc, decArc).flatMapN:
                   case (Some(ra), Some(dec)) => Right(Some(Region(ra, dec)))
                   case (None, None) => Right(None)
                   case _ => Left("Malformed region.")
 
               val target: Either[String, Either[Coordinates, Region]] =
-                (refCoords, region).tupled.flatMap:
+                (refCoords, region).flatMapN:
                   case (Some(rc), None) => Right(Left(rc))
                   case (None, Some(r))  => Right(Right(r))
                   case _ => Left("Malformed configuration target.")

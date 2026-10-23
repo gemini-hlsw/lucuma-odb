@@ -129,7 +129,7 @@ object Main extends CommandIOApp(
     Command(
       name    = "serve",
       header  = "Run the ODB service.",
-    )((ResetDatabase.opt, SkipMigration.opt).tupled.map { case (reset, skipMigration) =>
+    )((ResetDatabase.opt, SkipMigration.opt).mapN { (reset, skipMigration) =>
       given LF: LoggerFactory[IO] = Slf4jFactory.create[IO]
       given Logger[IO] = LF.getLoggerFromName("lucuma-odb")
 

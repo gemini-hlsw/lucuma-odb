@@ -46,7 +46,7 @@ trait ConstraintSetGroupMapping[F[_]]
     )) =>
       Elab.transformChild { child =>
         val rOffset: Result[Predicate] = PagingOffset.predicate(Predicates.observation.id, rOFFSET, rOFFSET_AT, rOFFSET_AFTER)
-        (rIncludeDeleted, rOffset, rLIMIT).parTupled.flatMap { (includeDeleted, offset, lim) =>
+        (rIncludeDeleted, rOffset, rLIMIT).parFlatMapN { (includeDeleted, offset, lim) =>
           val limit = lim.fold(ResultMapping.MaxLimit)(_.value)
           ResultMapping.selectResult(child, limit) { q =>
             FilterOrderByOffsetLimit(

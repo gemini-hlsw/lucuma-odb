@@ -34,7 +34,7 @@ object ConditionsMeasurementInput {
         AngleInput.Binding.Option("azimuth", rAzimuth),
         AngleInput.Binding.Option("elevation", rElevation),
       ) =>
-        (rSource, rSeeing, rExtinction, rWavelength, rAzimuth, rElevation).parTupled.flatMap { (source, seeing, extinction, wavelength, azimuth, elevation) =>
+        (rSource, rSeeing, rExtinction, rWavelength, rAzimuth, rElevation).parFlatMapN { (source, seeing, extinction, wavelength, azimuth, elevation) =>
           if List(seeing, extinction, wavelength, azimuth, elevation).exists(_.isDefined) then
             (azimuth, elevation) match {
               case (None, None) | (Some(_), Some(_)) =>

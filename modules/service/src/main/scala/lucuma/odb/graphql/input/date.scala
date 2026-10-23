@@ -43,7 +43,7 @@ object date:
   ): Result[DateInterval] =
     (validateInput(startName, rStart),
      validateInput(endName, rEnd)
-    ).parTupled.flatMap: (start, end) =>
+    ).parFlatMapN: (start, end) =>
       Result.fromOption(
         Option.when(start < end)(DateInterval.between(start, end)),
         s"'$startName' must come before '$endName'"
@@ -57,7 +57,7 @@ object date:
   ): Result[Option[Ior[LocalDate, LocalDate]]] =
     (validateOptionalInput(startName, rStart),
      validateOptionalInput(endName, rEnd)
-    ).parTupled.flatMap:
+    ).parFlatMapN:
       case (Some(s), Some(e)) if s > e =>
         Result.failure(s"'$startName' must come before '$endName'")
       case (s, e)                      =>

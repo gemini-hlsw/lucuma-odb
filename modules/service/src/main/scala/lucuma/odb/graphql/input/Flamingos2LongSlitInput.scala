@@ -108,7 +108,7 @@ object Flamingos2LongSlitInput:
           rTelescopeConfigs,
           rTelluricType,
           rAcquisition
-        ).parTupled.flatMap { case (disperser, filter, fpu, exposureTimeMode, readMode, reads, decker, readoutMode, telescopeConfigs, telluricType, acquisition) =>
+        ).parFlatMapN { (disperser, filter, fpu, exposureTimeMode, readMode, reads, decker, readoutMode, telescopeConfigs, telluricType, acquisition) =>
           (TelluricExposureTimeModeEdit.forCreate(exposureTimeMode),
            telescopeConfigs.traverse(Flamingos2SpectroscopyInput.validateTelescopeConfigs)
           ).parMapN { (etm, validated) =>
@@ -219,7 +219,7 @@ object Flamingos2LongSlitInput:
           rTelescopeConfigs,
           rTelluricType,
           rAcquisition
-        ).parTupled.flatMap { case (grating, filter, fpu, exposureTimeMode, readMode, reads, decker, readoutMode, telescopeConfigs, telluricType, acquisition) =>
+        ).parFlatMapN { (grating, filter, fpu, exposureTimeMode, readMode, reads, decker, readoutMode, telescopeConfigs, telluricType, acquisition) =>
           telescopeConfigs.traverse(Flamingos2SpectroscopyInput.validateTelescopeConfigs).map { validated =>
             Edit(
               grating,

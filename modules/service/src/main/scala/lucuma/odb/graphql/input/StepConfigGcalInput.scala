@@ -20,7 +20,7 @@ object StepConfigGcalInput:
         GcalDiffuserBinding("diffuser", rDiffuser),
         GcalFilterBinding("filter", rFilter),
         GcalShutterBinding("shutter", rShutter)
-      ) => (rArcs, rContinuum, rDiffuser, rFilter, rShutter).parTupled.flatMap {
+      ) => (rArcs, rContinuum, rDiffuser, rFilter, rShutter).parFlatMapN {
          (arcs, continuum, diffuser, filter, shutter) =>
            Lamp.fromContinuumOrArcs(continuum, arcs.toList.flatten) match
              case Left(msg)   => Result.failure(msg)

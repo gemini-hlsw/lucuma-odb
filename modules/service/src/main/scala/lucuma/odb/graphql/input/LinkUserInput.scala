@@ -22,4 +22,4 @@ object LinkUserInput:
         ProgramUserIdBinding("programUserId", rProgramUserId),
         UserIdBinding("userId", rUserId)
       ) =>
-        (rProgramUserId, rUserId).parTupled.map(LinkUserInput.apply)
+        (rProgramUserId, rUserId).parMapN(LinkUserInput.apply)
