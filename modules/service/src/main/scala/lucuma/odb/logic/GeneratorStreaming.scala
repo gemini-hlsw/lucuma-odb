@@ -36,8 +36,8 @@ import lucuma.odb.data.ItcAcquisition
 import lucuma.odb.data.ItcScience
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.ObservingMode
-import lucuma.odb.sequence.StepTimeEstimateCalculator
 import lucuma.odb.sequence.ObservingMode.Syntax.*
+import lucuma.odb.sequence.StepTimeEstimateCalculator
 import lucuma.odb.sequence.data.StreamingExecutionConfig
 import lucuma.odb.sequence.daytimecal.StaticConfigs as DaytimeStatics
 import lucuma.odb.sequence.util.CommitHash

@@ -6,9 +6,9 @@ package input
 
 import cats.data.NonEmptySet
 import cats.syntax.all.*
+import eu.timepit.refined.types.numeric.PosInt
 import grackle.Result
 import grackle.syntax.*
-import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.CalibrationSetType
 import lucuma.core.enums.GcalArc
 import lucuma.core.enums.GcalContinuum
