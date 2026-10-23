@@ -6,7 +6,7 @@ package lucuma.odb.service
 import cats.effect.IO
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ObservationWorkflowState
-import lucuma.core.enums.TelluricCalibrationOrder
+import lucuma.core.enums.TelluricSlot
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
@@ -156,7 +156,7 @@ trait TelluricTargetsServiceSuiteSupport extends ExecutionTestSupportForFlamingo
   private val metaCodec: Codec[TelluricTargets.Meta] =
     (observation_id *: program_id *: observation_id *: calculation_state *:
      core_timestamp *: core_timestamp *: core_timestamp.opt *: int4 *:
-     target_id.opt *: text.opt *: time_span *: telluric_calibration_order).to[TelluricTargets.Meta]
+     target_id.opt *: text.opt *: time_span *: telluric_slot).to[TelluricTargets.Meta]
 
   // Direct DB queries for verification
   def selectMeta(oid: Observation.Id): IO[Option[TelluricTargets.Meta]] =
@@ -173,7 +173,7 @@ trait TelluricTargetsServiceSuiteSupport extends ExecutionTestSupportForFlamingo
                c_resolved_target_id,
                c_error_message,
                c_science_duration,
-               c_calibration_order
+               c_slot
         FROM t_telluric_resolution
         WHERE c_observation_id = $observation_id
       """.query(metaCodec)
@@ -194,7 +194,7 @@ trait TelluricTargetsServiceSuiteSupport extends ExecutionTestSupportForFlamingo
                c_resolved_target_id,
                c_error_message,
                c_science_duration,
-               c_calibration_order
+               c_slot
         FROM t_telluric_resolution
         ORDER BY c_last_invalidation
       """.query(metaCodec)
@@ -228,7 +228,7 @@ trait TelluricTargetsServiceSuiteSupport extends ExecutionTestSupportForFlamingo
     oid:              Observation.Id,
     sid:              Observation.Id,
     scienceDuration:  TimeSpan,
-    calibrationOrder: TelluricCalibrationOrder = TelluricCalibrationOrder.After
+    slot: TelluricSlot = TelluricSlot.After
   ): TelluricTargets.Pending =
     TelluricTargets.Pending(
       observationId = oid,
@@ -238,7 +238,7 @@ trait TelluricTargetsServiceSuiteSupport extends ExecutionTestSupportForFlamingo
       failureCount = 0,
       scienceDuration = scienceDuration,
       paramsHash = None,
-      calibrationOrder = calibrationOrder
+      slot = slot
     )
 
   def createMetaEntry(
@@ -247,7 +247,7 @@ trait TelluricTargetsServiceSuiteSupport extends ExecutionTestSupportForFlamingo
     sid:              Observation.Id,
     state:            CalculationState,
     scienceDuration:  TimeSpan,
-    calibrationOrder: TelluricCalibrationOrder = TelluricCalibrationOrder.After
+    slot: TelluricSlot = TelluricSlot.After
   ): TelluricTargets.Meta =
     TelluricTargets.Meta(
       observationId = oid,
@@ -261,7 +261,7 @@ trait TelluricTargetsServiceSuiteSupport extends ExecutionTestSupportForFlamingo
       resolvedTargetId = None,
       errorMessage = None,
       scienceDuration = scienceDuration,
-      calibrationOrder = calibrationOrder
+      slot = slot
     )
 
   // Convenience helpers

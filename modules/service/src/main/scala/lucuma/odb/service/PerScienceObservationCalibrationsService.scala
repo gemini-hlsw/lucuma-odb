@@ -14,7 +14,7 @@ import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObservingModeType
-import lucuma.core.enums.TelluricCalibrationOrder
+import lucuma.core.enums.TelluricSlot
 import lucuma.core.math.Angle
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
@@ -69,7 +69,7 @@ trait PerScienceObservationCalibrationsService[F[_]]:
 object PerScienceObservationCalibrationsService:
   private case class GroupTelluric(
     oid:         Observation.Id,
-    order:       Option[TelluricCalibrationOrder],
+    slot:       Option[TelluricSlot],
     duration:    Option[TimeSpan],
     firstVisit:  Option[Timestamp],
     lastVisit:   Option[Timestamp],
@@ -89,14 +89,14 @@ object PerScienceObservationCalibrationsService:
    * after the boundary belongs to the current visit; with no completed After
    * yet, every visited telluric does.
    */
-  private def currentVisitSlots(tellurics: List[GroupTelluric]): List[TelluricCalibrationOrder] =
+  private def currentVisitSlots(tellurics: List[GroupTelluric]): List[TelluricSlot] =
     val visitEnd = tellurics
-      .filter(t => t.completed && t.order.contains(TelluricCalibrationOrder.After))
+      .filter(t => t.completed && t.slot.contains(TelluricSlot.After))
       .flatMap(_.firstVisit)
       .maximumOption
     tellurics
       .filter(t => visitEnd.fold(t.visited)(end => t.firstVisit.exists(_ > end)))
-      .flatMap(_.order)
+      .flatMap(_.slot)
       .distinct
 
   /**
@@ -105,11 +105,11 @@ object PerScienceObservationCalibrationsService:
    * since the science of that visit is already past.
    */
   private def remainingSlots(
-    required:  List[TelluricCalibrationOrder],
+    required:  List[TelluricSlot],
     tellurics: List[GroupTelluric]
-  ): List[TelluricCalibrationOrder] =
+  ): List[TelluricSlot] =
     val filled = currentVisitSlots(tellurics)
-    if filled.contains(TelluricCalibrationOrder.After) then Nil
+    if filled.contains(TelluricSlot.After) then Nil
     else required.filterNot(filled.contains)
 
   def instantiate[F[_]: {Concurrent as F, Tracer as T, Logger, Services as S}]: PerScienceObservationCalibrationsService[F] =
@@ -238,23 +238,23 @@ object PerScienceObservationCalibrationsService:
         scienceOid:    Observation.Id,
         groupId:       Group.Id,
         telluricIndex: NonNegShort,
-        order:         TelluricCalibrationOrder,
-        register:      (Observation.Id, TelluricCalibrationOrder) => F[Unit],
-        configure:     (Observation.Id, TelluricCalibrationOrder) => F[Unit]
+        slot:         TelluricSlot,
+        register:      (Observation.Id, TelluricSlot) => F[Unit],
+        configure:     (Observation.Id, TelluricSlot) => F[Unit]
       )(using Transaction[F], SuperUserAccess): F[Observation.Id] =
         for
           altair     <- selectAltair(scienceOid)
           telluricId <- insertTelluricObservation(pid, groupId, telluricIndex, altair.map(AltairConfiguration.forTelluric))
-          _          <- register(telluricId, order)
-          _          <- configure(telluricId, order)
+          _          <- register(telluricId, slot)
+          _          <- configure(telluricId, slot)
         yield telluricId
 
-      private def ordersFor(count: Int): List[TelluricCalibrationOrder] =
-        if count > 1 then List(TelluricCalibrationOrder.Before, TelluricCalibrationOrder.After)
-        else List(TelluricCalibrationOrder.After)
+      private def slotsFor(count: Int): List[TelluricSlot] =
+        if count > 1 then List(TelluricSlot.Before, TelluricSlot.After)
+        else List(TelluricSlot.After)
 
-      private def requiredOrders(duration: TimeSpan): List[TelluricCalibrationOrder] =
-        ordersFor(ObsExtract.telluricsForVisit(duration).value)
+      private def requiredSlots(duration: TimeSpan): List[TelluricSlot] =
+        slotsFor(ObsExtract.telluricsForVisit(duration).value)
 
       // `register` records the telluric's resolution row and `configure` fills
       // in the observation once it exists.
@@ -262,42 +262,42 @@ object PerScienceObservationCalibrationsService:
         pid:        Program.Id,
         scienceOid: Observation.Id,
         groupId:    Group.Id,
-        orders:     List[TelluricCalibrationOrder]
+        slots:     List[TelluricSlot]
       )(
-        register:   (Observation.Id, TelluricCalibrationOrder) => F[Unit],
-        configure:  (Observation.Id, TelluricCalibrationOrder) => F[Unit]
+        register:   (Observation.Id, TelluricSlot) => F[Unit],
+        configure:  (Observation.Id, TelluricSlot) => F[Unit]
       )(using Transaction[F], SuperUserAccess): F[List[Observation.Id]] =
         def obsGroupIndex(scienceOid: Observation.Id): F[NonNegShort] =
           session
             .prepareR(Statements.selectScienceObservationIndex)
             .use(_.unique(scienceOid))
 
-        orders.foldLeftM(List.empty[Observation.Id]): (created, order) =>
+        slots.foldLeftM(List.empty[Observation.Id]): (created, slot) =>
           obsGroupIndex(scienceOid).flatMap: sciIdx =>
-            val idx = order match
-              case TelluricCalibrationOrder.Before => sciIdx
-              case TelluricCalibrationOrder.After  =>
+            val idx = slot match
+              case TelluricSlot.Before => sciIdx
+              case TelluricSlot.After  =>
                 NonNegShort.unsafeFrom((sciIdx.value + 1).toShort)
-            createTelluricObs(pid, scienceOid, groupId, idx, order, register, configure).map(created :+ _)
+            createTelluricObs(pid, scienceOid, groupId, idx, slot, register, configure).map(created :+ _)
 
       private def createGeneratedTellurics(
         pid:        Program.Id,
         scienceOid: Observation.Id,
         groupId:    Group.Id,
         duration:   TimeSpan,
-        orders:     List[TelluricCalibrationOrder]
+        slots:     List[TelluricSlot]
       )(using Transaction[F], SuperUserAccess): F[List[Observation.Id]] =
-        createTelluricCalibrations(pid, scienceOid, groupId, orders)(
-          (tid, order) => telluricTargetsService.requestTelluricTarget(pid, tid, scienceOid, duration, order),
+        createTelluricCalibrations(pid, scienceOid, groupId, slots)(
+          (tid, slot) => telluricTargetsService.requestTelluricTarget(pid, tid, scienceOid, duration, slot),
           (tid, _)     => syncConfiguration(pid, scienceOid, tid, CalibrationRole.Telluric)
         )
 
       /**
        * The user's tellurics are never resynced or searched for: the set is only
-       * reconciled by order, converting generated ones in place so they keep
-       * their star, and adding the orders still missing. A missing order is
+       * reconciled by slot, converting generated ones in place so they keep
+       * their star, and adding the slots still missing. A missing slot is
        * cloned from the most recently observed user-defined telluric of that
-       * order, star and configuration included, so every visit gets the PI's
+       * slot, star and configuration included, so every visit gets the PI's
        * standard again; with none observed yet it starts empty.
        */
       private def syncUserDefinedTellurics(
@@ -311,12 +311,12 @@ object PerScienceObservationCalibrationsService:
           telluricTargetsService.markUserDefined(tid) *>
             syncConfiguration(pid, scienceOid, tid, CalibrationRole.Telluric)
 
-        def register(tid: Observation.Id, order: TelluricCalibrationOrder): F[Unit] =
-          telluricTargetsService.registerUserDefinedTelluric(pid, tid, scienceOid, order)
+        def register(tid: Observation.Id, slot: TelluricSlot): F[Unit] =
+          telluricTargetsService.registerUserDefinedTelluric(pid, tid, scienceOid, slot)
 
-        def configure(spent: List[GroupTelluric])(tid: Observation.Id, order: TelluricCalibrationOrder): F[Unit] =
+        def configure(spent: List[GroupTelluric])(tid: Observation.Id, slot: TelluricSlot): F[Unit] =
           spent
-            .filter(_.order.contains(order))
+            .filter(_.slot.contains(slot))
             .maximumByOption(_.lastVisit)
             .fold(syncConfiguration(pid, scienceOid, tid, CalibrationRole.Telluric))(s => cloneUserDefinedTelluric(s.oid, tid))
 
@@ -324,11 +324,11 @@ object PerScienceObservationCalibrationsService:
           tellurics    <- findGroupTellurics(gid)
           unobserved    = tellurics.filterNot(_.visited)
           spent         = tellurics.filter(t => t.visited && t.userDefined.value)
-          required      = remainingSlots(ordersFor(count.value.value), tellurics)
-          (keep, drop)  = unobserved.partition(_.order.exists(required.contains))
+          required      = remainingSlots(slotsFor(count.value.value), tellurics)
+          (keep, drop)  = unobserved.partition(_.slot.exists(required.contains))
           toDelete      = drop.map(_.oid)
           toConvert     = keep.filterNot(_.userDefined.value).map(_.oid)
-          toCreate      = required.filterNot(o => keep.exists(_.order.contains(o)))
+          toCreate      = required.filterNot(o => keep.exists(_.slot.contains(o)))
           _            <- NonEmptyList.fromList(toDelete).traverse_(observationService.deleteCalibrationObservations)
           _            <- toConvert.traverse_(convert)
           created      <- createTelluricCalibrations(pid, scienceOid, gid, toCreate)(register, configure(spent))
@@ -400,10 +400,10 @@ object PerScienceObservationCalibrationsService:
                                 else Option.empty[TimeSpan].pure[F]
           _                  <- warn"No execution digest duration for ${obs.id}, requiring 0 tellurics".whenA(requiresTelluric && duration.isEmpty)
           _                  <- info"Observation ${obs.id} does not request tellurics".unlessA(requiresTelluric)
-          required           =  remainingSlots(duration.toList.flatMap(requiredOrders), tellurics)
+          required           =  remainingSlots(duration.toList.flatMap(requiredSlots), tellurics)
           // A user-defined telluric left behind by a type change is rebuilt as a generated one.
-          complete           =  unobserved.forall(t => t.order.isDefined && !t.userDefined.value) &&
-                                  unobserved.flatMap(_.order).map(_.tag).sorted ==
+          complete           =  unobserved.forall(t => t.slot.isDefined && !t.userDefined.value) &&
+                                  unobserved.flatMap(_.slot).map(_.tag).sorted ==
                                     required.map(_.tag).sorted
           // With a known duration the unobserved set is rebuilt even while the science is
           // ongoing, so the parent execution-state protection does not apply here.
@@ -1053,7 +1053,7 @@ object PerScienceObservationCalibrationsService:
         val selectGroupTellurics: Query[(Group.Id, CalibrationRole), GroupTelluric] =
           sql"""
             SELECT o.c_observation_id,
-                   r.c_calibration_order,
+                   r.c_slot,
                    r.c_science_duration,
                    v.c_first_visit,
                    v.c_last_visit,
@@ -1071,7 +1071,7 @@ object PerScienceObservationCalibrationsService:
               AND  o.c_calibration_role = $calibration_role
             ORDER BY o.c_group_index
           """.query(
-            observation_id *: telluric_calibration_order.opt *: time_span.opt *: core_timestamp.opt *: core_timestamp.opt *: is_user_defined_telluric *: bool
+            observation_id *: telluric_slot.opt *: time_span.opt *: core_timestamp.opt *: core_timestamp.opt *: is_user_defined_telluric *: bool
           ).to[GroupTelluric]
 
         val selectScienceObservationIndex: Query[Observation.Id, NonNegShort] =

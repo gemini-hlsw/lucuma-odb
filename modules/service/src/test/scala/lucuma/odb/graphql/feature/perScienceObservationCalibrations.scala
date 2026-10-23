@@ -27,7 +27,7 @@ import lucuma.core.enums.ProposalStatus
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.TargetDisposition
-import lucuma.core.enums.TelluricCalibrationOrder
+import lucuma.core.enums.TelluricSlot
 import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.math.BoundedInterval
 import lucuma.core.math.Coordinates
@@ -1584,7 +1584,7 @@ class perScienceObservationCalibrations
       telluricObs        =  obsInGroup.filter(_.calibrationRole.contains(CalibrationRole.Telluric))
       scienceObs         =  obsInGroup.filter(_.calibrationRole.isEmpty).head
       metas              <- added.traverse(selectMeta)
-      orders             =  metas.flatten.map(_.calibrationOrder)
+      slots             =  metas.flatten.map(_.slot)
     } yield {
       assertEquals(telluricObs.size, 2)
       assertEquals(obsInGroup.size, 3)
@@ -1593,8 +1593,8 @@ class perScienceObservationCalibrations
       // Verify tellurics positions in the group
       assertEquals(telluricObs.head.groupIndex.get, scienceObs.groupIndex.get - 1)
       assertEquals(telluricObs.last.groupIndex.get, scienceObs.groupIndex.get + 1)
-      assert(orders.contains(TelluricCalibrationOrder.Before))
-      assert(orders.contains(TelluricCalibrationOrder.After))
+      assert(slots.contains(TelluricSlot.Before))
+      assert(slots.contains(TelluricSlot.After))
     }
 
   test("create one telluric for short duration science observation"):
@@ -1618,7 +1618,7 @@ class perScienceObservationCalibrations
       assertEquals(removed.size, 0)
       // Verify tellurics positions in the group
       assertEquals(telluricObs.head.groupIndex.get, scienceObs.groupIndex.get + 1)
-      assertEquals(meta.get.calibrationOrder, TelluricCalibrationOrder.After)
+      assertEquals(meta.get.slot, TelluricSlot.After)
     }
 
   test("update from two to one telluric when duration decreases"):
@@ -1721,7 +1721,7 @@ class perScienceObservationCalibrations
       assertEquals(added2.size, 1)
       assertEquals(removed2.toSet, added1.toSet)
       assertEquals(tellurics.map(_.id), added2)
-      assertEquals(metas.flatten.map(_.calibrationOrder), List(TelluricCalibrationOrder.After))
+      assertEquals(metas.flatten.map(_.slot), List(TelluricSlot.After))
       assertEquals(metas.flatten.map(_.scienceDuration), List(60.minTimeSpan))
     }
 
@@ -1740,14 +1740,14 @@ class perScienceObservationCalibrations
       gid                <- queryObservation(oid).map(_.groupId.get)
       obsInGroup         <- queryObservationsInGroup(gid)
       metas              <- added2.traverse(selectMeta)
-      orders             =  metas.flatten.map(_.calibrationOrder)
+      slots             =  metas.flatten.map(_.slot)
     } yield {
       assertEquals(added1.size, 2)
       assertEquals(added2.size, 2)
       assertEquals(removed2.size, 0)
       assertEquals(obsInGroup.count(_.calibrationRole.contains(CalibrationRole.Telluric)), 4)
-      assert(orders.contains(TelluricCalibrationOrder.Before))
-      assert(orders.contains(TelluricCalibrationOrder.After))
+      assert(slots.contains(TelluricSlot.Before))
+      assert(slots.contains(TelluricSlot.After))
     }
 
   test("a started Before telluric still covers the visit in progress"):
@@ -1760,7 +1760,7 @@ class perScienceObservationCalibrations
       (added1, _)        <- recalculateCalibrations(pid, when, oid)
       _                  <- sleep >> resolveTelluricTargets
       metas              <- added1.traverse(selectMeta)
-      before             =  added1.zip(metas).collectFirst { case (t, Some(m)) if m.calibrationOrder === TelluricCalibrationOrder.Before => t }.get
+      before             =  added1.zip(metas).collectFirst { case (t, Some(m)) if m.slot === TelluricSlot.Before => t }.get
       _                  <- recordVisitAs(serviceUser, before)
       (added2, removed2) <- recalculateCalibrations(pid, when, oid)
       // The science starts: still nothing to replace.
@@ -1796,7 +1796,7 @@ class perScienceObservationCalibrations
       assertEquals((added2, removed2), (Nil, Nil))
       assertEquals(added3.size, 1)
       assertEquals(removed3, Nil)
-      assertEquals(metas.flatten.map(_.calibrationOrder), List(TelluricCalibrationOrder.After))
+      assertEquals(metas.flatten.map(_.slot), List(TelluricSlot.After))
     }
 
   test("an After executed to completion ends the visit"):
@@ -1832,11 +1832,11 @@ class perScienceObservationCalibrations
       (added2, removed2) <- recalculateCalibrations(pid, when, oid)
       _                  <- declareExecutionComplete(added1.head)
       (added3, _)        <- recalculateCalibrations(pid, when, oid)
-      orders             <- added3.traverse(selectMeta).map(_.flatten.map(_.calibrationOrder))
+      slots             <- added3.traverse(selectMeta).map(_.flatten.map(_.slot))
     } yield {
       assertEquals(added1.size, 1)
       assertEquals((added2, removed2), (Nil, Nil))
-      assertEquals(orders.toSet, Set(TelluricCalibrationOrder.Before, TelluricCalibrationOrder.After))
+      assertEquals(slots.toSet, Set(TelluricSlot.Before, TelluricSlot.After))
     }
 
   test("a later visit on a completed After does not move the visit boundary"):
@@ -1854,7 +1854,7 @@ class perScienceObservationCalibrations
       (added2, _)        <- recalculateCalibrations(pid, when, oid)
       _                  <- sleep >> resolveTelluricTargets
       metas              <- added2.traverse(selectMeta)
-      before             =  added2.zip(metas).collectFirst { case (t, Some(m)) if m.calibrationOrder === TelluricCalibrationOrder.Before => t }.get
+      before             =  added2.zip(metas).collectFirst { case (t, Some(m)) if m.slot === TelluricSlot.Before => t }.get
       _                  <- recordVisitAs(serviceUser, before)
       _                  <- recordVisitAs(serviceUser, spentAfter)
       (added3, removed3) <- recalculateCalibrations(pid, when, oid)
@@ -1874,19 +1874,19 @@ class perScienceObservationCalibrations
       (added1, _)        <- recalculateCalibrations(pid, when, oid)
       _                  <- sleep >> resolveTelluricTargets
       metas              <- added1.traverse(selectMeta)
-      byOrder            =  added1.zip(metas).collect { case (t, Some(m)) => m.calibrationOrder -> t }.toMap
-      _                  <- recordVisitAs(serviceUser, byOrder(TelluricCalibrationOrder.Before))
-      _                  <- recordVisitAs(serviceUser, byOrder(TelluricCalibrationOrder.After))
+      byOrder            =  added1.zip(metas).collect { case (t, Some(m)) => m.slot -> t }.toMap
+      _                  <- recordVisitAs(serviceUser, byOrder(TelluricSlot.Before))
+      _                  <- recordVisitAs(serviceUser, byOrder(TelluricSlot.After))
       (added2, removed2) <- recalculateCalibrations(pid, when, oid)
-      _                  <- declareExecutionComplete(byOrder(TelluricCalibrationOrder.After))
+      _                  <- declareExecutionComplete(byOrder(TelluricSlot.After))
       (added3, removed3) <- recalculateCalibrations(pid, when, oid)
-      orders             <- added3.traverse(selectMeta).map(_.flatten.map(_.calibrationOrder))
+      slots             <- added3.traverse(selectMeta).map(_.flatten.map(_.slot))
     } yield {
       assertEquals(added1.size, 2)
       assertEquals((added2, removed2), (Nil, Nil))
       assertEquals(added3.size, 2)
       assertEquals(removed3, Nil)
-      assertEquals(orders.toSet, Set(TelluricCalibrationOrder.Before, TelluricCalibrationOrder.After))
+      assertEquals(slots.toSet, Set(TelluricSlot.Before, TelluricSlot.After))
     }
 
   test("Obs calibration group and obs preserved when science becomes ongoing"):
@@ -4327,7 +4327,7 @@ class perScienceObservationCalibrations
       fpu                    <- queryObservationFpu(clone)
       flagged                <- queryUserDefinedTelluric(clone)
       state                  <- calculationState(clone)
-      order                  <- selectMeta(clone).map(_.map(_.calibrationOrder))
+      slot                  <- selectMeta(clone).map(_.map(_.slot))
       tellurics              <- groupTellurics(oid)
     yield
       assertEquals(addedWhileStarted, Nil)
@@ -4337,13 +4337,13 @@ class perScienceObservationCalibrations
       assertEquals(fpu, Flamingos2Fpu.LongSlit2.some)
       assert(flagged)
       assertEquals(state, CalculationState.Ready)
-      assertEquals(order, Some(TelluricCalibrationOrder.After))
+      assertEquals(slot, Some(TelluricSlot.After))
       assertEquals(tellurics.toSet, Set(tel, clone))
 
-  test("each spent user-defined order is cloned from its own telluric"):
-    def telluricOfOrder(oid: Observation.Id, order: TelluricCalibrationOrder): IO[Observation.Id] =
+  test("each spent user-defined slot is cloned from its own telluric"):
+    def telluricOfSlot(oid: Observation.Id, slot: TelluricSlot): IO[Observation.Id] =
       groupTellurics(oid).flatMap: tels =>
-        tels.findM(t => selectMeta(t).map(_.exists(_.calibrationOrder === order))).map(_.get)
+        tels.findM(t => selectMeta(t).map(_.exists(_.slot === slot))).map(_.get)
 
     for
       pid        <- createProgramAs(pi)
@@ -4353,8 +4353,8 @@ class perScienceObservationCalibrations
       _          <- setUserDefinedTellurics(oid, 2)
       _          <- runObscalcUpdate(pid, oid)
       _          <- recalculateCalibrations(pid, when, oid)
-      before     <- telluricOfOrder(oid, TelluricCalibrationOrder.Before)
-      after      <- telluricOfOrder(oid, TelluricCalibrationOrder.After)
+      before     <- telluricOfSlot(oid, TelluricSlot.Before)
+      after      <- telluricOfSlot(oid, TelluricSlot.After)
       starB      <- createTargetWithProfileAs(pi, pid)
       starA      <- createTargetWithProfileAs(pi, pid)
       _          <- editAsterismAs(pi, before, List(starB), Nil)
@@ -4363,10 +4363,10 @@ class perScienceObservationCalibrations
       _          <- recordVisitAs(serviceUser, after)
       _          <- declareExecutionComplete(after)
       (added, _) <- recalculateCalibrations(pid, when, oid)
-      orders     <- added.traverse(t => selectMeta(t).map(_.map(_.calibrationOrder)))
+      slots     <- added.traverse(t => selectMeta(t).map(_.map(_.slot)))
       targets    <- added.traverse(queryObservationWithTarget).map(_.map(_.targetId))
     yield
       assertEquals(added.size, 2)
-      val expected: Set[(Option[TelluricCalibrationOrder], Option[Target.Id])] =
-        Set((TelluricCalibrationOrder.Before.some, starB.some), (TelluricCalibrationOrder.After.some, starA.some))
-      assertEquals(orders.zip(targets).toSet, expected)
+      val expected: Set[(Option[TelluricSlot], Option[Target.Id])] =
+        Set((TelluricSlot.Before.some, starB.some), (TelluricSlot.After.some, starA.some))
+      assertEquals(slots.zip(targets).toSet, expected)

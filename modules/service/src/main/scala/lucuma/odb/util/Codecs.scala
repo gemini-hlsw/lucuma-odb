@@ -805,8 +805,8 @@ trait Codecs extends CoreCodecs {
   val _calibration_role: Codec[List[CalibrationRole]] =
     _enumerated[CalibrationRole](Type("_e_calibration_role", List(Type("e_calibration_role"))))
 
-  val telluric_calibration_order: Codec[TelluricCalibrationOrder] =
-    enumerated(Type("e_telluric_calibration_order"))
+  val telluric_slot: Codec[TelluricSlot] =
+    enumerated(Type("e_telluric_slot"))
 
   // TelluricType is an ADT and we store it as jsonb in the db.
   val telluric_type: Codec[TelluricType] =

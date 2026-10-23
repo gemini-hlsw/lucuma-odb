@@ -16,7 +16,7 @@ import lucuma.core.enums.Flamingos2Fpu
 import lucuma.core.enums.Site
 import lucuma.core.enums.StellarLibrarySpectrum
 import lucuma.core.enums.TargetDisposition
-import lucuma.core.enums.TelluricCalibrationOrder
+import lucuma.core.enums.TelluricSlot
 import lucuma.core.enums.TwilightType
 import lucuma.core.math.Coordinates
 import lucuma.core.math.skycalc.ImprovedSkyCalc
@@ -93,18 +93,18 @@ trait TelluricTargetsService[F[_]]:
     telluricId:      Observation.Id,
     scienceId:       Observation.Id,
     scienceDuration: TimeSpan,
-    order:           TelluricCalibrationOrder
+    slot:           TelluricSlot
   )(using ServiceAccess, Transaction[F]): F[Unit]
 
   /**
-   * Records a user-defined telluric: its resolution row keeps the order but is
+   * Records a user-defined telluric: its resolution row keeps the slot but is
    * never searched for.
    */
   def registerUserDefinedTelluric(
     pid:        Program.Id,
     telluricId: Observation.Id,
     scienceId:  Observation.Id,
-    order:      TelluricCalibrationOrder
+    slot:      TelluricSlot
   )(using ServiceAccess, Transaction[F]): F[Unit]
 
   /**
@@ -257,8 +257,8 @@ object TelluricTargetsService:
     site:    Site,
     obsTime: Option[Timestamp]
   ): Option[(TelluricStar, A)] =
-    val before = results.find(_._1.order == TelluricCalibrationOrder.Before)
-    val after  = results.find(_._1.order == TelluricCalibrationOrder.After)
+    val before = results.find(_._1.slot == TelluricSlot.Before)
+    val after  = results.find(_._1.slot == TelluricSlot.After)
     (before, after, obsTime) match
       case (None, None, _)              => none
       case (None, Some(a), _)           => a.some
@@ -383,17 +383,17 @@ object TelluricTargetsService:
         telluricId:      Observation.Id,
         scienceId:       Observation.Id,
         scienceDuration: TimeSpan,
-        order:           TelluricCalibrationOrder
+        slot:           TelluricSlot
       )(using ServiceAccess, Transaction[F]): F[Unit] =
-        session.execute(Statements.InsertResolutionRequest)(telluricId, pid, scienceId, scienceDuration, order).void
+        session.execute(Statements.InsertResolutionRequest)(telluricId, pid, scienceId, scienceDuration, slot).void
 
       override def registerUserDefinedTelluric(
         pid:        Program.Id,
         telluricId: Observation.Id,
         scienceId:  Observation.Id,
-        order:      TelluricCalibrationOrder
+        slot:      TelluricSlot
       )(using ServiceAccess, Transaction[F]): F[Unit] =
-        session.execute(Statements.InsertUserDefinedResolution)(telluricId, pid, scienceId, order) *>
+        session.execute(Statements.InsertUserDefinedResolution)(telluricId, pid, scienceId, slot) *>
           session.execute(Statements.MarkUserDefinedTelluric)(telluricId).void
 
       override def markUserDefined(
@@ -545,16 +545,16 @@ object TelluricTargetsService:
                   Logger[F].error(e)(s"Telluric search failed for ${pending.observationId}") *>
                     handleFailure(msg, paramsHash.some)
                 case Right(results) =>
-                  // For multi-telluric (duration > 1.5h) match the requested order.
+                  // For multi-telluric (duration > 1.5h) match the requested slot.
                   // For single-telluric (duration <= 1.5h) apply the RA vs. twilight LST rule.
                   val matchingStar =
                     if pending.scienceDuration > MultiTelluricThreshold then
-                      results.find(_._1.order == pending.calibrationOrder)
+                      results.find(_._1.slot == pending.slot)
                         .orElse(results.headOption)
                     else
                       TelluricTargetsService
                         .selectSingleByLstRule(results, params.coords, params.site, params.obsTime)
-                        .orElse(results.find(_._1.order == pending.calibrationOrder))
+                        .orElse(results.find(_._1.slot == pending.slot))
                         .orElse(results.headOption)
 
                   matchingStar match
@@ -562,7 +562,7 @@ object TelluricTargetsService:
                       val sidereal =
                         catalogResult.map(_.target).getOrElse(star.asSiderealTarget).sedFromTelluricType(star, params.telluricType)
 
-                      info"Found telluric star ID ${star.id} with type `${params.telluricType}` and order: ${star.order} for ${pending.calibrationOrder} observation ${pending.observationId}" *>
+                      info"Found telluric star ID ${star.id} with type `${params.telluricType}` and slot: ${star.slot} for ${pending.slot} observation ${pending.observationId}" *>
                         linkTargetAndReady(sidereal, paramsHash)
                     case None =>
                       val msg = s"No telluric stars found for observation ${pending.observationId}"
@@ -610,21 +610,21 @@ object TelluricTargetsService:
       object Statements:
 
         val pending: Codec[TelluricTargets.Pending] =
-          (observation_id *: program_id *: observation_id *: core_timestamp *: int4 *: time_span *: md5_hash.opt *: telluric_calibration_order)
+          (observation_id *: program_id *: observation_id *: core_timestamp *: int4 *: time_span *: md5_hash.opt *: telluric_slot)
             .to[TelluricTargets.Pending]
 
         val meta: Codec[TelluricTargets.Meta] =
           (observation_id *: program_id *: observation_id *: calculation_state *:
            core_timestamp *: core_timestamp *: core_timestamp.opt *: int4 *:
-           target_id.opt *: text.opt *: time_span *: telluric_calibration_order).to[TelluricTargets.Meta]
+           target_id.opt *: text.opt *: time_span *: telluric_slot).to[TelluricTargets.Meta]
 
         private val pendingColumns: String =
-          "c_observation_id, c_program_id, c_science_observation_id, c_last_invalidation, c_failure_count, c_science_duration, c_params_hash, c_calibration_order"
+          "c_observation_id, c_program_id, c_science_observation_id, c_last_invalidation, c_failure_count, c_science_duration, c_params_hash, c_slot"
 
         private val metaColumns: String =
           """c_observation_id, c_program_id, c_science_observation_id, c_state,
              c_last_invalidation, c_last_update, c_retry_at, c_failure_count,
-             c_resolved_target_id, c_error_message, c_science_duration, c_calibration_order"""
+             c_resolved_target_id, c_error_message, c_science_duration, c_slot"""
 
         // A user-defined telluric's row is never searched for.
         private val notUserDefined: String =
@@ -714,14 +714,14 @@ object TelluricTargetsService:
               AND  r.c_state = 'calculating'
           """.command
 
-        val InsertUserDefinedResolution: Command[(Observation.Id, Program.Id, Observation.Id, TelluricCalibrationOrder)] =
+        val InsertUserDefinedResolution: Command[(Observation.Id, Program.Id, Observation.Id, TelluricSlot)] =
           sql"""
             INSERT INTO t_telluric_resolution (
               c_observation_id,
               c_program_id,
               c_science_observation_id,
               c_science_duration,
-              c_calibration_order,
+              c_slot,
               c_state,
               c_last_invalidation
             ) VALUES (
@@ -729,7 +729,7 @@ object TelluricTargetsService:
               $program_id,
               $observation_id,
               '0 seconds'::interval,
-              $telluric_calibration_order,
+              $telluric_slot,
               'ready',
               now()
             )
@@ -827,14 +827,14 @@ object TelluricTargetsService:
             WHERE  c_observation_id = $observation_id
           """.query(observation_id)
 
-        val InsertResolutionRequest: Command[(Observation.Id, Program.Id, Observation.Id, TimeSpan, TelluricCalibrationOrder)] =
+        val InsertResolutionRequest: Command[(Observation.Id, Program.Id, Observation.Id, TimeSpan, TelluricSlot)] =
           sql"""
             INSERT INTO t_telluric_resolution (
               c_observation_id,
               c_program_id,
               c_science_observation_id,
               c_science_duration,
-              c_calibration_order,
+              c_slot,
               c_state,
               c_last_invalidation
             ) VALUES (
@@ -842,7 +842,7 @@ object TelluricTargetsService:
               $program_id,
               $observation_id,
               $time_span,
-              $telluric_calibration_order,
+              $telluric_slot,
               'pending',
               now()
             )
