@@ -4472,6 +4472,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
                 at { nanometers }
               }
             }
+            telluricType { tag }
           }
         }
       }
@@ -4515,7 +4516,8 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
                         "nanometers": 2200.000
                       }
                     }
-                  }
+                  },
+                  "telluricType": { "tag": "A0V" }
                 }
               }
             }

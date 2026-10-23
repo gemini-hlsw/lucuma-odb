@@ -74,7 +74,7 @@ object Igrins2LongSlitInput:
     exposureTimeMode: Option[ExposureTimeMode],
     svc:              Option[Svc.Create] = None,
     explicitTelescopeConfigs: Option[SlitTelescopeConfigs] = None,
-    telluricType: TelluricType = TelluricType.Hot
+    telluricType: TelluricType = TelluricType.A0V
   ):
     def observingModeType: ObservingModeType =
       ObservingModeType.Igrins2LongSlit
@@ -96,7 +96,7 @@ object Igrins2LongSlitInput:
           TelluricTypeBinding.Option("telluricType", rTelluricType)
         ) =>
           (rETM.flatMap(TelluricExposureTimeModeEdit.forCreate), rSvc, rTelescopeConfigs, rTelluricType).parMapN { (etm, svc, telescopeConfigs, telluricType) =>
-            Create(etm, svc, telescopeConfigs, telluricType.getOrElse(TelluricType.Hot))
+            Create(etm, svc, telescopeConfigs, telluricType.getOrElse(TelluricType.A0V))
           }
       }
 
@@ -130,7 +130,7 @@ object Igrins2LongSlitInput:
               s.explicitTelescopeConfigs.toOption
             ),
           explicitTelescopeConfigs.toOption,
-          telluricType.getOrElse(TelluricType.Hot)
+          telluricType.getOrElse(TelluricType.A0V)
         )
 
   object Edit:

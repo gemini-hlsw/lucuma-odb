@@ -2701,7 +2701,7 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat with que
            igrins2NodAlongSlitDefault,
            igrins2NodAlongSlitDefault,
            Some(Json.Null),
-           TelluricType.Hot
+           TelluricType.A0V
           )
         )
 
@@ -2831,6 +2831,22 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat with que
       }
     }
   }
+
+  test("[igrins2] specify igrins-2 long slit observing mode at observation creation with telluricType Hot"):
+    createProgramAs(pi).flatMap { pid =>
+      query(pi,
+        createObsWithIgrins2ObservingModeAllParams(
+          pid,
+          telluricType = TelluricType.Hot
+        )).flatMap { js =>
+          val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", "igrins2LongSlit")
+
+          assertIO(
+            longSlit.downIO[TelluricType]("telluricType"),
+            TelluricType.Hot
+          )
+      }
+    }
 
   test("[igrins2] specify igrins-2 long slit observing mode at observation creation with telluricType A0V") {
     createProgramAs(pi).flatMap { pid =>
