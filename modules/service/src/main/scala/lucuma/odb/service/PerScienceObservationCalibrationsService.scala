@@ -55,6 +55,7 @@ import skunk.*
 import skunk.AppliedFragment
 import skunk.Query
 import skunk.Transaction
+import skunk.codec.boolean.bool
 import skunk.syntax.all.*
 
 trait PerScienceObservationCalibrationsService[F[_]]:
@@ -70,31 +71,46 @@ object PerScienceObservationCalibrationsService:
     oid:         Observation.Id,
     order:       Option[TelluricCalibrationOrder],
     duration:    Option[TimeSpan],
+    firstVisit:  Option[Timestamp],
     lastVisit:   Option[Timestamp],
     userDefined: IsUserDefinedTelluric,
     completed:   Boolean
   ):
     def visited: Boolean =
-      lastVisit.isDefined
+      firstVisit.isDefined
 
   /**
    * Slots (before or after the science) that the current visit has already
    * observed a telluric for. Those tellurics are spent but not yet replaceable.
    *
    * A visit is over once its After telluric completes, so the boundary is the
-   * visit time of the most recently completed After. Any telluric visited after
-   * that boundary belongs to the current visit; with no completed After yet,
-   * every visited telluric does.
+   * first visit of the most recently completed After; first rather than last so
+   * a later return to that telluric cannot move it. Any telluric first visited
+   * after the boundary belongs to the current visit; with no completed After
+   * yet, every visited telluric does.
    */
   private def currentVisitSlots(tellurics: List[GroupTelluric]): List[TelluricCalibrationOrder] =
     val visitEnd = tellurics
       .filter(t => t.completed && t.order.contains(TelluricCalibrationOrder.After))
-      .flatMap(_.lastVisit)
+      .flatMap(_.firstVisit)
       .maximumOption
     tellurics
-      .filter(t => t.visited && visitEnd.forall(end => t.lastVisit.exists(_ > end)))
+      .filter(t => visitEnd.fold(t.visited)(end => t.firstVisit.exists(_ > end)))
       .flatMap(_.order)
       .distinct
+
+  /**
+   * What the visit in progress still needs out of the required slots: those no
+   * spent telluric of it fills, and nothing once its After has been visited,
+   * since the science of that visit is already past.
+   */
+  private def remainingSlots(
+    required:  List[TelluricCalibrationOrder],
+    tellurics: List[GroupTelluric]
+  ): List[TelluricCalibrationOrder] =
+    val filled = currentVisitSlots(tellurics)
+    if filled.contains(TelluricCalibrationOrder.After) then Nil
+    else required.filterNot(filled.contains)
 
   def instantiate[F[_]: {Concurrent as F, Tracer as T, Logger, Services as S}]: PerScienceObservationCalibrationsService[F] =
     new PerScienceObservationCalibrationsService[F] with CalibrationObservations with WorkflowStateQueries[F]:
@@ -308,7 +324,7 @@ object PerScienceObservationCalibrationsService:
           tellurics    <- findGroupTellurics(gid)
           unobserved    = tellurics.filterNot(_.visited)
           spent         = tellurics.filter(t => t.visited && t.userDefined.value)
-          required      = ordersFor(count.value.value).filterNot(currentVisitSlots(tellurics).contains)
+          required      = remainingSlots(ordersFor(count.value.value), tellurics)
           (keep, drop)  = unobserved.partition(_.order.exists(required.contains))
           toDelete      = drop.map(_.oid)
           toConvert     = keep.filterNot(_.userDefined.value).map(_.oid)
@@ -384,8 +400,7 @@ object PerScienceObservationCalibrationsService:
                                 else Option.empty[TimeSpan].pure[F]
           _                  <- warn"No execution digest duration for ${obs.id}, requiring 0 tellurics".whenA(requiresTelluric && duration.isEmpty)
           _                  <- info"Observation ${obs.id} does not request tellurics".unlessA(requiresTelluric)
-          // Slots filled by the visit in progress are not required again until it ends.
-          required           =  duration.toList.flatMap(requiredOrders).filterNot(currentVisitSlots(tellurics).contains)
+          required           =  remainingSlots(duration.toList.flatMap(requiredOrders), tellurics)
           // A user-defined telluric left behind by a type change is rebuilt as a generated one.
           complete           =  unobserved.forall(t => t.order.isDefined && !t.userDefined.value) &&
                                   unobserved.flatMap(_.order).map(_.tag).sorted ==
@@ -957,7 +972,7 @@ object PerScienceObservationCalibrationsService:
               AND  (g.c_version IS NULL OR g.c_version = 'current'::e_observing_mode_row_version)
             ORDER BY COALESCE(g.c_index, 0), e.c_exposure_time_mode_id
           """.query(
-            exposure_time_mode_id *: exposure_time_mode *: wavelength_pm.opt *: skunk.codec.boolean.bool
+            exposure_time_mode_id *: exposure_time_mode *: wavelength_pm.opt *: bool
           )
 
         // Every science exposure time mode row, both versions, with its configuration's
@@ -1040,17 +1055,23 @@ object PerScienceObservationCalibrationsService:
             SELECT o.c_observation_id,
                    r.c_calibration_order,
                    r.c_science_duration,
-                   (SELECT max(v.c_effective_time) FROM t_visit v WHERE v.c_observation_id = o.c_observation_id),
+                   v.c_first_visit,
+                   v.c_last_visit,
                    o.c_is_user_defined_telluric,
                    s.c_execution_state IN ('completed', 'declared_complete')
             FROM   t_observation o
             LEFT JOIN t_telluric_resolution r ON r.c_observation_id = o.c_observation_id
             JOIN   v_execution_state s ON s.c_observation_id = o.c_observation_id
+            LEFT JOIN LATERAL (
+              SELECT min(v.c_effective_time) AS c_first_visit, max(v.c_effective_time) AS c_last_visit
+              FROM   t_visit v
+              WHERE  v.c_observation_id = o.c_observation_id
+            ) v ON TRUE
             WHERE  o.c_group_id         = $group_id
               AND  o.c_calibration_role = $calibration_role
             ORDER BY o.c_group_index
           """.query(
-            observation_id *: telluric_calibration_order.opt *: time_span.opt *: core_timestamp.opt *: is_user_defined_telluric *: skunk.codec.boolean.bool
+            observation_id *: telluric_calibration_order.opt *: time_span.opt *: core_timestamp.opt *: core_timestamp.opt *: is_user_defined_telluric *: bool
           ).to[GroupTelluric]
 
         val selectScienceObservationIndex: Query[Observation.Id, NonNegShort] =

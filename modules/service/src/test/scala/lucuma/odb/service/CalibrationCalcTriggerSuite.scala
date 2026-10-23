@@ -6,6 +6,7 @@ package lucuma.odb.service
 import cats.effect.IO
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.model.Observation
+import lucuma.core.model.Program
 import lucuma.core.util.CalculationState
 import lucuma.odb.graphql.TestUsers
 import lucuma.odb.graphql.query.ExecutionTestSupportForFlamingos2
@@ -75,6 +76,47 @@ class CalibrationCalcTriggerSuite extends ExecutionTestSupportForFlamingos2 {
       _     <- settleObscalcToReady(oid)
       state <- queueState(oid)
     yield assertEquals(state, None)
+
+  private def completeObscalc(oid: Observation.Id): IO[Unit] =
+    withSession: session =>
+      session.execute(
+        sql"""
+          UPDATE t_obscalc
+          SET c_sci_execution_state = 'completed'
+          WHERE c_observation_id = $observation_id
+        """.command
+      )(oid).void
+
+  private def telluricFor(pid: Program.Id, oid: Observation.Id): IO[Observation.Id] =
+    for
+      _     <- runObscalcUpdate(pid, oid)
+      added <- recalculateCalibrations(pid, java.time.Instant.now, oid).map(_._1)
+    yield added.head
+
+  test("a telluric whose sequence completes enqueues its science recalculation"):
+    for
+      _     <- cleanupQueue
+      pid   <- createProgramAs(pi, "Trigger Test")
+      tid   <- createTargetWithProfileAs(pi, pid)
+      oid   <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      tel   <- telluricFor(pid, oid)
+      _     <- cleanupQueue
+      _     <- seedObscalc(tel)
+      _     <- completeObscalc(tel)
+      state <- queueState(oid)
+    yield assertEquals(state, Some(CalculationState.Pending))
+
+  test("a telluric declared complete enqueues its science recalculation"):
+    for
+      _     <- cleanupQueue
+      pid   <- createProgramAs(pi, "Trigger Test")
+      tid   <- createTargetWithProfileAs(pi, pid)
+      oid   <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      tel   <- telluricFor(pid, oid)
+      _     <- cleanupQueue
+      _     <- declareExecutionComplete(tel)
+      state <- queueState(oid)
+    yield assertEquals(state, Some(CalculationState.Pending))
 
   test("re-invalidation moves a ready queue row back to pending"):
     for

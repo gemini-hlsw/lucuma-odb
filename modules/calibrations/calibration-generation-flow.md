@@ -199,7 +199,7 @@ flowchart TD
     X --> Y["S/N = max(science_S/N x 2, 100)"]
 ```
 
-Spent tellurics are never deleted. One still fills its slot (before or after the science) for the visit in progress; the visit ends when its After telluric completes (execution state `completed` or `declared_complete`), and only then does the next visit get its own set, so an observation can accumulate more tellurics than one visit needs. The unobserved ones are replaced as a set rather than reused one by one, so every telluric of a visit shares one recorded duration.
+Spent tellurics are never deleted. One still fills its slot (before or after the science) for the visit in progress, and once the visit's After telluric has been visited nothing more is required for that visit. The visit ends when its After telluric completes (execution state `completed` or `declared_complete`); the boundary is that After's first visit, so a later return to it changes nothing. Only then does the next visit get its own set, so an observation can accumulate more tellurics than one visit needs. The completion itself enqueues the science recalculation (`V1364`: a telluric's `t_obscalc.c_sci_execution_state` reaching `completed`, or its `c_declared_state` becoming `declared_complete`, calls `invalidate_calibration_calc` for the science), since the stale-estimate refresh does not. The unobserved ones are replaced as a set rather than reused one by one, so every telluric of a visit shares one recorded duration.
 
 ### User-Defined Tellurics
 
