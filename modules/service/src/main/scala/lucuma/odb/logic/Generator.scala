@@ -873,8 +873,26 @@ object Generator:
             case _: ExchangeObservingModeType         =>
               EitherT.pure(())
 
+            // Only GMOS daytime calibrations generate from Calibration Sets so
+            // far.  A stored sequence wins, and with no sets there is nothing
+            // to materialize: doing so anyway would freeze the rows behind a
+            // visit that produced nothing.
             case _: DaytimeCalibrationObservingModeType =>
-              EitherT.pure(())
+              val hasSets = ctx.params.observingMode.asDaytimeCalibration.exists(_.sets.nonEmpty)
+              def unlessMaterialized(gen: => EitherT[F, OdbError, Unit]): EitherT[F, OdbError, Unit] =
+                EitherT.liftF(sequenceService.isMaterialized(oid, SequenceType.Science)).flatMap: m =>
+                  if m || !hasSets then EitherT.pure(()) else gen
+              daytimeInstrument(ctx) match
+                case Instrument.GmosNorth =>
+                  unlessMaterialized:
+                    EitherT(streaming.generateDaytimeGmosNorth(ctx))
+                      .flatMap(s => EitherT.liftF(sequenceService.materializeGmosNorthExecutionConfig(oid, s, sequenceTypes)))
+                case Instrument.GmosSouth =>
+                  unlessMaterialized:
+                    EitherT(streaming.generateDaytimeGmosSouth(ctx))
+                      .flatMap(s => EitherT.liftF(sequenceService.materializeGmosSouthExecutionConfig(oid, s, sequenceTypes)))
+                case _                    =>
+                  EitherT.pure(())
 
         transactionallyWithContext(oid, commitHash): ctx =>
           // Nothing executable is written for a sequence whose Altair guide star could not be

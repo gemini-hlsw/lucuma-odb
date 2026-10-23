@@ -15,5 +15,5 @@ object DaytimeCalibrationValidator extends ObservationValidator:
     "No sequence has been defined."
 
   def apply(info: ObservationValidationInfo): ObservationValidationMap =
-    if info.hasScienceSteps then ObservationValidationMap.empty
+    if info.hasSequenceSource then ObservationValidationMap.empty
     else ObservationValidationMap.singleton(ObservationValidation.configuration(sequenceMissing))

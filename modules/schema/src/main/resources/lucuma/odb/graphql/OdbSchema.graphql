@@ -6376,7 +6376,7 @@ input CalibrationSetInput {
   kind: CalibrationSetType!
 
   """
-  Exposures taken with this setup.
+  Exposures taken with this setup, at most 1000.
   """
   count: PosInt!
 

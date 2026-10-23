@@ -94,7 +94,7 @@ case class ObservationValidationInfo(
   explicitGuideProbe:     Option[GuideProbe] = None,
   altair:                 Option[AltairConfiguration],
   executionDigest:        Option[ExecutionDigest] = None,
-  hasScienceSteps:        Boolean = false, // set for daytime calibrations
+  hasSequenceSource:      Boolean = false, // set for daytime calibrations
   instrument:             Option[Instrument] = None
 ) {
 
@@ -260,21 +260,22 @@ object ObservationValidationInfo {
             configs.get(oid).fold(oid -> info): cfg =>
               oid -> info.copy(keckInstrument = cfg.keckInstrument, subaruInstrument = cfg.subaruInstrument)
 
-    // Whether a daytime calibration has stored science steps.  Only daytime
-    // calibrations are looked up.
+    // Whether a daytime calibration has a source for its science sequence:
+    // stored steps, or Calibration Sets while nothing is materialized.  Only
+    // daytime calibrations are looked up.
     def addDaytimeCalibrationInfos(input: Map[Observation.Id, ObservationValidationInfo]): F[Map[Observation.Id, ObservationValidationInfo]] =
       NonEmptyList.fromList(input.collect { case (oid, info) if info.isDaytimeCalibration => oid }.toList) match
         case None      => input.pure[F]
         case Some(nel) =>
           val enc = observation_id.nel(nel)
           session
-            .stream(Statements.WithScienceSteps(enc))(nel, 1024)
+            .stream(Statements.WithSequenceSource(enc))(nel, 1024)
             .compile
             .toList
             .map(_.toSet)
             .map: withSteps =>
               input.map: (oid, info) =>
-                oid -> (if info.isDaytimeCalibration then info.copy(hasScienceSteps = withSteps.contains(oid)) else info)
+                oid -> (if info.isDaytimeCalibration then info.copy(hasSequenceSource = withSteps.contains(oid)) else info)
 
     def addProgramAllocations(input: Map[Observation.Id, ObservationValidationInfo]): F[Map[Observation.Id, ObservationValidationInfo]] =
       NonEmptyList.fromList(input.values.map(_.pid).toList.distinct) match
@@ -389,13 +390,31 @@ object ObservationValidationInfo {
         ) s ON TRUE
       """
 
-    def WithScienceSteps[A <: NonEmptyList[Observation.Id]](enc: skunk.Encoder[A]): Query[A, Observation.Id] =
+    def WithSequenceSource[A <: NonEmptyList[Observation.Id]](enc: skunk.Encoder[A]): Query[A, Observation.Id] =
       sql"""
-        SELECT DISTINCT a.c_observation_id
-          FROM t_atom a
-          JOIN t_step s ON s.c_atom_id = a.c_atom_id
-         WHERE a.c_sequence_type = 'science'
-           AND a.c_observation_id IN ($enc)
+        SELECT o.c_observation_id
+          FROM t_observation o
+         WHERE o.c_observation_id IN ($enc)
+           AND (
+             EXISTS (
+               SELECT 1
+                 FROM t_atom a
+                 JOIN t_step s ON s.c_atom_id = a.c_atom_id
+                WHERE a.c_observation_id = o.c_observation_id
+                  AND a.c_sequence_type = 'science'
+             ) OR (
+               NOT EXISTS (
+                 SELECT 1
+                   FROM t_sequence_materialization m
+                  WHERE m.c_observation_id = o.c_observation_id
+                    AND m.c_sequence_type = 'science'
+               ) AND EXISTS (
+                 SELECT 1
+                   FROM t_daytime_calibration_set c
+                  WHERE c.c_observation_id = o.c_observation_id
+               )
+             )
+           )
       """.query(observation_id)
 
     def ObservationValidationInfosWithoutAsterisms[A <: NonEmptyList[Observation.Id]](enc: Encoder[A]): Query[A, ObservationValidationInfo] =
