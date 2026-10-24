@@ -9,6 +9,15 @@ processors:
     limit_mib: 400
     spike_limit_mib: 100
     check_interval: 5s
+  # WebSocket handshake traces carry no useful data and failed ones flood Tempo.
+  # Spans are filtered one by one, so the route's inner spans are listed too.
+  filter/ws-handshake:
+    error_mode: ignore
+    traces:
+      span:
+        - 'attributes["url.path"] == "/ws"'
+        - 'name == "GET /ws"'
+        - 'name == "graphql.routes.webSocketConnection"'
   batch:
     timeout: 5s
     send_batch_size: 512
@@ -23,7 +32,7 @@ service:
   pipelines:
     traces:
       receivers: [otlp]
-      processors: [memory_limiter, batch]
+      processors: [memory_limiter, filter/ws-handshake, batch]
       exporters: [otlphttp/grafana]
     metrics:
       receivers: [otlp]
