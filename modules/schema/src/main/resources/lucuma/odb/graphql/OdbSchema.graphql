@@ -14009,6 +14009,14 @@ type InterleavedImagingVariant {
   Offset generator to use for the sky datasets.
   """
   skyOffsets: TelescopeConfigGenerator!
+
+  """
+  Number of consecutive science exposures to collect in one filter at each
+  object offset position before moving on to the next filter and position.  A
+  filter's final position may receive fewer exposures so that its overall
+  exposure count is honored.
+  """
+  exposuresPerOffset: PosInt!
 }
 
 """
@@ -14035,6 +14043,13 @@ input InterleavedImagingVariantInput {
   a value greater than 0.
   """
   skyOffsets: TelescopeConfigGeneratorInput
+
+  """
+  Number of consecutive science exposures to collect in one filter at each
+  object offset position before moving on to the next filter and position.
+  Defaults to 1 on creation, absent (i.e., not modified) on update.
+  """
+  exposuresPerOffset: PosInt
 
 }
 

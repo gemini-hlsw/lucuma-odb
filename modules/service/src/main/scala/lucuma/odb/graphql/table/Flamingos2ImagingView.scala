@@ -35,13 +35,14 @@ trait Flamingos2ImagingView[F[_]] extends BaseMapping[F]:
     val ReadoutMode: ColumnRef        = col("c_readout_mode", flamingos_2_readout_mode.opt)
     val ReadoutModeDefault: ColumnRef = col("c_readout_mode_default", flamingos_2_readout_mode)
 
+    val ExposuresPerOffset: ColumnRef = col("c_exposures_per_offset", int4_pos)
+
     object Sky:
       val Count: ColumnRef = col("c_sky_count", int4_nonneg)
 
     object Grouped:
       val ObservationId: ColumnRef   = col("c_grouped_observation_id", observation_id.embedded)
       val WavelengthOrder: ColumnRef = col("c_wavelength_order", wavelength_order)
-      val ExposuresPerOffset: ColumnRef = col("c_exposures_per_offset", int4_pos)
 
     object Interleaved:
       val ObservationId: ColumnRef = col("c_interleaved_observation_id", observation_id.embedded)

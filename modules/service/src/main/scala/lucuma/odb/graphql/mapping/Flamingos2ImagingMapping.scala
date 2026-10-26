@@ -37,20 +37,21 @@ trait Flamingos2ImagingMapping[F[_]]
 
   lazy val Flamingos2GroupedImagingMapping: ObjectMapping =
     ObjectMapping(Flamingos2ImagingType / "variant" / "grouped")(
-      SqlField("observationId",   Flamingos2ImagingView.Grouped.ObservationId, key = true, hidden = true),
-      SqlField("order",           Flamingos2ImagingView.Grouped.WavelengthOrder),
-      SqlField("skyCount",        Flamingos2ImagingView.Sky.Count),
-      SqlField("exposuresPerOffset", Flamingos2ImagingView.Grouped.ExposuresPerOffset),
-      SqlObject("offsets",        Join(Flamingos2ImagingView.ObservationId, TelescopeConfigGeneratorView.ObjectObservationId)),
-      SqlObject("skyOffsets",     Join(Flamingos2ImagingView.ObservationId, TelescopeConfigGeneratorView.SkyObservationId)),
+      SqlField("observationId",      Flamingos2ImagingView.Grouped.ObservationId, key = true, hidden = true),
+      SqlField("order",              Flamingos2ImagingView.Grouped.WavelengthOrder),
+      SqlField("skyCount",           Flamingos2ImagingView.Sky.Count),
+      SqlField("exposuresPerOffset", Flamingos2ImagingView.ExposuresPerOffset),
+      SqlObject("offsets",           Join(Flamingos2ImagingView.ObservationId, TelescopeConfigGeneratorView.ObjectObservationId)),
+      SqlObject("skyOffsets",        Join(Flamingos2ImagingView.ObservationId, TelescopeConfigGeneratorView.SkyObservationId)),
     )
 
   lazy val Flamingos2InterleavedImagingMapping: ObjectMapping =
     ObjectMapping(Flamingos2ImagingType / "variant" / "interleaved")(
-      SqlField("observationId", Flamingos2ImagingView.Interleaved.ObservationId, key = true, hidden = true),
-      SqlField("skyCount",      Flamingos2ImagingView.Sky.Count),
-      SqlObject("offsets",      Join(Flamingos2ImagingView.ObservationId, TelescopeConfigGeneratorView.ObjectObservationId)),
-      SqlObject("skyOffsets",   Join(Flamingos2ImagingView.ObservationId, TelescopeConfigGeneratorView.SkyObservationId)),
+      SqlField("observationId",      Flamingos2ImagingView.Interleaved.ObservationId, key = true, hidden = true),
+      SqlField("skyCount",           Flamingos2ImagingView.Sky.Count),
+      SqlField("exposuresPerOffset", Flamingos2ImagingView.ExposuresPerOffset),
+      SqlObject("offsets",           Join(Flamingos2ImagingView.ObservationId, TelescopeConfigGeneratorView.ObjectObservationId)),
+      SqlObject("skyOffsets",        Join(Flamingos2ImagingView.ObservationId, TelescopeConfigGeneratorView.SkyObservationId)),
     )
 
   lazy val Flamingos2PreImagingMapping: ObjectMapping =

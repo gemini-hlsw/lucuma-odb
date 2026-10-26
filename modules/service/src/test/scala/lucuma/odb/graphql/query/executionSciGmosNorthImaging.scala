@@ -560,6 +560,90 @@ class executionSciGmosNorthImaging extends ExecutionTestSupportForGmos:
         expected = expectedResult(json).asRight
       )
 
+  // `size` consecutive exposures in one filter at a single offset position.
+  private def stop(f: GmosNorthFilter, t: IntegrationTime, size: Int, offset: Int): List[Json] =
+    List.fill(size)(gnAtom(Step(f, t).withOffset(offset, offset)))
+
+  private def interleavedMode(offsetCount: Int, exposuresPerOffset: Int): String =
+    s"""{
+      gmosNorthImaging: {
+        variant: {
+          interleaved: {
+            offsets: {
+              ${enumerated((0 until offsetCount).toList.fproduct(identity) *)}
+            }
+            skyCount: 0
+            exposuresPerOffset: $exposuresPerOffset
+          }
+        }
+        filters: [
+          { filter: G_PRIME },
+          { filter: I_PRIME },
+          { filter: Y       }
+        ]
+      }
+    }"""
+
+  test("interleaved, offsets, exposuresPerOffset"):
+    // With 2 exposures per offset, G (6), I (12) and Y (30) need 3, 6 and 15
+    // offset positions.  The shortest filter sets the group count (3), so each
+    // group holds 1 G stop, 2 I stops and 5 Y stops -- the same shape as the
+    // one-exposure-per-offset case, with every position doubled up.
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createObservation(p, t, Site.GN)(interleavedMode(24, 2))
+      yield o
+
+    def oneGroup(i: Int): List[Json] =
+      stop(GmosNorthFilter.GPrime, Time120x06, 2, i)                                    ++
+      (1 to 2).toList.flatMap(j => stop(GmosNorthFilter.IPrime, Time060x12, 2, i + j))  ++
+      (3 to 7).toList.flatMap(j => stop(GmosNorthFilter.Y,      Time030x30, 2, i + j))
+
+    val json: List[Json] = (0 until 3).toList.flatMap: i =>
+      oneGroup(i * 8)
+
+    setup.flatMap: oid =>
+      expect(
+        user     = pi,
+        query    = gmosNorthScienceQuery(oid, 100.some),
+        expected = expectedResult(json).asRight
+      )
+
+  test("interleaved, offsets, exposuresPerOffset, short final positions"):
+    // With 4 exposures per offset, G (6) needs 2 positions (4 + 2), I (12)
+    // needs 3 (4 + 4 + 4) and Y (30) needs 8 (7 x 4 + 2).  That gives 2 groups,
+    // with I's odd position falling in the first.  Each filter's final position
+    // is short so that the ITC exposure counts are honored exactly.
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createObservation(p, t, Site.GN)(interleavedMode(13, 4))
+      yield o
+
+    val group0: List[Json] =
+      stop(GmosNorthFilter.GPrime, Time120x06, 4, 0) ++
+      stop(GmosNorthFilter.IPrime, Time060x12, 4, 1) ++
+      stop(GmosNorthFilter.IPrime, Time060x12, 4, 2) ++
+      (3 to 6).toList.flatMap(j => stop(GmosNorthFilter.Y, Time030x30, 4, j))
+
+    val group1: List[Json] =
+      stop(GmosNorthFilter.GPrime, Time120x06, 2,  7) ++
+      stop(GmosNorthFilter.IPrime, Time060x12, 4,  8) ++
+      stop(GmosNorthFilter.Y,      Time030x30, 4,  9) ++
+      stop(GmosNorthFilter.Y,      Time030x30, 4, 10) ++
+      stop(GmosNorthFilter.Y,      Time030x30, 4, 11) ++
+      stop(GmosNorthFilter.Y,      Time030x30, 2, 12)
+
+    setup.flatMap: oid =>
+      expect(
+        user     = pi,
+        query    = gmosNorthScienceQuery(oid, 100.some),
+        expected = expectedResult(group0 ++ group1).asRight
+      )
+
   test("interleaved, no offsets, sky"):
     val mode =
       s"""{

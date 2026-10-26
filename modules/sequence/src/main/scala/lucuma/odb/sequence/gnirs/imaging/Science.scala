@@ -217,7 +217,7 @@ object Science:
             generateOffsets(offsets, skyCount, skyOffsets)(_.max).map: (o, s) =>
               ProtoSequences.grouped(config, nem, readModes, o, s)
 
-          case Variant.Interleaved(offsets, skyCount, skyOffsets) =>
+          case Variant.Interleaved(offsets, skyCount, skyOffsets, _) =>
             // The offset pattern is applied to the sequence as a whole so we
             // need an offset per science exposure. Also there are skyCount sky
             // positions per filter.

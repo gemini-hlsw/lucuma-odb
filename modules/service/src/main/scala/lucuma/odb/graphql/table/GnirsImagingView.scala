@@ -38,13 +38,14 @@ trait GnirsImagingView[F[_]] extends BaseMapping[F]:
     val AcqSkyOffsetP: ColumnRef = col("c_acq_sky_offset_p", angle_µas.opt)
     val AcqSkyOffsetQ: ColumnRef = col("c_acq_sky_offset_q", angle_µas.opt)
 
+    val ExposuresPerOffset: ColumnRef = col("c_exposures_per_offset", int4_pos)
+
     object Sky:
       val Count: ColumnRef = col("c_sky_count", int4_nonneg)
 
     object Grouped:
       val ObservationId: ColumnRef   = col("c_grouped_observation_id", observation_id.embedded)
       val WavelengthOrder: ColumnRef = col("c_wavelength_order", wavelength_order)
-      val ExposuresPerOffset: ColumnRef = col("c_exposures_per_offset", int4_pos)
 
     object Interleaved:
       val ObservationId: ColumnRef = col("c_interleaved_observation_id", observation_id.embedded)

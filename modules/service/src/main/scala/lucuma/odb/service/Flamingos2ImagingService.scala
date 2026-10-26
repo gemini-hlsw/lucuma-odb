@@ -224,7 +224,7 @@ object Flamingos2ImagingService:
             SET.variant.fold(().pure[F]): v =>
               val (o, s) = v match
                 case ImagingVariantInput.Grouped(_, offsets, _, skyOffsets, _)  => (offsets, skyOffsets)
-                case ImagingVariantInput.Interleaved(offsets, _, skyOffsets) => (offsets, skyOffsets)
+                case ImagingVariantInput.Interleaved(offsets, _, skyOffsets, _) => (offsets, skyOffsets)
                 case _                                                       => (Nullable.Null, Nullable.Null)
               updateOffsetForRole(o, v.variantType, TelescopeConfigGeneratorRole.Object) *>
               updateOffsetForRole(s, v.variantType, TelescopeConfigGeneratorRole.Sky)

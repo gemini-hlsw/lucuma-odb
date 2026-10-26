@@ -834,6 +834,82 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
       )
     )
 
+  test("observing mode: exposuresPerOffset kept on update, reset on variant switch"):
+
+    val query = """
+      observations {
+        observingMode {
+          gmosNorthImaging {
+            variant {
+              grouped { exposuresPerOffset }
+              interleaved { exposuresPerOffset }
+            }
+          }
+        }
+      }
+    """
+
+    def variant(v: String): String =
+      s"""
+        observingMode: {
+          gmosNorthImaging: {
+            variant: { $v }
+          }
+        }
+      """
+
+    def expected(grouped: Option[Int], interleaved: Option[Int]): Either[Nothing, Json] =
+      def obj(n: Option[Int]): Json =
+        n.fold(Json.Null)(k => Json.obj("exposuresPerOffset" -> Json.fromInt(k)))
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "observingMode": {
+                "gmosNorthImaging": {
+                  "variant": {
+                    "grouped": ${obj(grouped)},
+                    "interleaved": ${obj(interleaved)}
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+      """.asRight
+
+    val create = """
+      scienceRequirements: {
+        exposureTimeMode: {
+          signalToNoise: {
+            value: 100.0
+            at: { nanometers: 500.0 }
+          }
+        }
+      }
+      observingMode: {
+        gmosNorthImaging: {
+          filters: [ { filter: G_PRIME } ]
+          variant: {
+            grouped: { exposuresPerOffset: 3 }
+          }
+        }
+      }
+    """
+
+    multiUpdateTest(
+      pi,
+      List(
+        (create,                                             query, expected(3.some, none)), // set on create
+        (variant("interleaved: {}"),                         query, expected(none, 1.some)), // reset on switch
+        (variant("interleaved: { exposuresPerOffset: 2 }"),  query, expected(none, 2.some)), // explicit set
+        (variant("interleaved: { skyCount: 1 }"),            query, expected(none, 2.some)), // kept on update
+        (variant("grouped: {}"),                             query, expected(1.some, none))  // reset on switch
+      )
+    )
+
   val preImagingInterleavedSwitchQuery: String =
     s"""
       observations {

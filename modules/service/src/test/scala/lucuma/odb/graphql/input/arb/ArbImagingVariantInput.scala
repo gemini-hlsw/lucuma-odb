@@ -38,7 +38,8 @@ trait ArbImagingVariantInput:
         of <- arbitrary[Nullable[TelescopeConfigGeneratorInput]]
         sc <- Gen.option(Gen.choose(0, 100).map(NonNegInt.unsafeFrom))
         so <- arbitrary[Nullable[TelescopeConfigGeneratorInput]]
-      yield ImagingVariantInput.Interleaved(of, sc, so)
+        ic <- Gen.option(Gen.choose(1, 10).map(PosInt.unsafeFrom))
+      yield ImagingVariantInput.Interleaved(of, sc, so, ic)
 
   given arbVariantInputPreImaging: Arbitrary[ImagingVariantInput.PreImaging] =
     Arbitrary:

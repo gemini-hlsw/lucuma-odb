@@ -27,7 +27,7 @@ sealed trait Variant:
   def variantType: ImagingVariantType =
     this match
       case Grouped(_, _, _, _, _) => ImagingVariantType.Grouped
-      case Interleaved(_, _, _)   => ImagingVariantType.Interleaved
+      case Interleaved(_, _, _, _)   => ImagingVariantType.Interleaved
       case PreImaging(_, _, _, _) => ImagingVariantType.PreImaging
   def fold[A](
     fg: Grouped     => A,
@@ -36,7 +36,7 @@ sealed trait Variant:
   ): A =
     this match
       case g @ Grouped(_, _, _, _, _) => fg(g)
-      case i @ Interleaved(_, _, _)   => fi(i)
+      case i @ Interleaved(_, _, _, _)   => fi(i)
       case p @ PreImaging(_, _, _, _) => fp(p)
 
   def grouped: Option[Grouped] =
@@ -94,17 +94,19 @@ object Variant:
         )
 
   case class Interleaved(
-    offsets:    TelescopeConfigGenerator,
-    skyCount:   NonNegInt,
-    skyOffsets: TelescopeConfigGenerator
+    offsets:            TelescopeConfigGenerator,
+    skyCount:           NonNegInt,
+    skyOffsets:         TelescopeConfigGenerator,
+    exposuresPerOffset: PosInt
   ) extends Variant
 
   object Interleaved:
     val Default: Interleaved =
       Interleaved(
-        offsets    = TelescopeConfigGenerator.NoGenerator,
-        skyCount   = NonNegInt.MinValue,
-        skyOffsets = TelescopeConfigGenerator.NoGenerator
+        offsets            = TelescopeConfigGenerator.NoGenerator,
+        skyCount           = NonNegInt.MinValue,
+        skyOffsets         = TelescopeConfigGenerator.NoGenerator,
+        exposuresPerOffset = PosInt.MinValue
       )
 
     given HashBytes[Interleaved] with
@@ -115,6 +117,7 @@ object Variant:
         out.write(i.offsets.hashBytes)
         out.write(i.skyCount.hashBytes)
         out.write(i.skyOffsets.hashBytes)
+        out.write(i.exposuresPerOffset.hashBytes)
 
         out.close()
         bao.toByteArray
@@ -124,7 +127,8 @@ object Variant:
        (
           g.offsets,
           g.skyCount,
-          g.skyOffsets
+          g.skyOffsets,
+          g.exposuresPerOffset
         )
 
   case class PreImaging(
@@ -164,22 +168,22 @@ object Variant:
   val offsets: Optional[Variant, TelescopeConfigGenerator] =
     Optional.apply[Variant, TelescopeConfigGenerator] {
       case Variant.Grouped(_, o, _, _, _) => o.some
-      case Variant.Interleaved(o, _, _)   => o.some
+      case Variant.Interleaved(o, _, _, _) => o.some
       case Variant.PreImaging(_, _, _, _) => none
     } { og => {
       case v @ Variant.Grouped(_, _, _, _, _) => v.copy(offsets = og)
-      case v @ Variant.Interleaved(_, _, _)   => v.copy(offsets = og)
+      case v @ Variant.Interleaved(_, _, _, _)   => v.copy(offsets = og)
       case v @ Variant.PreImaging(_, _, _, _) => v
     }}
 
   val skyOffsets: Optional[Variant, TelescopeConfigGenerator] =
     Optional.apply[Variant, TelescopeConfigGenerator] {
       case Variant.Grouped(_, _, _, s, _) => s.some
-      case Variant.Interleaved(_, _, s)   => s.some
+      case Variant.Interleaved(_, _, s, _) => s.some
       case Variant.PreImaging(_, _, _, _) => none
     } { og => {
       case v @ Variant.Grouped(_, _, _, _, _) => v.copy(skyOffsets = og)
-      case v @ Variant.Interleaved(_, _, _)   => v.copy(skyOffsets = og)
+      case v @ Variant.Interleaved(_, _, _, _)   => v.copy(skyOffsets = og)
       case v @ Variant.PreImaging(_, _, _, _) => v
     }}
 
@@ -199,7 +203,7 @@ object Variant:
     ): Variant =
       variantType match
         case ImagingVariantType.Grouped     => Grouped(order, objectGen, skyCount, skyGen, exposuresPerOffset)
-        case ImagingVariantType.Interleaved => Interleaved(objectGen, skyCount, skyGen)
+        case ImagingVariantType.Interleaved => Interleaved(objectGen, skyCount, skyGen, exposuresPerOffset)
         case ImagingVariantType.PreImaging  => PreImaging(offset1, offset2, offset3, offset4)
 
 
@@ -211,6 +215,6 @@ object Variant:
     def eqv(x: Variant, y: Variant): Boolean =
       (x, y) match
         case (a @ Grouped(_, _, _, _, _),    b @ Grouped(_, _, _, _, _))    => a === b
-        case (a @ Interleaved(_, _, _),   b @ Interleaved(_, _, _))   => a === b
+        case (a @ Interleaved(_, _, _, _),   b @ Interleaved(_, _, _, _))   => a === b
         case (a @ PreImaging(_, _, _, _), b @ PreImaging(_, _, _, _)) => a === b
         case _                                                        => false

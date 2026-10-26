@@ -36,9 +36,10 @@ object ImagingVariantInput:
     GenPrism[ImagingVariantInput, Grouped]
 
   case class Interleaved(
-    offsets:    Nullable[TelescopeConfigGeneratorInput],
-    skyCount:   Option[NonNegInt],
-    skyOffsets: Nullable[TelescopeConfigGeneratorInput]
+    offsets:            Nullable[TelescopeConfigGeneratorInput],
+    skyCount:           Option[NonNegInt],
+    skyOffsets:         Nullable[TelescopeConfigGeneratorInput],
+    exposuresPerOffset: Option[PosInt]
   ) extends ImagingVariantInput:
     def variantType: ImagingVariantType =
       ImagingVariantType.Interleaved
@@ -69,44 +70,46 @@ object ImagingVariantInput:
 
   val offsets: Optional[ImagingVariantInput, Nullable[TelescopeConfigGeneratorInput]] =
     Optional[ImagingVariantInput, Nullable[TelescopeConfigGeneratorInput]] {
-      case Grouped(_, o, _, _, _) => o.some
-      case Interleaved(o, _, _)   => o.some
-      case _                      => none
+      case Grouped(_, o, _, _, _)  => o.some
+      case Interleaved(o, _, _, _) => o.some
+      case _                       => none
     } { gen => {
-      case g: Grouped                           => g.copy(offsets = gen)
-      case Interleaved(_, skyCount, skyOffsets) => Interleaved(gen, skyCount, skyOffsets)
-      case in                                   => in
+      case g: Grouped     => g.copy(offsets = gen)
+      case i: Interleaved => i.copy(offsets = gen)
+      case in             => in
     }}
 
   val skyCount: Optional[ImagingVariantInput, Option[NonNegInt]] =
     Optional[ImagingVariantInput, Option[NonNegInt]] {
-      case Grouped(_, _, c, _, _) => c.some
-      case Interleaved(_, c, _)   => c.some
-      case _                      => none
+      case Grouped(_, _, c, _, _)  => c.some
+      case Interleaved(_, c, _, _) => c.some
+      case _                       => none
     } { skyCount => {
-      case g: Grouped                          => g.copy(skyCount = skyCount)
-      case Interleaved(offsets, _, skyOffsets) => Interleaved(offsets, skyCount, skyOffsets)
-      case in                                  => in
+      case g: Grouped     => g.copy(skyCount = skyCount)
+      case i: Interleaved => i.copy(skyCount = skyCount)
+      case in             => in
     }}
 
   val skyOffsets: Optional[ImagingVariantInput, Nullable[TelescopeConfigGeneratorInput]] =
     Optional[ImagingVariantInput, Nullable[TelescopeConfigGeneratorInput]] {
-      case Grouped(_, _, _, o, _) => o.some
-      case Interleaved(_, _, o)   => o.some
-      case _                      => none
+      case Grouped(_, _, _, o, _)  => o.some
+      case Interleaved(_, _, o, _) => o.some
+      case _                       => none
     } { gen => {
-      case g: Grouped                        => g.copy(skyOffsets = gen)
-      case Interleaved(offsets, skyCount, _) => Interleaved(offsets, skyCount, gen)
-      case in                                => in
+      case g: Grouped     => g.copy(skyOffsets = gen)
+      case i: Interleaved => i.copy(skyOffsets = gen)
+      case in             => in
     }}
 
   val exposuresPerOffset: Optional[ImagingVariantInput, Option[PosInt]] =
     Optional[ImagingVariantInput, Option[PosInt]] {
-      case Grouped(_, _, _, _, k) => k.some
-      case _                      => none
+      case Grouped(_, _, _, _, k)  => k.some
+      case Interleaved(_, _, _, k) => k.some
+      case _                       => none
     } { k => {
-      case g: Grouped => g.copy(exposuresPerOffset = k)
-      case in         => in
+      case g: Grouped     => g.copy(exposuresPerOffset = k)
+      case i: Interleaved => i.copy(exposuresPerOffset = k)
+      case in             => in
     }}
 
   val Default: ImagingVariantInput =
@@ -130,10 +133,11 @@ object ImagingVariantInput:
         case List(
           TelescopeConfigGeneratorInput.Binding.Nullable("offsets", rOffsets),
           NonNegIntBinding.Option("skyCount", rSkyCount),
-          TelescopeConfigGeneratorInput.Binding.Nullable("skyOffsets", rSkyOffsets)
-        ) => (rOffsets, rSkyCount, rSkyOffsets).parMapN:
-          (offsets, skyCount, skyOffsets) =>
-            Interleaved(offsets, skyCount, skyOffsets)
+          TelescopeConfigGeneratorInput.Binding.Nullable("skyOffsets", rSkyOffsets),
+          PosIntBinding.Option("exposuresPerOffset", rExposuresPerOffset)
+        ) => (rOffsets, rSkyCount, rSkyOffsets, rExposuresPerOffset).parMapN:
+          (offsets, skyCount, skyOffsets, exposuresPerOffset) =>
+            Interleaved(offsets, skyCount, skyOffsets, exposuresPerOffset)
 
     val PreImagingBinding: Matcher[ImagingVariantInput] =
       ObjectFieldsBinding.rmap:
