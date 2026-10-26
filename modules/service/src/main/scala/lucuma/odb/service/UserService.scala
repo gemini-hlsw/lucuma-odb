@@ -4,6 +4,7 @@
 package lucuma.odb.service
 
 import cats.effect.MonadCancelThrow
+import cats.effect.Resource
 import cats.syntax.all.*
 import lucuma.core.model.GuestUser
 import lucuma.core.model.ServiceUser
@@ -22,6 +23,13 @@ trait UserService[F[_]] {
 }
 
 object UserService {
+
+  /** Borrows a session per call, so a dropped connection is replaced instead of reused forever. */
+  def fromPool[F[_]: {MonadCancelThrow, Tracer}](pool: Resource[F, Session[F]]): UserService[F] =
+    new UserService[F] {
+      def canonicalizeUser(u: User)(using Services.SuperUserAccess): F[Unit] =
+        pool.use(fromSession(_).canonicalizeUser(u))
+    }
 
   def fromSession[F[_]: {MonadCancelThrow, Tracer as T}](s: Session[F]): UserService[F] =
     new UserService[F] {
