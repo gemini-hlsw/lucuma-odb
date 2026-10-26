@@ -20,5 +20,6 @@ trait Flamingos2DynamicMapping[F[_]] extends Flamingos2DynamicView[F]:
       SqlField("decker",      Flamingos2DynamicView.Decker),
       SqlField("readoutMode", Flamingos2DynamicView.ReadoutMode),
       SqlField("reads",       Flamingos2DynamicView.Reads),
+      SqlField("windowCover", Flamingos2DynamicView.WindowCover),
       SqlObject("centralWavelength")
     )

@@ -121,7 +121,8 @@ object Flamingos2SequenceService:
         "c_fpu_builtin",
         "c_decker",
         "c_readout_mode",
-        "c_reads"
+        "c_reads",
+        "c_window_cover"
       )
 
     val InsertDynamic: Command[(Step.Id, Flamingos2DynamicConfig)] =

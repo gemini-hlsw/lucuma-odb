@@ -20,6 +20,7 @@ trait Flamingos2DynamicView[F[_]] extends BaseMapping[F]:
     val Decker: ColumnRef            = col("c_decker",             flamingos_2_decker)
     val ReadoutMode: ColumnRef       = col("c_readout_mode",       flamingos_2_readout_mode)
     val Reads: ColumnRef             = col("c_reads",              flamingos_2_reads)
+    val WindowCover: ColumnRef       = col("c_window_cover",       flamingos_2_window_cover.opt)
     val CentralWavelength: ColumnRef = col("c_central_wavelength", wavelength_pm)
 
     object Fpu:

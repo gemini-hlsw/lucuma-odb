@@ -14,6 +14,7 @@ import lucuma.core.enums.Flamingos2LyotWheel
 import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.Flamingos2ReadoutMode
 import lucuma.core.enums.Flamingos2Reads
+import lucuma.core.enums.Flamingos2WindowCover
 import lucuma.core.model.Attachment
 import lucuma.core.model.Defined
 import lucuma.core.model.MaskDefinition
@@ -63,6 +64,9 @@ trait Flamingos2Codecs:
   val flamingos_2_reads: Codec[Flamingos2Reads] =
     enumerated(Type.varchar)
 
+  val flamingos_2_window_cover: Codec[Flamingos2WindowCover] =
+    enumerated(Type.varchar)
+
   val flamingos_2_static: Codec[Flamingos2StaticConfig] =
     (
       Codecs.mos_pre_imaging *:
@@ -101,7 +105,8 @@ trait Flamingos2Codecs:
       flamingos_2_fpu_mask      *:
       flamingos_2_decker        *:
       flamingos_2_readout_mode  *:
-      flamingos_2_reads
+      flamingos_2_reads         *:
+      flamingos_2_window_cover.opt
     ).to[Flamingos2DynamicConfig]
 
 object Flamingos2Codecs extends Flamingos2Codecs
