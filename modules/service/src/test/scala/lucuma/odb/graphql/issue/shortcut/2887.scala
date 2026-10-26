@@ -5,7 +5,6 @@ package lucuma.odb.graphql
 package issue.shortcut
 
 import cats.effect.IO
-import cats.effect.Ref
 import cats.syntax.either.*
 import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
@@ -16,21 +15,21 @@ import lucuma.itc.IntegrationTime
 import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
 import lucuma.odb.logic.Generator.SequenceAtomLimit
 
-class ShortCut_2887 extends ExecutionTestSupportForGmos {
-
-  lazy val atomCount: Ref[IO, Int] =
-    Ref.unsafe(0)
+abstract class ShortCut_2887(atomCount: Int) extends ExecutionTestSupportForGmos {
 
   override def fakeItcSpectroscopyResult: IntegrationTime =
     IntegrationTime(
       1.hrTimeSpan,
-      PosInt.unsafeFrom(atomCount.get.unsafeRunSync() max 1)
+      PosInt.unsafeFrom(atomCount)
     )
+
+}
+
+class ShortCut_2887_TooLong extends ShortCut_2887(SequenceAtomLimit + 1) {
 
   test("forever sequence") {
     val setup: IO[Observation.Id] =
       for {
-        _ <- atomCount.set(SequenceAtomLimit + 1)
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(serviceUser, p, List(t))
@@ -61,10 +60,13 @@ class ShortCut_2887 extends ExecutionTestSupportForGmos {
     }
   }
 
+}
+
+class ShortCut_2887_AtLimit extends ShortCut_2887(SequenceAtomLimit - 1) {
+
   test("on the edge of forever") {
     val setup: IO[Observation.Id] =
       for {
-        _ <- atomCount.set(SequenceAtomLimit - 1)
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
