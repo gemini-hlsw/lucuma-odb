@@ -60,7 +60,8 @@ trait Flamingos2ImagingMapping[F[_]]
       SqlObject("offset1"),
       SqlObject("offset2"),
       SqlObject("offset3"),
-      SqlObject("offset4")
+      SqlObject("offset4"),
+      SqlField("exposuresPerOffset", Flamingos2ImagingView.ExposuresPerOffset)
     )
 
   lazy val Flamingos2ImagingVariantMapping: ObjectMapping =

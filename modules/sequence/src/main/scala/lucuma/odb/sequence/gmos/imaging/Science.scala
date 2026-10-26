@@ -254,12 +254,15 @@ object Science:
             generateOffsets(offsets, sc, skyOffsets)(_.map(c => (c + k - 1) / k).sum).map: (o, s) =>
               state.interleaved(config, nem, o, s, exposuresPerOffset)
 
-          case Variant.PreImaging(o1, o2, o3, o4)                 =>
+          case Variant.PreImaging(o1, o2, o3, o4, exposuresPerOffset) =>
+            // Pre-imaging is grouped imaging over the four named positions,
+            // cycled as needed, with `exposuresPerOffset` exposures at each.
+            val k          = exposuresPerOffset.value
             val offsets    = TelescopeConfigGenerator.Enumerated:
               NonEmptyList.of(o1, o2, o3, o4).map(o => TelescopeConfig(o, StepGuideState.Enabled))
             val skyOffsets = TelescopeConfigGenerator.NoGenerator
-            generateOffsets(offsets, NonNegInt.MinValue, skyOffsets)(_.max).map: (o, s) =>
-              state.grouped(config, nem, o, s, PosInt.MinValue)
+            generateOffsets(offsets, NonNegInt.MinValue, skyOffsets)(cs => (cs.max + k - 1) / k).map: (o, s) =>
+              state.grouped(config, nem, o, s, exposuresPerOffset)
 
         protoAtoms.map: v =>
           ImagingSequence.makeGenerator(estimator, static, namespace, v)

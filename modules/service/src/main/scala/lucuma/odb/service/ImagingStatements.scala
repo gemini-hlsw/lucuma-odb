@@ -117,9 +117,9 @@ object ImagingStatements:
       val upPre4p = sql"c_pre_imaging_off4_p = ${angle_µas}"
       val upPre4q = sql"c_pre_imaging_off4_q = ${angle_µas}"
       input match
-        case ImagingVariantInput.PreImaging(o1, o2, o3, o4) =>
+        case ImagingVariantInput.PreImaging(o1, o2, o3, o4, exposuresPerOffset) =>
           upSkyCount(ImagingVariantType.PreImaging, None) ::
-          upExposuresPerOffset(ImagingVariantType.PreImaging, None) :: List(
+          upExposuresPerOffset(ImagingVariantType.PreImaging, exposuresPerOffset) :: List(
             upVariant(ImagingVariantType.PreImaging).some,
             o1.map(o => upPre1p(o.p.toAngle)),
             o1.map(o => upPre1q(o.q.toAngle)),

@@ -843,6 +843,7 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
             variant {
               grouped { exposuresPerOffset }
               interleaved { exposuresPerOffset }
+              preImaging { exposuresPerOffset }
             }
           }
         }
@@ -858,7 +859,7 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
         }
       """
 
-    def expected(grouped: Option[Int], interleaved: Option[Int]): Either[Nothing, Json] =
+    def expected(grouped: Option[Int], interleaved: Option[Int], preImaging: Option[Int] = none): Either[Nothing, Json] =
       def obj(n: Option[Int]): Json =
         n.fold(Json.Null)(k => Json.obj("exposuresPerOffset" -> Json.fromInt(k)))
       json"""
@@ -870,7 +871,8 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
                 "gmosNorthImaging": {
                   "variant": {
                     "grouped": ${obj(grouped)},
-                    "interleaved": ${obj(interleaved)}
+                    "interleaved": ${obj(interleaved)},
+                    "preImaging": ${obj(preImaging)}
                   }
                 }
               }
@@ -906,7 +908,10 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
         (variant("interleaved: {}"),                         query, expected(none, 1.some)), // reset on switch
         (variant("interleaved: { exposuresPerOffset: 2 }"),  query, expected(none, 2.some)), // explicit set
         (variant("interleaved: { skyCount: 1 }"),            query, expected(none, 2.some)), // kept on update
-        (variant("grouped: {}"),                             query, expected(1.some, none))  // reset on switch
+        (variant("grouped: {}"),                             query, expected(1.some, none)), // reset on switch
+        (variant("preImaging: { exposuresPerOffset: 4 }"),   query, expected(none, none, 4.some)), // explicit set on switch
+        (variant("preImaging: { offset1: { p: { arcseconds: 1 } q: { arcseconds: 1 } } }"), query, expected(none, none, 4.some)), // kept on update
+        (variant("interleaved: {}"),                         query, expected(none, 1.some))        // reset on switch
       )
     )
 

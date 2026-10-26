@@ -48,10 +48,11 @@ object ImagingVariantInput:
     GenPrism[ImagingVariantInput, Interleaved]
 
   case class PreImaging(
-    offset1: Option[Offset],
-    offset2: Option[Offset],
-    offset3: Option[Offset],
-    offset4: Option[Offset]
+    offset1:            Option[Offset],
+    offset2:            Option[Offset],
+    offset3:            Option[Offset],
+    offset4:            Option[Offset],
+    exposuresPerOffset: Option[PosInt]
   ) extends ImagingVariantInput:
     def variantType: ImagingVariantType =
       ImagingVariantType.PreImaging
@@ -103,13 +104,13 @@ object ImagingVariantInput:
 
   val exposuresPerOffset: Optional[ImagingVariantInput, Option[PosInt]] =
     Optional[ImagingVariantInput, Option[PosInt]] {
-      case Grouped(_, _, _, _, k)  => k.some
-      case Interleaved(_, _, _, k) => k.some
-      case _                       => none
+      case Grouped(_, _, _, _, k)    => k.some
+      case Interleaved(_, _, _, k)   => k.some
+      case PreImaging(_, _, _, _, k) => k.some
     } { k => {
       case g: Grouped     => g.copy(exposuresPerOffset = k)
       case i: Interleaved => i.copy(exposuresPerOffset = k)
-      case in             => in
+      case p: PreImaging  => p.copy(exposuresPerOffset = k)
     }}
 
   val Default: ImagingVariantInput =
@@ -145,9 +146,11 @@ object ImagingVariantInput:
           OffsetInput.Binding.Option("offset1", rOffset1),
           OffsetInput.Binding.Option("offset2", rOffset2),
           OffsetInput.Binding.Option("offset3", rOffset3),
-          OffsetInput.Binding.Option("offset4", rOffset4)
-        ) => (rOffset1, rOffset2, rOffset3, rOffset4).parMapN: (o1, o2, o3, o4) =>
-          PreImaging(o1, o2, o3, o4)
+          OffsetInput.Binding.Option("offset4", rOffset4),
+          PosIntBinding.Option("exposuresPerOffset", rExposuresPerOffset)
+        ) => (rOffset1, rOffset2, rOffset3, rOffset4, rExposuresPerOffset).parMapN:
+          (o1, o2, o3, o4, exposuresPerOffset) =>
+            PreImaging(o1, o2, o3, o4, exposuresPerOffset)
 
     OneOfBinding(
       "grouped"     -> GroupedBinding,

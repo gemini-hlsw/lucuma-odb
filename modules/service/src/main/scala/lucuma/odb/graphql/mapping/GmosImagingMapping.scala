@@ -82,7 +82,8 @@ trait GmosImagingMapping[F[_]] extends GmosImagingView[F]
       SqlObject("offset1"),
       SqlObject("offset2"),
       SqlObject("offset3"),
-      SqlObject("offset4")
+      SqlObject("offset4"),
+      SqlField("exposuresPerOffset", c.ExposuresPerOffset)
     )
 
   lazy val GmosNorthPreImagingMapping: ObjectMapping =

@@ -225,7 +225,7 @@ object Science:
             generateOffsets(offsets, sc, skyOffsets)(_.sum).map: (o, s) =>
               ProtoSequences.interleaved(config, nem, readModes, o, s)
 
-          case Variant.PreImaging(o1, o2, o3, o4)                 =>
+          case Variant.PreImaging(o1, o2, o3, o4, _)              =>
             val offsets    = TelescopeConfigGenerator.Enumerated:
               NonEmptyList.of(o1, o2, o3, o4).map(o => TelescopeConfig(o, StepGuideState.Enabled))
             val skyOffsets = TelescopeConfigGenerator.NoGenerator

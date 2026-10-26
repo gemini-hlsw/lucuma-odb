@@ -14061,6 +14061,14 @@ type PreImagingVariant {
   offset2: Offset!
   offset3: Offset!
   offset4: Offset!
+
+  """
+  Number of consecutive science exposures to collect in one filter at each
+  offset position before moving on to the next position.  A filter's final
+  position may receive fewer exposures so that its overall exposure count is
+  honored.
+  """
+  exposuresPerOffset: PosInt!
 }
 
 """
@@ -14071,6 +14079,13 @@ input PreImagingVariantInput {
   offset2: OffsetInput
   offset3: OffsetInput
   offset4: OffsetInput
+
+  """
+  Number of consecutive science exposures to collect in one filter at each
+  offset position before moving on to the next position.  Defaults to 1 on
+  creation, absent (i.e., not modified) on update.
+  """
+  exposuresPerOffset: PosInt
 }
 
 """

@@ -694,42 +694,43 @@ class executionSciGmosNorthImaging extends ExecutionTestSupportForGmos:
         expected = expectedResult(json).asRight
       )
 
-  test("preImaging"):
-    val mode =
-      s"""{
-        gmosNorthImaging: {
-          variant: {
-            preImaging: {
-              offset1: {
-                p: { arcseconds: 1 }
-                q: { arcseconds: 1 }
-              }
-              offset2: {
-                p: { arcseconds: 2 }
-                q: { arcseconds: 2 }
-              }
-              offset3: {
-                p: { arcseconds: 3 }
-                q: { arcseconds: 3 }
-              }
-              offset4: {
-                p: { arcseconds: 4 }
-                q: { arcseconds: 4 }
-              }
+  private def preImagingMode(exposuresPerOffset: Option[Int]): String =
+    s"""{
+      gmosNorthImaging: {
+        variant: {
+          preImaging: {
+            offset1: {
+              p: { arcseconds: 1 }
+              q: { arcseconds: 1 }
             }
+            offset2: {
+              p: { arcseconds: 2 }
+              q: { arcseconds: 2 }
+            }
+            offset3: {
+              p: { arcseconds: 3 }
+              q: { arcseconds: 3 }
+            }
+            offset4: {
+              p: { arcseconds: 4 }
+              q: { arcseconds: 4 }
+            }
+            ${exposuresPerOffset.fold("")(k => s"exposuresPerOffset: $k")}
           }
-          filters: [
-            { filter: G_PRIME },
-            { filter: I_PRIME }
-          ]
         }
-      }"""
+        filters: [
+          { filter: G_PRIME },
+          { filter: I_PRIME }
+        ]
+      }
+    }"""
 
+  test("preImaging"):
     val setup: IO[Observation.Id] =
       for
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
-        o <- createObservation(p, t, Site.GN)(mode)
+        o <- createObservation(p, t, Site.GN)(preImagingMode(none))
       yield o
 
     // Pre-imaging would usually be done with a TimeAndCount mode with exactly
@@ -764,6 +765,31 @@ class executionSciGmosNorthImaging extends ExecutionTestSupportForGmos:
         user     = pi,
         query    = gmosNorthScienceQuery(oid, 100.some),
         expected = expectedResult(g ++ i).asRight
+      )
+
+  test("preImaging, exposuresPerOffset"):
+    // With exposuresPerOffset = 3, I' (12 exposures) takes three at each of the
+    // four positions while G' (6 exposures) needs only the first two.
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createObservation(p, t, Site.GN)(preImagingMode(3.some))
+      yield o
+
+    def preImaging(f: GmosNorthFilter, t: IntegrationTime, positions: Int): List[Json] =
+      (1 to positions).toList.flatMap(n => List.fill(3)(n)).map: n =>
+        gnAtom(Step(f, t).withOffset(n, n))
+
+    val json: List[Json] =
+      preImaging(GmosNorthFilter.GPrime, Time120x06, 2) ++
+      preImaging(GmosNorthFilter.IPrime, Time060x12, 4)
+
+    setup.flatMap: oid =>
+      expect(
+        user     = pi,
+        query    = gmosNorthScienceQuery(oid, 100.some),
+        expected = expectedResult(json).asRight
       )
 
   test("digest"):

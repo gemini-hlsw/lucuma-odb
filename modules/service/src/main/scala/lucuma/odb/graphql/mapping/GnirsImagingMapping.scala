@@ -67,7 +67,8 @@ trait GnirsImagingMapping[F[_]]
       SqlObject("offset1"),
       SqlObject("offset2"),
       SqlObject("offset3"),
-      SqlObject("offset4")
+      SqlObject("offset4"),
+      SqlField("exposuresPerOffset", GnirsImagingView.ExposuresPerOffset)
     )
 
   lazy val GnirsImagingVariantMapping: ObjectMapping =

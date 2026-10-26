@@ -48,7 +48,8 @@ trait ArbImagingVariantInput:
         o2 <- arbitrary[Option[Offset]]
         o3 <- arbitrary[Option[Offset]]
         o4 <- arbitrary[Option[Offset]]
-      yield ImagingVariantInput.PreImaging(o1, o2, o3, o4)
+        ic <- Gen.option(Gen.choose(1, 10).map(PosInt.unsafeFrom))
+      yield ImagingVariantInput.PreImaging(o1, o2, o3, o4, ic)
 
   given Arbitrary[ImagingVariantInput] =
     Arbitrary:
