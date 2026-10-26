@@ -47,11 +47,12 @@ object ServerMiddleware {
       Kleisli { req =>
         val updateUser: F[Unit] =
           client.find(req).flatMap(_.traverse_ { user =>
-            cache(user.id).flatModify { cached =>
-              // Update the user if not present in the cache, or if it has changed since the last time we saw it.
-              // The cache will grow in an unbounded fashion, which is fine. Not all that many users.
-              val update = Services.asSuperUser(userService.canonicalizeUser(user).whenA(cached.forall(_ =!= user)))
-              (user.some, update)
+            // Update the user if not present in the cache, or if it has changed since the last time we saw it.
+            // Cache only after the write succeeds, so a failed write is retried on the next request.
+            // The cache will grow in an unbounded fashion, which is fine. Not all that many users.
+            cache(user.id).get.flatMap { cached =>
+              (Services.asSuperUser(userService.canonicalizeUser(user)) *> cache(user.id).set(user.some))
+                .whenA(cached.forall(_ =!= user))
             }
           })
         OptionT.liftF(updateUser) *> routes(req)

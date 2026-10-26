@@ -260,7 +260,7 @@ object FMain extends MainParams {
       httpClient        <- httpClientResource
       horizonsClient    <- horizonsClientResource
       goaClient         <- goaClientResource
-      userSvc           <- pool.map(UserService.fromSession(_))
+      userSvc            = UserService.fromPool(pool)
       middleware        <- ServerMiddleware(corsOverHttps, domain, ssoClient, userSvc)
       enums             <- Resource.eval(pool.use(Enums.load))
       ptc               <- Resource.eval(pool.use(TimeEstimateCalculatorImplementation.fromSession(_, enums)))
@@ -269,7 +269,7 @@ object FMain extends MainParams {
       s3ClientOps       <- s3OpsResource
       s3Presigner       <- s3PresignerResource
       s3FileService      = S3FileService.fromS3ConfigAndClient(awsConfig, s3ClientOps, s3Presigner)
-      webhookService    <- pool.map(EmailWebhookService.fromSession(_))
+      webhookService     = EmailWebhookService.fromPool(pool)
       healthRoutes      <- Resource.eval(HealthRoutes[F](
                              commitHash.format,
                              healthChecks(singleSession(databaseConfig), httpClient, ssoRoot, itcRoot)

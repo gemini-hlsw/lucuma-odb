@@ -161,7 +161,7 @@ object PMain extends MainParams:
       enums            <- Resource.eval(pool.use(Enums.load))
       user             <- Resource.eval(serviceUser[F](c))
       _                <- Resource.eval(user.traverse_ : u =>
-                            pool.use(s => Services.asSuperUser(UserService.fromSession(s).canonicalizeUser(u)))
+                            Services.asSuperUser(UserService.fromPool(pool).canonicalizeUser(u))
                           )
       httpClient       <- c.httpClientResource
       gaiaClient       <- c.gaiaClient
