@@ -293,9 +293,7 @@ object CalcMain extends MainParams:
       ptc        <- Resource.eval(pool.use(TimeEstimateCalculatorImplementation.fromSession(_, enums)))
       t          <- topic(pool)
       user       <- Resource.eval(serviceUser[F](c))
-      _          <- Resource.eval(pool.use: s =>
-                      Services.asSuperUser(UserService.fromSession(s).canonicalizeUser(user))
-                    )
+      _          <- Resource.eval(Services.asSuperUser(UserService.fromPool(pool).canonicalizeUser(user)))
       schema     <- Resource.eval(OdbMapping.loadSchema[F])
       mapping     = (s: Session[F]) =>
                       OdbMapping.forObscalc(

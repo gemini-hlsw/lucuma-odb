@@ -41,8 +41,19 @@ class queryAfterConnectionLoss extends OdbSuite:
                 new RuntimeException("Expected server connections to terminate, found none.")
       _    <- withSession: s =>
                 pids.traverse_(pid => s.unique(sql"SELECT pg_terminate_backend($int4)".query(bool))(pid).void)
-      _    <- IO.sleep(500.millis)
+      _    <- awaitGone(pids.toSet)
     yield ()
+
+  // skunk only marks a session unhealthy once its reader has seen the EOF, so wait for
+  // the backends to disappear rather than sleeping a fixed time.
+  private def awaitGone(pids: Set[Int]): IO[Unit] =
+    def go: IO[Unit] =
+      serverBackends.flatMap: live =>
+        if live.exists(pids) then IO.sleep(100.millis) *> go else IO.unit
+    go.timeoutTo(
+      30.seconds,
+      IO.raiseError(new RuntimeException("Terminated server connections never went away."))
+    )
 
   test("serve new users over HTTP and WS after the database connections are lost"):
     for
