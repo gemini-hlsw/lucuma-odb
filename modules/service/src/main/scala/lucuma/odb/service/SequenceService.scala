@@ -868,7 +868,7 @@ object SequenceService:
                  Instrument.Flamingos2,
                  observationId,
                  sequenceType,
-                 sequence,
+                 sequence.map(_.map(Flamingos2SequenceService.withDarkWindowCover)),
                  batch,
                  abandonOngoingStep,
                  customized,

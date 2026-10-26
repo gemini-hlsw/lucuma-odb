@@ -38,7 +38,7 @@ class replaceFlamingos2Sequence extends query.ExecutionTestSupportForFlamingos2 
               decker: LONG_SLIT
               readoutMode: SCIENCE
               reads: READS_1
-              ${windowCover.fold("")(w => s"windowCover: ${w.tag.toScreamingSnakeCase}")}
+              ${windowCover.foldMap(w => s"windowCover: ${w.tag.toScreamingSnakeCase}")}
             }
             stepConfig: {
               $stepConfig
@@ -353,3 +353,13 @@ class replaceFlamingos2Sequence extends query.ExecutionTestSupportForFlamingos2 
       createWindowCoverObservation.flatMap: oid =>
         val inputString = input(oid, SequenceType.Science, atomInput("Foo", stepInput(Flamingos2Filter.J, wc.some)))
         expect(pi, windowCoverQuery(inputString), windowCoverResult(wc.some).asRight)
+
+  test("dark window cover defaults to close"):
+    createWindowCoverObservation.flatMap: oid =>
+      val inputString = input(oid, SequenceType.Science, atomInput("Foo", stepInput(Flamingos2Filter.J, stepConfig = "dark: true")))
+      expect(pi, windowCoverQuery(inputString), windowCoverResult(Flamingos2WindowCover.Close.some).asRight)
+
+  test("dark window cover keeps an explicit open"):
+    createWindowCoverObservation.flatMap: oid =>
+      val inputString = input(oid, SequenceType.Science, atomInput("Foo", stepInput(Flamingos2Filter.J, Flamingos2WindowCover.Open.some, "dark: true")))
+      expect(pi, windowCoverQuery(inputString), windowCoverResult(Flamingos2WindowCover.Open.some).asRight)

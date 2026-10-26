@@ -97,15 +97,15 @@ trait Flamingos2Codecs:
 
   val flamingos_2_dynamic: Codec[Flamingos2DynamicConfig] =
     (
-      time_span                 *:
-      flamingos_2_disperser.opt *:
-      flamingos_2_filter        *:
-      flamingos_2_read_mode     *:
-      flamingos_2_lyot_wheel    *:
-      flamingos_2_fpu_mask      *:
-      flamingos_2_decker        *:
-      flamingos_2_readout_mode  *:
-      flamingos_2_reads         *:
+      time_span                    *:
+      flamingos_2_disperser.opt    *:
+      flamingos_2_filter           *:
+      flamingos_2_read_mode        *:
+      flamingos_2_lyot_wheel       *:
+      flamingos_2_fpu_mask         *:
+      flamingos_2_decker           *:
+      flamingos_2_readout_mode     *:
+      flamingos_2_reads            *:
       flamingos_2_window_cover.opt
     ).to[Flamingos2DynamicConfig]
 

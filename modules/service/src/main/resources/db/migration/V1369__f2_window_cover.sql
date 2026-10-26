@@ -3,6 +3,13 @@ DROP VIEW v_flamingos_2_dynamic;
 ALTER TABLE t_flamingos_2_dynamic
   ADD COLUMN c_window_cover d_tag NULL REFERENCES t_f2_window_cover(c_tag);
 
+UPDATE t_flamingos_2_dynamic d
+   SET c_window_cover = 'Close'
+  FROM t_step s
+ WHERE s.c_step_id = d.c_step_id
+   AND s.c_step_type = 'dark'
+   AND d.c_window_cover IS NULL;
+
 CREATE VIEW v_flamingos_2_dynamic AS
   SELECT t.*,
   f.c_wavelength AS c_central_wavelength,
