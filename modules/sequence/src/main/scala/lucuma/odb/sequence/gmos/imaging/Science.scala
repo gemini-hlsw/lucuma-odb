@@ -46,6 +46,7 @@ import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.TelescopeConfigGenerator
+import lucuma.odb.sequence.imaging.ExposuresPerOffset
 import lucuma.odb.sequence.imaging.ImagingSequence
 import lucuma.odb.sequence.imaging.Variant
 
@@ -76,10 +77,10 @@ object Science:
       yield ()
 
     def grouped(
-      config:          Config[L],
-      time:            NonEmptyMap[L, Zipper[Result]],
-      offsets:         List[TelescopeConfig],
-      skyOffsets:      List[TelescopeConfig],
+      config:             Config[L],
+      time:               NonEmptyMap[L, Zipper[Result]],
+      offsets:            List[TelescopeConfig],
+      skyOffsets:         List[TelescopeConfig],
       exposuresPerOffset: PosInt
     )(using Order[L]): Stream[Pure, ProtoAtom[ProtoStep[D]]] =
 
@@ -90,10 +91,7 @@ object Science:
           sky <- skyOffsets
                    .traverse: offset =>
                      scienceStep(offset, ObserveClass.Science)
-          // Each object offset position gets `exposuresPerOffset` consecutive
-          // exposures.  The overall frame count from the ITC still caps the
-          // total, so the final position may receive fewer than that many.
-          obj <- offsets.flatMap(o => List.fill(exposuresPerOffset.value)(o)).take(integrationTime.frameCount.value)
+          obj <- ExposuresPerOffset.repeat(offsets, exposuresPerOffset, integrationTime.frameCount.value)
                    .traverse: offset =>
                      scienceStep(offset, ObserveClass.Science)
         yield
@@ -133,47 +131,23 @@ object Science:
             s <- scienceStep(offset, ObserveClass.Science)
           yield s
 
-      // Each filter's frames are taken in "stops" of `exposuresPerOffset`
-      // consecutive exposures at a single offset position.  The last stop is
-      // short when the frame count isn't a multiple, so the ITC frame count is
-      // honored exactly.  With one exposure per offset a stop is just a frame.
-      val k = exposuresPerOffset.value
+      val plan: List[List[(L, Int)]] =
+        ExposuresPerOffset.interleave(filters.fproduct(filterTimes(_).frameCount.value), exposuresPerOffset)
 
-      val stopSizes: Map[L, List[Int]] =
-        filters
-          .fproduct: filter =>
-            val total = filterTimes(filter).frameCount.value
-            List.tabulate((total + k - 1) / k)(i => k min (total - i * k))
-          .toMap
-
-      // number of groups of interleaved filters
-      val groupCount: Int =
-        stopSizes.values.map(_.size).min
-
-      // stop count per filter in group n
-      def stopCount(filter: L, n: Int): Int =
-        val total = stopSizes(filter).size
-        (total / groupCount) + (if total % groupCount > n then 1 else 0)
-
-      // the dynamic config and size of each stop in group n
-      def oneGroup(n: Int): State[D, Stream[Pure, (D, Int)]] =
-        filters
-          .traverse: filter =>
-            val first = (0 until n).map(stopCount(filter, _)).sum
-            for
-              _ <- setFilter(filter, filterTimes(filter).exposureTime)
-              d <- State.get
-            yield Stream.emits(stopSizes(filter).slice(first, first + stopCount(filter, n)).tupleLeft(d))
-          .map(lst => Stream.emits(lst).flatten)
+      // the dynamic config and size of each stop in a group
+      def oneGroup(group: List[(L, Int)]): State[D, List[(D, Int)]] =
+        group.traverse: (filter, size) =>
+          for
+            _ <- setFilter(filter, filterTimes(filter).exposureTime)
+            d <- State.get
+          yield (d, size)
 
       val groups: State[D, Stream[Pure, Chunk[ProtoStep[D]]]] =
-        (0 until groupCount)
-          .toList
-          .traverse(oneGroup)   // State[D, List[Stream[Pure, (D, Int)]]]
+        plan
+          .traverse(oneGroup)   // State[D, List[List[(D, Int)]]]
           .map: lst =>
             Stream
-              .emits(lst.zipWithIndex.map((s, i) => s.tupleRight(i)))
-              .flatten
+              .emits(lst.zipWithIndex.flatMap((g, i) => g.tupleRight(i)))
               .zip(Stream.emits(offsets)) // Stream[Pure, (((D, Int), Int), TelescopeConfig)], one offset per stop
               .flatMap { case (((d, size), i), tc) =>
                 Stream.emits(List.fill(size)(ProtoStep(d, StepConfig.Science, tc, ObserveClass.Science) -> i))
@@ -236,32 +210,27 @@ object Science:
           yield (o, s)
 
         val protoAtoms = config.variant match
-          case Variant.Grouped(_, offsets, skyCount, skyOffsets, exposuresPerOffset)  =>
-            // offsets to cover the filter with the most frames.  Each offset
-            // position is visited `exposuresPerOffset` times, so we only need
-            // ceil(max / exposuresPerOffset) distinct positions.
-            val k = exposuresPerOffset.value
-            generateOffsets(offsets, skyCount, skyOffsets)(cs => (cs.max + k - 1) / k).map: (o, s) =>
+          case Variant.Grouped(_, offsets, skyCount, skyOffsets, exposuresPerOffset) =>
+            // The same pattern is repeated for each filter so we need enough
+            // offsets to cover the filter with the most stops.
+            generateOffsets(offsets, skyCount, skyOffsets)(ExposuresPerOffset.groupedOffsetCount(_, exposuresPerOffset)).map: (o, s) =>
               state.grouped(config, nem, o, s, exposuresPerOffset)
 
           case Variant.Interleaved(offsets, skyCount, skyOffsets, exposuresPerOffset) =>
             // The offset pattern is applied to the sequence as a whole so we
-            // need an offset per stop (`exposuresPerOffset` consecutive
-            // exposures in one filter). Also there are skyCount sky positions
+            // need an offset per stop. Also there are skyCount sky positions
             // per filter.
-            val k  = exposuresPerOffset.value
             val sc = NonNegInt.unsafeFrom(skyCount.value * nem.length)
-            generateOffsets(offsets, sc, skyOffsets)(_.map(c => (c + k - 1) / k).sum).map: (o, s) =>
+            generateOffsets(offsets, sc, skyOffsets)(ExposuresPerOffset.interleavedOffsetCount(_, exposuresPerOffset)).map: (o, s) =>
               state.interleaved(config, nem, o, s, exposuresPerOffset)
 
           case Variant.PreImaging(o1, o2, o3, o4, exposuresPerOffset) =>
             // Pre-imaging is grouped imaging over the four named positions,
-            // cycled as needed, with `exposuresPerOffset` exposures at each.
-            val k          = exposuresPerOffset.value
+            // cycled as needed.
             val offsets    = TelescopeConfigGenerator.Enumerated:
               NonEmptyList.of(o1, o2, o3, o4).map(o => TelescopeConfig(o, StepGuideState.Enabled))
             val skyOffsets = TelescopeConfigGenerator.NoGenerator
-            generateOffsets(offsets, NonNegInt.MinValue, skyOffsets)(cs => (cs.max + k - 1) / k).map: (o, s) =>
+            generateOffsets(offsets, NonNegInt.MinValue, skyOffsets)(ExposuresPerOffset.groupedOffsetCount(_, exposuresPerOffset)).map: (o, s) =>
               state.grouped(config, nem, o, s, exposuresPerOffset)
 
         protoAtoms.map: v =>

@@ -23,10 +23,10 @@ sealed trait ImagingVariantInput:
 object ImagingVariantInput:
 
   case class Grouped(
-    order:           Option[WavelengthOrder],
-    offsets:         Nullable[TelescopeConfigGeneratorInput],
-    skyCount:        Option[NonNegInt],
-    skyOffsets:      Nullable[TelescopeConfigGeneratorInput],
+    order:              Option[WavelengthOrder],
+    offsets:            Nullable[TelescopeConfigGeneratorInput],
+    skyCount:           Option[NonNegInt],
+    skyOffsets:         Nullable[TelescopeConfigGeneratorInput],
     exposuresPerOffset: Option[PosInt]
   ) extends ImagingVariantInput:
     def variantType: ImagingVariantType =
@@ -122,9 +122,9 @@ object ImagingVariantInput:
         case List(
           WavelengthOrderBinding.Option("order", rOrder),
           TelescopeConfigGeneratorInput.Binding.Nullable("offsets", rOffsets),
-          NonNegIntBinding.Option("skyCount", rSkyCount),
+          NonNegIntBinding.NonNullable("skyCount", rSkyCount),
           TelescopeConfigGeneratorInput.Binding.Nullable("skyOffsets", rSkyOffsets),
-          PosIntBinding.Option("exposuresPerOffset", rExposuresPerOffset)
+          PosIntBinding.NonNullable("exposuresPerOffset", rExposuresPerOffset)
         ) => (rOrder, rOffsets, rSkyCount, rSkyOffsets, rExposuresPerOffset).parMapN:
           (order, offsets, skyCount, skyOffsets, exposuresPerOffset) =>
             Grouped(order, offsets, skyCount, skyOffsets, exposuresPerOffset)
@@ -133,9 +133,9 @@ object ImagingVariantInput:
       ObjectFieldsBinding.rmap:
         case List(
           TelescopeConfigGeneratorInput.Binding.Nullable("offsets", rOffsets),
-          NonNegIntBinding.Option("skyCount", rSkyCount),
+          NonNegIntBinding.NonNullable("skyCount", rSkyCount),
           TelescopeConfigGeneratorInput.Binding.Nullable("skyOffsets", rSkyOffsets),
-          PosIntBinding.Option("exposuresPerOffset", rExposuresPerOffset)
+          PosIntBinding.NonNullable("exposuresPerOffset", rExposuresPerOffset)
         ) => (rOffsets, rSkyCount, rSkyOffsets, rExposuresPerOffset).parMapN:
           (offsets, skyCount, skyOffsets, exposuresPerOffset) =>
             Interleaved(offsets, skyCount, skyOffsets, exposuresPerOffset)
@@ -147,7 +147,7 @@ object ImagingVariantInput:
           OffsetInput.Binding.Option("offset2", rOffset2),
           OffsetInput.Binding.Option("offset3", rOffset3),
           OffsetInput.Binding.Option("offset4", rOffset4),
-          PosIntBinding.Option("exposuresPerOffset", rExposuresPerOffset)
+          PosIntBinding.NonNullable("exposuresPerOffset", rExposuresPerOffset)
         ) => (rOffset1, rOffset2, rOffset3, rOffset4, rExposuresPerOffset).parMapN:
           (o1, o2, o3, o4, exposuresPerOffset) =>
             PreImaging(o1, o2, o3, o4, exposuresPerOffset)

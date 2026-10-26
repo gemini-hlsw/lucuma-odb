@@ -13,6 +13,7 @@ import cats.data.State
 import cats.effect.Sync
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegInt
+import eu.timepit.refined.types.numeric.PosInt
 import fs2.Chunk
 import fs2.Pure
 import fs2.Stream
@@ -36,6 +37,7 @@ import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.TelescopeConfigGenerator
+import lucuma.odb.sequence.imaging.ExposuresPerOffset
 import lucuma.odb.sequence.imaging.ImagingSequence
 import lucuma.odb.sequence.imaging.Variant
 
@@ -68,11 +70,12 @@ object Science:
       yield ()
 
     def grouped(
-      config:     Config,
-      time:       NonEmptyMap[GnirsFilter, Zipper[Result]],
-      readModes:  NonEmptyMap[GnirsFilter, GnirsReadMode],
-      offsets:    List[TelescopeConfig],
-      skyOffsets: List[TelescopeConfig]
+      config:             Config,
+      time:               NonEmptyMap[GnirsFilter, Zipper[Result]],
+      readModes:          NonEmptyMap[GnirsFilter, GnirsReadMode],
+      offsets:            List[TelescopeConfig],
+      skyOffsets:         List[TelescopeConfig],
+      exposuresPerOffset: PosInt
     )(using Order[GnirsFilter]): Stream[Pure, ProtoAtom[ProtoStep[GnirsDynamicConfig]]] =
 
       def oneFilter(filter: GnirsFilter): State[GnirsDynamicConfig, Stream[Pure, ProtoAtom[ProtoStep[GnirsDynamicConfig]]]] =
@@ -82,7 +85,7 @@ object Science:
           sky <- skyOffsets
                    .traverse: offset =>
                      scienceStep(offset, ObserveClass.Science)
-          obj <- offsets.take(integrationTime.frameCount.value)
+          obj <- ExposuresPerOffset.repeat(offsets, exposuresPerOffset, integrationTime.frameCount.value)
                    .traverse: offset =>
                      scienceStep(offset, ObserveClass.Science)
         yield
@@ -99,11 +102,12 @@ object Science:
         .flatten
 
     def interleaved(
-      config:     Config,
-      time:       NonEmptyMap[GnirsFilter, Zipper[Result]],
-      readModes:  NonEmptyMap[GnirsFilter, GnirsReadMode],
-      offsets:    List[TelescopeConfig],
-      skyOffsets: List[TelescopeConfig]
+      config:             Config,
+      time:               NonEmptyMap[GnirsFilter, Zipper[Result]],
+      readModes:          NonEmptyMap[GnirsFilter, GnirsReadMode],
+      offsets:            List[TelescopeConfig],
+      skyOffsets:         List[TelescopeConfig],
+      exposuresPerOffset: PosInt
     )(using Order[GnirsFilter]): Stream[Pure, ProtoAtom[ProtoStep[GnirsDynamicConfig]]] =
 
       val filterTimes: Map[GnirsFilter, IntegrationTime] =
@@ -122,39 +126,27 @@ object Science:
             s <- scienceStep(offset, ObserveClass.Science)
           yield s
 
-      // number of groups of interleaved filters
-      val groupCount: Int =
-        filterTimes.values.map(_.frameCount.value).min
+      val plan: List[List[(GnirsFilter, Int)]] =
+        ExposuresPerOffset.interleave(filters.fproduct(filterTimes(_).frameCount.value), exposuresPerOffset)
 
-      def oneGroup(n: Int): State[GnirsDynamicConfig, Stream[Pure, GnirsDynamicConfig]] =
-        // exposure count per filter in this group.
-        val perFilterCounts =
-          filters
-            .fproduct: filter =>
-              val total = filterTimes(filter).frameCount.value
-              (total / groupCount) + (if total % groupCount > n then 1 else 0)
-            .toMap
-
-        filters
-          .traverse: filter =>
-            for
-              _ <- setFilter(config, filter, filterTimes(filter), readModes(filter).get)
-              d <- State.get
-            yield Stream.emits(List.fill(perFilterCounts(filter))(d))
-          .map(lst => Stream.emits(lst).flatten)
+      // the dynamic config and size of each stop in a group
+      def oneGroup(group: List[(GnirsFilter, Int)]): State[GnirsDynamicConfig, List[(GnirsDynamicConfig, Int)]] =
+        group.traverse: (filter, size) =>
+          for
+            _ <- setFilter(config, filter, filterTimes(filter), readModes(filter).get)
+            d <- State.get
+          yield (d, size)
 
       val groups: State[GnirsDynamicConfig, Stream[Pure, Chunk[ProtoStep[GnirsDynamicConfig]]]] =
-        (0 until groupCount)
-          .toList
+        plan
           .traverse(oneGroup)
           .map: lst =>
             Stream
-              .emits(lst.zipWithIndex.map(_.tupleRight(_)))
-              .flatten
-              .zip(Stream.emits(offsets))
-              .map:
-                case ((d, i), tc) =>
-                  ProtoStep(d, StepConfig.Science, tc, ObserveClass.Science) -> i
+              .emits(lst.zipWithIndex.flatMap((g, i) => g.tupleRight(i)))
+              .zip(Stream.emits(offsets)) // one offset per stop
+              .flatMap:
+                case (((d, size), i), tc) =>
+                  Stream.emits(List.fill(size)(ProtoStep(d, StepConfig.Science, tc, ObserveClass.Science) -> i))
               .groupAdjacentBy(_._2)
               .map(_._2.map(_._1))
 
@@ -211,26 +203,28 @@ object Science:
           yield (o, s)
 
         val protoAtoms = config.variant match
-          case Variant.Grouped(_, offsets, skyCount, skyOffsets, _)  =>
+          case Variant.Grouped(_, offsets, skyCount, skyOffsets, exposuresPerOffset) =>
             // The same pattern is repeated for each filter so we need enough
-            // offsets to cover the filter with the most frames.
-            generateOffsets(offsets, skyCount, skyOffsets)(_.max).map: (o, s) =>
-              ProtoSequences.grouped(config, nem, readModes, o, s)
+            // offsets to cover the filter with the most stops.
+            generateOffsets(offsets, skyCount, skyOffsets)(ExposuresPerOffset.groupedOffsetCount(_, exposuresPerOffset)).map: (o, s) =>
+              ProtoSequences.grouped(config, nem, readModes, o, s, exposuresPerOffset)
 
-          case Variant.Interleaved(offsets, skyCount, skyOffsets, _) =>
+          case Variant.Interleaved(offsets, skyCount, skyOffsets, exposuresPerOffset) =>
             // The offset pattern is applied to the sequence as a whole so we
-            // need an offset per science exposure. Also there are skyCount sky
-            // positions per filter.
+            // need an offset per stop. Also there are skyCount sky positions
+            // per filter.
             val sc = NonNegInt.unsafeFrom(skyCount.value * nem.length)
-            generateOffsets(offsets, sc, skyOffsets)(_.sum).map: (o, s) =>
-              ProtoSequences.interleaved(config, nem, readModes, o, s)
+            generateOffsets(offsets, sc, skyOffsets)(ExposuresPerOffset.interleavedOffsetCount(_, exposuresPerOffset)).map: (o, s) =>
+              ProtoSequences.interleaved(config, nem, readModes, o, s, exposuresPerOffset)
 
-          case Variant.PreImaging(o1, o2, o3, o4, _)              =>
+          case Variant.PreImaging(o1, o2, o3, o4, exposuresPerOffset) =>
+            // Pre-imaging is grouped imaging over the four named positions,
+            // cycled as needed.
             val offsets    = TelescopeConfigGenerator.Enumerated:
               NonEmptyList.of(o1, o2, o3, o4).map(o => TelescopeConfig(o, StepGuideState.Enabled))
             val skyOffsets = TelescopeConfigGenerator.NoGenerator
-            generateOffsets(offsets, NonNegInt.MinValue, skyOffsets)(_.max).map: (o, s) =>
-              ProtoSequences.grouped(config, nem, readModes, o, s)
+            generateOffsets(offsets, NonNegInt.MinValue, skyOffsets)(ExposuresPerOffset.groupedOffsetCount(_, exposuresPerOffset)).map: (o, s) =>
+              ProtoSequences.grouped(config, nem, readModes, o, s, exposuresPerOffset)
 
         protoAtoms.map: v =>
           ImagingSequence.makeGenerator(estimator, static, namespace, v)

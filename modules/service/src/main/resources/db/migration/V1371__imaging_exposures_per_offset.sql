@@ -1,7 +1,7 @@
 -- Number of consecutive science exposures to collect at each object offset
--- position in the "grouped" imaging variant.  Shared shape with the other
--- imaging mode tables (gmos north/south, gnirs, flamingos2); only GMOS exposes
--- it through the API for now, so the other modes simply carry the default of 1.
+-- position.  Like c_sky_count, a single column is shared by all the imaging
+-- variants (grouped, interleaved and pre-imaging) and added to every imaging
+-- mode table (gmos north/south, gnirs, flamingos2).
 
 ALTER TABLE t_gmos_north_imaging
   ADD COLUMN c_exposures_per_offset int NOT NULL DEFAULT 1 CHECK (c_exposures_per_offset > 0);

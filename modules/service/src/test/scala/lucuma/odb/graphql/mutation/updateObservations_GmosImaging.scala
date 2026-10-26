@@ -915,6 +915,80 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
       )
     )
 
+  test("observing mode: skyCount and exposuresPerOffset cannot be null"):
+
+    val query = """
+      observations {
+        observingMode {
+          gmosNorthImaging {
+            variant {
+              grouped { skyCount exposuresPerOffset }
+            }
+          }
+        }
+      }
+    """
+
+    def variant(v: String): String =
+      s"""
+        observingMode: {
+          gmosNorthImaging: {
+            variant: { $v }
+          }
+        }
+      """
+
+    def invalid(field: String): Either[String, Json] =
+      s"Argument 'input.SET.observingMode.gmosNorthImaging.variant.grouped.$field' is invalid: cannot be null".asLeft
+
+    val create = """
+      scienceRequirements: {
+        exposureTimeMode: {
+          signalToNoise: {
+            value: 100.0
+            at: { nanometers: 500.0 }
+          }
+        }
+      }
+      observingMode: {
+        gmosNorthImaging: {
+          filters: [ { filter: G_PRIME } ]
+          variant: {
+            grouped: { skyCount: 2, exposuresPerOffset: 3 }
+          }
+        }
+      }
+    """
+
+    val unchanged: Either[String, Json] =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "observingMode": {
+                "gmosNorthImaging": {
+                  "variant": {
+                    "grouped": { "skyCount": 2, "exposuresPerOffset": 3 }
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+      """.asRight
+
+    multiUpdateTest(
+      pi,
+      List(
+        (create,                                         query, unchanged),
+        (variant("grouped: { exposuresPerOffset: null }"), query, invalid("exposuresPerOffset")),
+        (variant("grouped: { skyCount: null }"),           query, invalid("skyCount")),
+        (variant("grouped: {}"),                           query, unchanged)
+      )
+    )
+
   val preImagingInterleavedSwitchQuery: String =
     s"""
       observations {
