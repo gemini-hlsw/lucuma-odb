@@ -30,6 +30,7 @@ import lucuma.core.model.User
 import lucuma.core.model.UserProfile
 import lucuma.core.util.Gid
 import lucuma.odb.data.OdbError
+import munit.AnyFixture
 import org.http4s.Request
 import org.http4s.Response
 import org.http4s.Status
@@ -41,7 +42,12 @@ class requestWarningDismissal extends OdbSuite with query.ObservingModeSetupOper
   val SystemSender = "explore@gpp.com"
 
   // The form most recently sent to the mail provider for each recipient.
-  val sentForms: Ref[IO, Map[String, UrlForm]] = Ref.unsafe(Map.empty)
+  private lazy val sentFormsFixture: AnyFixture[Ref[IO, Map[String, UrlForm]]] =
+    ResourceSuiteLocalFixture("sentForms", Resource.eval(Ref.of[IO, Map[String, UrlForm]](Map.empty)))
+
+  private def sentForms: Ref[IO, Map[String, UrlForm]] = sentFormsFixture()
+
+  override def munitFixtures = sentFormsFixture +: super.munitFixtures
 
   // Like `invitationEmailRequestHandler`, except that the mail provider rejects
   // any message addressed to a "bounce" recipient.
