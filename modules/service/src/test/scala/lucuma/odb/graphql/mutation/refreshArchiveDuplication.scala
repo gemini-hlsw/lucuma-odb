@@ -7,6 +7,7 @@ package mutation
 import cats.data.EitherNec
 import cats.effect.IO
 import cats.effect.Ref
+import cats.effect.Resource
 import cats.syntax.all.*
 import io.circe.Json
 import io.circe.literal.*
@@ -24,6 +25,7 @@ import lucuma.core.model.Program
 import lucuma.core.model.Semester
 import lucuma.core.model.User
 import lucuma.odb.data.OdbError
+import munit.AnyFixture
 
 class refreshArchiveDuplication extends OdbSuite with query.ObservingModeSetupOperations:
 
@@ -38,8 +40,12 @@ class refreshArchiveDuplication extends OdbSuite with query.ObservingModeSetupOp
     case Down
     case Holding(json: String)
 
-  private val archive: Ref[IO, Archive] =
-    Ref.unsafe(Archive.Holding("[]"))
+  private lazy val archiveFixture: AnyFixture[Ref[IO, Archive]] =
+    ResourceSuiteLocalFixture("archive", Resource.eval(Ref.of[IO, Archive](Archive.Holding("[]"))))
+
+  private def archive: Ref[IO, Archive] = archiveFixture()
+
+  override def munitFixtures = archiveFixture +: super.munitFixtures
 
   override protected def goaClient: IO[GoaClient[IO]] =
     IO.pure:
