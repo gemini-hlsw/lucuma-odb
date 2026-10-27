@@ -131,6 +131,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F]:
       LeafMapping[Flamingos2Decker](Flamingos2DeckerType),
       LeafMapping[Flamingos2ReadoutMode](Flamingos2ReadoutModeType),
       LeafMapping[Flamingos2Reads](Flamingos2ReadsType),
+      LeafMapping[Flamingos2WindowCover](Flamingos2WindowCoverType),
       LeafMapping[FocalPlane](FocalPlaneType),
       LeafMapping[Gender](GenderType),
       LeafMapping[GcalArc](GcalArcType),

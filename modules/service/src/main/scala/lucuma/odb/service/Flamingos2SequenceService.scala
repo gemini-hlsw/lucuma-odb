@@ -5,11 +5,14 @@ package lucuma.odb.service
 
 import cats.effect.Concurrent
 import cats.syntax.all.*
+import lucuma.core.enums.Flamingos2WindowCover
 import lucuma.core.enums.ImagingVariantType
 import lucuma.core.enums.MosPreImaging
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.enums.StepType
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Step
+import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
 import lucuma.odb.util.Codecs.imaging_variant
@@ -49,6 +52,12 @@ trait Flamingos2SequenceService[F[_]]:
   )(using Transaction[F]): F[Option[Flamingos2StaticConfig]]
 
 object Flamingos2SequenceService:
+
+  // Darks keep the window cover closed unless the user explicitly asks otherwise.
+  def withDarkWindowCover(stepConfig: StepConfig)(config: Flamingos2DynamicConfig): Flamingos2DynamicConfig =
+    if stepConfig.stepType === StepType.Dark then
+      Flamingos2DynamicConfig.windowCover.modify(_.orElse(Flamingos2WindowCover.Close.some))(config)
+    else config
 
   // Extract the mos-preimaging setting from the imaging variant
   private def mosPreImaging(v: Option[ImagingVariantType]): MosPreImaging =
@@ -121,7 +130,8 @@ object Flamingos2SequenceService:
         "c_fpu_builtin",
         "c_decker",
         "c_readout_mode",
-        "c_reads"
+        "c_reads",
+        "c_window_cover"
       )
 
     val InsertDynamic: Command[(Step.Id, Flamingos2DynamicConfig)] =
