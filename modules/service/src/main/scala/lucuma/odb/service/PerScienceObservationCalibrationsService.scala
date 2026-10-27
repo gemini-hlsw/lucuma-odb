@@ -865,12 +865,12 @@ object PerScienceObservationCalibrationsService:
                )
         yield ()
 
-      /** Present and in a mode with tellurics, whatever its workflow state. */
+      /** Present, in a mode with tellurics and asking for them, whatever its workflow state. */
       private def scienceTakesTellurics(scienceOid: Observation.Id): F[Boolean] =
         S.session
           .prepareR(Statements.selectScienceTakesTellurics)
           .use(_.option(scienceOid))
-          .map(_.exists((present, mode) => present && mode.exists(ObsExtract.modeTakesTelluric)))
+          .map(_.exists((present, mode, requested) => present && mode.exists(ObsExtract.modeTakesTelluric) && requested))
 
       /**
        * Deletes the unexecuted calibrations of a science observation, and the
@@ -954,13 +954,20 @@ object PerScienceObservationCalibrationsService:
 
       object Statements:
 
-        val selectScienceTakesTellurics: Query[Observation.Id, (Boolean, Option[ObservingModeType])] =
+        // The telluric type lives in the mode table of each mode that has tellurics.
+        val selectScienceTakesTellurics: Query[Observation.Id, (Boolean, Option[ObservingModeType], Boolean)] =
           sql"""
-            SELECT c_existence = 'present',
-                   c_observing_mode_type
-            FROM   t_observation
-            WHERE  c_observation_id = $observation_id
-          """.query(bool *: observing_mode_type.opt)
+            SELECT o.c_existence = 'present',
+                   o.c_observing_mode_type,
+                   upper(COALESCE(f2.c_telluric_type, mos.c_telluric_type, ig.c_telluric_type, gn.c_telluric_type)->>'tag')
+                     IS DISTINCT FROM 'NO_TELLURIC'
+            FROM   t_observation o
+            LEFT JOIN t_flamingos_2_long_slit f2  ON f2.c_observation_id  = o.c_observation_id
+            LEFT JOIN t_flamingos_2_mos       mos ON mos.c_observation_id = o.c_observation_id
+            LEFT JOIN t_igrins_2_long_slit    ig  ON ig.c_observation_id  = o.c_observation_id
+            LEFT JOIN t_gnirs_spectroscopy    gn  ON gn.c_observation_id  = o.c_observation_id
+            WHERE  o.c_observation_id = $observation_id
+          """.query(bool *: observing_mode_type.opt *: bool)
 
         val selectObsCalibrationGroup: Query[(Observation.Id, List[CalibrationRole]), Group.Id] =
           sql"""

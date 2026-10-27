@@ -4480,3 +4480,15 @@ class perScienceObservationCalibrations
     yield
       assertEquals(removed, List(tel))
       assert(!exists)
+
+  test("a user-defined telluric goes when an inactive science asks for no telluric"):
+    for
+      pid            <- createProgramAs(pi)
+      (oid, tel, _)  <- userDefinedTelluricWithStar(pid)
+      _              <- setObservationWorkflowState(pi, oid, ObservationWorkflowState.Inactive)
+      _              <- setTelluricType(oid, "flamingos2LongSlit", "NO_TELLURIC")
+      (_, removed)   <- recalculateCalibrations(pid, when, oid)
+      exists         <- queryObservationExists(tel)
+    yield
+      assertEquals(removed, List(tel))
+      assert(!exists)
