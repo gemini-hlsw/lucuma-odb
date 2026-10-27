@@ -6,11 +6,17 @@ package table
 
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Flamingos2Codecs.*
+import org.tpolecat.typename.TypeName
+import skunk.codec.numeric.int8
 
-trait Flamingos2DynamicView[F[_]] extends BaseMapping[F]:
+trait Flamingos2DynamicTables[F[_]] extends BaseMapping[F]:
 
-  object Flamingos2DynamicView extends TableDef("v_flamingos_2_dynamic"):
-    val Id: ColumnRef                = col("c_step_id",            step_id)
+  class Flamingos2DynamicTable[I](
+    name:   String,
+    idName: String,
+    id:     skunk.Codec[I]
+  )(using TypeName[I]) extends TableDef(name):
+    val Id: ColumnRef                = col(idName,                id)
     val Instrument: ColumnRef        = col("c_instrument",         instrument)
     val ExposureTime: ColumnRef      = col("c_exposure_time",      time_span)
     val Disperser: ColumnRef         = col("c_disperser",          flamingos_2_disperser.opt)
@@ -24,9 +30,21 @@ trait Flamingos2DynamicView[F[_]] extends BaseMapping[F]:
     val CentralWavelength: ColumnRef = col("c_central_wavelength", wavelength_pm)
 
     object Fpu:
-      val SyntheticId: ColumnRef   = col("c_fpu_id",                     step_id.embedded)
+      val SyntheticId: ColumnRef   = col("c_fpu_id",                     id.embedded)
       object CustomMask:
-        val SyntheticId: ColumnRef  = col("c_fpu_custom_mask_id",            step_id.embedded)
+        val SyntheticId: ColumnRef  = col("c_fpu_custom_mask_id",            id.embedded)
         val AttachmentId: ColumnRef = col("c_fpu_custom_mask_attachment_id", attachment_id.opt)
         val SlitWidth: ColumnRef    = col("c_fpu_custom_mask_slit_width",    flamingos_2_custom_slit_width.embedded)
       val Builtin: ColumnRef       = col("c_fpu_builtin",                flamingos_2_fpu.opt)
+
+  object Flamingos2DynamicView extends Flamingos2DynamicTable(
+    "v_flamingos_2_dynamic",
+    "c_step_id",
+    step_id
+  )
+
+  object Flamingos2CalibrationSetupTable extends Flamingos2DynamicTable(
+    "v_flamingos_2_daytime_calibration_setup",
+    "c_set_id",
+    int8
+  )

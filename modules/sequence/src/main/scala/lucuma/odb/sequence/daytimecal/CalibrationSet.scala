@@ -8,6 +8,7 @@ import cats.syntax.eq.*
 import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.CalibrationSetType
 import lucuma.core.model.sequence.StepConfig
+import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.odb.json.all.transport.given
 import lucuma.odb.sequence.util.HashBytes
@@ -44,27 +45,32 @@ object CalibrationSet:
  * The instrument setups a calibration set may carry.
  */
 enum InstrumentSetup:
+  case Flamingos2(config: Flamingos2DynamicConfig)
   case GmosNorth(config: DynamicConfig.GmosNorth)
   case GmosSouth(config: DynamicConfig.GmosSouth)
 
   def instrument: lucuma.core.enums.Instrument =
     this match
-      case GmosNorth(_) => lucuma.core.enums.Instrument.GmosNorth
-      case GmosSouth(_) => lucuma.core.enums.Instrument.GmosSouth
+      case Flamingos2(_) => lucuma.core.enums.Instrument.Flamingos2
+      case GmosNorth(_)  => lucuma.core.enums.Instrument.GmosNorth
+      case GmosSouth(_)  => lucuma.core.enums.Instrument.GmosSouth
 
 object InstrumentSetup:
 
   given Eq[InstrumentSetup] =
     Eq.instance:
-      case (GmosNorth(a), GmosNorth(b)) => a === b
-      case (GmosSouth(a), GmosSouth(b)) => a === b
-      case _                            => false
+      case (Flamingos2(a), Flamingos2(b)) => a === b
+      case (GmosNorth(a), GmosNorth(b))   => a === b
+      case (GmosSouth(a), GmosSouth(b))   => a === b
+      case _                              => false
 
+  private given HashBytes[Flamingos2DynamicConfig]  = HashBytes.forJsonEncoder
   private given HashBytes[DynamicConfig.GmosNorth] = HashBytes.forJsonEncoder
   private given HashBytes[DynamicConfig.GmosSouth] = HashBytes.forJsonEncoder
 
   given HashBytes[InstrumentSetup] with
     def hashBytes(s: InstrumentSetup): Array[Byte] =
       s match
-        case GmosNorth(c) => Array.concat(Array[Byte](0), HashBytes[DynamicConfig.GmosNorth].hashBytes(c))
-        case GmosSouth(c) => Array.concat(Array[Byte](1), HashBytes[DynamicConfig.GmosSouth].hashBytes(c))
+        case GmosNorth(c)  => Array.concat(Array[Byte](0), HashBytes[DynamicConfig.GmosNorth].hashBytes(c))
+        case GmosSouth(c)  => Array.concat(Array[Byte](1), HashBytes[DynamicConfig.GmosSouth].hashBytes(c))
+        case Flamingos2(c) => Array.concat(Array[Byte](2), HashBytes[Flamingos2DynamicConfig].hashBytes(c))

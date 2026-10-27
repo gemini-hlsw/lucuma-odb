@@ -6,22 +6,24 @@ package mapping
 
 import grackle.Path
 
-import table.Flamingos2DynamicView
+import table.Flamingos2DynamicTables
 
-trait Flamingos2FpuMaskMapping[F[_]] extends Flamingos2DynamicView[F]:
+trait Flamingos2FpuMaskMapping[F[_]] extends Flamingos2DynamicTables[F]:
 
   private def fpuMappingAtPath(
-    path: Path
+    path:  Path,
+    table: Flamingos2DynamicTable[?]
   ): ObjectMapping =
     ObjectMapping(path)(
-      SqlField("synthetic_id", Flamingos2DynamicView.Fpu.SyntheticId, key = true, hidden = true),
+      SqlField("synthetic_id", table.Fpu.SyntheticId, key = true, hidden = true),
       SqlObject("customMask"),
-      SqlField("builtin", Flamingos2DynamicView.Fpu.Builtin)
+      SqlField("builtin", table.Fpu.Builtin)
     )
 
   lazy val Flamingos2FpuMaskMappings: List[TypeMapping] =
     List(
-      fpuMappingAtPath(StepRecordType / "flamingos2" / "fpu")
+      fpuMappingAtPath(StepRecordType / "flamingos2" / "fpu", Flamingos2DynamicView),
+      fpuMappingAtPath(CalibrationSetType / "flamingos2" / "fpu", Flamingos2CalibrationSetupTable)
 
       // N.B. This will be required, but ultimately unused, when flamingos2 is
       // added to "type ExecutionConfig".

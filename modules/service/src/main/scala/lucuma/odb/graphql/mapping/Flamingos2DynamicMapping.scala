@@ -4,22 +4,33 @@
 package lucuma.odb.graphql
 package mapping
 
-import table.Flamingos2DynamicView
+import grackle.Path
 
-trait Flamingos2DynamicMapping[F[_]] extends Flamingos2DynamicView[F]:
+import table.Flamingos2DynamicTables
 
-  lazy val Flamingos2DynamicMapping: TypeMapping =
-    ObjectMapping(StepRecordType / "flamingos2")(
-      SqlField("id",          Flamingos2DynamicView.Id, key = true, hidden = true),
+trait Flamingos2DynamicMapping[F[_]] extends Flamingos2DynamicTables[F]:
+
+  private def dynamicMappingAtPath(
+    path:  Path,
+    table: Flamingos2DynamicTable[?]
+  ): ObjectMapping =
+    ObjectMapping(path)(
+      SqlField("id",          table.Id, key = true, hidden = true),
       SqlObject("exposure"),
-      SqlField("disperser",   Flamingos2DynamicView.Disperser),
-      SqlField("filter",      Flamingos2DynamicView.Filter),
-      SqlField("readMode",    Flamingos2DynamicView.ReadMode),
-      SqlField("lyotWheel",   Flamingos2DynamicView.LyotWheel),
+      SqlField("disperser",   table.Disperser),
+      SqlField("filter",      table.Filter),
+      SqlField("readMode",    table.ReadMode),
+      SqlField("lyotWheel",   table.LyotWheel),
       SqlObject("fpu"),
-      SqlField("decker",      Flamingos2DynamicView.Decker),
-      SqlField("readoutMode", Flamingos2DynamicView.ReadoutMode),
-      SqlField("reads",       Flamingos2DynamicView.Reads),
-      SqlField("windowCover", Flamingos2DynamicView.WindowCover),
+      SqlField("decker",      table.Decker),
+      SqlField("readoutMode", table.ReadoutMode),
+      SqlField("reads",       table.Reads),
+      SqlField("windowCover", table.WindowCover),
       SqlObject("centralWavelength")
+    )
+
+  lazy val Flamingos2DynamicMappings: List[TypeMapping] =
+    List(
+      dynamicMappingAtPath(StepRecordType / "flamingos2", Flamingos2DynamicView),
+      dynamicMappingAtPath(CalibrationSetType / "flamingos2", Flamingos2CalibrationSetupTable)
     )

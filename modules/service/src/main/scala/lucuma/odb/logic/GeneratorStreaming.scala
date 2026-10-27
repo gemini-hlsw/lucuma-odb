@@ -62,6 +62,10 @@ sealed trait GeneratorStreaming[F[_]]:
     context: GeneratorContext
   )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, Flamingos2Static, Flamingos2Dynamic]]]
 
+  def generateDaytimeFlamingos2(
+    context: GeneratorContext
+  ): F[Either[OdbError, StreamingExecutionConfig[F, Flamingos2Static, Flamingos2Dynamic]]]
+
   def selectDaytimeGhost(
     context: GeneratorContext
   )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, GhostStatic, GhostDynamic]]]
@@ -346,11 +350,6 @@ object GeneratorStreaming:
           StreamingExecutionConfig[F, S, D](static, Stream.empty, Stream.empty).asRight[OdbError].pure[F]
         )
 
-      override def selectDaytimeFlamingos2(
-        context: GeneratorContext
-      )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, Flamingos2Static, Flamingos2Dynamic]]] =
-        selectOrEmpty(DaytimeStatics.Flamingos2, sequenceService.selectFlamingos2Sequence(context.oid, _, _))
-
       override def selectDaytimeGhost(
         context: GeneratorContext
       )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, GhostStatic, GhostDynamic]]] =
@@ -379,6 +378,16 @@ object GeneratorStreaming:
           cfg <- extractMode(ObservingMode.DaytimeCalibrationName, context)(_.asDaytimeCalibration)
           gen <- EitherT.fromEither[F](DaytimeCalibration.executionConfig(context.oid, estimator, static, context.namespace, sets(cfg)))
         yield gen.covary[F]).value
+
+      override def selectDaytimeFlamingos2(
+        context: GeneratorContext
+      )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, Flamingos2Static, Flamingos2Dynamic]]] =
+        selectDaytime(DaytimeStatics.Flamingos2, sequenceService.selectFlamingos2Sequence(context.oid, _, _), generateDaytimeFlamingos2(context))
+
+      override def generateDaytimeFlamingos2(
+        context: GeneratorContext
+      ): F[Either[OdbError, StreamingExecutionConfig[F, Flamingos2Static, Flamingos2Dynamic]]] =
+        generateDaytime(context, calculator.flamingos2Step, DaytimeStatics.Flamingos2, _.flamingos2Sets)
 
       override def selectDaytimeGmosNorth(
         context: GeneratorContext

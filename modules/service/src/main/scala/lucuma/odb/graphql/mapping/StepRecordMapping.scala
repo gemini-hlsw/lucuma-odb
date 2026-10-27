@@ -20,7 +20,7 @@ import lucuma.odb.json.time.query.given
 import lucuma.odb.service.Services
 
 import table.AtomRecordView
-import table.Flamingos2DynamicView
+import table.Flamingos2DynamicTables
 import table.GhostDynamicTable
 import table.GmosDynamicTables
 import table.GnirsDynamicView
@@ -32,7 +32,7 @@ trait StepRecordMapping[F[_]] extends StepRecordView[F]
                                  with AtomRecordView[F]
                                  with EventRangeEffectHandler[F]
                                  with KeyValueEffectHandler[F]
-                                 with Flamingos2DynamicView[F]
+                                 with Flamingos2DynamicTables[F]
                                  with GhostDynamicTable[F]
                                  with GmosDynamicTables[F]
                                  with GnirsDynamicView[F]

@@ -81,6 +81,24 @@ trait DaytimeCalibrationOps extends ReplaceSequenceOps:
       }
     """
 
+  // A Flamingos 2 dark.
+  def flamingos2DarkStep: String =
+    """
+      {
+        instrumentConfig: {
+          exposure: { seconds: 20 }
+          filter: J
+          readMode: BRIGHT
+          lyotWheel: F16
+          decker: LONG_SLIT
+          readoutMode: SCIENCE
+          reads: READS_1
+        }
+        stepConfig: { dark: true }
+        observeClass: DAY_CAL
+      }
+    """
+
   def workflowQuery(oid: Observation.Id): String =
     s"""
       query {

@@ -10,7 +10,7 @@ import lucuma.core.math.Wavelength
 import lucuma.odb.graphql.table.ArchiveMatchView
 import lucuma.odb.graphql.table.ChronConditionsEntryView
 import lucuma.odb.graphql.table.ExposureTimeModeView
-import lucuma.odb.graphql.table.Flamingos2DynamicView
+import lucuma.odb.graphql.table.Flamingos2DynamicTables
 import lucuma.odb.graphql.table.GmosDynamicTables
 import lucuma.odb.graphql.table.GmosIfuView
 import lucuma.odb.graphql.table.GmosLongSlitView
@@ -27,7 +27,7 @@ trait WavelengthMapping[F[_]]
      with GmosIfuView[F]
      with ChronConditionsEntryView[F]
      with ExposureTimeModeView[F]
-     with Flamingos2DynamicView[F]
+     with Flamingos2DynamicTables[F]
      with GmosDynamicTables[F]
      with GnirsDynamicView[F]
      with GnirsSpectroscopyView[F]
@@ -94,6 +94,7 @@ trait WavelengthMapping[F[_]]
       wavelengthMappingAtPath(StepRecordType / "gmosSouth" / "gratingConfig" / "wavelength", GmosSouthDynamicTable.Grating.Wavelength, GmosSouthDynamicTable.Id),
       wavelengthMappingAtPath(CalibrationSetType / "gmosNorth" / "centralWavelength", GmosNorthCalibrationSetupTable.CentralWavelength.Value, GmosNorthCalibrationSetupTable.CentralWavelength.SyntheticId),
       wavelengthMappingAtPath(CalibrationSetType / "gmosSouth" / "centralWavelength", GmosSouthCalibrationSetupTable.CentralWavelength.Value, GmosSouthCalibrationSetupTable.CentralWavelength.SyntheticId),
+      wavelengthMappingAtPath(CalibrationSetType / "flamingos2" / "centralWavelength", Flamingos2CalibrationSetupTable.CentralWavelength, Flamingos2CalibrationSetupTable.Id),
       wavelengthMappingAtPath(CalibrationSetType / "gmosNorth" / "gratingConfig" / "wavelength", GmosNorthCalibrationSetupTable.Grating.Wavelength, GmosNorthCalibrationSetupTable.Id),
       wavelengthMappingAtPath(CalibrationSetType / "gmosSouth" / "gratingConfig" / "wavelength", GmosSouthCalibrationSetupTable.Grating.Wavelength, GmosSouthCalibrationSetupTable.Id),
       wavelengthMappingAtPath(TimeAndCountExposureTimeModeType / "at", ExposureTimeModeView.TimeAndCount.At, ExposureTimeModeView.TimeAndCount.SyntheticId),

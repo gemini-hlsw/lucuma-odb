@@ -6,6 +6,7 @@ package lucuma.odb.sequence.daytimecal
 import cats.Eq
 import lucuma.core.enums.DaytimeCalibrationObservingModeType
 import lucuma.core.enums.Instrument
+import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.odb.sequence.util.HashBytes
 
@@ -20,6 +21,10 @@ final case class Config(
 
   def mode: DaytimeCalibrationObservingModeType =
     DaytimeCalibrationObservingModeType.DaytimeCalibration
+
+  def flamingos2Sets: List[CalibrationSet[Flamingos2DynamicConfig]] =
+    sets.collect:
+      case s @ CalibrationSet(_, _, _, InstrumentSetup.Flamingos2(c)) => s.copy(setup = c)
 
   def gmosNorthSets: List[CalibrationSet[DynamicConfig.GmosNorth]] =
     sets.collect:
