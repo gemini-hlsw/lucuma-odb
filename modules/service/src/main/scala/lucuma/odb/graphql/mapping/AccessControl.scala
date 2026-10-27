@@ -281,10 +281,17 @@ trait AccessControl[F[_]] extends Predicates[F] {
    * of type `Type` that match the given `Predicate`. Note that the query generated
    * here is not subject to elaboration; the predicate passed here must express
    * exactly what is needed.
+   *
+   * Grackle compiles `Filter(False, _)` to an empty query with no SQL at all, so
+   * a predicate that folds to `False` (e.g. a user with no write access) is
+   * replaced by `Not(True)`, which still produces a SELECT that matches nothing.
    */
   protected def idSelectFromPredicate(tpe: Type, pred: Predicate): Result[Fragment] =
     Context(Path.from(tpe)).flatMap: ctx =>
-      val q = Filter(pred, Select("id", None, Query.Empty))
+      val p = pred match
+        case False => Not(True)
+        case _     => pred
+      val q = Filter(p, Select("id", None, Query.Empty))
       MappedQuery(q, ctx).flatMap(_.fragment)
 
   /**

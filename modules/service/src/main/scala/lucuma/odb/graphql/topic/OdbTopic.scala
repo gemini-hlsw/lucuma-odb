@@ -13,8 +13,10 @@ import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import fs2.Stream
 import fs2.concurrent.Topic
+import lucuma.core.enums.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.User
+import lucuma.odb.util.Codecs.partner
 import lucuma.odb.util.Codecs.user_id
 import org.typelevel.log4cats.Logger
 import org.typelevel.otel4s.trace.Tracer
@@ -78,6 +80,23 @@ object OdbTopic:
         """.query(user_id)
       )
 
+  // Partners requesting time (a non-zero partner split) or holding an allocation for
+  // the program, i.e. the NGOs who may read it.  Interpolated directly for the
+  // same reason as selectProgramUsers.
+  def selectProgramPartners[F[_]: Tracer](
+    s:   Session[F],
+    pid: Program.Id,
+  ): F[List[Partner]] =
+    Tracer[F].span("topic.selectProgramPartners").surround:
+      s.execute(
+        sql"""
+          select c_partner from t_partner_split where c_program_id = '#${pid.toString}' and c_percent > 0
+          union
+          select c_ta_category from t_allocation where c_program_id = '#${pid.toString}' and c_duration > 'PT'
+            and c_ta_category in (select c_tag from t_partner)
+        """.query(partner)
+      )
+
   /**
    * Runs the given topic feeds together on a pair of sessions checked out from
    * `pool`. If any feed fails, or they somehow all terminate, the sessions are
@@ -117,7 +136,7 @@ object OdbTopic:
     name:    String,
     channel: Identifier,
     pid:     U => Program.Id,
-    element: (U, List[User.Id]) => E
+    element: (U, List[User.Id], List[Partner]) => E
   )(update: PartialFunction[Array[String], Option[U]]): OdbTopic[E] =
     new OdbTopic[E]:
 
@@ -138,7 +157,8 @@ object OdbTopic:
         for
           up <- updates(sessions.listen, maxQueued)
           us <- Stream.eval(selectProgramUsers(sessions.lookup, pid(up)))
-          e   = element(up, us)
+          ps <- Stream.eval(selectProgramPartners(sessions.lookup, pid(up)))
+          e   = element(up, us, ps)
           _  <- Stream.eval(Logger[F].info(s"$name channel: $e"))
         yield e
 

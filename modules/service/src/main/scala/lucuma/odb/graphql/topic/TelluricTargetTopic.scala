@@ -8,6 +8,7 @@ import cats.effect.std.Supervisor
 import cats.implicits.*
 import fs2.Stream
 import fs2.concurrent.Topic
+import lucuma.core.enums.Partner
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
@@ -25,7 +26,8 @@ object TelluricTargetTopic:
     programId:     Program.Id,
     oldState:      Option[CalculationState],
     newState:      Option[CalculationState],
-    users:         List[User.Id]
+    users:         List[User.Id],
+    partners:      List[Partner]
   ) extends TopicElement
 
   private val topic =
@@ -33,7 +35,7 @@ object TelluricTargetTopic:
       "TelluricTarget",
       ident"ch_telluric_resolution",
       _._2,
-      (update, users) => Element(update._1, update._2, update._3, update._4, users)
+      (update, users, partners) => Element(update._1, update._2, update._3, update._4, users, partners)
     ) {
       case Array(_oid, _pid, _oldState, _newState) =>
         (
