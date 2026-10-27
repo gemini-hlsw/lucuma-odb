@@ -498,3 +498,86 @@ class ShortCut_7658_GmosMos extends ExecutionTestSupportForGmos with ShortCut_76
   test("gmosSouthMos: staff cannot update non-acquisition for ongoing observation"):
     createOngoingGmosSouthMosObservation.flatMap: oid =>
       testFailed(staff, oid, nonAcquisitionUpdate("gmosSouthMos"))
+
+class ShortCut_7658_GnirsImaging extends ExecutionTestSupportForGnirs with ShortCut_7658_Helpers:
+
+  private def gnirsImagingUpdate(inner: String): String =
+    s"""
+      observingMode: {
+        gnirsImaging: {
+          $inner
+        }
+      }
+    """
+
+  private val AcquisitionUpdate: String =
+    gnirsImagingUpdate("acquisition: { explicitAcquisitionType: BRIGHT }")
+
+  private val NonAcquisitionUpdate: String =
+    gnirsImagingUpdate("explicitReadMode: FAINT")
+
+  private val AcquisitionQuery: String =
+    """
+      observations {
+        observingMode {
+          gnirsImaging {
+            acquisition { explicitAcquisitionType }
+          }
+        }
+      }
+    """
+
+  private val ExpectedAcquisition: Json =
+    json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "observingMode": {
+                "gnirsImaging": {
+                  "acquisition": { "explicitAcquisitionType": "BRIGHT" }
+                }
+              }
+            }
+          ]
+        }
+      }
+    """
+
+  private def testFailed(user: User, oid: Observation.Id, update: String, error: String = ErrorForOngoing): IO[Unit] =
+    expectOdbError(
+      user     = user,
+      query    = updateObservationsMutation(oid, update, "observations { id }"),
+      expected = {
+        case OdbError.InvalidObservation(_, Some(msg)) if msg.contains(error) => ()
+      }
+    )
+
+  test("gnirsImaging: pi cannot update acquisition for ongoing observation"):
+    createOngoingGnirsImagingObservation.flatMap: oid =>
+      testFailed(pi, oid, AcquisitionUpdate)
+
+  test("gnirsImaging: pi cannot update non-acquisition for ongoing observation"):
+    createOngoingGnirsImagingObservation.flatMap: oid =>
+      testFailed(pi, oid, NonAcquisitionUpdate)
+
+  test("gnirsImaging: staff can update acquisition for ongoing observation"):
+    createOngoingGnirsImagingObservation.flatMap: oid =>
+      updateObservation(
+        user     = staff,
+        oid      = oid,
+        update   = AcquisitionUpdate,
+        query    = AcquisitionQuery,
+        expected = ExpectedAcquisition.asRight
+      )
+
+  test("gnirsImaging: staff cannot update acquisition for completed observation"):
+    for
+      oid <- createOngoingGnirsImagingObservation
+      _   <- setObservationWorkflowState(pi, oid, ObservationWorkflowState.Completed)
+      _   <- testFailed(staff, oid, AcquisitionUpdate, ErrorForCompleted)
+    yield ()
+
+  test("gnirsImaging: staff cannot update non-acquisition for ongoing observation"):
+    createOngoingGnirsImagingObservation.flatMap: oid =>
+      testFailed(staff, oid, NonAcquisitionUpdate)

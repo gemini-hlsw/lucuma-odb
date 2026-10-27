@@ -474,6 +474,17 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
   def gnirsScienceQuery(oid: Observation.Id, futureLimit: Option[Int] = None): String =
     executionConfigQuery(oid, "gnirs", "science", GnirsAtomQuery, futureLimit)
 
+  val createOngoingGnirsImagingObservation: IO[Observation.Id] =
+    for
+      p <- createProgramAs(pi)
+      t <- createTargetWithProfileAs(pi, p)
+      o <- createGnirsImagingObservationAs(pi, p, t)
+      v <- recordVisitAs(serviceUser, o)
+      s <- firstScienceStepId(serviceUser, o)
+      _ <- addEndStepEvent(s, v)
+      _ <- runObscalcUpdate(p, o)
+    yield o
+
   val createOngoingGnirsLongSlitObservation: IO[Observation.Id] =
     for
       p <- createProgramAs(pi)

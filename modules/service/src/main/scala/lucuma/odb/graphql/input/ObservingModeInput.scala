@@ -143,6 +143,7 @@ object ObservingModeInput:
       gmosSouthMos.exists(_.updatesAcquisition)       ||
       gmosNorthIfu.exists(_.updatesAcquisition)       ||
       gmosSouthIfu.exists(_.updatesAcquisition)       ||
+      gnirsImaging.exists(_.updatesAcquisition)       ||
       gnirsSpectroscopy.exists(_.updatesAcquisition)
 
     def limitToPreExecution(access: Access): Boolean =
@@ -160,7 +161,7 @@ object ObservingModeInput:
         gmosSouthMos.exists(_.limitToPreExecution(access))       ||
         gmosNorthIfu.exists(_.limitToPreExecution(access))       ||
         gmosSouthIfu.exists(_.limitToPreExecution(access))       ||
-        gnirsImaging.isDefined                                   ||
+        gnirsImaging.exists(_.limitToPreExecution(access))       ||
         gnirsSpectroscopy.exists(_.limitToPreExecution(access))  ||
         igrins2LongSlit.isDefined
 
