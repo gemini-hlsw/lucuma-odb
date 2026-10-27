@@ -749,7 +749,7 @@ object Generator:
             case ObservingModeType.GmosSouthIfu         =>
               go(freshAcq, ctxʹ.params.itcInput.toOption, streaming.generateGmosSouthIfu(ctxʹ))(sequenceService.resetGmosSouthAcquisition)
             case ObservingModeType.GnirsImaging         =>
-              EitherT.pure(())
+              go(freshAcq, ctxʹ.params.itcInput.toOption, streaming.generateGnirsImaging(ctxʹ))(sequenceService.resetGnirsAcquisition)
 
             case ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu =>
               go(freshAcq, ctxʹ.params.itcInput.toOption, streaming.generateGnirsSpectroscopy(ctxʹ))(sequenceService.resetGnirsAcquisition)

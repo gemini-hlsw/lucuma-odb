@@ -5,6 +5,7 @@ package lucuma.odb.graphql.query
 
 import cats.effect.IO
 import cats.syntax.either.*
+import cats.syntax.foldable.*
 import cats.syntax.option.*
 import io.circe.Json
 import io.circe.literal.*
@@ -14,6 +15,7 @@ import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.StepGuideState
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
+import lucuma.core.model.User
 import lucuma.core.syntax.string.*
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
@@ -61,8 +63,11 @@ class executionAcqGnirsImaging extends ExecutionTestSupportForGnirs:
 
   /** Applies an acquisition customization block to a GNIRS imaging observation. */
   private def setImagingAcquisition(oid: Observation.Id, acquisition: String): IO[Unit] =
+    setImagingAcquisitionAs(pi, oid, acquisition)
+
+  private def setImagingAcquisitionAs(user: User, oid: Observation.Id, acquisition: String): IO[Unit] =
     query(
-      pi,
+      user,
       s"""
         mutation {
           updateObservations(input: {
@@ -284,3 +289,33 @@ class executionAcqGnirsImaging extends ExecutionTestSupportForGnirs:
         }"""
       ) *>
       expect(pi, gnirsAcqImagingQuery(oid), expectedAcquisition(field, onTargetBreak, onTarget).asRight)
+
+  test("reset restores an executed acquisition"):
+    for
+      oid    <- imagingObs("SHORT_BLUE", "K")
+      v      <- recordVisitAs(serviceUser, oid)
+      before <- acquisitionSequenceIds(pi, oid)
+      _      <- before.values.flatten.toList.traverse_(addEndStepEvent(_, v))
+      _      <- acquisitionSequenceIds(pi, oid).map(ids => assertEquals(ids.size, 0))
+      _      <- resetAcquisitionAs(serviceUser, oid)
+      after  <- acquisitionSequenceIds(pi, oid)
+      _       = assertEquals(after.values.map(_.size).toList, before.values.map(_.size).toList)
+      _       = assert(after.keySet.intersect(before.keySet).isEmpty)
+    yield ()
+
+  test("editing the acquisition of an ongoing observation regenerates it"):
+    // As in the explicit BRIGHT test above, but after the first acquisition step has
+    // executed, so the materialized acquisition has to be regenerated.
+    val field                     = acqStep(3.secTimeSpan, 1, GnirsFilter.K, "SHORT_BLUE", 10, 0, StepGuideState.Disabled)
+    val (onTargetBreak, onTarget) = onTargetSteps(30.secTimeSpan, 1, GnirsFilter.K, "SHORT_BLUE", GnirsReadMode.VeryFaint)
+    for
+      p   <- createProgram
+      t   <- createTargetWithProfileAs(pi, p)
+      oid <- createObservationWithModeAs(pi, p, List(t), """gnirsImaging: { camera: SHORT_BLUE filters: [ { filter: K } ] }""")
+      v   <- recordVisitAs(serviceUser, oid)
+      s   <- firstAcquisitionStepId(serviceUser, oid)
+      _   <- addEndStepEvent(s, v)
+      _   <- runObscalcUpdate(p, oid)
+      _   <- setImagingAcquisitionAs(staff, oid, "{ explicitAcquisitionType: BRIGHT }")
+      _   <- expect(pi, gnirsAcqImagingQuery(oid), expectedAcquisition(field, onTargetBreak, onTarget).asRight)
+    yield ()
