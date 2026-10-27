@@ -737,8 +737,11 @@ object Generator:
             case ObservingModeType.GmosSouthLongSlit    =>
               go(freshAcq, ctxʹ.params.itcInput.toOption, streaming.generateGmosSouthLongSlit(ctxʹ))(sequenceService.resetGmosSouthAcquisition)
 
-            case ObservingModeType.GmosNorthMos | ObservingModeType.GmosSouthMos  =>
-              EitherT.pure(())
+            case ObservingModeType.GmosNorthMos         =>
+              go(freshAcq, ctxʹ.params.itcInput.toOption, streaming.generateGmosNorthMos(ctxʹ))(sequenceService.resetGmosNorthAcquisition)
+
+            case ObservingModeType.GmosSouthMos         =>
+              go(freshAcq, ctxʹ.params.itcInput.toOption, streaming.generateGmosSouthMos(ctxʹ))(sequenceService.resetGmosSouthAcquisition)
 
             case ObservingModeType.GmosNorthIfu         =>
               go(freshAcq, ctxʹ.params.itcInput.toOption, streaming.generateGmosNorthIfu(ctxʹ))(sequenceService.resetGmosNorthAcquisition)
