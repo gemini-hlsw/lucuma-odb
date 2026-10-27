@@ -24,10 +24,10 @@ import lucuma.core.enums.GmosSouthIfuFpu
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
 import lucuma.core.enums.ObservingModeType
-import lucuma.core.model.Access
 import lucuma.core.enums.Site
 import lucuma.core.math.Wavelength
 import lucuma.core.math.WavelengthDither
+import lucuma.core.model.Access
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.GmosIfuAnalysis
 import lucuma.core.model.sequence.TelescopeConfig
