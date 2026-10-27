@@ -69,9 +69,9 @@ object CalibrationSetInput:
   private def zeroExposure(kind: CalibrationSetType, setup: InstrumentSetup): InstrumentSetup =
     if kind =!= CalibrationSetType.Bias then setup
     else setup match
-      case InstrumentSetup.GmosNorth(c)     => InstrumentSetup.GmosNorth(c.copy(exposure = TimeSpan.Zero))
-      case InstrumentSetup.GmosSouth(c)     => InstrumentSetup.GmosSouth(c.copy(exposure = TimeSpan.Zero))
-      case f: InstrumentSetup.Flamingos2    => f
+      case InstrumentSetup.GmosNorth(c)  => InstrumentSetup.GmosNorth(c.copy(exposure = TimeSpan.Zero))
+      case InstrumentSetup.GmosSouth(c)  => InstrumentSetup.GmosSouth(c.copy(exposure = TimeSpan.Zero))
+      case f: InstrumentSetup.Flamingos2 => f
 
   private def allowedKinds(instrument: Instrument): Set[CalibrationSetType] =
     instrument match

@@ -24,15 +24,15 @@ final case class Config(
 
   def flamingos2Sets: List[CalibrationSet[Flamingos2DynamicConfig]] =
     sets.collect:
-      case s @ CalibrationSet(_, _, _, InstrumentSetup.Flamingos2(c)) => s.copy(setup = c)
+      case s @ CalibrationSet(setup = InstrumentSetup.Flamingos2(c)) => s.copy(setup = c)
 
   def gmosNorthSets: List[CalibrationSet[DynamicConfig.GmosNorth]] =
     sets.collect:
-      case s @ CalibrationSet(_, _, _, InstrumentSetup.GmosNorth(c)) => s.copy(setup = c)
+      case s @ CalibrationSet(setup = InstrumentSetup.GmosNorth(c)) => s.copy(setup = c)
 
   def gmosSouthSets: List[CalibrationSet[DynamicConfig.GmosSouth]] =
     sets.collect:
-      case s @ CalibrationSet(_, _, _, InstrumentSetup.GmosSouth(c)) => s.copy(setup = c)
+      case s @ CalibrationSet(setup = InstrumentSetup.GmosSouth(c)) => s.copy(setup = c)
 
 object Config:
 

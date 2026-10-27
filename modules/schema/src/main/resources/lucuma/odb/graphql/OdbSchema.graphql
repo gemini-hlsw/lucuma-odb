@@ -6414,8 +6414,7 @@ Calibration set input.  Exactly one instrument setup must be given and it must
 match the mode's instrument.  A FLAT needs a `gcal` with a continuum lamp, an
 ARC one with at least one arc lamp; BIAS, DARK and DAYTIME_OBSERVE take none.
 A BIAS ignores the setup's exposure time and takes zero.  A Flamingos 2 set
-may only be a DARK, FLAT or ARC; its window cover is stored as given, unset
-included.
+may only be a DARK, FLAT or ARC.
 """
 input CalibrationSetInput {
   kind: CalibrationSetType!

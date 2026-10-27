@@ -64,7 +64,7 @@ object InstrumentSetup:
       case (GmosSouth(a), GmosSouth(b))   => a === b
       case _                              => false
 
-  private given HashBytes[Flamingos2DynamicConfig]  = HashBytes.forJsonEncoder
+  private given HashBytes[Flamingos2DynamicConfig] = HashBytes.forJsonEncoder
   private given HashBytes[DynamicConfig.GmosNorth] = HashBytes.forJsonEncoder
   private given HashBytes[DynamicConfig.GmosSouth] = HashBytes.forJsonEncoder
 
