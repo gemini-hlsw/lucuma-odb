@@ -8,7 +8,10 @@ UPDATE t_flamingos_2_dynamic d
   FROM t_step s
  WHERE s.c_step_id = d.c_step_id
    AND s.c_step_type = 'dark'
-   AND d.c_window_cover IS NULL;
+   AND d.c_window_cover IS NULL
+   AND NOT EXISTS (
+     SELECT 1 FROM t_step_execution e WHERE e.c_step_id = d.c_step_id
+   );
 
 CREATE VIEW v_flamingos_2_dynamic AS
   SELECT t.*,

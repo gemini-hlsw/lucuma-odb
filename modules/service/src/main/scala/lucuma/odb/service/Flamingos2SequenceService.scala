@@ -12,9 +12,9 @@ import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.StepType
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Step
+import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
-import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.util.Codecs.imaging_variant
 import lucuma.odb.util.Codecs.observation_id
 import lucuma.odb.util.Codecs.observing_mode_type
@@ -54,10 +54,10 @@ trait Flamingos2SequenceService[F[_]]:
 object Flamingos2SequenceService:
 
   // Darks keep the window cover closed unless the user explicitly asks otherwise.
-  def withDarkWindowCover(step: ProtoStep[Flamingos2DynamicConfig]): ProtoStep[Flamingos2DynamicConfig] =
-    if step.stepConfig.stepType === StepType.Dark then
-      step.map(Flamingos2DynamicConfig.windowCover.modify(_.orElse(Flamingos2WindowCover.Close.some)))
-    else step
+  def withDarkWindowCover(stepConfig: StepConfig)(config: Flamingos2DynamicConfig): Flamingos2DynamicConfig =
+    if stepConfig.stepType === StepType.Dark then
+      Flamingos2DynamicConfig.windowCover.modify(_.orElse(Flamingos2WindowCover.Close.some))(config)
+    else config
 
   // Extract the mos-preimaging setting from the imaging variant
   private def mosPreImaging(v: Option[ImagingVariantType]): MosPreImaging =

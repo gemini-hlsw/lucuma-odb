@@ -10390,7 +10390,7 @@ type Flamingos2Dynamic {
   reads: Flamingos2Reads!
 
   """
-  Flamingos 2 window cover, if set explicitly.
+  Flamingos 2 window cover. Null means unspecified; dark steps default to CLOSE.
   """
   windowCover: Flamingos2WindowCover
 
