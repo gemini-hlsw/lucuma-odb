@@ -9,6 +9,7 @@ import cats.data.NonEmptyList
 import cats.derived.*
 import cats.syntax.option.*
 import cats.syntax.parallel.*
+import cats.syntax.partialOrder.*
 import cats.syntax.traverse.*
 import grackle.Result
 import lucuma.core.enums.GmosAmpGain
@@ -25,6 +26,7 @@ import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.Site
 import lucuma.core.math.Wavelength
 import lucuma.core.math.WavelengthDither
+import lucuma.core.model.Access
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.gmos.GmosFpuMask
@@ -210,6 +212,14 @@ object GmosMosInput extends AcquisitionFilterCheck:
       common:          Edit.Common
     ) derives Eq:
 
+      def updatesAcquisition: Boolean =
+        acquisition.exists(_.updatesAcquisition)
+
+      def limitToPreExecution(access: Access): Boolean =
+        // Staff can edit the acquisition info for ongoing observations
+        access <= Access.Pi ||
+          copy(acquisition = None) =!= North.AllUndefined
+
       val observingModeType: ObservingModeType =
         ObservingModeType.GmosNorthMos
 
@@ -222,6 +232,9 @@ object GmosMosInput extends AcquisitionFilterCheck:
           Create.North(_, filter.toOption, _, acquisitionType.getOrElse(GmosMosAcquisitionType.MaskIn), acquisition, _)
 
     object North:
+
+      private val AllUndefined: North =
+        North(None, Nullable.Absent, None, None, None, Common.AllUndefined)
 
       val Binding: Matcher[North] =
         NorthData.rmap:
@@ -237,6 +250,14 @@ object GmosMosInput extends AcquisitionFilterCheck:
       common:          Edit.Common
     ) derives Eq:
 
+      def updatesAcquisition: Boolean =
+        acquisition.exists(_.updatesAcquisition)
+
+      def limitToPreExecution(access: Access): Boolean =
+        // Staff can edit the acquisition info for ongoing observations
+        access <= Access.Pi ||
+          copy(acquisition = None) =!= South.AllUndefined
+
       val observingModeType: ObservingModeType =
         ObservingModeType.GmosSouthMos
 
@@ -249,6 +270,9 @@ object GmosMosInput extends AcquisitionFilterCheck:
           Create.South(_, filter.toOption, _, acquisitionType.getOrElse(GmosMosAcquisitionType.MaskIn), acquisition, _)
 
     object South:
+
+      private val AllUndefined: South =
+        South(None, Nullable.Absent, None, None, None, Common.AllUndefined)
 
       val Binding: Matcher[South] =
         SouthData.rmap:

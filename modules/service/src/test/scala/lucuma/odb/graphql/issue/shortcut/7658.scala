@@ -371,3 +371,130 @@ class ShortCut_7658_GmosIfu extends ExecutionTestSupportForGmos with ShortCut_76
   test("gmosSouthIfu: staff cannot update non-acquisition for ongoing observation"):
     createOngoingGmosSouthIfuObservation.flatMap: oid =>
       testFailedNonAcquistion(staff, oid, "gmosSouthIfu")
+
+// A MOS acquisition exposure time mode must be time and count, so it gets its
+// own update strings.
+class ShortCut_7658_GmosMos extends ExecutionTestSupportForGmos with ShortCut_7658_Helpers:
+
+  private def mosUpdate(modeField: String, inner: String): String =
+    s"""
+      observingMode: {
+        $modeField: {
+          $inner
+        }
+      }
+    """
+
+  private def acquisitionUpdate(modeField: String): String =
+    mosUpdate(modeField, """
+      acquisition: {
+        exposureTimeMode: {
+          timeAndCount: {
+            time: { seconds: 45 }
+            count: 2
+            at: { picometers: 10000 }
+          }
+        }
+      }
+    """)
+
+  private def nonAcquisitionUpdate(modeField: String): String =
+    mosUpdate(modeField, "explicitRoi: CCD2")
+
+  private def acquisitionQuery(modeField: String): String =
+    s"""
+      observations {
+        observingMode {
+          $modeField {
+            acquisition {
+              exposureTimeMode {
+                timeAndCount {
+                  time { seconds }
+                  count
+                }
+              }
+            }
+          }
+        }
+      }
+    """
+
+  private def expectedAcquisition(modeField: String): Json =
+    Json.obj(
+      "updateObservations" -> Json.obj(
+        "observations" -> Json.arr(
+          Json.obj(
+            "observingMode" -> Json.obj(
+              modeField -> json"""
+                {
+                  "acquisition": {
+                    "exposureTimeMode": {
+                      "timeAndCount": {
+                        "time": { "seconds": 45.000000 },
+                        "count": 2
+                      }
+                    }
+                  }
+                }
+              """
+            )
+          )
+        )
+      )
+    )
+
+  private def testFailed(user: User, oid: Observation.Id, update: String, error: String = ErrorForOngoing): IO[Unit] =
+    expectOdbError(
+      user     = user,
+      query    = updateObservationsMutation(oid, update, "observations { id }"),
+      expected = {
+        case OdbError.InvalidObservation(_, Some(msg)) if msg.contains(error) => ()
+      }
+    )
+
+  test("gmosNorthMos: pi cannot update acquisition for ongoing observation"):
+    createOngoingGmosNorthMosObservation.flatMap: oid =>
+      testFailed(pi, oid, acquisitionUpdate("gmosNorthMos"))
+
+  test("gmosNorthMos: pi cannot update non-acquisition for ongoing observation"):
+    createOngoingGmosNorthMosObservation.flatMap: oid =>
+      testFailed(pi, oid, nonAcquisitionUpdate("gmosNorthMos"))
+
+  test("gmosNorthMos: staff can update acquisition for ongoing observation"):
+    createOngoingGmosNorthMosObservation.flatMap: oid =>
+      updateObservation(
+        user     = staff,
+        oid      = oid,
+        update   = acquisitionUpdate("gmosNorthMos"),
+        query    = acquisitionQuery("gmosNorthMos"),
+        expected = expectedAcquisition("gmosNorthMos").asRight
+      )
+
+  test("gmosNorthMos: staff cannot update acquisition for completed observation"):
+    for
+      oid <- createOngoingGmosNorthMosObservation
+      _   <- setObservationWorkflowState(pi, oid, ObservationWorkflowState.Completed)
+      _   <- testFailed(staff, oid, acquisitionUpdate("gmosNorthMos"), ErrorForCompleted)
+    yield ()
+
+  test("gmosNorthMos: staff cannot update non-acquisition for ongoing observation"):
+    createOngoingGmosNorthMosObservation.flatMap: oid =>
+      testFailed(staff, oid, nonAcquisitionUpdate("gmosNorthMos"))
+
+  test("gmosSouthMos: pi cannot update acquisition for ongoing observation"):
+    createOngoingGmosSouthMosObservation.flatMap: oid =>
+      testFailed(pi, oid, acquisitionUpdate("gmosSouthMos"))
+
+  test("gmosSouthMos: staff can update acquisition for ongoing observation"):
+    createOngoingGmosSouthMosObservation.flatMap: oid =>
+      updateObservation(
+        user     = staff,
+        oid      = oid,
+        update   = acquisitionUpdate("gmosSouthMos"),
+        query    = acquisitionQuery("gmosSouthMos"),
+        expected = expectedAcquisition("gmosSouthMos").asRight
+      )
+
+  test("gmosSouthMos: staff cannot update non-acquisition for ongoing observation"):
+    createOngoingGmosSouthMosObservation.flatMap: oid =>
+      testFailed(staff, oid, nonAcquisitionUpdate("gmosSouthMos"))

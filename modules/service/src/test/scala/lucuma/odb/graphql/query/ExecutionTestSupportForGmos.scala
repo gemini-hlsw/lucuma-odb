@@ -629,6 +629,28 @@ trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
       _ <- runObscalcUpdate(p, o)
     yield o
 
+  val createOngoingGmosNorthMosObservation: IO[Observation.Id] =
+    for
+      p <- createProgramAs(pi)
+      t <- createTargetWithProfileAs(pi, p)
+      o <- createGmosNorthMosObservationAs(pi, p, List(t))
+      v <- recordVisitAs(serviceUser, o)
+      s <- firstScienceStepId(serviceUser, o)
+      _ <- addEndStepEvent(s, v)
+      _ <- runObscalcUpdate(p, o)
+    yield o
+
+  val createOngoingGmosSouthMosObservation: IO[Observation.Id] =
+    for
+      p <- createProgramAs(pi)
+      t <- createTargetWithProfileAs(pi, p)
+      o <- createGmosSouthMosObservationAs(pi, p, List(t))
+      v <- recordVisitAs(serviceUser, o)
+      s <- firstScienceStepId(serviceUser, o)
+      _ <- addEndStepEvent(s, v)
+      _ <- runObscalcUpdate(p, o)
+    yield o
+
   val createOngoingGmosSouthIfuObservation: IO[Observation.Id] =
     for
       p <- createProgramAs(pi)
