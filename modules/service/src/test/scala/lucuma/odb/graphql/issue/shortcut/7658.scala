@@ -9,7 +9,6 @@ import cats.effect.IO
 import cats.syntax.all.*
 import io.circe.Json
 import io.circe.literal.*
-import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.model.Observation
 import lucuma.core.model.User
@@ -21,15 +20,11 @@ import lucuma.odb.graphql.query.ExecutionTestSupportForGnirs
 
 // https://app.shortcut.com/lucuma/story/7658
 trait ShortCut_7658_Helpers extends OdbSuite with UpdateObservationsOps:
-  extension (i: Instrument)
-    private def fieldName: String = i match
-      case Instrument.Flamingos2 => "flamingos2LongSlit"
-      case Instrument.GmosNorth  => "gmosNorthLongSlit"
-      case Instrument.GmosSouth  => "gmosSouthLongSlit"
-      case _ => throw new Exception("Unexpected Instrument")
-    
+  // The helpers take the observing mode input field; the acquisition and
+  // exposure time mode inputs are shaped alike across these modes.
+  extension (modeField: String)
     private def expectedObservingMode(inner: Json): Json =
-      Json.obj(fieldName -> inner)
+      Json.obj(modeField -> inner)
 
   private val ExposureTimeModeUpdate: String =
     """
@@ -48,19 +43,19 @@ trait ShortCut_7658_Helpers extends OdbSuite with UpdateObservationsOps:
       }
     """
 
-  private def acquisitionUpdate(i: Instrument): String =
+  private def acquisitionUpdate(modeField: String): String =
     s"""
       observingMode: {
-        ${i.fieldName}: {
+        $modeField: {
           $AcquisitionUpdate
         }
       }
     """
 
-  private def nonAcquisitionUpdate(i: Instrument): String =
+  private def nonAcquisitionUpdate(modeField: String): String =
     s"""
       observingMode: {
-        ${i.fieldName}: {
+        $modeField: {
           $ExposureTimeModeUpdate
         }
       }
@@ -80,11 +75,11 @@ trait ShortCut_7658_Helpers extends OdbSuite with UpdateObservationsOps:
       }
     """
 
-  private def updateAcquisitionMutation(oid: Observation.Id, i: Instrument): String =
-    updateObservingModeMutation(oid, acquisitionUpdate(i))
+  private def updateAcquisitionMutation(oid: Observation.Id, modeField: String): String =
+    updateObservingModeMutation(oid, acquisitionUpdate(modeField))
 
-  private def updateNonAcquisitionMutation(oid: Observation.Id, i: Instrument): String =
-    updateObservingModeMutation(oid, nonAcquisitionUpdate(i))
+  private def updateNonAcquisitionMutation(oid: Observation.Id, modeField: String): String =
+    updateObservingModeMutation(oid, nonAcquisitionUpdate(modeField))
 
   private val EtmQuery: String =
     """
@@ -103,19 +98,19 @@ trait ShortCut_7658_Helpers extends OdbSuite with UpdateObservationsOps:
       }
     """
 
-  private def observingModeQuery(i: Instrument, subQuery: String): String =
+  private def observingModeQuery(modeField: String, subQuery: String): String =
     s"""
       observations {
         observingMode {
-          ${i.fieldName} {
+          $modeField {
             $subQuery
           }
         }
       }
     """
 
-  private def acquisitionQuery(i: Instrument): String = 
-    observingModeQuery(i, AcquisitionQuery)
+  private def acquisitionQuery(modeField: String): String = 
+    observingModeQuery(modeField, AcquisitionQuery)
 
   private val ExpectedEtm: Json =
     json"""
@@ -151,109 +146,109 @@ trait ShortCut_7658_Helpers extends OdbSuite with UpdateObservationsOps:
       }
     """
 
-  private def expectedAcquisition(i: Instrument): Json =
-    expectedObservingMode(i.expectedObservingMode(ExpectedAcquisition))
+  private def expectedAcquisition(modeField: String): Json =
+    expectedObservingMode(modeField.expectedObservingMode(ExpectedAcquisition))
 
   protected val ErrorForOngoing: String = "is ineligible for this operation due to its workflow state (Ongoing with allowed transition to Completed)"
   protected val ErrorForCompleted: String = "is ineligible for this operation due to its workflow state (Completed with allowed transition to Ongoing)"
 
-  def testFailedAcquistion(user: User, oid: Observation.Id, i: Instrument, error: String = ErrorForOngoing): IO[Unit] =
+  def testFailedAcquistion(user: User, oid: Observation.Id, modeField: String, error: String = ErrorForOngoing): IO[Unit] =
     expectOdbError(
       user = user,
-      query = updateAcquisitionMutation(oid, i),
+      query = updateAcquisitionMutation(oid, modeField),
       expected = {
         case OdbError.InvalidObservation(_, Some(msg)) if msg.contains(error) => ()
       }
     )
 
-  def testFailedNonAcquistion(user: User, oid: Observation.Id, i: Instrument, error: String = ErrorForOngoing): IO[Unit] =
+  def testFailedNonAcquistion(user: User, oid: Observation.Id, modeField: String, error: String = ErrorForOngoing): IO[Unit] =
     expectOdbError(
       user = user,
-      query = updateNonAcquisitionMutation(oid, i),
+      query = updateNonAcquisitionMutation(oid, modeField),
       expected = {
         case OdbError.InvalidObservation(_, Some(msg)) if msg.contains(error) => ()
       }
     )
 
-  def testSuccessAcquisition(user: User, oid: Observation.Id, i: Instrument): IO[Unit] =
+  def testSuccessAcquisition(user: User, oid: Observation.Id, modeField: String): IO[Unit] =
     updateObservation(
       user = user,
       oid,
-      update = acquisitionUpdate(i),
-      query = acquisitionQuery(i),
-      expected = expectedAcquisition(i).asRight
+      update = acquisitionUpdate(modeField),
+      query = acquisitionQuery(modeField),
+      expected = expectedAcquisition(modeField).asRight
     )
 
 class ShortCut_7658_Flamingos2 extends ExecutionTestSupportForFlamingos2 with ShortCut_7658_Helpers:
   test("flamingos2: pi cannot update acquisition for ongoing observation"):
     createOngoingFlamingos2Observation.flatMap: oid =>
-      testFailedAcquistion(pi, oid, Instrument.Flamingos2)
+      testFailedAcquistion(pi, oid, "flamingos2LongSlit")
 
   test("flamingos2: pi cannot update non-acquisition for ongoing observation"):
     createOngoingFlamingos2Observation.flatMap: oid =>
-      testFailedNonAcquistion(pi, oid, Instrument.Flamingos2)
+      testFailedNonAcquistion(pi, oid, "flamingos2LongSlit")
 
   test("flamingos2: staff can update acquisition for ongoing observation"):
     createOngoingFlamingos2Observation.flatMap: oid =>
-      testSuccessAcquisition(staff, oid, Instrument.Flamingos2)
+      testSuccessAcquisition(staff, oid, "flamingos2LongSlit")
 
   test("flamingos2: staff cannot update acquisition for completed observation"):
     for
       oid <- createOngoingFlamingos2Observation
       _   <- setObservationWorkflowState(pi, oid, ObservationWorkflowState.Completed)
-      _   <- testFailedAcquistion(staff, oid, Instrument.Flamingos2, ErrorForCompleted)
+      _   <- testFailedAcquistion(staff, oid, "flamingos2LongSlit", ErrorForCompleted)
     yield ()
 
   test("flamingos2: staff cannot update non-acquisition for ongoing observation"):
     createOngoingFlamingos2Observation.flatMap: oid =>
-      testFailedNonAcquistion(staff, oid, Instrument.Flamingos2)
+      testFailedNonAcquistion(staff, oid, "flamingos2LongSlit")
 
 class ShortCut_7658_Gmos extends ExecutionTestSupportForGmos with ShortCut_7658_Helpers:
   test("gmosNorth: pi cannot update acquisition for ongoing observation"):
     createOngoingGmosNorthObservation.flatMap: oid =>
-      testFailedAcquistion(pi, oid, Instrument.GmosNorth)
+      testFailedAcquistion(pi, oid, "gmosNorthLongSlit")
 
   test("gmosNorth: pi cannot update non-acquisition for ongoing observation"):
     createOngoingGmosNorthObservation.flatMap: oid =>
-      testFailedNonAcquistion(pi, oid, Instrument.GmosNorth)
+      testFailedNonAcquistion(pi, oid, "gmosNorthLongSlit")
 
   test("gmosNorth: staff can update acquisition for ongoing observation"):
     createOngoingGmosNorthObservation.flatMap: oid =>
-      testSuccessAcquisition(staff, oid, Instrument.GmosNorth)
+      testSuccessAcquisition(staff, oid, "gmosNorthLongSlit")
 
   test("gmosNorth: staff cannot update acquisition for completed observation"):
     for
       oid <- createOngoingGmosNorthObservation
       _   <- setObservationWorkflowState(pi, oid, ObservationWorkflowState.Completed)
-      _   <- testFailedAcquistion(staff, oid, Instrument.GmosNorth, ErrorForCompleted)
+      _   <- testFailedAcquistion(staff, oid, "gmosNorthLongSlit", ErrorForCompleted)
     yield ()
 
   test("gmosNorth: staff cannot update non-acquisition for ongoing observation"):
     createOngoingGmosNorthObservation.flatMap: oid =>
-      testFailedNonAcquistion(staff, oid, Instrument.GmosNorth)
+      testFailedNonAcquistion(staff, oid, "gmosNorthLongSlit")
 
   test("gmosSouth: pi cannot update acquisition for ongoing observation"):
     createOngoingGmosSouthObservation.flatMap: oid =>
-      testFailedAcquistion(pi, oid, Instrument.GmosSouth)
+      testFailedAcquistion(pi, oid, "gmosSouthLongSlit")
 
   test("gmosSouth: pi cannot update non-acquisition for ongoing observation"):
     createOngoingGmosSouthObservation.flatMap: oid =>
-      testFailedNonAcquistion(pi, oid, Instrument.GmosSouth)
+      testFailedNonAcquistion(pi, oid, "gmosSouthLongSlit")
 
   test("gmosSouth: staff can update acquisition for ongoing observation"):
     createOngoingGmosSouthObservation.flatMap: oid =>
-      testSuccessAcquisition(staff, oid, Instrument.GmosSouth)
+      testSuccessAcquisition(staff, oid, "gmosSouthLongSlit")
 
   test("gmosSouth: staff cannot update acquisition for completed observation"):
     for
       oid <- createOngoingGmosSouthObservation
       _   <- setObservationWorkflowState(pi, oid, ObservationWorkflowState.Completed)
-      _   <- testFailedAcquistion(staff, oid, Instrument.GmosSouth, ErrorForCompleted)
+      _   <- testFailedAcquistion(staff, oid, "gmosSouthLongSlit", ErrorForCompleted)
     yield ()
 
   test("gmosSouth: staff cannot update non-acquisition for ongoing observation"):
     createOngoingGmosSouthObservation.flatMap: oid =>
-      testFailedNonAcquistion(staff, oid, Instrument.GmosSouth)
+      testFailedNonAcquistion(staff, oid, "gmosSouthLongSlit")
 
 
 // GNIRS has no mode-level exposure time mode and its acquisition input is
@@ -340,3 +335,39 @@ class ShortCut_7658_Gnirs extends ExecutionTestSupportForGnirs with ShortCut_765
   test("gnirs: staff cannot update non-acquisition for ongoing observation"):
     createOngoingGnirsLongSlitObservation.flatMap: oid =>
       testFailed(staff, oid, NonAcquisitionUpdate)
+
+class ShortCut_7658_GmosIfu extends ExecutionTestSupportForGmos with ShortCut_7658_Helpers:
+  test("gmosNorthIfu: pi cannot update acquisition for ongoing observation"):
+    createOngoingGmosNorthIfuObservation.flatMap: oid =>
+      testFailedAcquistion(pi, oid, "gmosNorthIfu")
+
+  test("gmosNorthIfu: pi cannot update non-acquisition for ongoing observation"):
+    createOngoingGmosNorthIfuObservation.flatMap: oid =>
+      testFailedNonAcquistion(pi, oid, "gmosNorthIfu")
+
+  test("gmosNorthIfu: staff can update acquisition for ongoing observation"):
+    createOngoingGmosNorthIfuObservation.flatMap: oid =>
+      testSuccessAcquisition(staff, oid, "gmosNorthIfu")
+
+  test("gmosNorthIfu: staff cannot update acquisition for completed observation"):
+    for
+      oid <- createOngoingGmosNorthIfuObservation
+      _   <- setObservationWorkflowState(pi, oid, ObservationWorkflowState.Completed)
+      _   <- testFailedAcquistion(staff, oid, "gmosNorthIfu", ErrorForCompleted)
+    yield ()
+
+  test("gmosNorthIfu: staff cannot update non-acquisition for ongoing observation"):
+    createOngoingGmosNorthIfuObservation.flatMap: oid =>
+      testFailedNonAcquistion(staff, oid, "gmosNorthIfu")
+
+  test("gmosSouthIfu: pi cannot update acquisition for ongoing observation"):
+    createOngoingGmosSouthIfuObservation.flatMap: oid =>
+      testFailedAcquistion(pi, oid, "gmosSouthIfu")
+
+  test("gmosSouthIfu: staff can update acquisition for ongoing observation"):
+    createOngoingGmosSouthIfuObservation.flatMap: oid =>
+      testSuccessAcquisition(staff, oid, "gmosSouthIfu")
+
+  test("gmosSouthIfu: staff cannot update non-acquisition for ongoing observation"):
+    createOngoingGmosSouthIfuObservation.flatMap: oid =>
+      testFailedNonAcquistion(staff, oid, "gmosSouthIfu")

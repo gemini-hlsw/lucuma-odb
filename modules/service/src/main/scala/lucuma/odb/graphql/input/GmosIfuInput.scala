@@ -8,6 +8,7 @@ import cats.Eq
 import cats.data.NonEmptyList
 import cats.derived.*
 import cats.syntax.parallel.*
+import cats.syntax.partialOrder.*
 import cats.syntax.traverse.*
 import grackle.Result
 import lucuma.core.enums.GmosAmpGain
@@ -23,6 +24,7 @@ import lucuma.core.enums.GmosSouthIfuFpu
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.model.Access
 import lucuma.core.enums.Site
 import lucuma.core.math.Wavelength
 import lucuma.core.math.WavelengthDither
@@ -203,6 +205,14 @@ object GmosIfuInput extends AcquisitionFilterCheck:
       common:      Edit.Common
     ) derives Eq:
 
+      def updatesAcquisition: Boolean =
+        acquisition.exists(_.updatesAcquisition)
+
+      def limitToPreExecution(access: Access): Boolean =
+        // Staff can edit the acquisition info for ongoing observations
+        access <= Access.Pi ||
+          copy(acquisition = None) =!= North.AllUndefined
+
       val observingModeType: ObservingModeType =
         ObservingModeType.GmosNorthIfu
 
@@ -215,6 +225,9 @@ object GmosIfuInput extends AcquisitionFilterCheck:
           Create.North(_, filter.toOption, _, acquisition, _)
 
     object North:
+
+      private val AllUndefined: North =
+        North(None, Nullable.Absent, None, None, Common.AllUndefined)
 
       val Binding: Matcher[North] =
         NorthData.rmap:
@@ -229,6 +242,14 @@ object GmosIfuInput extends AcquisitionFilterCheck:
       common:      Edit.Common
     ) derives Eq:
 
+      def updatesAcquisition: Boolean =
+        acquisition.exists(_.updatesAcquisition)
+
+      def limitToPreExecution(access: Access): Boolean =
+        // Staff can edit the acquisition info for ongoing observations
+        access <= Access.Pi ||
+          copy(acquisition = None) =!= South.AllUndefined
+
       val observingModeType: ObservingModeType =
         ObservingModeType.GmosSouthIfu
 
@@ -241,6 +262,9 @@ object GmosIfuInput extends AcquisitionFilterCheck:
           Create.South(_, filter.toOption, _, acquisition, _)
 
     object South:
+
+      private val AllUndefined: South =
+        South(None, Nullable.Absent, None, None, Common.AllUndefined)
 
       val Binding: Matcher[South] =
         SouthData.rmap:

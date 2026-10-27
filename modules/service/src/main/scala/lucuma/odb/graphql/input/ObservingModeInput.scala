@@ -139,6 +139,8 @@ object ObservingModeInput:
       flamingos2Mos.exists(_.updatesAcquisition)      ||
       gmosNorthLongSlit.exists(_.updatesAcquisition)  ||
       gmosSouthLongSlit.exists(_.updatesAcquisition)  ||
+      gmosNorthIfu.exists(_.updatesAcquisition)       ||
+      gmosSouthIfu.exists(_.updatesAcquisition)       ||
       gnirsSpectroscopy.exists(_.updatesAcquisition)
 
     def limitToPreExecution(access: Access): Boolean =
@@ -154,6 +156,8 @@ object ObservingModeInput:
         gmosSouthLongSlit.exists(_.limitToPreExecution(access))  ||
         gmosNorthMos.isDefined                                   ||
         gmosSouthMos.isDefined                                   ||
+        gmosNorthIfu.exists(_.limitToPreExecution(access))       ||
+        gmosSouthIfu.exists(_.limitToPreExecution(access))       ||
         gnirsImaging.isDefined                                   ||
         gnirsSpectroscopy.exists(_.limitToPreExecution(access))  ||
         igrins2LongSlit.isDefined
