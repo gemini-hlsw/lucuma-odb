@@ -17,6 +17,7 @@ import lucuma.odb.data.OdbError
 import lucuma.odb.graphql.mutation.UpdateObservationsOps
 import lucuma.odb.graphql.query.ExecutionTestSupportForFlamingos2
 import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
+import lucuma.odb.graphql.query.ExecutionTestSupportForGnirs
 
 // https://app.shortcut.com/lucuma/story/7658
 trait ShortCut_7658_Helpers extends OdbSuite with UpdateObservationsOps:
@@ -254,3 +255,88 @@ class ShortCut_7658_Gmos extends ExecutionTestSupportForGmos with ShortCut_7658_
     createOngoingGmosSouthObservation.flatMap: oid =>
       testFailedNonAcquistion(staff, oid, Instrument.GmosSouth)
 
+
+// GNIRS has no mode-level exposure time mode and its acquisition input is
+// shaped differently, so it gets its own update strings.
+class ShortCut_7658_Gnirs extends ExecutionTestSupportForGnirs with ShortCut_7658_Helpers:
+
+  private def gnirsUpdate(inner: String): String =
+    s"""
+      observingMode: {
+        gnirsSpectroscopy: {
+          $inner
+        }
+      }
+    """
+
+  private val AcquisitionUpdate: String =
+    gnirsUpdate("acquisition: { explicitAcquisitionType: BRIGHT }")
+
+  private val NonAcquisitionUpdate: String =
+    gnirsUpdate("explicitReadMode: FAINT")
+
+  private val AcquisitionQuery: String =
+    """
+      observations {
+        observingMode {
+          gnirsSpectroscopy {
+            acquisition { explicitAcquisitionType }
+          }
+        }
+      }
+    """
+
+  private val ExpectedAcquisition: Json =
+    json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "observingMode": {
+                "gnirsSpectroscopy": {
+                  "acquisition": { "explicitAcquisitionType": "BRIGHT" }
+                }
+              }
+            }
+          ]
+        }
+      }
+    """
+
+  private def testFailed(user: User, oid: Observation.Id, update: String, error: String = ErrorForOngoing): IO[Unit] =
+    expectOdbError(
+      user     = user,
+      query    = updateObservationsMutation(oid, update, "observations { id }"),
+      expected = {
+        case OdbError.InvalidObservation(_, Some(msg)) if msg.contains(error) => ()
+      }
+    )
+
+  test("gnirs: pi cannot update acquisition for ongoing observation"):
+    createOngoingGnirsLongSlitObservation.flatMap: oid =>
+      testFailed(pi, oid, AcquisitionUpdate)
+
+  test("gnirs: pi cannot update non-acquisition for ongoing observation"):
+    createOngoingGnirsLongSlitObservation.flatMap: oid =>
+      testFailed(pi, oid, NonAcquisitionUpdate)
+
+  test("gnirs: staff can update acquisition for ongoing observation"):
+    createOngoingGnirsLongSlitObservation.flatMap: oid =>
+      updateObservation(
+        user     = staff,
+        oid      = oid,
+        update   = AcquisitionUpdate,
+        query    = AcquisitionQuery,
+        expected = ExpectedAcquisition.asRight
+      )
+
+  test("gnirs: staff cannot update acquisition for completed observation"):
+    for
+      oid <- createOngoingGnirsLongSlitObservation
+      _   <- setObservationWorkflowState(pi, oid, ObservationWorkflowState.Completed)
+      _   <- testFailed(staff, oid, AcquisitionUpdate, ErrorForCompleted)
+    yield ()
+
+  test("gnirs: staff cannot update non-acquisition for ongoing observation"):
+    createOngoingGnirsLongSlitObservation.flatMap: oid =>
+      testFailed(staff, oid, NonAcquisitionUpdate)

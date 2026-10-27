@@ -155,7 +155,7 @@ object ObservingModeInput:
         gmosNorthMos.isDefined                                   ||
         gmosSouthMos.isDefined                                   ||
         gnirsImaging.isDefined                                   ||
-        gnirsSpectroscopy.isDefined                              ||
+        gnirsSpectroscopy.exists(_.limitToPreExecution(access))  ||
         igrins2LongSlit.isDefined
 
     def needsStaffAccess: Boolean =
