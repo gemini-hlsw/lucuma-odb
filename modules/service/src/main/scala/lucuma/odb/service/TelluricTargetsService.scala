@@ -64,8 +64,7 @@ import scala.util.control.NoStackTrace
 trait TelluricTargetsService[F[_]]:
 
   /**
-   * Requeues all 'calculating' entries on startup: 'pending' for generated
-   * tellurics, 'ready' for user-defined ones, which are never searched for.
+   * Requeues all 'calculating' entries as 'pending' on startup.
    * Called by the daemon to clean up state after restart.
    */
   def reset(using ServiceAccess, Transaction[F]): F[Unit]
@@ -105,14 +104,6 @@ trait TelluricTargetsService[F[_]]:
     telluricId: Observation.Id,
     scienceId:  Observation.Id,
     slot:      TelluricSlot
-  )(using ServiceAccess, Transaction[F]): F[Unit]
-
-  /**
-   * Turns a generated telluric into a user-defined one, keeping its current
-   * star (still a calibration target) and discarding any search in flight.
-   */
-  def markUserDefined(
-    telluricId: Observation.Id
   )(using ServiceAccess, Transaction[F]): F[Unit]
 
   /**
@@ -396,12 +387,6 @@ object TelluricTargetsService:
         session.execute(Statements.InsertUserDefinedResolution)(telluricId, pid, scienceId, slot) *>
           session.execute(Statements.MarkUserDefinedTelluric)(telluricId).void
 
-      override def markUserDefined(
-        telluricId: Observation.Id
-      )(using ServiceAccess, Transaction[F]): F[Unit] =
-        session.execute(Statements.MarkUserDefinedTelluric)(telluricId) *>
-          session.execute(Statements.SupersedeResolution)(telluricId).void
-
       override def updateScienceDuration(
         telluricId:      Observation.Id,
         scienceDuration: TimeSpan
@@ -462,8 +447,8 @@ object TelluricTargetsService:
             .map(_.toRight(s"Missing coordinates or instrument config for science observation ${pending.scienceObservationId}"))
 
         // Linking the star and marking the row ready happen in one transaction guarded by the
-        // invalidation the search read, so a conversion or science edit that landed meanwhile
-        // rolls the link back instead of overwriting the asterism with a stale result.
+        // invalidation the search read, so a science edit that landed meanwhile rolls the
+        // link back instead of overwriting the asterism with a stale result.
         def linkTargetAndReady(sidereal: Target.Sidereal, paramsHash: Md5Hash): F[Option[TelluricTargets.Meta]] =
           S.transactionally:
             Services.asSuperUser:
@@ -635,15 +620,13 @@ object TelluricTargetsService:
                  AND  o.c_is_user_defined_telluric
              )"""
 
-        // A row converted to user-defined while calculating would never be loaded again.
         val ResetCalculating: Command[Void] =
           sql"""
-            UPDATE t_telluric_resolution r
-            SET    c_state = CASE WHEN #$notUserDefined THEN 'pending'::e_calculation_state
-                                  ELSE 'ready'::e_calculation_state END,
+            UPDATE t_telluric_resolution
+            SET    c_state = 'pending',
                    c_retry_at = NULL,
                    c_failure_count = 0
-            WHERE  r.c_state = 'calculating'
+            WHERE  c_state = 'calculating'
           """.command
 
         val LoadPending: Query[Int, TelluricTargets.Pending] =
@@ -705,13 +688,12 @@ object TelluricTargetsService:
 
         val RequeueSuperseded: Command[Observation.Id] =
           sql"""
-            UPDATE t_telluric_resolution r
-            SET    c_state = CASE WHEN #$notUserDefined THEN 'pending'::e_calculation_state
-                                  ELSE 'ready'::e_calculation_state END,
+            UPDATE t_telluric_resolution
+            SET    c_state = 'pending',
                    c_retry_at = NULL,
                    c_failure_count = 0
-            WHERE  r.c_observation_id = $observation_id
-              AND  r.c_state = 'calculating'
+            WHERE  c_observation_id = $observation_id
+              AND  c_state = 'calculating'
           """.command
 
         val InsertUserDefinedResolution: Command[(Observation.Id, Program.Id, Observation.Id, TelluricSlot)] =
@@ -744,17 +726,6 @@ object TelluricTargetsService:
 
         // A search in flight writes its result only against the invalidation it
         // read, so bumping it discards that result.
-        val SupersedeResolution: Command[Observation.Id] =
-          sql"""
-            UPDATE t_telluric_resolution
-            SET    c_last_invalidation = now(),
-                   c_retry_at          = NULL,
-                   c_failure_count     = 0,
-                   c_state             = CASE WHEN c_state = 'calculating' THEN c_state
-                                              ELSE 'ready'::e_calculation_state END
-            WHERE  c_observation_id = $observation_id
-          """.command
-
         val ResetToReady: Query[(Observation.Id, Timestamp), TelluricTargets.Meta] =
           sql"""
             UPDATE t_telluric_resolution

@@ -294,11 +294,12 @@ object PerScienceObservationCalibrationsService:
 
       /**
        * The user's tellurics are never resynced or searched for: the set is only
-       * reconciled by slot, converting generated ones in place so they keep
-       * their star, and adding the slots still missing. A missing slot is
-       * cloned from the most recently observed user-defined telluric of that
-       * slot, star and configuration included, so every visit gets the PI's
-       * standard again; with none observed yet it starts empty.
+       * reconciled by slot against the count. Switching to user-defined is a
+       * fresh start, so an unobserved generated telluric goes, its star with it
+       * once orphaned. A missing slot is cloned from the most recently observed
+       * user-defined telluric of that slot, star and configuration included, so
+       * every visit gets the PI's standard again; with none observed yet it
+       * starts empty.
        */
       private def syncUserDefinedTellurics(
         pid:        Program.Id,
@@ -306,11 +307,6 @@ object PerScienceObservationCalibrationsService:
         gid:        Group.Id,
         count:      TelluricCount
       )(using Transaction[F], SuperUserAccess): F[(List[Observation.Id], List[Observation.Id])] =
-        // A conversion takes the science configuration one last time, as creation does.
-        def convert(tid: Observation.Id): F[Unit] =
-          telluricTargetsService.markUserDefined(tid) *>
-            syncConfiguration(pid, scienceOid, tid, CalibrationRole.Telluric)
-
         def register(tid: Observation.Id, slot: TelluricSlot): F[Unit] =
           telluricTargetsService.registerUserDefinedTelluric(pid, tid, scienceOid, slot)
 
@@ -325,12 +321,10 @@ object PerScienceObservationCalibrationsService:
           unobserved    = tellurics.filterNot(_.visited)
           spent         = tellurics.filter(t => t.visited && t.userDefined.value)
           required      = remainingSlots(slotsFor(count.value.value), tellurics)
-          (keep, drop)  = unobserved.partition(_.slot.exists(required.contains))
+          (keep, drop)  = unobserved.partition(t => t.userDefined.value && t.slot.exists(required.contains))
           toDelete      = drop.map(_.oid)
-          toConvert     = keep.filterNot(_.userDefined.value).map(_.oid)
           toCreate      = required.filterNot(o => keep.exists(_.slot.contains(o)))
           _            <- NonEmptyList.fromList(toDelete).traverse_(observationService.deleteCalibrationObservations)
-          _            <- toConvert.traverse_(convert)
           created      <- createTelluricCalibrations(pid, scienceOid, gid, toCreate)(register, configure(spent))
         yield (created, toDelete)
 
