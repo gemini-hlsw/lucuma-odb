@@ -17,6 +17,7 @@ import lucuma.core.enums.Flamingos2LyotWheel
 import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.Flamingos2ReadoutMode
 import lucuma.core.enums.Flamingos2Reads
+import lucuma.core.enums.Flamingos2WindowCover
 import lucuma.core.enums.MosPreImaging
 import lucuma.core.math.Wavelength
 import lucuma.core.model.Attachment
@@ -100,7 +101,8 @@ trait Flamingos2Codec:
         k <- c.downField("decker").as[Flamingos2Decker]
         m <- c.downField("readoutMode").as[Flamingos2ReadoutMode]
         s <- c.downField("reads").as[Flamingos2Reads]
-      yield Flamingos2DynamicConfig(e, d, f, r, l, u, k, m, s)
+        w <- c.downField("windowCover").as[Option[Flamingos2WindowCover]]
+      yield Flamingos2DynamicConfig(e, d, f, r, l, u, k, m, s, w)
 
   given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[Flamingos2DynamicConfig] =
     Encoder.instance[Flamingos2DynamicConfig]: a =>
@@ -114,6 +116,7 @@ trait Flamingos2Codec:
         "decker"            -> a.decker.asJson,
         "readoutMode"       -> a.readoutMode.asJson,
         "reads"             -> a.reads.asJson,
+        "windowCover"       -> a.windowCover.asJson,
         "centralWavelength" -> a.centralWavelength.asJson
       )
 
