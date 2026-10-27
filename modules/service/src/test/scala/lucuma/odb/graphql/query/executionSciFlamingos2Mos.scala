@@ -29,6 +29,7 @@ import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
 import lucuma.odb.graphql.ACursorOps
+import lucuma.odb.graphql.mutation.UpdateObservationsOps
 import lucuma.odb.json.time.decoder.given
 import lucuma.odb.sequence.flamingos2.mos.Acquisition.RepeatingAtomCount
 import lucuma.refined.*
@@ -38,7 +39,7 @@ import lucuma.refined.*
  * custom mask on every step, and an acquisition that images the field with the mask
  * out of the beam before confirming the alignment through it.
  */
-class executionSciFlamingos2Mos extends ExecutionTestSupportForFlamingos2:
+class executionSciFlamingos2Mos extends ExecutionTestSupportForFlamingos2 with UpdateObservationsOps:
 
   val ExposureTime: TimeSpan = 5.minuteTimeSpan
 
@@ -276,3 +277,40 @@ class executionSciFlamingos2Mos extends ExecutionTestSupportForFlamingos2:
       yield (full, reacq),
       (MosSetup, Reacquisition)
     )
+
+  test("reset restores an executed acquisition"):
+    for
+      p      <- createProgram
+      t      <- createTargetWithProfileAs(pi, p)
+      oid    <- createFlamingos2MosObservationAs(pi, p, List(t))
+      v      <- recordVisitAs(serviceUser, oid)
+      before <- acquisitionSequenceIds(pi, oid)
+      _      <- before.values.flatten.toList.traverse_(addEndStepEvent(_, v))
+      _      <- acquisitionSequenceIds(pi, oid).map(ids => assertEquals(ids.size, 0))
+      _      <- resetAcquisitionAs(serviceUser, oid)
+      after  <- acquisitionSequenceIds(pi, oid)
+      _       = assertEquals(after.values.map(_.size).toList, before.values.map(_.size).toList)
+      _       = assert(after.keySet.intersect(before.keySet).isEmpty)
+    yield ()
+
+  test("editing the acquisition of an ongoing observation regenerates it"):
+    val update = """
+      observingMode: {
+        flamingos2Mos: {
+          acquisition: { explicitFilter: H }
+        }
+      }
+    """
+    for
+      p      <- createProgram
+      t      <- createTargetWithProfileAs(pi, p)
+      oid    <- createFlamingos2MosObservationAs(pi, p, List(t))
+      v      <- recordVisitAs(serviceUser, oid)
+      before <- acquisitionSequenceIds(pi, oid)
+      _      <- addEndStepEvent(before.values.flatten.head, v)
+      _      <- runObscalcUpdate(p, oid)
+      _      <- query(staff, updateObservationsMutation(oid, update, "observations { id }"))
+      after  <- acquisitionSequenceIds(pi, oid)
+      _       = assertEquals(after.values.map(_.size).toList, before.values.map(_.size).toList)
+      _       = assert(after.keySet.intersect(before.keySet).isEmpty)
+    yield ()

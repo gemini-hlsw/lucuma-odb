@@ -715,10 +715,8 @@ object Generator:
             case ObservingModeType.Flamingos2LongSlit   =>
               go(freshAcq, ctxʹ.params.itcInput.toOption, streaming.generateFlamingos2LongSlit(ctxʹ))(sequenceService.resetFlamingos2Acquisition)
 
-            // N.B. there is no MOS acquisition yet, so there is nothing to reset.
-            // This becomes wrong once a MOS acquisition lands.
             case ObservingModeType.Flamingos2Mos        =>
-              EitherT.pure(())
+              go(freshAcq, ctxʹ.params.itcInput.toOption, streaming.generateFlamingos2Mos(ctxʹ))(sequenceService.resetFlamingos2Acquisition)
 
             // N.B. there is no imaging acquisition, but it should not blow up.
             case ObservingModeType.GhostIfu             =>
