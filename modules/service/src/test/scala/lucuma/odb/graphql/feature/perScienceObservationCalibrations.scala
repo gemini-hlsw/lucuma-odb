@@ -4,6 +4,7 @@
 package lucuma.odb.graphql
 package feature
 
+import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.PosInt
@@ -62,10 +63,12 @@ import lucuma.odb.json.wavelength.decoder.given
 import lucuma.odb.service.ObsExtract
 import lucuma.odb.service.Services
 import lucuma.odb.service.TelluricTargetsServiceSuiteSupport
+import lucuma.odb.service.UserService
 import lucuma.odb.smartgcal.data.Gnirs
 import lucuma.odb.smartgcal.data.SmartGcalValue.LegacyInstrumentConfig
 import lucuma.odb.util.Codecs.observation_id
 import lucuma.odb.util.Codecs.user_state
+import org.typelevel.otel4s.trace.Tracer
 import skunk.syntax.all.*
 
 import java.time.LocalDateTime
@@ -4370,3 +4373,110 @@ class perScienceObservationCalibrations
       val expected: Set[(Option[TelluricSlot], Option[Target.Id])] =
         Set((TelluricSlot.Before.some, starB.some), (TelluricSlot.After.some, starA.some))
       assertEquals(slots.zip(targets).toSet, expected)
+
+  // A recalculation without settling obscalc first, as the daemon runs when an
+  // edit queues it while the science calculation is still pending.
+  private def recalculateCalibrationsWithPendingObscalc(pid: Program.Id, oid: Observation.Id): IO[(List[Observation.Id], List[Observation.Id])] =
+    import Tracer.Implicits.noop
+    withServices(serviceUser): services =>
+      for
+        _ <- Services.asSuperUser(UserService.fromSession(services.session).canonicalizeUser(serviceUser))
+        r <- services.transactionally:
+               Services.asSuperUser:
+                 services.calibrationsService.recalculateCalibrations(pid, when, NonEmptyList.one(oid))
+      yield r
+
+  // A science observation with one user-defined telluric holding the PI's star.
+  private def userDefinedTelluricWithStar(pid: Program.Id): IO[(Observation.Id, Observation.Id, Target.Id)] =
+    for
+      tid      <- createTargetWithProfileAs(pi, pid)
+      oid      <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _        <- setUserDefinedTellurics(oid, 1)
+      _        <- runObscalcUpdate(pid, oid)
+      _        <- recalculateCalibrations(pid, when, oid)
+      tel      <- groupTellurics(oid).map(_.head)
+      standard <- createTargetWithProfileAs(pi, pid)
+      _        <- editAsterismAs(pi, tel, List(standard), Nil)
+    yield (oid, tel, standard)
+
+  test("a user-defined telluric survives the science becoming unapproved"):
+    for
+      pid                  <- createProgramWithUsPi(pi)
+      cid                  <- createGeminiCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A"))
+      _                    <- addDemoScienceProposal(pi, pid, cid)
+      (oid, tel, standard) <- userDefinedTelluricWithStar(pid)
+      _                    <- setProposalStatusDirectly(pid, ProposalStatus.Submitted)
+      _                    <- setProposalStatusDirectly(pid, ProposalStatus.Accepted)
+      _                    <- runObscalcUpdate(pid, oid)
+      state                <- queryObservationWorkflowState(pi, oid)
+      (added, removed)     <- recalculateCalibrations(pid, when, oid)
+      tellurics            <- groupTellurics(oid)
+      exists               <- queryObservationExists(tel)
+      target               <- if exists then queryObservationWithTarget(tel).map(_.targetId) else none[Target.Id].pure[IO]
+    yield
+      assertEquals(state, ObservationWorkflowState.Unapproved)
+      assertEquals((added, removed), (Nil, Nil))
+      assert(exists, s"user-defined telluric $tel was deleted")
+      assertEquals(tellurics, List(tel))
+      assertEquals(target, Some(standard))
+
+  test("a user-defined telluric survives a recalculation while the science obscalc is pending"):
+    for
+      pid                  <- createProgramAs(pi)
+      (oid, tel, standard) <- userDefinedTelluricWithStar(pid)
+      _                    <- setObservationTimeAndDuration(pi, oid, Timestamp.FromString.getOption("2024-01-01T12:00:00Z"), 2.hourTimeSpan.some)
+      pending              <- obscalcRow(oid).map(_._1)
+      (added, removed)     <- recalculateCalibrationsWithPendingObscalc(pid, oid)
+      tellurics            <- groupTellurics(oid)
+      exists               <- queryObservationExists(tel)
+      target               <- if exists then queryObservationWithTarget(tel).map(_.targetId) else none[Target.Id].pure[IO]
+    yield
+      assertEquals(pending, CalculationState.Pending)
+      assertEquals((added, removed), (Nil, Nil))
+      assert(exists, s"user-defined telluric $tel was deleted")
+      assertEquals(tellurics, List(tel))
+      assertEquals(target, Some(standard))
+
+  test("a user-defined telluric survives the science being inactive"):
+    for
+      pid                  <- createProgramAs(pi)
+      (oid, tel, standard) <- userDefinedTelluricWithStar(pid)
+      _                    <- setObservationWorkflowState(pi, oid, ObservationWorkflowState.Inactive)
+      (_, removed)         <- recalculateCalibrations(pid, when, oid)
+      _                    <- setObservationWorkflowState(pi, oid, ObservationWorkflowState.Defined)
+      (added, _)           <- recalculateCalibrations(pid, when, oid)
+      tellurics            <- groupTellurics(oid)
+      exists               <- queryObservationExists(tel)
+      target               <- if exists then queryObservationWithTarget(tel).map(_.targetId) else none[Target.Id].pure[IO]
+    yield
+      assertEquals(removed, Nil)
+      assertEquals(added, Nil)
+      assert(exists, s"user-defined telluric $tel was deleted")
+      assertEquals(tellurics, List(tel))
+      assertEquals(target, Some(standard))
+
+  test("a user-defined telluric goes with its deleted science observation"):
+    for
+      pid            <- createProgramAs(pi)
+      (oid, tel, _)  <- userDefinedTelluricWithStar(pid)
+      gid            <- queryObservation(oid).map(_.groupId.get)
+      _              <- deleteObservation(pi, oid)
+      (_, removed)   <- recalculateCalibrations(pid, when, oid)
+      exists         <- queryObservationExists(tel)
+      groupExists    <- queryGroupExists(gid)
+    yield
+      assertEquals(removed, List(tel))
+      assert(!exists)
+      assert(!groupExists)
+
+  test("a user-defined telluric goes when the science asks for no telluric"):
+    for
+      pid            <- createProgramAs(pi)
+      (oid, tel, _)  <- userDefinedTelluricWithStar(pid)
+      _              <- setTelluricType(oid, "flamingos2LongSlit", "NO_TELLURIC")
+      _              <- runObscalcUpdate(pid, oid)
+      (_, removed)   <- recalculateCalibrations(pid, when, oid)
+      exists         <- queryObservationExists(tel)
+    yield
+      assertEquals(removed, List(tel))
+      assert(!exists)

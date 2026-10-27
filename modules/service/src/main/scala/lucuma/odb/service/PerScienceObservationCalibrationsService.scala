@@ -510,7 +510,7 @@ object PerScienceObservationCalibrationsService:
             findObsCalibrationGroupForObservation(obs.id).flatMap:
               case Some(gid) =>
                 info"Observation ${obs.id} does not require tellurics, cleaning up obs calibration group $gid" *>
-                  cleanupOrphanedObsCalibrationGroup(pid, gid, obs.id)
+                  cleanupOrphanedObsCalibrationGroup(pid, gid, obs.id, keepUserDefined = false)
               case None      =>
                 (List.empty[Observation.Id], List.empty[Observation.Id]).pure[F]
           else
@@ -865,22 +865,35 @@ object PerScienceObservationCalibrationsService:
                )
         yield ()
 
+      /** Present and in a mode with tellurics, whatever its workflow state. */
+      private def scienceTakesTellurics(scienceOid: Observation.Id): F[Boolean] =
+        S.session
+          .prepareR(Statements.selectScienceTakesTellurics)
+          .use(_.option(scienceOid))
+          .map(_.exists((present, mode) => present && mode.exists(ObsExtract.modeTakesTelluric)))
+
+      /**
+       * Deletes the unexecuted calibrations of a science observation, and the
+       * group once empty. With `keepUserDefined` the PI's tellurics survive: an
+       * inactive or unapproved science is a passing state, unlike its deletion
+       * or a configuration without tellurics.
+       */
       private def cleanupOrphanedObsCalibrationGroup(
-        pid:        Program.Id,
-        gid:        Group.Id,
-        scienceOid: Observation.Id
+        pid:             Program.Id,
+        gid:             Group.Id,
+        scienceOid:      Observation.Id,
+        keepUserDefined: Boolean
       )(using Transaction[F], SuperUserAccess): F[(List[Observation.Id], List[Observation.Id])] =
         for
           // Query the calibration observations in the group (tellurics and any
           // daytime pinhole flat), not all observations.
-          telluricOidsInGroup <- S.session
-                                   .prepareR(Statements.selectTelluricObservations)
-                                   .use(_.stream((gid, CalibrationRole.Telluric), 1024).compile.toList)
+          telluricsInGroup    <- findGroupTellurics(gid)
           pinholeOidsInGroup  <- findDaytimePinholeObservations(gid)
-          allOidsInGroup       = telluricOidsInGroup ++ pinholeOidsInGroup
+          allOidsInGroup       = telluricsInGroup.map(_.oid) ++ pinholeOidsInGroup
+          keptUserDefined      = if keepUserDefined then telluricsInGroup.filter(_.userDefined.value).map(_.oid) else Nil
           // Tellurics and daytime pinhole flats alike are kept if they (or the
           // parent science obs) have started/finished executing or have visits.
-          deletable           <- excludeObsCalibrationsFromDeletion(allOidsInGroup, identity)
+          deletable           <- excludeObsCalibrationsFromDeletion(allOidsInGroup.filterNot(keptUserDefined.contains), identity)
           deleted             <- NonEmptyList.fromList(deletable) match
                                    case Some(nel) => observationService.deleteCalibrationObservations(nel).as(deletable)
                                    case None      => List.empty.pure[F]
@@ -892,7 +905,7 @@ object PerScienceObservationCalibrationsService:
           // Actually delete the orphaned group
           _                   <- groupService.deleteSystemGroup(pid, gid).whenA(allDeleted)
           _                   <- (info"Deleted orphaned obs calibration group $gid").whenA(allDeleted)
-          _                   <- (info"Obs calibration group $gid retained: ${allOidsInGroup.size - deleted.size} observations have visits").whenA(!allDeleted && deleted.nonEmpty)
+          _                   <- (info"Obs calibration group $gid retained: ${allOidsInGroup.size - deleted.size} observations are user-defined or have visits").whenA(!allDeleted && deleted.nonEmpty)
         yield (List.empty, deleted)
 
       override def generateCalibrations(
@@ -931,7 +944,8 @@ object PerScienceObservationCalibrationsService:
                                                       syncTelluricObservation(pid, obs, gid, true, syncExisting = false)
                                                   case (Some(gid), None) =>
                                                     info"Observation $oid no longer active or ongoing, cleaning up obs calibration group $gid" *>
-                                                      cleanupOrphanedObsCalibrationGroup(pid, gid, oid)
+                                                      scienceTakesTellurics(oid).flatMap: keepUserDefined =>
+                                                        cleanupOrphanedObsCalibrationGroup(pid, gid, oid, keepUserDefined)
                                                   case (None, _) =>
                                                     debug"Observation $oid has no obs calibration group, skipping" *>
                                                       (List.empty[Observation.Id], List.empty[Observation.Id]).pure
@@ -939,6 +953,14 @@ object PerScienceObservationCalibrationsService:
           } yield result
 
       object Statements:
+
+        val selectScienceTakesTellurics: Query[Observation.Id, (Boolean, Option[ObservingModeType])] =
+          sql"""
+            SELECT c_existence = 'present',
+                   c_observing_mode_type
+            FROM   t_observation
+            WHERE  c_observation_id = $observation_id
+          """.query(bool *: observing_mode_type.opt)
 
         val selectObsCalibrationGroup: Query[(Observation.Id, List[CalibrationRole]), Group.Id] =
           sql"""
