@@ -8,6 +8,7 @@ import cats.data.NonEmptyList
 import cats.data.StateT
 import cats.effect.Concurrent
 import cats.syntax.all.*
+import fs2.Stream
 import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.Site
@@ -30,6 +31,7 @@ import lucuma.odb.graphql.input.TimeChargeCorrectionInput
 import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.util.Codecs.*
 import skunk.*
+import skunk.codec.boolean.bool
 import skunk.codec.numeric.int8
 import skunk.codec.temporal.interval
 import skunk.codec.text.text
@@ -57,6 +59,24 @@ trait TimeAccountingService[F[_]] {
   def updateAll(
     observationId: Observation.Id
   )(using Transaction[F], Services.ServiceAccess): F[Unit]
+
+  /**
+   * A visitor instrument visit's charge depends on when the next chargeable
+   * visit at the site starts and on whether its night is over (see
+   * `VisitInfo.visitorEnd`), neither of which touches the visit itself.  This
+   * finds up to `limit` recent visitor visits whose charge would now end
+   * differently than when it was last computed, and marks them as needing an
+   * update.  Visits with a time charge correction are left alone: staff have
+   * taken them over.  Each visit is marked in a transaction of its own so that
+   * only one observation is ever locked at a time.  A failure to mark one visit
+   * does not keep the others from being marked; the first failure is raised
+   * after all have been attempted.
+   *
+   * @return the number of visits marked
+   */
+  def invalidateStaleVisitorVisits(
+    limit: Int
+  )(using NoTransaction[F], Services.ServiceAccess): F[Int]
 
   /**
    * Adds a manual time charge correction.
@@ -139,6 +159,53 @@ object TimeAccountingService {
     amount:      TimeSpan
   )
 
+  /**
+   * Visit information needed to charge visitor instrument visits.
+   *
+   * @param isVisitor whether the visit uses a visitor instrument
+   * @param night the visit's observing night
+   * @param lastEvent time of the visit's last execution event, if any
+   * @param nextVisitStart start of the next chargeable visit at the same site,
+   *                       if any (only looked up for visitor visits)
+   */
+  case class VisitInfo(
+    isVisitor:      Boolean,
+    night:          ObservingNight,
+    lastEvent:      Option[Timestamp],
+    nextVisitStart: Option[Timestamp]
+  ) {
+
+    /**
+     * Visitor instruments are not executed with Observe, so their visits have
+     * only the slew event(s) recorded by Navigate.  They are charged from the
+     * slew until the next chargeable visit at the site starts or, once the
+     * night is over, until nautical dawn, whichever comes first.  While the
+     * night is in progress and no other visit has started, nothing beyond the
+     * recorded events is charged.
+     *
+     * @param now the current time
+     * @return the end of the charged interval, when it extends past the last
+     *         event
+     */
+    def visitorEnd(now: Timestamp): Option[Timestamp] = {
+      val dawn = night.nauticalTwilight.end
+      for {
+        last <- lastEvent.filter(_ => isVisitor)
+        end  <- nextVisitStart.map(_.min(dawn)).orElse(Option.when(now >= dawn)(dawn))
+        if end > last
+      } yield end
+    }
+
+  }
+
+  /**
+   * How long after a visitor visit starts the obscalc worker keeps checking
+   * whether its charge should end differently.  This covers the rest of its
+   * night plus a margin, after which its end can no longer change in practice.
+   */
+  val VisitorSweepWindow: Duration =
+    Duration.ofHours(36)
+
   def instantiate[F[_]: Concurrent](using Services[F]): TimeAccountingService[F] =
     new TimeAccountingService[F] {
 
@@ -166,33 +233,60 @@ object TimeAccountingService {
             session.execute(MarkVisitTimeAccountingUpdated)(invalidation, visitId).void
           }
 
-      case class Update(visitId: Visit.Id)(using Transaction[F]) {
-        lazy val run: F[Unit] =
-          computeInvoice.flatMap(updateInvoice)
+      override def invalidateStaleVisitorVisits(
+        limit: Int
+      )(using NoTransaction[F], Services.ServiceAccess): F[Int] =
+        services
+          .transactionally:
+            for
+              now <- timeService.transactionTime
+              cs  <- session.execute(SelectRecentVisitorVisits)(VisitorSweepWindow)
+            yield cs.collect { case (vid, oid, info, recorded) if info.visitorEnd(now) =!= recorded => (vid, oid) }
+          .flatMap: stale =>
+            stale
+              .take(limit)
+              .traverse: (visitId, observationId) =>
+                services.transactionally(session.execute(InvalidateVisit)(visitId, observationId).void).attempt
+              .flatMap: results =>
+                results.collectFirst { case Left(t) => t }.fold(results.size.pure[F])(_.raiseError[F, Int])
 
-        private val initialState: F[TimeAccountingState] =
+      case class Update(visitId: Visit.Id)(using Transaction[F]) {
+        // The end of a visitor visit's charge is recorded so that the obscalc
+        // worker can tell when it would change.
+        lazy val run: F[Unit] =
+          for
+            v   <- session.unique(SelectVisitInfo)(visitId)
+            now <- timeService.transactionTime
+            end  = v.visitorEnd(now)
+            i   <- computeInvoice(v, end)
+            _   <- updateInvoice(i, end)
+          yield ()
+
+        private def initialState(end: Option[Timestamp]): F[TimeAccountingState] =
           for {
             o <- session.unique(SelectObservationId)(visitId)
             c <- session.unique(SelectObserveClass)(o)
+            x  = end.map(TimeAccounting.Event(_, TimeAccounting.Context(visitId, c.chargeClass, None)))
             s <- session
                    .stream(SelectEvents)((c, visitId), 1024)
+                   .append(Stream.emits(x.toList))
                    .through(TimeAccountingState.eventStreamPipe(c.chargeClass, visitId))
                    .compile
                    .onlyOrError
           } yield s
 
-        private val daylightDiscounts: StateT[F, TimeAccountingState, List[TimeCharge.DiscountEntry]] =
+        private def daylightDiscounts(night: ObservingNight): StateT[F, TimeAccountingState, List[TimeCharge.DiscountEntry]] =
           StateT: tas =>
-            session.unique(SelectObservingNight)(visitId).map: night =>
-              val interval  = night.nauticalTwilight
-              val preDusk   = toDiscount(tas.until(interval.start), TimeAccounting.comment.PreDusk)
-              val postDawn  = toDiscount(tas.from(interval.end),    TimeAccounting.comment.PostDawn)
-              val discounts = preDusk.toList ++ postDawn.toList
-              (tas.between(interval), discounts.map(TimeCharge.DiscountEntry.Daylight(_, night.site)))
+            val interval  = night.nauticalTwilight
+            val preDusk   = toDiscount(tas.until(interval.start), TimeAccounting.comment.PreDusk)
+            val postDawn  = toDiscount(tas.from(interval.end),    TimeAccounting.comment.PostDawn)
+            val discounts = preDusk.toList ++ postDawn.toList
+            (tas.between(interval), discounts.map(TimeCharge.DiscountEntry.Daylight(_, night.site))).pure[F]
 
-        private val noDataDiscount: StateT[F, TimeAccountingState, List[TimeCharge.DiscountEntry]] =
+        // Visitor instrument visits never have datasets, so they are exempt.
+        private def noDataDiscount(isVisitor: Boolean): StateT[F, TimeAccountingState, List[TimeCharge.DiscountEntry]] =
           StateT { tas =>
-            datasetService.hasDatasets(visitId).map {
+            (if isVisitor then true.pure[F] else datasetService.hasDatasets(visitId)).map {
               case false => (TimeAccountingState.Empty,
                              toDiscount(tas, TimeAccounting.comment.NoData)
                                .map(TimeCharge.DiscountEntry.NoData.apply)
@@ -227,12 +321,15 @@ object TimeAccountingService {
             }
           }
 
-        private val computeInvoice: F[TimeCharge.Invoice] = {
+        private def computeInvoice(
+          visit:      VisitInfo,
+          visitorEnd: Option[Timestamp]
+        ): F[TimeCharge.Invoice] = {
           def invoice(corrections: List[Correction]): StateT[F, TimeAccountingState, TimeCharge.Invoice] =
             for {
               ini <- StateT.get[F, TimeAccountingState]
-              nod <- noDataDiscount
-              day <- daylightDiscounts
+              nod <- noDataDiscount(visit.isVisitor)
+              day <- daylightDiscounts(visit.night)
               ovr <- overlapDiscounts
               qa  <- qaDiscounts
               // ... other discounts here ...
@@ -240,16 +337,16 @@ object TimeAccountingService {
             } yield TimeCharge.Invoice(ini.charge, nod ++ day ++ ovr ++ qa, fin.charge.corrected(corrections))
 
           for {
-            s <- initialState
+            s <- initialState(visitorEnd)
             c <- session.execute(SelectCorrection)(visitId)
             i <- invoice(c).runA(s)
           } yield i
         }
 
-        private def updateInvoice(inv: TimeCharge.Invoice): F[Unit] =
+        private def updateInvoice(inv: TimeCharge.Invoice, visitorEnd: Option[Timestamp]): F[Unit] =
           for {
             _ <- updateDiscounts(inv.discounts)
-            _ <- session.execute(UpdateTimeAccounting)((visitId, inv.executionTime, inv.finalCharge))
+            _ <- session.execute(UpdateTimeAccounting)((visitId, inv.executionTime, inv.finalCharge, visitorEnd))
           } yield ()
 
         // Delete existing discounts (if any) and write the new ones.
@@ -359,21 +456,24 @@ object TimeAccountingService {
     val UpdateTimeAccounting: Command[(
       Visit.Id,
       CategorizedTime,
-      CategorizedTime
+      CategorizedTime,
+      Option[Timestamp]
     )] =
       sql"""
         UPDATE t_visit
            SET c_raw_non_charged_time   = $time_span,
                c_raw_program_time       = $time_span,
                c_final_non_charged_time = $time_span,
-               c_final_program_time     = $time_span
+               c_final_program_time     = $time_span,
+               c_ta_visitor_end         = ${core_timestamp.opt}
          WHERE c_visit_id = $visit_id
       """.command
-         .contramap { case (v, r, f) => (
+         .contramap { case (v, r, f, n) => (
            r.nonCharged,
            r.programTime,
            f.nonCharged,
            f.programTime,
+           n,
            v
          )}
 
@@ -408,19 +508,6 @@ object TimeAccountingService {
           c_visit_id = $visit_id
       """.query(observation_id)
 
-    val SelectObservingNight: Query[Visit.Id, ObservingNight] =
-      sql"""
-        SELECT
-          c_site,
-          c_effective_time
-        FROM
-          t_visit
-        WHERE
-          c_visit_id = $visit_id
-      """.query(site *: core_timestamp)
-         .map: (site, ts) =>
-            ObservingNight.fromSiteAndInstant(site, ts.toInstant)
-
     val SelectObserveClass: Query[Observation.Id, ObserveClass] =
       sql"""
         SELECT
@@ -448,6 +535,77 @@ object TimeAccountingService {
         ORDER BY
           e.c_effective_time, e.c_execution_event_id
       """.query(codec.event)
+
+    // The start of the next chargeable visit at visit `v`'s site.  Visits that
+    // start at the same time are ordered by id, as in SelectChargeableOverlap.
+    private val NextVisitStart: Fragment[Void] =
+      sql"""
+        (
+          SELECT MIN(v2.c_start)
+          FROM t_visit v2
+          WHERE v2.c_site = v.c_site     AND
+                v2.c_chargeable          AND
+                v2.c_start IS NOT NULL   AND
+                (v2.c_start, v2.c_visit_id) > (v.c_start, v.c_visit_id)
+        )
+      """
+
+    private val visit_info: Decoder[VisitInfo] =
+      (bool *: site *: core_timestamp *: core_timestamp.opt *: core_timestamp.opt).map:
+        case (isVisitor, site, time, last, next) =>
+          VisitInfo(isVisitor, ObservingNight.fromSiteAndInstant(site, time.toInstant), last, next)
+
+    // The next visit only matters for visitor visits, so it isn't looked up
+    // for the others.
+    val SelectVisitInfo: Query[Visit.Id, VisitInfo] =
+      sql"""
+        SELECT
+          i.c_is_visitor,
+          v.c_site,
+          v.c_effective_time,
+          v.c_end,
+          CASE WHEN i.c_is_visitor THEN $NextVisitStart END
+        FROM
+          t_visit v
+        INNER JOIN t_instrument i ON i.c_tag = v.c_instrument
+        WHERE
+          v.c_visit_id = $visit_id
+      """.query(visit_info)
+
+    // Visitor visits that started within the window, along with the end that
+    // was recorded for their charge.  Visits already awaiting a time
+    // accounting update are skipped so that they are not invalidated again on
+    // every sweep until the worker gets to them, as are visits with a
+    // correction.
+    val SelectRecentVisitorVisits: Query[Duration, (Visit.Id, Observation.Id, VisitInfo, Option[Timestamp])] =
+      sql"""
+        SELECT
+          v.c_visit_id,
+          v.c_observation_id,
+          i.c_is_visitor,
+          v.c_site,
+          v.c_effective_time,
+          v.c_end,
+          $NextVisitStart,
+          v.c_ta_visitor_end
+        FROM
+          t_instrument i
+        INNER JOIN t_visit v ON v.c_instrument = i.c_tag
+        WHERE
+          i.c_is_visitor                         AND
+          v.c_start > now() - $interval          AND
+          v.c_ta_invalidation <= v.c_ta_update   AND
+          NOT EXISTS (
+            SELECT 1
+            FROM t_time_charge_correction c
+            WHERE c.c_visit_id = v.c_visit_id
+          )
+      """.query(visit_id *: observation_id *: visit_info *: core_timestamp.opt)
+
+    val InvalidateVisit: Command[(Visit.Id, Observation.Id)] =
+      sql"""
+        CALL invalidate_visit_time_accounting($visit_id, $observation_id)
+      """.command
 
     val SelectChargeableOverlap: Query[Visit.Id, (Timestamp, Observation.Id)] =
       sql"""

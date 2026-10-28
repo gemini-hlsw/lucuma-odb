@@ -22,9 +22,11 @@ import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.Site
+import lucuma.core.enums.SlewStage
 import lucuma.core.enums.StepStage
 import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.enums.TwilightType.Nautical
+import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.ExecutionEvent.*
 import lucuma.core.model.Observation
@@ -51,6 +53,9 @@ import lucuma.odb.service.TimeAccounting
 import lucuma.odb.util.Codecs.*
 import skunk.syntax.all.*
 
+import java.time.Duration
+import java.time.Instant
+import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.Month
 
@@ -1396,5 +1401,205 @@ class timeAccounting extends OdbSuite with DatabaseOperations with ExecutionTest
       _ <- expect(pi, invoiceQuery(v1.oid), invoiceExected(invoice1, Nil))
     yield ()
 
+  // A visitor instrument visit, created the way Navigate creates one: by
+  // recording a slew.  That slew is then removed so that the test controls the
+  // event times.
+  def recordVisitorVisit(when: Timestamp): IO[(Program.Id, Observation.Id, Visit.Id)] =
+    for
+      pid <- createProgramAs(pi)
+      tid <- createTargetWithProfileAs(pi, pid)
+      oid <- createVisitorModeObservationAs(pi, pid, VisitorObservingModeType.ZorroSpeckle, tid)
+      vid <- addSlewEventAs(serviceUser, oid, SlewStage.StartSlew).map(_.visitId)
+      _   <- withSession(_.execute(sql"DELETE FROM t_execution_event WHERE c_visit_id = $visit_id".command)(vid).void)
+      _   <- setVisitTime(vid, when)
+    yield (pid, oid, vid)
+
+  def insertSlew(pid: Program.Id, oid: Observation.Id, vid: Visit.Id, start: Timestamp, end: Timestamp): IO[Unit] =
+    insertEvents(pid, List(
+      SlewEvent(EventId, start, oid, vid, none, SlewStage.StartSlew),
+      SlewEvent(EventId, end,   oid, vid, none, SlewStage.EndSlew)
+    ))
+
+  def insertSequence(v: VisitNode, start: Timestamp, end: Timestamp): IO[Unit] =
+    insertEvents(v.pid, List(
+      SequenceEvent(EventId, start, v.oid, v.vid, none, SequenceCommand.Start),
+      SequenceEvent(EventId, end,   v.oid, v.vid, none, SequenceCommand.Stop)
+    ))
+
+  // Mirrors the obscalc worker's periodic sweep for visitor visits whose
+  // charge would now end differently.
+  def runVisitorSweep: IO[Int] =
+    withServices(serviceUser): s =>
+      s.timeAccountingService.invalidateStaleVisitorVisits(64)
+
+  def simpleInvoice(t: TimeSpan): TimeCharge.Invoice =
+    val c = CategorizedTime(ChargeClass.Program -> t)
+    TimeCharge.Invoice(c, Nil, c)
+
+  // A night a week from now, which is still in progress (and within the
+  // worker's sweep window) when the tests run.
+  val futureLdt   = LocalDate.now().plusDays(7).atTime(23, 0)
+  val futureTime  = Timestamp.unsafeFromLocalDateTime(futureLdt)
+  val futureStart = Timestamp.unsafeFromInstantTruncated(
+    ObservingNight.fromSiteAndLocalDateTime(Site.GS, futureLdt).twilightBoundedUnsafe(Nautical).start
+  )
+
+  def future(sec: Int): Timestamp =
+    futureStart.plusMillisOption(sec * 1000L).get
+
+  test("visitor: once the night is over, charged until dawn"):
+    // No datasets, but no "no data" discount either.
+    for
+      _           <- cleanup
+      (p, o, v)   <- recordVisitorVisit(visitTime)
+      _           <- insertSlew(p, o, v, (-20).fromNightEnd, (-10).fromNightEnd)
+      _           <- runTimeAccounting(o)
+      _           <- expect(pi, invoiceQuery(o), invoiceExected(simpleInvoice(20.sec), Nil))
+    yield ()
+
+  test("visitor: while the night is in progress, only the slew is charged"):
+    for
+      _           <- cleanup
+      (p, o, v)   <- recordVisitorVisit(futureTime)
+      _           <- insertSlew(p, o, v, future(0), future(10))
+      _           <- runTimeAccounting(o)
+      _           <- expect(pi, invoiceQuery(o), invoiceExected(simpleInvoice(10.sec), Nil))
+      _           <- assertIO(runVisitorSweep, 0)
+    yield ()
+
+  test("visitor: charged until the next visit at the site starts"):
+    for
+      _           <- cleanup
+      (p, o, v)   <- recordVisitorVisit(futureTime)
+      _           <- insertSlew(p, o, v, future(0), future(10))
+      _           <- runTimeAccounting(o)
+      _           <- assertIO(visitFinalProgramTime(v), 10.sec)
+
+      // The next visit starting doesn't touch the visitor visit itself, but
+      // the sweep notices and invalidates it so that it is repriced.
+      next        <- recordVisit(pi, serviceUser, mode, futureTime, 1, 1, 1, 3000)
+      _           <- insertSequence(next, future(30), future(40))
+      _           <- runTimeAccounting(o)
+      _           <- assertIO(visitFinalProgramTime(v), 10.sec)
+      _           <- assertIO(runVisitorSweep, 1)
+      _           <- runTimeAccounting(o)
+      _           <- expect(pi, invoiceQuery(o), invoiceExected(simpleInvoice(30.sec), Nil))
+
+      // Back in sync.
+      _           <- assertIO(runVisitorSweep, 0)
+    yield ()
+
+  test("visitor: an earlier next visit shortens the charge"):
+    for
+      _           <- cleanup
+      (p, o, v)   <- recordVisitorVisit(futureTime)
+      _           <- insertSlew(p, o, v, future(0), future(10))
+      later       <- recordVisit(pi, serviceUser, mode, futureTime, 1, 1, 1, 3100)
+      _           <- insertSequence(later, future(40), future(50))
+      _           <- runTimeAccounting(o)
+      _           <- assertIO(visitFinalProgramTime(v), 40.sec)
+
+      earlier     <- recordVisit(pi, serviceUser, mode, futureTime, 1, 1, 1, 3200)
+      _           <- insertSequence(earlier, future(20), future(30))
+      _           <- assertIO(runVisitorSweep, 1)
+      _           <- runTimeAccounting(o)
+      _           <- assertIO(visitFinalProgramTime(v), 20.sec)
+    yield ()
+
+  test("visitor: a non-chargeable visit does not end the charge"):
+    for
+      _           <- cleanup
+      (p, o, v)   <- recordVisitorVisit(futureTime)
+      _           <- insertSlew(p, o, v, future(0), future(10))
+      _           <- runTimeAccounting(o)
+
+      // Stands in for, say, a daytime calibration taken at night.
+      cal         <- recordVisit(pi, serviceUser, mode, futureTime, 1, 1, 1, 3500)
+      _           <- withSession(_.execute(sql"UPDATE t_visit SET c_chargeable = false WHERE c_visit_id = $visit_id".command)(cal.vid).void)
+      _           <- insertSequence(cal, future(20), future(25))
+      _           <- assertIO(runVisitorSweep, 0)
+
+      next        <- recordVisit(pi, serviceUser, mode, futureTime, 1, 1, 1, 3600)
+      _           <- insertSequence(next, future(40), future(50))
+      _           <- assertIO(runVisitorSweep, 1)
+      _           <- runTimeAccounting(o)
+      _           <- assertIO(visitFinalProgramTime(v), 40.sec)
+    yield ()
+
+  test("visitor: the sweep skips visits already awaiting an update"):
+    for
+      _           <- cleanup
+      (p, o, v)   <- recordVisitorVisit(futureTime)
+      _           <- insertSlew(p, o, v, future(0), future(10))   // leaves the visit dirty
+      next        <- recordVisit(pi, serviceUser, mode, futureTime, 1, 1, 1, 3400)
+      _           <- insertSequence(next, future(30), future(40))
+      _           <- assertIO(runVisitorSweep, 0)
+      _           <- runTimeAccounting(o)
+      _           <- assertIO(visitFinalProgramTime(v), 30.sec)
+      _           <- assertIO(runVisitorSweep, 0)
+    yield ()
+
+  test("visitor: the sweep leaves corrected visits alone"):
+    val correction = TimeChargeCorrectionInput(ChargeClass.Program, TimeChargeCorrection.Op.Add, 60.sec, "by hand".comment)
+    for
+      _           <- cleanup
+      (p, o, v)   <- recordVisitorVisit(futureTime)
+      _           <- insertSlew(p, o, v, future(0), future(10))
+      _           <- runTimeAccounting(o)
+      _           <- addTimeChargeCorrection(staff, v, correction)
+      _           <- assertIO(visitFinalProgramTime(v), 70.sec)
+
+      next        <- recordVisit(pi, serviceUser, mode, futureTime, 1, 1, 1, 3700)
+      _           <- insertSequence(next, future(30), future(40))
+      _           <- assertIO(runVisitorSweep, 0)
+      _           <- assertIO(visitFinalProgramTime(v), 70.sec)
+    yield ()
+
+  test("visitor: once its night is over, the sweep extends the charge to dawn"):
+    // Last night: its dawn has passed, but it is recent enough for the sweep.
+    val lastNight = ObservingNight.fromSiteAndInstant(Site.GS, Instant.now().minus(Duration.ofDays(1)))
+    val dawn      = Timestamp.unsafeFromInstantTruncated(lastNight.twilightBoundedUnsafe(Nautical).end)
+    val t0        = dawn.plusMillisOption(-20 * 1000L).get
+    val t1        = dawn.plusMillisOption(-10 * 1000L).get
+    for
+      _           <- cleanup
+      (p, o, v)   <- recordVisitorVisit(t0)
+      _           <- insertSlew(p, o, v, t0, t1)
+      _           <- runTimeAccounting(o)
+      _           <- assertIO(visitFinalProgramTime(v), 20.sec)
+
+      // As if it had last been priced while the night was still in progress.
+      _           <- withSession(_.execute(sql"UPDATE t_visit SET c_ta_visitor_end = NULL WHERE c_visit_id = $visit_id".command)(v).void)
+      _           <- setFinalProgramTime(v, 10.sec)
+      _           <- assertIO(runVisitorSweep, 1)
+      _           <- runTimeAccounting(o)
+      _           <- assertIO(visitFinalProgramTime(v), 20.sec)
+    yield ()
+
+  test("visitor: charge stops at nautical dawn"):
+    for
+      _           <- cleanup
+      (p, o, v)   <- recordVisitorVisit(visitTime)
+      _           <- insertSlew(p, o, v, (-20).fromNightEnd, (-10).fromNightEnd)
+      next        <- recordVisit(pi, serviceUser, mode, visitTime, 1, 1, 1, 3300)
+      _           <- insertSequence(next, 3600.fromNightEnd, 3610.fromNightEnd)
+      _           <- runTimeAccounting(o)
+      _           <- expect(pi, invoiceQuery(o), invoiceExected(simpleInvoice(20.sec), Nil))
+    yield ()
+
+  test("visitor: visits outside the sweep window are not rechecked"):
+    // Priced to dawn; a next visit before dawn showing up much later is not
+    // noticed, as the visit is far older than the sweep window.
+    for
+      _           <- cleanup
+      (p, o, v)   <- recordVisitorVisit(visitTime)
+      _           <- insertSlew(p, o, v, (-100).fromNightEnd, (-90).fromNightEnd)
+      _           <- runTimeAccounting(o)
+      _           <- assertIO(visitFinalProgramTime(v), 100.sec)
+      next        <- recordVisit(pi, serviceUser, mode, visitTime, 1, 1, 1, 3800)
+      _           <- insertSequence(next, (-50).fromNightEnd, (-40).fromNightEnd)
+      _           <- assertIO(runVisitorSweep, 0)
+      _           <- assertIO(visitFinalProgramTime(v), 100.sec)
+    yield ()
 
 }

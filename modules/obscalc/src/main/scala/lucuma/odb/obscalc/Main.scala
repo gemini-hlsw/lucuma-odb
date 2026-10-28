@@ -239,6 +239,29 @@ object CalcMain extends MainParams:
               .handleErrorWith: t =>
                 Logger[F].warn(t)("Calibration estimate refresh failed")
 
+    // Visitor instrument visits are charged until the next chargeable visit at
+    // the site starts (which happens in some other observation) or, once the
+    // night is over, until dawn.  Rather than lock that other observation from
+    // the event insert that starts the next visit, we periodically look for
+    // recent visitor visits whose charge would now end differently and
+    // invalidate them, which brings them back through calcAndUpdateStream.  A
+    // failure is logged and retried on the next poll.  Only a few visits change
+    // in a typical poll; the limit keeps the connection the sweep holds from
+    // being tied up by a backlog, which is worked off over the following polls.
+    val visitorTimeAccountingStream: Stream[F, Unit] =
+      Stream
+        .awakeEvery(pollPeriod)
+        .evalMap: _ =>
+          T.noopScope:
+            services
+              .useNonTransactionally:
+                requireServiceAccessOrThrow:
+                  timeAccountingService.invalidateStaleVisitorVisits(64)
+              .flatMap: n =>
+                Logger[F].debug(s"Invalidated the time accounting of $n visitor visits.").whenA(n > 0)
+              .handleErrorWith: t =>
+                Logger[F].warn(t)("Visitor visit time accounting sweep failed")
+
     for
       _ <- Resource.eval(Logger[F].info("Processing PendingCalc"))
       _ <- Resource.eval:
@@ -246,7 +269,12 @@ object CalcMain extends MainParams:
                services.useTransactionally:
                  requireServiceAccessOrThrow:
                    obscalcService.reset
-      o <- calcAndUpdateStream.merge(refreshCalibrationsStream).compile.drain.background
+      o <- calcAndUpdateStream
+             .merge(refreshCalibrationsStream)
+             .merge(visitorTimeAccountingStream)
+             .compile
+             .drain
+             .background
     yield o
 
   def services[F[_]: Async: Parallel: UUIDGen: Tracer: Logger: LoggerFactory](
