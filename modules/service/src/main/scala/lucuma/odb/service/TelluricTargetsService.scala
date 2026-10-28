@@ -724,8 +724,6 @@ object TelluricTargetsService:
             WHERE  c_observation_id = $observation_id
           """.command
 
-        // A search in flight writes its result only against the invalidation it
-        // read, so bumping it discards that result.
         val ResetToReady: Query[(Observation.Id, Timestamp), TelluricTargets.Meta] =
           sql"""
             UPDATE t_telluric_resolution
