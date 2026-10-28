@@ -7,6 +7,7 @@ package query
 import cats.effect.IO
 import cats.syntax.all.*
 import grackle.Result
+import lucuma.core.enums.Partner
 import lucuma.core.math.Angle
 import lucuma.core.math.Coordinates
 import lucuma.core.math.syntax.int.*
@@ -35,8 +36,10 @@ class coneCandidates extends OdbSuite with ObservingModeSetupOperations with Con
   val piOwner     = TestUsers.Standard.pi(5, 34)
   val piUnlinked  = TestUsers.Standard.pi(6, 35)
   val piBoundary  = TestUsers.Standard.pi(7, 36)
+  val ngoUs       = TestUsers.Standard.ngo(8, 37, Partner.US)
+  val ngoCa       = TestUsers.Standard.ngo(9, 38, Partner.CA)
 
-  val validUsers = List(admin, piGeneral, piPole, piHalfWidth, piOwner, piUnlinked, piBoundary)
+  val validUsers = List(admin, piGeneral, piPole, piHalfWidth, piOwner, piUnlinked, piBoundary, ngoUs, ngoCa)
 
   // 18' west of RA 0: even a small cone at the origin has to wrap to reach it.
   private val tightSeam: Coordinates =
@@ -58,11 +61,16 @@ class coneCandidates extends OdbSuite with ObservingModeSetupOperations with Con
    *  that decides whether a cone matches it. Reference coordinates come from the
    *  observation's asterism, so seeding a target is what fills the columns the SQL reads.
    */
-  private def seed(as: User, positions: List[Coordinates]): IO[List[(ConfigurationRequest.Id, Coordinates)]] =
+  private def seed(
+    as:        User,
+    positions: List[Coordinates],
+    splits:    List[(Partner, Int)] = Nil
+  ): IO[List[(ConfigurationRequest.Id, Coordinates)]] =
     for
       cfpid  <- createGeminiCallForProposalsAs(admin)
       pid    <- createProgramAs(as)
       _      <- addProposal(as, pid, Some(cfpid), None)
+      _      <- addPartnerSplits(as, pid, partnerSplits = splits).whenA(splits.nonEmpty)
       seeded <- positions.traverse: c =>
                   for
                     tid <- createSiderealTargetAtAs(as, pid, c)
@@ -176,6 +184,18 @@ class coneCandidates extends OdbSuite with ObservingModeSetupOperations with Con
       ids <- withServices(piUnlinked): svc =>
                svc.configurationService.coneCandidates(wide).flatMap(_.get)
     yield assertEquals(ids, Nil, clue = "unlinked PI sees no candidates")
+
+  test("an NGO sees candidates only in programs its partner requests time in"):
+    for
+      seeded <- seed(piOwner, nearWide, splits = List((Partner.US, 100), (Partner.CA, 0)))
+      us     <- withServices(ngoUs): svc =>
+                  svc.configurationService.coneCandidates(wide).flatMap(_.get)
+      ca     <- withServices(ngoCa): svc =>
+                  svc.configurationService.coneCandidates(wide).flatMap(_.get)
+    yield
+      val ours = seeded.map(_._1).toSet
+      assertEquals(us.toSet.intersect(ours), within(seeded)(wide.center, wide.distance))
+      assertEquals(ca, Nil, clue = "a 0% split grants nothing")
 
   // Truncating would return wrong-but-plausible results, so the statement selects one row
   // over the cap and fails on it.

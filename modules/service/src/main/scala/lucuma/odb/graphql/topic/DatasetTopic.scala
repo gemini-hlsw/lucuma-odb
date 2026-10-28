@@ -8,6 +8,7 @@ import cats.effect.std.Supervisor
 import cats.syntax.all.*
 import fs2.Stream
 import fs2.concurrent.Topic
+import lucuma.core.enums.Partner
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
@@ -26,7 +27,8 @@ object DatasetTopic:
     programId:     Program.Id,
     isWritten:     Boolean,
     editType:      EditType,
-    users:         List[User.Id]
+    users:         List[User.Id],
+    partners:      List[Partner]
   ) extends TopicElement
 
   private val topic =
@@ -34,7 +36,7 @@ object DatasetTopic:
       "Dataset",
       ident"ch_dataset_edit",
       _._3,
-      (update, users) => Element(update._1, update._2, update._3, update._4, update._5, users)
+      (update, users, partners) => Element(update._1, update._2, update._3, update._4, update._5, users, partners)
     ) {
       case Array(_did, _oid, _pid, _isWritten, _tg_op) =>
         (

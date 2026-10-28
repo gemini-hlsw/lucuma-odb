@@ -8,6 +8,7 @@ import cats.effect.std.Supervisor
 import cats.implicits.*
 import fs2.Stream
 import fs2.concurrent.Topic
+import lucuma.core.enums.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
@@ -25,12 +26,14 @@ object TargetTopic:
    * @param eventId serial event id
    * @param editType determines creation vs update
    * @param users users associated with this program
+   * @param partners partners who may read the program (NGO audience)
    */
   case class Element(
     targetId:  Target.Id,
     programId: Program.Id,
     editType:  EditType,
-    users:     List[User.Id]
+    users:     List[User.Id],
+    partners:  List[Partner]
   ) extends TopicElement
 
   private val topic =
@@ -38,7 +41,7 @@ object TargetTopic:
       "Target",
       ident"ch_target_edit",
       _._2,
-      (update, users) => Element(update._1, update._2, update._3, users)
+      (update, users, partners) => Element(update._1, update._2, update._3, users, partners)
     ) {
       case Array(_oid, _pid, _tg_op) =>
         (

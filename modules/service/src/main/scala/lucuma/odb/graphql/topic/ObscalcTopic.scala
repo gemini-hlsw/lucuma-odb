@@ -9,6 +9,7 @@ import cats.implicits.*
 import fs2.Stream
 import fs2.concurrent.Topic
 import lucuma.core.enums.ObservationWorkflowState
+import lucuma.core.enums.Partner
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
@@ -29,6 +30,7 @@ object ObscalcTopic:
    * @param newState the current obs calculation state
    * @param editType determines creation vs update
    * @param users users associated with this program
+   * @param partners partners who may read the program (NGO audience)
    */
   case class Element(
     observationId: Observation.Id,
@@ -38,7 +40,8 @@ object ObscalcTopic:
     oldWorkflow:   Option[ObservationWorkflowState],
     newWorkflow:   Option[ObservationWorkflowState],
     editType:      EditType,
-    users:         List[User.Id]
+    users:         List[User.Id],
+    partners:      List[Partner]
   ) extends TopicElement
 
   private val topic =
@@ -54,7 +57,7 @@ object ObscalcTopic:
       "Obscalc",
       ident"ch_obscalc_update",
       _._2,
-      (update, users) => Element(update._1, update._2, update._3, update._4, update._5, update._6, update._7, users)
+      (update, users, partners) => Element(update._1, update._2, update._3, update._4, update._5, update._6, update._7, users, partners)
     ) {
       case Array(_oid, _pid, _oldState, _newState, _oldWorkflow, _newWorkflow, _tg_op) =>
         (

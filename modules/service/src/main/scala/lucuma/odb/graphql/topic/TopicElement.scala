@@ -3,19 +3,18 @@
 
 package lucuma.odb.graphql.topic
 
-import lucuma.core.model.Access.Admin
-import lucuma.core.model.Access.Guest
-import lucuma.core.model.Access.Ngo
-import lucuma.core.model.Access.Pi
-import lucuma.core.model.Access.Service
-import lucuma.core.model.Access.Staff
+import lucuma.core.enums.Partner
+import lucuma.core.model.GuestRole
+import lucuma.core.model.ServiceRole
+import lucuma.core.model.StandardRole
 import lucuma.core.model.User
 
 trait TopicElement:
   def users: List[User.Id]
+  def partners: List[Partner]
 
   def canRead(u: User): Boolean =
-    u.role.access match
-      case Admin | Service | Staff => true
-      case Ngo                     => ??? // TODO
-      case Guest | Pi              => users.contains(u.id)
+    u.role match
+      case ServiceRole(_) | StandardRole.Admin(_) | StandardRole.Staff(_) => true
+      case StandardRole.Ngo(_, partner)                                    => partners.contains(partner)
+      case GuestRole | StandardRole.Pi(_)                                  => users.contains(u.id)

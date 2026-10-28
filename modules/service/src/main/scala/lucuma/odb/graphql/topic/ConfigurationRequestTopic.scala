@@ -8,6 +8,7 @@ import cats.effect.std.Supervisor
 import cats.implicits.*
 import fs2.Stream
 import fs2.concurrent.Topic
+import lucuma.core.enums.Partner
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.Program
 import lucuma.core.model.User
@@ -23,7 +24,8 @@ object ConfigurationRequestTopic:
     configurationRequestId: ConfigurationRequest.Id,
     programId: Program.Id,
     editType: EditType,
-    users: List[User.Id]
+    users: List[User.Id],
+    partners: List[Partner]
   ) extends TopicElement
 
   private val topic =
@@ -31,7 +33,7 @@ object ConfigurationRequestTopic:
       "Configuration Request",
       ident"ch_configuration_request_edit",
       _._2,
-      (update, users) => Element(update._1, update._2, update._3, users)
+      (update, users, partners) => Element(update._1, update._2, update._3, users, partners)
     ) {
       case Array(_oid, _pid, _tg_op) =>
         (

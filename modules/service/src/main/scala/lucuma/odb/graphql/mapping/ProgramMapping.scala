@@ -111,6 +111,7 @@ trait ProgramMapping[F[_]]
       SqlField("tooActivationCeiling", ProgramView.TooActivationCeiling),
       SqlField("maxTooActivation", ProgramView.MaxTooActivation),
       SqlField("maxSchedulingMode", ProgramView.MaxSchedulingMode),
+      SqlField("ngoPartners", ProgramView.NgoPartners, hidden = true),
       SqlObject("emails", Join(ProgramView.Id, EmailTable.ProgramId)),
     )
 

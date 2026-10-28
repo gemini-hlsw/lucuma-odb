@@ -636,6 +636,20 @@ object ProgramUserService:
         EXISTS (select c_duration from t_allocation where c_program_id = $program_id and c_ta_category=${lucuma.odb.util.Codecs.time_accounting_category} and c_duration > 'PT')
       """.apply(programId, partner.timeAccountingCategory)
 
+    /** The partner is among the NGO partners (see V1370) of the program identified by the `programId` SQL expression. */
+    private def isNgoPartnerOf(
+      partner:   Partner,
+      programId: AppliedFragment
+    ): AppliedFragment =
+      sql"${lucuma.odb.util.Codecs.partner} IN (SELECT program_ngo_partners("(partner) |+| programId |+| void"))"
+
+    /** NGO read access: the partner is among the program's NGO partners. */
+    def existsNgoReadAccess(
+      programId: Program.Id,
+      partner:   Partner
+    ): AppliedFragment =
+      isNgoPartnerOf(partner, sql"$program_id"(programId))
+
     def existsUserReadAccess(
       user:      User,
       programId: Program.Id
@@ -643,7 +657,7 @@ object ProgramUserService:
       user.role match
         case GuestRole                    => existsUserAsPi(programId, user.id).some
         case StandardRole.Pi(_)           => (void"(" |+| existsProgramUserInRole(programId, user.id, List(ProgramUserRole.Pi, ProgramUserRole.Coi, ProgramUserRole.CoiRO, ProgramUserRole.SupportPrimary, ProgramUserRole.SupportSecondary)) |+| void")").some
-        case StandardRole.Ngo(_, partner) => existsAllocationForPartner(programId, partner).some
+        case StandardRole.Ngo(_, partner) => existsNgoReadAccess(programId, partner).some
         case ServiceRole(_) |
              StandardRole.Admin(_) |
              StandardRole.Staff(_)        => none
@@ -726,18 +740,22 @@ object ProgramUserService:
     /** A boolean predicate correlated on `programIdColumn` (qualified, e.g.
      *  `"v_configuration_request.c_program_id"`) mirroring
      *  `ProgramPredicates.isVisibleTo`, the visibility the query WHEREs apply:
-     *  guests and PIs see a program they are linked to (any role); staff and
-     *  above see everything; NGO visibility is unimplemented there, so NGO
-     *  stays unscoped (`true`).
+     *  guests and PIs see a program they are linked to (any role); NGOs see a
+     *  program whose `program_ngo_partners` (V1370) include their partner;
+     *  staff and above see everything.
      */
     def correlatedIsVisibleTo(
       user:            User,
       programIdColumn: String
     ): AppliedFragment =
-      user.role.access match
-        case Access.Guest | Access.Pi =>
+      user.role match
+        case GuestRole | StandardRole.Pi(_) =>
           sql"exists (select 1 from t_program_user pu where pu.c_program_id = #$programIdColumn and pu.c_user_id = $user_id)".apply(user.id)
-        case _                        =>
+        case StandardRole.Ngo(_, partner)   =>
+          isNgoPartnerOf(partner, sql"#$programIdColumn"(Void))
+        case ServiceRole(_)        |
+             StandardRole.Admin(_) |
+             StandardRole.Staff(_)          =>
           void"true"
 
     private def correlatedPiAccessOnly(

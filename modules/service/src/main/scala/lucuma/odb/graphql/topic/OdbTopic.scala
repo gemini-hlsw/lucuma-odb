@@ -13,8 +13,10 @@ import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import fs2.Stream
 import fs2.concurrent.Topic
+import lucuma.core.enums.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.User
+import lucuma.odb.util.Codecs.partner
 import lucuma.odb.util.Codecs.user_id
 import org.typelevel.log4cats.Logger
 import org.typelevel.otel4s.trace.Tracer
@@ -67,15 +69,20 @@ object OdbTopic:
   // in fs2 or skunk that releases the portal too early and you get portal not found
   // asynchronously when doing other things. This is a workaround for now that just
   // interpolates the strings directly rather than preparing a statement.
-  def selectProgramUsers[F[_]: Tracer](
+  //
+  // Selects the program's audience in one round trip: each row holds either a
+  // linked user or a partner whose NGOs may read the program.
+  def selectProgramAudience[F[_]: Tracer](
     s:   Session[F],
     pid: Program.Id,
-  ): F[List[User.Id]] =
-    Tracer[F].span("topic.selectProgramUsers").surround:
+  ): F[List[(Option[User.Id], Option[Partner])]] =
+    Tracer[F].span("topic.selectProgramAudience").surround:
       s.execute(
         sql"""
-          select c_user_id from t_program_user where c_program_id = '#${pid.toString}' and c_user_id notnull
-        """.query(user_id)
+          select c_user_id, null::d_tag from t_program_user where c_program_id = '#${pid.toString}' and c_user_id notnull
+          union all
+          select null, x from program_ngo_partners('#${pid.toString}') x
+        """.query(user_id.opt *: partner.opt)
       )
 
   /**
@@ -117,7 +124,7 @@ object OdbTopic:
     name:    String,
     channel: Identifier,
     pid:     U => Program.Id,
-    element: (U, List[User.Id]) => E
+    element: (U, List[User.Id], List[Partner]) => E
   )(update: PartialFunction[Array[String], Option[U]]): OdbTopic[E] =
     new OdbTopic[E]:
 
@@ -137,8 +144,8 @@ object OdbTopic:
       ): Stream[F, E] =
         for
           up <- updates(sessions.listen, maxQueued)
-          us <- Stream.eval(selectProgramUsers(sessions.lookup, pid(up)))
-          e   = element(up, us)
+          as <- Stream.eval(selectProgramAudience(sessions.lookup, pid(up)))
+          e   = element(up, as.flatMap(_._1), as.flatMap(_._2))
           _  <- Stream.eval(Logger[F].info(s"$name channel: $e"))
         yield e
 

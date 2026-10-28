@@ -8,6 +8,7 @@ import cats.effect.std.Supervisor
 import cats.syntax.apply.*
 import fs2.Stream
 import fs2.concurrent.Topic
+import lucuma.core.enums.Partner
 import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -27,7 +28,8 @@ object ExecutionEventAddedTopic:
     observationId:   Observation.Id,
     visitId:         Visit.Id,
     eventType:       ExecutionEventType,
-    users:           List[User.Id]
+    users:           List[User.Id],
+    partners:        List[Partner]
   ) extends TopicElement
 
   private val topic =
@@ -35,7 +37,7 @@ object ExecutionEventAddedTopic:
       "ExecutionEvent",
       ident"ch_execution_event_added",
       _._2,
-      (update, users) => Element(update._1, update._2, update._3, update._4, update._5, users)
+      (update, users, partners) => Element(update._1, update._2, update._3, update._4, update._5, users, partners)
     ) {
       case Array(_eid, _pid, _oid, _vid, _type) =>
         (

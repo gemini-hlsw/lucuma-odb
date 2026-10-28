@@ -9,6 +9,7 @@ import grackle.skunk.SkunkMapping
 import lucuma.odb.util.Codecs.*
 import skunk.codec.boolean.bool
 import skunk.codec.temporal.date
+import skunk.codec.text.text
 
 trait ProgramView[F[_]] extends BaseMapping[F]:
 
@@ -32,6 +33,7 @@ trait ProgramView[F[_]] extends BaseMapping[F]:
     val TooActivationCeiling = col("c_too_activation_ceiling", too_activation.opt)
     val MaxTooActivation     = col("c_max_too_activation", too_activation)
     val MaxSchedulingMode    = col("c_max_scheduling_mode", scheduling_mode)
+    val NgoPartners          = col("c_ngo_partners", text)
 
     object Goa:
       val Proprietary   = col("c_goa_proprietary", int4_nonneg)

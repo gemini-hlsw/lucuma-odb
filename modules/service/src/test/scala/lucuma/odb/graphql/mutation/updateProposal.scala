@@ -39,8 +39,9 @@ class updateProposal extends OdbSuite with ObservingModeSetupOperations {
   val guest = TestUsers.guest(nextId)
   val ngo   = TestUsers.Standard.ngo(nextId, nextId, Partner.CA)
   val staff = TestUsers.Standard.staff(nextId, nextId)
+  val coiRo = TestUsers.Standard.pi(nextId, nextId)
 
-  val validUsers = List(pi, pi2, guest, ngo, staff)
+  val validUsers = List(pi, pi2, guest, ngo, staff, coiRo)
 
   test("✓ generic properties") {
     createProgramAs(pi).flatMap { pid =>
@@ -1763,6 +1764,18 @@ class updateProposal extends OdbSuite with ObservingModeSetupOperations {
       acceptProposal(staff, pid) *>
       expect(
         user     = ngo,
+        query    = setMinPercent(pid, 50),
+        expected = List(s"Program $pid does not exist, is not visible, or is ineligible for the requested operation.").asLeft
+      )
+    }
+  }
+
+  test("⨯ a read-only CoI cannot edit the proposal") {
+    submittableProposal.flatMap { pid =>
+      createUsers(coiRo) *>
+      addProgramUserAs(pi, pid, ProgramUserRole.CoiRO).flatMap(linkUserAs(pi, _, coiRo.id)) *>
+      expect(
+        user     = coiRo,
         query    = setMinPercent(pid, 50),
         expected = List(s"Program $pid does not exist, is not visible, or is ineligible for the requested operation.").asLeft
       )

@@ -31,6 +31,7 @@ import lucuma.catalog.clients.GaiaClient
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.TimeAccountingCategory
+import lucuma.core.model.Access
 import lucuma.core.model.Attachment
 import lucuma.core.model.CallForProposals
 import lucuma.core.model.ConfigurationRequest
@@ -454,9 +455,14 @@ trait MutationMapping[F[_]] extends AccessControl[F] with UserEnv {
     MutationField("createConfigurationRequest", CreateConfigurationRequestInput.Binding) { (input, child) =>
       services.useTransactionally {
         requirePiAccess {
-          configurationService.canonicalizeRequest(input).nestMap { req =>
-            Unique(Filter(Predicates.configurationRequest.id.eql(req.id), child))
-          }
+          // canonicalizeRequest checks only that the observation is readable,
+          // and NGO access is read-only.
+          if user.role.access === Access.Ngo then
+            OdbError.NotAuthorized(user.id, "NGO users cannot create configuration requests.".some).asFailureF
+          else
+            configurationService.canonicalizeRequest(input).nestMap { req =>
+              Unique(Filter(Predicates.configurationRequest.id.eql(req.id), child))
+            }
         }
       }
     }

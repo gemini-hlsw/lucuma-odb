@@ -8,6 +8,7 @@ import cats.effect.std.Supervisor
 import cats.implicits.*
 import fs2.Stream
 import fs2.concurrent.Topic
+import lucuma.core.enums.Partner
 import lucuma.core.enums.TooActivation
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -37,6 +38,7 @@ object TooTriggerTopic:
    *                      its closing event, not the successor's.
    * @param editType      creation vs update
    * @param users         users associated with the program (audience for scoping)
+   * @param partners      partners who may read the program (NGO audience)
    */
   case class Element(
     triggerId:     TooTrigger.Id,
@@ -45,7 +47,8 @@ object TooTriggerTopic:
     status:        TooTriggerStatus,
     activation:    TooActivation,
     editType:      EditType,
-    users:         List[User.Id]
+    users:         List[User.Id],
+    partners:      List[Partner]
   ) extends TopicElement
 
   private val topic =
@@ -53,7 +56,7 @@ object TooTriggerTopic:
       "TooTrigger",
       ident"ch_too_trigger_edit",
       _._3, // program id -> audience is anyone who can read the program
-      (u, users) => Element(u._1, u._2, u._3, u._4, u._5, u._6, users)
+      (u, users, partners) => Element(u._1, u._2, u._3, u._4, u._5, u._6, users, partners)
     ) {
       case Array(_tid, _oid, _pid, _status, _activation, _tg_op) =>
         (
