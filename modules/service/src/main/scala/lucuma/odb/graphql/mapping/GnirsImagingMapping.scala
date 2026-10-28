@@ -44,19 +44,21 @@ trait GnirsImagingMapping[F[_]]
 
   lazy val GnirsGroupedImagingMapping: ObjectMapping =
     ObjectMapping(GnirsImagingType / "variant" / "grouped")(
-      SqlField("observationId", GnirsImagingView.Grouped.ObservationId, key = true, hidden = true),
-      SqlField("order",         GnirsImagingView.Grouped.WavelengthOrder),
-      SqlField("skyCount",      GnirsImagingView.Sky.Count),
-      SqlObject("offsets",      Join(GnirsImagingView.ObservationId, TelescopeConfigGeneratorView.ObjectObservationId)),
-      SqlObject("skyOffsets",   Join(GnirsImagingView.ObservationId, TelescopeConfigGeneratorView.SkyObservationId)),
+      SqlField("observationId",      GnirsImagingView.Grouped.ObservationId, key = true, hidden = true),
+      SqlField("order",              GnirsImagingView.Grouped.WavelengthOrder),
+      SqlField("skyCount",           GnirsImagingView.Sky.Count),
+      SqlField("exposuresPerOffset", GnirsImagingView.ExposuresPerOffset),
+      SqlObject("offsets",           Join(GnirsImagingView.ObservationId, TelescopeConfigGeneratorView.ObjectObservationId)),
+      SqlObject("skyOffsets",        Join(GnirsImagingView.ObservationId, TelescopeConfigGeneratorView.SkyObservationId)),
     )
 
   lazy val GnirsInterleavedImagingMapping: ObjectMapping =
     ObjectMapping(GnirsImagingType / "variant" / "interleaved")(
-      SqlField("observationId", GnirsImagingView.Interleaved.ObservationId, key = true, hidden = true),
-      SqlField("skyCount",      GnirsImagingView.Sky.Count),
-      SqlObject("offsets",      Join(GnirsImagingView.ObservationId, TelescopeConfigGeneratorView.ObjectObservationId)),
-      SqlObject("skyOffsets",   Join(GnirsImagingView.ObservationId, TelescopeConfigGeneratorView.SkyObservationId)),
+      SqlField("observationId",      GnirsImagingView.Interleaved.ObservationId, key = true, hidden = true),
+      SqlField("skyCount",           GnirsImagingView.Sky.Count),
+      SqlField("exposuresPerOffset", GnirsImagingView.ExposuresPerOffset),
+      SqlObject("offsets",           Join(GnirsImagingView.ObservationId, TelescopeConfigGeneratorView.ObjectObservationId)),
+      SqlObject("skyOffsets",        Join(GnirsImagingView.ObservationId, TelescopeConfigGeneratorView.SkyObservationId)),
     )
 
   lazy val GnirsPreImagingMapping: ObjectMapping =
@@ -65,7 +67,8 @@ trait GnirsImagingMapping[F[_]]
       SqlObject("offset1"),
       SqlObject("offset2"),
       SqlObject("offset3"),
-      SqlObject("offset4")
+      SqlObject("offset4"),
+      SqlField("exposuresPerOffset", GnirsImagingView.ExposuresPerOffset)
     )
 
   lazy val GnirsImagingVariantMapping: ObjectMapping =

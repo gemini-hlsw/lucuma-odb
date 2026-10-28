@@ -312,6 +312,83 @@ class executionSciFlamingos2Imaging extends ExecutionTestSupportForFlamingos2:
         """)
       )
 
+  // Three guided object positions, at (1, 1), (2, 2) and (3, 3).
+  private val objectOffsetsInput: String =
+    s"""
+      offsets: {
+        enumerated: {
+          values: [
+            { offset: { p: { arcseconds: 1 }, q: { arcseconds: 1 } }, guiding: ENABLED },
+            { offset: { p: { arcseconds: 2 }, q: { arcseconds: 2 } }, guiding: ENABLED },
+            { offset: { p: { arcseconds: 3 }, q: { arcseconds: 3 } }, guiding: ENABLED }
+          ]
+        }
+      }
+    """
+
+  private def exposuresPerOffsetTest(variant: String, atoms: List[Json]): IO[Unit] =
+    val mode =
+      s"""
+        flamingos2Imaging: {
+          variant: { $variant }
+          filters: [ { filter: Y }, { filter: J } ]
+        }
+      """
+
+    for
+      p <- createProgram
+      t <- createTargetWithProfileAs(pi, p)
+      o <- createObservationWithModeAs(pi, p, List(t), mode)
+      _ <- expect(pi, flamingos2ScienceQuery(o, 100.some), expectedScience(atoms).asRight)
+    yield ()
+
+  test("grouped, offsets, exposuresPerOffset"):
+    // Two exposures per position: Y (2) fills position 1, J (3) fills position
+    // 1 and takes one more at position 2.
+    exposuresPerOffsetTest(
+      s"grouped: { skyCount: 0, exposuresPerOffset: 2, $objectOffsetsInput }",
+      List(
+        sciAtom(Flamingos2Filter.Y, 10.secondTimeSpan, 1, 1),
+        sciAtom(Flamingos2Filter.Y, 10.secondTimeSpan, 1, 1),
+        sciAtom(Flamingos2Filter.J, 20.secondTimeSpan, 1, 1),
+        sciAtom(Flamingos2Filter.J, 20.secondTimeSpan, 1, 1),
+        sciAtom(Flamingos2Filter.J, 20.secondTimeSpan, 2, 2)
+      )
+    )
+
+  test("interleaved, offsets, exposuresPerOffset"):
+    // Stops: Y [2], J [2, 1].  A single group, with an offset position per stop.
+    exposuresPerOffsetTest(
+      s"interleaved: { skyCount: 0, exposuresPerOffset: 2, $objectOffsetsInput }",
+      List(
+        sciAtom(Flamingos2Filter.Y, 10.secondTimeSpan, 1, 1),
+        sciAtom(Flamingos2Filter.Y, 10.secondTimeSpan, 1, 1),
+        sciAtom(Flamingos2Filter.J, 20.secondTimeSpan, 2, 2),
+        sciAtom(Flamingos2Filter.J, 20.secondTimeSpan, 2, 2),
+        sciAtom(Flamingos2Filter.J, 20.secondTimeSpan, 3, 3)
+      )
+    )
+
+  test("preImaging, exposuresPerOffset"):
+    exposuresPerOffsetTest(
+      s"""
+        preImaging: {
+          offset1: { p: { arcseconds: 1 }, q: { arcseconds: 1 } }
+          offset2: { p: { arcseconds: 2 }, q: { arcseconds: 2 } }
+          offset3: { p: { arcseconds: 3 }, q: { arcseconds: 3 } }
+          offset4: { p: { arcseconds: 4 }, q: { arcseconds: 4 } }
+          exposuresPerOffset: 2
+        }
+      """,
+      List(
+        sciAtom(Flamingos2Filter.Y, 10.secondTimeSpan, 1, 1),
+        sciAtom(Flamingos2Filter.Y, 10.secondTimeSpan, 1, 1),
+        sciAtom(Flamingos2Filter.J, 20.secondTimeSpan, 1, 1),
+        sciAtom(Flamingos2Filter.J, 20.secondTimeSpan, 1, 1),
+        sciAtom(Flamingos2Filter.J, 20.secondTimeSpan, 2, 2)
+      )
+    )
+
   test("Flamingos2 imaging materializes and serves the persisted sequence"):
     val mode =
       s"""

@@ -19,6 +19,7 @@ trait GmosImagingView[F[_]] extends BaseMapping[F]:
     val ExplicitAmpReadMode: ColumnRef         = col("c_amp_read_mode", gmos_amp_read_mode.opt)
     val ExplicitAmpGain: ColumnRef             = col("c_amp_gain", gmos_amp_gain.opt)
     val ExplicitRoi: ColumnRef                 = col("c_roi", gmos_roi.opt)
+    val ExposuresPerOffset: ColumnRef          = col("c_exposures_per_offset", int4_pos)
 
     object Sky:
       val Count: ColumnRef = col("c_sky_count", int4_nonneg)

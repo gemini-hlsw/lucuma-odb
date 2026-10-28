@@ -374,6 +374,53 @@ class executionSciGmosNorthImaging extends ExecutionTestSupportForGmos:
         expected = expectedResult(json).asRight
       )
 
+  test("grouped, offsets, exposuresPerOffset"):
+    // With exposuresPerOffset = 3 each object offset position gets three
+    // consecutive exposures.  The filter with the most exposures is Y (30), so
+    // the generator produces ceil(30 / 3) = 10 distinct offset positions
+    // (0..9), each visited three times; shorter filters take a prefix.
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createObservation(p, t, Site.GN):
+          s"""{
+            gmosNorthImaging: {
+              variant: {
+                grouped: {
+                  offsets: {
+                    ${enumerated((0 until 12).toList.fproduct(identity) *)}
+                  }
+                  skyCount: 0
+                  exposuresPerOffset: 3
+                }
+              }
+              filters: [
+                { filter: G_PRIME },
+                { filter: I_PRIME },
+                { filter: Y       }
+              ]
+            }
+          }"""
+      yield o
+
+    def grouped(f: GmosNorthFilter, t: IntegrationTime, positions: Int): List[Json] =
+      (0 until positions).toList.flatMap(n => List.fill(3)(n)).map: n =>
+        gnAtom(Step(f, t).withOffset(n, n))
+
+    // 6 exposures -> 2 positions, 12 -> 4 positions, 30 -> 10 positions.
+    val json: List[Json] =
+      grouped(GmosNorthFilter.GPrime, Time120x06,  2) ++
+      grouped(GmosNorthFilter.IPrime, Time060x12,  4) ++
+      grouped(GmosNorthFilter.Y,      Time030x30, 10)
+
+    setup.flatMap: oid =>
+      expect(
+        user     = pi,
+        query    = gmosNorthScienceQuery(oid, 100.some),
+        expected = expectedResult(json).asRight
+      )
+
   test("grouped, no offsets, sky"):
     val setup: IO[Observation.Id] =
       for
@@ -513,6 +560,90 @@ class executionSciGmosNorthImaging extends ExecutionTestSupportForGmos:
         expected = expectedResult(json).asRight
       )
 
+  // `size` consecutive exposures in one filter at a single offset position.
+  private def stop(f: GmosNorthFilter, t: IntegrationTime, size: Int, offset: Int): List[Json] =
+    List.fill(size)(gnAtom(Step(f, t).withOffset(offset, offset)))
+
+  private def interleavedMode(offsetCount: Int, exposuresPerOffset: Int): String =
+    s"""{
+      gmosNorthImaging: {
+        variant: {
+          interleaved: {
+            offsets: {
+              ${enumerated((0 until offsetCount).toList.fproduct(identity) *)}
+            }
+            skyCount: 0
+            exposuresPerOffset: $exposuresPerOffset
+          }
+        }
+        filters: [
+          { filter: G_PRIME },
+          { filter: I_PRIME },
+          { filter: Y       }
+        ]
+      }
+    }"""
+
+  test("interleaved, offsets, exposuresPerOffset"):
+    // With 2 exposures per offset, G (6), I (12) and Y (30) need 3, 6 and 15
+    // offset positions.  The shortest filter sets the group count (3), so each
+    // group holds 1 G stop, 2 I stops and 5 Y stops -- the same shape as the
+    // one-exposure-per-offset case, with every position doubled up.
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createObservation(p, t, Site.GN)(interleavedMode(24, 2))
+      yield o
+
+    def oneGroup(i: Int): List[Json] =
+      stop(GmosNorthFilter.GPrime, Time120x06, 2, i)                                    ++
+      (1 to 2).toList.flatMap(j => stop(GmosNorthFilter.IPrime, Time060x12, 2, i + j))  ++
+      (3 to 7).toList.flatMap(j => stop(GmosNorthFilter.Y,      Time030x30, 2, i + j))
+
+    val json: List[Json] = (0 until 3).toList.flatMap: i =>
+      oneGroup(i * 8)
+
+    setup.flatMap: oid =>
+      expect(
+        user     = pi,
+        query    = gmosNorthScienceQuery(oid, 100.some),
+        expected = expectedResult(json).asRight
+      )
+
+  test("interleaved, offsets, exposuresPerOffset, short final positions"):
+    // With 4 exposures per offset, G (6) needs 2 positions (4 + 2), I (12)
+    // needs 3 (4 + 4 + 4) and Y (30) needs 8 (7 x 4 + 2).  That gives 2 groups,
+    // with I's odd position falling in the first.  Each filter's final position
+    // is short so that the ITC exposure counts are honored exactly.
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createObservation(p, t, Site.GN)(interleavedMode(13, 4))
+      yield o
+
+    val group0: List[Json] =
+      stop(GmosNorthFilter.GPrime, Time120x06, 4, 0) ++
+      stop(GmosNorthFilter.IPrime, Time060x12, 4, 1) ++
+      stop(GmosNorthFilter.IPrime, Time060x12, 4, 2) ++
+      (3 to 6).toList.flatMap(j => stop(GmosNorthFilter.Y, Time030x30, 4, j))
+
+    val group1: List[Json] =
+      stop(GmosNorthFilter.GPrime, Time120x06, 2,  7) ++
+      stop(GmosNorthFilter.IPrime, Time060x12, 4,  8) ++
+      stop(GmosNorthFilter.Y,      Time030x30, 4,  9) ++
+      stop(GmosNorthFilter.Y,      Time030x30, 4, 10) ++
+      stop(GmosNorthFilter.Y,      Time030x30, 4, 11) ++
+      stop(GmosNorthFilter.Y,      Time030x30, 2, 12)
+
+    setup.flatMap: oid =>
+      expect(
+        user     = pi,
+        query    = gmosNorthScienceQuery(oid, 100.some),
+        expected = expectedResult(group0 ++ group1).asRight
+      )
+
   test("interleaved, no offsets, sky"):
     val mode =
       s"""{
@@ -563,42 +694,43 @@ class executionSciGmosNorthImaging extends ExecutionTestSupportForGmos:
         expected = expectedResult(json).asRight
       )
 
-  test("preImaging"):
-    val mode =
-      s"""{
-        gmosNorthImaging: {
-          variant: {
-            preImaging: {
-              offset1: {
-                p: { arcseconds: 1 }
-                q: { arcseconds: 1 }
-              }
-              offset2: {
-                p: { arcseconds: 2 }
-                q: { arcseconds: 2 }
-              }
-              offset3: {
-                p: { arcseconds: 3 }
-                q: { arcseconds: 3 }
-              }
-              offset4: {
-                p: { arcseconds: 4 }
-                q: { arcseconds: 4 }
-              }
+  private def preImagingMode(exposuresPerOffset: Option[Int]): String =
+    s"""{
+      gmosNorthImaging: {
+        variant: {
+          preImaging: {
+            offset1: {
+              p: { arcseconds: 1 }
+              q: { arcseconds: 1 }
             }
+            offset2: {
+              p: { arcseconds: 2 }
+              q: { arcseconds: 2 }
+            }
+            offset3: {
+              p: { arcseconds: 3 }
+              q: { arcseconds: 3 }
+            }
+            offset4: {
+              p: { arcseconds: 4 }
+              q: { arcseconds: 4 }
+            }
+            ${exposuresPerOffset.fold("")(k => s"exposuresPerOffset: $k")}
           }
-          filters: [
-            { filter: G_PRIME },
-            { filter: I_PRIME }
-          ]
         }
-      }"""
+        filters: [
+          { filter: G_PRIME },
+          { filter: I_PRIME }
+        ]
+      }
+    }"""
 
+  test("preImaging"):
     val setup: IO[Observation.Id] =
       for
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
-        o <- createObservation(p, t, Site.GN)(mode)
+        o <- createObservation(p, t, Site.GN)(preImagingMode(none))
       yield o
 
     // Pre-imaging would usually be done with a TimeAndCount mode with exactly
@@ -633,6 +765,31 @@ class executionSciGmosNorthImaging extends ExecutionTestSupportForGmos:
         user     = pi,
         query    = gmosNorthScienceQuery(oid, 100.some),
         expected = expectedResult(g ++ i).asRight
+      )
+
+  test("preImaging, exposuresPerOffset"):
+    // With exposuresPerOffset = 3, I' (12 exposures) takes three at each of the
+    // four positions while G' (6 exposures) needs only the first two.
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createObservation(p, t, Site.GN)(preImagingMode(3.some))
+      yield o
+
+    def preImaging(f: GmosNorthFilter, t: IntegrationTime, positions: Int): List[Json] =
+      (1 to positions).toList.flatMap(n => List.fill(3)(n)).map: n =>
+        gnAtom(Step(f, t).withOffset(n, n))
+
+    val json: List[Json] =
+      preImaging(GmosNorthFilter.GPrime, Time120x06, 2) ++
+      preImaging(GmosNorthFilter.IPrime, Time060x12, 4)
+
+    setup.flatMap: oid =>
+      expect(
+        user     = pi,
+        query    = gmosNorthScienceQuery(oid, 100.some),
+        expected = expectedResult(json).asRight
       )
 
   test("digest"):

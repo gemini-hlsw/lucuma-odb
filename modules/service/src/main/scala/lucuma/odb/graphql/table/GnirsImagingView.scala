@@ -38,6 +38,8 @@ trait GnirsImagingView[F[_]] extends BaseMapping[F]:
     val AcqSkyOffsetP: ColumnRef = col("c_acq_sky_offset_p", angle_µas.opt)
     val AcqSkyOffsetQ: ColumnRef = col("c_acq_sky_offset_q", angle_µas.opt)
 
+    val ExposuresPerOffset: ColumnRef = col("c_exposures_per_offset", int4_pos)
+
     object Sky:
       val Count: ColumnRef = col("c_sky_count", int4_nonneg)
 

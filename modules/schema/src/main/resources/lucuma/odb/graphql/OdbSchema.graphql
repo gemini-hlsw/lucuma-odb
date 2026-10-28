@@ -13935,6 +13935,13 @@ type GroupedImagingVariant {
   Offset generator to use for the sky datasets.
   """
   skyOffsets: TelescopeConfigGenerator!
+
+  """
+  Number of consecutive science exposures to collect at each object offset
+  position before moving to the next position.  The overall exposure count still
+  caps the total, so the final position may receive fewer exposures.
+  """
+  exposuresPerOffset: PosInt!
 }
 
 """
@@ -13944,8 +13951,9 @@ input GroupedImagingVariantInput {
 
   """
   Whether the filters should appear in the sequence in increasing or decreasing
-  order by their wavelength.  Defaults to `INCREASING` on create, absent (i.e.,
-  not modified) on update.
+  order by their wavelength.  Defaults to `INCREASING` on create.  If absent on
+  update, the current value is kept, unless switching from another variant, in
+  which case it is reset to `INCREASING`.
   """
   order: WavelengthOrder
 
@@ -13960,7 +13968,8 @@ input GroupedImagingVariantInput {
   Number of sky positions to collect before and after object datasets. For
   example, if set to 2 there will be two sky positions before a group of object
   exposures and two more after using the same filter as the object datasets.
-  Defaults to 0 on creation, absent (i.e., not modified) on update.
+  Defaults to 0 on creation.  If absent on update, the current value is kept,
+  unless switching from another variant, in which case it is reset to 0.
   """
   skyCount: NonNegInt
 
@@ -13969,6 +13978,14 @@ input GroupedImagingVariantInput {
   be used.
   """
   skyOffsets: TelescopeConfigGeneratorInput
+
+  """
+  Number of consecutive science exposures to collect at each object offset
+  position before moving to the next position.  Defaults to 1 on creation.  If
+  absent on update, the current value is kept, unless switching from another
+  variant, in which case it is reset to 1.
+  """
+  exposuresPerOffset: PosInt
 
 }
 
@@ -13995,6 +14012,14 @@ type InterleavedImagingVariant {
   Offset generator to use for the sky datasets.
   """
   skyOffsets: TelescopeConfigGenerator!
+
+  """
+  Number of consecutive science exposures to collect in one filter at each
+  object offset position before moving on to the next filter and position.  A
+  filter's final position may receive fewer exposures so that its overall
+  exposure count is honored.
+  """
+  exposuresPerOffset: PosInt!
 }
 
 """
@@ -14010,8 +14035,9 @@ input InterleavedImagingVariantInput {
 
   """
   Number of sky positions to collect, per filter, before and after a series of
-  object datasets. Defaults to 0 on creation, absent (i.e., not modified) on
-  update.
+  object datasets.  Defaults to 0 on creation.  If absent on update, the current
+  value is kept, unless switching from another variant, in which case it is
+  reset to 0.
   """
   skyCount: NonNegInt
 
@@ -14021,6 +14047,14 @@ input InterleavedImagingVariantInput {
   a value greater than 0.
   """
   skyOffsets: TelescopeConfigGeneratorInput
+
+  """
+  Number of consecutive science exposures to collect in one filter at each
+  object offset position before moving on to the next filter and position.
+  Defaults to 1 on creation.  If absent on update, the current value is kept,
+  unless switching from another variant, in which case it is reset to 1.
+  """
+  exposuresPerOffset: PosInt
 
 }
 
@@ -14032,6 +14066,14 @@ type PreImagingVariant {
   offset2: Offset!
   offset3: Offset!
   offset4: Offset!
+
+  """
+  Number of consecutive science exposures to collect in one filter at each
+  offset position before moving on to the next position.  A filter's final
+  position may receive fewer exposures so that its overall exposure count is
+  honored.
+  """
+  exposuresPerOffset: PosInt!
 }
 
 """
@@ -14042,6 +14084,14 @@ input PreImagingVariantInput {
   offset2: OffsetInput
   offset3: OffsetInput
   offset4: OffsetInput
+
+  """
+  Number of consecutive science exposures to collect in one filter at each
+  offset position before moving on to the next position.  Defaults to 1 on
+  creation.  If absent on update, the current value is kept, unless switching
+  from another variant, in which case it is reset to 1.
+  """
+  exposuresPerOffset: PosInt
 }
 
 """

@@ -6,6 +6,7 @@ package lucuma.odb.service
 import cats.data.NonEmptyList
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegInt
+import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.ImagingVariantType
 import lucuma.core.enums.WavelengthOrder
 import lucuma.core.math.Offset
@@ -28,6 +29,7 @@ object ImagingStatements:
     "c_variant",
     "c_wavelength_order",
     "c_sky_count",
+    "c_exposures_per_offset",
     "c_pre_imaging_off1_p",
     "c_pre_imaging_off1_q",
     "c_pre_imaging_off2_p",
@@ -66,25 +68,43 @@ object ImagingStatements:
         case (_, Some(sc))                      =>
           sql"c_sky_count = $int4_nonneg"(sc)
 
+    // Exposures per offset is likewise shared by more than one mode and follows
+    // the same rule: keep the existing value on an update of the same mode,
+    // reset it when switching modes, unless it is explicitly set.
+    def upExposuresPerOffset(variant: ImagingVariantType, exposuresPerOffset: Option[PosInt]): AppliedFragment =
+      exposuresPerOffset match
+        case None    =>
+          sql"""
+            c_exposures_per_offset =
+              CASE
+                WHEN c_variant = $imaging_variant THEN c_exposures_per_offset
+                ELSE $int4_pos
+              END
+          """.apply(variant, PosInt.MinValue)
+        case Some(n) =>
+          sql"c_exposures_per_offset = $int4_pos"(n)
+
     def grouped: List[AppliedFragment] =
       val upOrder = sql"c_wavelength_order = ${wavelength_order}"
       input match
-        case ImagingVariantInput.Grouped(order, _, skyCount, _) =>
+        case ImagingVariantInput.Grouped(order, _, skyCount, _, exposuresPerOffset) =>
           List(
             upVariant(ImagingVariantType.Grouped),
-            upSkyCount(ImagingVariantType.Grouped, skyCount)
+            upSkyCount(ImagingVariantType.Grouped, skyCount),
+            upExposuresPerOffset(ImagingVariantType.Grouped, exposuresPerOffset)
           ) ++ order.map(upOrder).toList
-        case _                                                  =>
+        case _                                                                   =>
           List(upOrder(WavelengthOrder.Increasing))
 
     def interleaved: List[AppliedFragment] =
       input match
-        case ImagingVariantInput.Interleaved(_, skyCount, _) =>
+        case ImagingVariantInput.Interleaved(_, skyCount, _, exposuresPerOffset) =>
           List(
             upVariant(ImagingVariantType.Interleaved),
-            upSkyCount(ImagingVariantType.Interleaved, skyCount)
+            upSkyCount(ImagingVariantType.Interleaved, skyCount),
+            upExposuresPerOffset(ImagingVariantType.Interleaved, exposuresPerOffset)
           )
-        case _                                               =>
+        case _                                                                   =>
           Nil
 
     def preImaging: List[AppliedFragment] =
@@ -97,8 +117,9 @@ object ImagingStatements:
       val upPre4p = sql"c_pre_imaging_off4_p = ${angle_µas}"
       val upPre4q = sql"c_pre_imaging_off4_q = ${angle_µas}"
       input match
-        case ImagingVariantInput.PreImaging(o1, o2, o3, o4) =>
-          upSkyCount(ImagingVariantType.PreImaging, None) :: List(
+        case ImagingVariantInput.PreImaging(o1, o2, o3, o4, exposuresPerOffset) =>
+          upSkyCount(ImagingVariantType.PreImaging, None) ::
+          upExposuresPerOffset(ImagingVariantType.PreImaging, exposuresPerOffset) :: List(
             upVariant(ImagingVariantType.PreImaging).some,
             o1.map(o => upPre1p(o.p.toAngle)),
             o1.map(o => upPre1q(o.q.toAngle)),

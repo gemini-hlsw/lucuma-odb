@@ -354,6 +354,85 @@ class executionSciGnirsImaging extends ExecutionTestSupportForGnirs:
     setup.flatMap: oid =>
       expect(pi, gnirsScienceQuery(oid, 100.some), expectedScience(atoms).asRight)
 
+  // Three guided object positions, at (1, 1), (2, 2) and (3, 3).
+  private val objectOffsetsInput: String =
+    s"""
+      offsets: {
+        enumerated: {
+          values: [
+            { offset: { p: { arcseconds: 1 }, q: { arcseconds: 1 } }, guiding: ENABLED },
+            { offset: { p: { arcseconds: 2 }, q: { arcseconds: 2 } }, guiding: ENABLED },
+            { offset: { p: { arcseconds: 3 }, q: { arcseconds: 3 } }, guiding: ENABLED }
+          ]
+        }
+      }
+    """
+
+  private def exposuresPerOffsetTest(variant: String, atoms: List[Json]): IO[Unit] =
+    val mode =
+      s"""
+        gnirsImaging: {
+          camera: SHORT_BLUE
+          variant: { $variant }
+          filters: [ { filter: J }, { filter: ORDER4 } ]
+        }
+      """
+
+    for
+      p <- createProgram
+      t <- createTargetWithProfileAs(pi, p)
+      o <- createObservationWithModeAs(pi, p, List(t), mode)
+      _ <- expect(pi, gnirsScienceQuery(o, 100.some), expectedScience(atoms).asRight)
+    yield ()
+
+  test("grouped, offsets, exposuresPerOffset"):
+    // Two exposures per position: J (2) fills position 1, Order4 (3) fills
+    // position 1 and takes one more at position 2.
+    exposuresPerOffsetTest(
+      s"grouped: { skyCount: 0, exposuresPerOffset: 2, $objectOffsetsInput }",
+      List(
+        sciAtom(GnirsFilter.J,      10.secondTimeSpan, 1, 1),
+        sciAtom(GnirsFilter.J,      10.secondTimeSpan, 1, 1),
+        sciAtom(GnirsFilter.Order4, 25.secondTimeSpan, 1, 1),
+        sciAtom(GnirsFilter.Order4, 25.secondTimeSpan, 1, 1),
+        sciAtom(GnirsFilter.Order4, 25.secondTimeSpan, 2, 2)
+      )
+    )
+
+  test("interleaved, offsets, exposuresPerOffset"):
+    // Stops: J [2], Order4 [2, 1].  A single group, with an offset position per
+    // stop.
+    exposuresPerOffsetTest(
+      s"interleaved: { skyCount: 0, exposuresPerOffset: 2, $objectOffsetsInput }",
+      List(
+        sciAtom(GnirsFilter.J,      10.secondTimeSpan, 1, 1),
+        sciAtom(GnirsFilter.J,      10.secondTimeSpan, 1, 1),
+        sciAtom(GnirsFilter.Order4, 25.secondTimeSpan, 2, 2),
+        sciAtom(GnirsFilter.Order4, 25.secondTimeSpan, 2, 2),
+        sciAtom(GnirsFilter.Order4, 25.secondTimeSpan, 3, 3)
+      )
+    )
+
+  test("preImaging, exposuresPerOffset"):
+    exposuresPerOffsetTest(
+      s"""
+        preImaging: {
+          offset1: { p: { arcseconds: 1 }, q: { arcseconds: 1 } }
+          offset2: { p: { arcseconds: 2 }, q: { arcseconds: 2 } }
+          offset3: { p: { arcseconds: 3 }, q: { arcseconds: 3 } }
+          offset4: { p: { arcseconds: 4 }, q: { arcseconds: 4 } }
+          exposuresPerOffset: 2
+        }
+      """,
+      List(
+        sciAtom(GnirsFilter.J,      10.secondTimeSpan, 1, 1),
+        sciAtom(GnirsFilter.J,      10.secondTimeSpan, 1, 1),
+        sciAtom(GnirsFilter.Order4, 25.secondTimeSpan, 1, 1),
+        sciAtom(GnirsFilter.Order4, 25.secondTimeSpan, 1, 1),
+        sciAtom(GnirsFilter.Order4, 25.secondTimeSpan, 2, 2)
+      )
+    )
+
   // The acquisition sequence itself is asserted in detail in executionAcqGnirsImaging;
   // here we just confirm it is now generated (no longer null).
   test("acquisition sequence is generated"):

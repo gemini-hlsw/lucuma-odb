@@ -50,3 +50,30 @@ class guideTargetNameGMOS extends ExecutionTestSupportForGmos with GuideTargetNa
     nameAfter(updateLongSlit(_, "fpu: LONG_SLIT_1_00"))
       .flatMap: oid =>
         expect(pi, guideTargetNameQuery(oid), expected = guideTargetNameResult(none))
+
+  // Exposures per offset only regroups exposures over the same offset positions.
+  test("changing imaging exposures per offset keeps name"):
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgramAs(pi)
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthImagingObservationAs(pi, p, t)
+        _ <- setObservationTimeAndDuration(pi, o, ObsTime.some, none)
+        _ <- setGuideTargetName(pi, o, targetName1.some)
+        _ <- query(
+               pi,
+               s"""
+                 mutation {
+                   updateObservations(input: {
+                     SET: { observingMode: { gmosNorthImaging: { variant: { interleaved: { exposuresPerOffset: 3 } } } } }
+                     WHERE: { id: { EQ: "$o" } }
+                   }) {
+                     observations { id }
+                   }
+                 }
+               """
+             )
+      yield o
+
+    setup.flatMap: oid =>
+      expect(pi, guideTargetNameQuery(oid), expected = guideTargetNameResult(targetName1.some))

@@ -834,6 +834,161 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
       )
     )
 
+  test("observing mode: exposuresPerOffset kept on update, reset on variant switch"):
+
+    val query = """
+      observations {
+        observingMode {
+          gmosNorthImaging {
+            variant {
+              grouped { exposuresPerOffset }
+              interleaved { exposuresPerOffset }
+              preImaging { exposuresPerOffset }
+            }
+          }
+        }
+      }
+    """
+
+    def variant(v: String): String =
+      s"""
+        observingMode: {
+          gmosNorthImaging: {
+            variant: { $v }
+          }
+        }
+      """
+
+    def expected(grouped: Option[Int], interleaved: Option[Int], preImaging: Option[Int] = none): Either[Nothing, Json] =
+      def obj(n: Option[Int]): Json =
+        n.fold(Json.Null)(k => Json.obj("exposuresPerOffset" -> Json.fromInt(k)))
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "observingMode": {
+                "gmosNorthImaging": {
+                  "variant": {
+                    "grouped": ${obj(grouped)},
+                    "interleaved": ${obj(interleaved)},
+                    "preImaging": ${obj(preImaging)}
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+      """.asRight
+
+    val create = """
+      scienceRequirements: {
+        exposureTimeMode: {
+          signalToNoise: {
+            value: 100.0
+            at: { nanometers: 500.0 }
+          }
+        }
+      }
+      observingMode: {
+        gmosNorthImaging: {
+          filters: [ { filter: G_PRIME } ]
+          variant: {
+            grouped: { exposuresPerOffset: 3 }
+          }
+        }
+      }
+    """
+
+    multiUpdateTest(
+      pi,
+      List(
+        (create,                                             query, expected(3.some, none)), // set on create
+        (variant("interleaved: {}"),                         query, expected(none, 1.some)), // reset on switch
+        (variant("interleaved: { exposuresPerOffset: 2 }"),  query, expected(none, 2.some)), // explicit set
+        (variant("interleaved: { skyCount: 1 }"),            query, expected(none, 2.some)), // kept on update
+        (variant("grouped: {}"),                             query, expected(1.some, none)), // reset on switch
+        (variant("preImaging: { exposuresPerOffset: 4 }"),   query, expected(none, none, 4.some)), // explicit set on switch
+        (variant("preImaging: { offset1: { p: { arcseconds: 1 } q: { arcseconds: 1 } } }"), query, expected(none, none, 4.some)), // kept on update
+        (variant("interleaved: {}"),                         query, expected(none, 1.some))        // reset on switch
+      )
+    )
+
+  test("observing mode: skyCount and exposuresPerOffset cannot be null"):
+
+    val query = """
+      observations {
+        observingMode {
+          gmosNorthImaging {
+            variant {
+              grouped { skyCount exposuresPerOffset }
+            }
+          }
+        }
+      }
+    """
+
+    def variant(v: String): String =
+      s"""
+        observingMode: {
+          gmosNorthImaging: {
+            variant: { $v }
+          }
+        }
+      """
+
+    def invalid(field: String): Either[String, Json] =
+      s"Argument 'input.SET.observingMode.gmosNorthImaging.variant.grouped.$field' is invalid: cannot be null".asLeft
+
+    val create = """
+      scienceRequirements: {
+        exposureTimeMode: {
+          signalToNoise: {
+            value: 100.0
+            at: { nanometers: 500.0 }
+          }
+        }
+      }
+      observingMode: {
+        gmosNorthImaging: {
+          filters: [ { filter: G_PRIME } ]
+          variant: {
+            grouped: { skyCount: 2, exposuresPerOffset: 3 }
+          }
+        }
+      }
+    """
+
+    val unchanged: Either[String, Json] =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "observingMode": {
+                "gmosNorthImaging": {
+                  "variant": {
+                    "grouped": { "skyCount": 2, "exposuresPerOffset": 3 }
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+      """.asRight
+
+    multiUpdateTest(
+      pi,
+      List(
+        (create,                                         query, unchanged),
+        (variant("grouped: { exposuresPerOffset: null }"), query, invalid("exposuresPerOffset")),
+        (variant("grouped: { skyCount: null }"),           query, invalid("skyCount")),
+        (variant("grouped: {}"),                           query, unchanged)
+      )
+    )
+
   val preImagingInterleavedSwitchQuery: String =
     s"""
       observations {

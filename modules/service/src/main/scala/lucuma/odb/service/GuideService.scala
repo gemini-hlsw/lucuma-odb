@@ -12,6 +12,7 @@ import cats.derived.*
 import cats.effect.Async
 import cats.syntax.all.*
 import eu.timepit.refined.cats.*
+import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Stream
 import grackle.Result
@@ -85,6 +86,7 @@ import lucuma.odb.sequence.ghost
 import lucuma.odb.sequence.gmos
 import lucuma.odb.sequence.gnirs
 import lucuma.odb.sequence.igrins2
+import lucuma.odb.sequence.imaging.Variant
 import lucuma.odb.sequence.syntax.hash.*
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.sequence.util.HashBytes
@@ -505,23 +507,29 @@ object GuideService {
     }
 
     // The offsets as defined, not as generated: imaging positions follow the exposure count.
+    // Exposures per offset only regroups the exposures over those same defined positions,
+    // so like the exposure count it is left out.  Changing it should not discard a manually
+    // selected guide star.
+    private def imagingOffsetDefinition(variant: Variant): Array[Byte] =
+      Variant.exposuresPerOffset.replace(PosInt.MinValue)(variant).hashBytes
+
     private def offsetDefinition: Array[Byte] =
       params.observingMode match
         case _: daytimecal.Config              => Array.emptyByteArray
         case _: exchange.Config                => Array.emptyByteArray
-        case c: flamingos2.imaging.Config      => c.variant.hashBytes
+        case c: flamingos2.imaging.Config      => imagingOffsetDefinition(c.variant)
         case c: flamingos2.longslit.Config     => c.telescopeConfigs.hashBytes
         case c: flamingos2.mos.Config          => c.telescopeConfigs.hashBytes
         case c: ghost.ifu.Config               => c.skyPosition.hashBytes
-        case c: gmos.imaging.Config.GmosNorth  => c.variant.hashBytes
-        case c: gmos.imaging.Config.GmosSouth  => c.variant.hashBytes
+        case c: gmos.imaging.Config.GmosNorth  => imagingOffsetDefinition(c.variant)
+        case c: gmos.imaging.Config.GmosSouth  => imagingOffsetDefinition(c.variant)
         case c: gmos.longslit.Config.GmosNorth => c.telescopeConfigs.hashBytes
         case c: gmos.longslit.Config.GmosSouth => c.telescopeConfigs.hashBytes
         case c: gmos.mos.Config.GmosNorth      => c.telescopeConfigs.hashBytes
         case c: gmos.mos.Config.GmosSouth      => c.telescopeConfigs.hashBytes
         case c: gmos.ifu.Config.GmosNorth      => c.telescopeConfigs.hashBytes
         case c: gmos.ifu.Config.GmosSouth      => c.telescopeConfigs.hashBytes
-        case c: gnirs.imaging.Config           => c.variant.hashBytes
+        case c: gnirs.imaging.Config           => imagingOffsetDefinition(c.variant)
         case c: gnirs.spectroscopy.Config      => c.telescopeConfigs.hashBytes
         case c: igrins2.longslit.Config        => c.steps.hashBytes
         case _: visitor.Config                 => Array.emptyByteArray

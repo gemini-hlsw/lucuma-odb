@@ -5,6 +5,7 @@ package lucuma.odb.graphql.input
 package arb
 
 import eu.timepit.refined.types.numeric.NonNegInt
+import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.WavelengthOrder
 import lucuma.core.math.Offset
 import lucuma.core.math.arb.ArbOffset
@@ -28,7 +29,8 @@ trait ArbImagingVariantInput:
         of <- arbitrary[Nullable[TelescopeConfigGeneratorInput]]
         sc <- Gen.option(Gen.choose(0, 100).map(NonNegInt.unsafeFrom))
         so <- arbitrary[Nullable[TelescopeConfigGeneratorInput]]
-      yield ImagingVariantInput.Grouped(wo, of, sc, so)
+        ic <- Gen.option(Gen.choose(1, 10).map(PosInt.unsafeFrom))
+      yield ImagingVariantInput.Grouped(wo, of, sc, so, ic)
 
   given arbVariantInputInterleaved: Arbitrary[ImagingVariantInput.Interleaved] =
     Arbitrary:
@@ -36,7 +38,8 @@ trait ArbImagingVariantInput:
         of <- arbitrary[Nullable[TelescopeConfigGeneratorInput]]
         sc <- Gen.option(Gen.choose(0, 100).map(NonNegInt.unsafeFrom))
         so <- arbitrary[Nullable[TelescopeConfigGeneratorInput]]
-      yield ImagingVariantInput.Interleaved(of, sc, so)
+        ic <- Gen.option(Gen.choose(1, 10).map(PosInt.unsafeFrom))
+      yield ImagingVariantInput.Interleaved(of, sc, so, ic)
 
   given arbVariantInputPreImaging: Arbitrary[ImagingVariantInput.PreImaging] =
     Arbitrary:
@@ -45,7 +48,8 @@ trait ArbImagingVariantInput:
         o2 <- arbitrary[Option[Offset]]
         o3 <- arbitrary[Option[Offset]]
         o4 <- arbitrary[Option[Offset]]
-      yield ImagingVariantInput.PreImaging(o1, o2, o3, o4)
+        ic <- Gen.option(Gen.choose(1, 10).map(PosInt.unsafeFrom))
+      yield ImagingVariantInput.PreImaging(o1, o2, o3, o4, ic)
 
   given Arbitrary[ImagingVariantInput] =
     Arbitrary:

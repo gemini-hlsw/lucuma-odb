@@ -8,12 +8,14 @@ import cats.syntax.eq.*
 import cats.syntax.option.*
 import eu.timepit.refined.cats.*
 import eu.timepit.refined.types.numeric.NonNegInt
+import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.ImagingVariantType
 import lucuma.core.enums.WavelengthOrder
 import lucuma.core.math.Offset
 import lucuma.odb.sequence.data.TelescopeConfigGenerator
 import lucuma.odb.sequence.syntax.hash.*
 import lucuma.odb.sequence.util.HashBytes
+import monocle.Lens
 import monocle.Optional
 
 import java.io.ByteArrayOutputStream
@@ -25,18 +27,19 @@ sealed trait Variant:
 
   def variantType: ImagingVariantType =
     this match
-      case Grouped(_, _, _, _)    => ImagingVariantType.Grouped
-      case Interleaved(_, _, _)   => ImagingVariantType.Interleaved
-      case PreImaging(_, _, _, _) => ImagingVariantType.PreImaging
+      case Grouped(_, _, _, _, _)    => ImagingVariantType.Grouped
+      case Interleaved(_, _, _, _)   => ImagingVariantType.Interleaved
+      case PreImaging(_, _, _, _, _) => ImagingVariantType.PreImaging
+
   def fold[A](
     fg: Grouped     => A,
     fi: Interleaved => A,
     fp: PreImaging  => A
   ): A =
     this match
-      case g @ Grouped(_, _, _, _)    => fg(g)
-      case i @ Interleaved(_, _, _)   => fi(i)
-      case p @ PreImaging(_, _, _, _) => fp(p)
+      case g @ Grouped(_, _, _, _, _)    => fg(g)
+      case i @ Interleaved(_, _, _, _)   => fi(i)
+      case p @ PreImaging(_, _, _, _, _) => fp(p)
 
   def grouped: Option[Grouped] =
     fold(_.some, _ => none, _ => none)
@@ -49,21 +52,30 @@ sealed trait Variant:
 
 object Variant:
 
+  // Hashed only when it differs from the default of 1, so that the hash of every
+  // variant that existed before `exposuresPerOffset` was introduced is unchanged.
+  // In particular the guide star override hash depends upon it, and a change
+  // would discard every manually selected guide star.
+  private def exposuresPerOffsetHashBytes(k: PosInt): Array[Byte] =
+    if k === PosInt.MinValue then Array.emptyByteArray else k.hashBytes
+
   case class Grouped(
-    order:      WavelengthOrder,
-    offsets:    TelescopeConfigGenerator,
-    skyCount:   NonNegInt,
-    skyOffsets: TelescopeConfigGenerator
+    order:              WavelengthOrder,
+    offsets:            TelescopeConfigGenerator,
+    skyCount:           NonNegInt,
+    skyOffsets:         TelescopeConfigGenerator,
+    exposuresPerOffset: PosInt
   ) extends Variant
 
   object Grouped:
 
     val Default: Grouped =
       Grouped(
-        order      = WavelengthOrder.Increasing,
-        offsets    = TelescopeConfigGenerator.NoGenerator,
-        skyCount   = NonNegInt.MinValue,
-        skyOffsets = TelescopeConfigGenerator.NoGenerator
+        order              = WavelengthOrder.Increasing,
+        offsets            = TelescopeConfigGenerator.NoGenerator,
+        skyCount           = NonNegInt.MinValue,
+        skyOffsets         = TelescopeConfigGenerator.NoGenerator,
+        exposuresPerOffset = PosInt.MinValue
       )
 
     given HashBytes[Grouped] with
@@ -75,6 +87,7 @@ object Variant:
         out.write(g.offsets.hashBytes)
         out.write(g.skyCount.hashBytes)
         out.write(g.skyOffsets.hashBytes)
+        out.write(exposuresPerOffsetHashBytes(g.exposuresPerOffset))
 
         out.close()
         bao.toByteArray
@@ -85,21 +98,24 @@ object Variant:
           g.order,
           g.offsets,
           g.skyCount,
-          g.skyOffsets
+          g.skyOffsets,
+          g.exposuresPerOffset
         )
 
   case class Interleaved(
-    offsets:    TelescopeConfigGenerator,
-    skyCount:   NonNegInt,
-    skyOffsets: TelescopeConfigGenerator
+    offsets:            TelescopeConfigGenerator,
+    skyCount:           NonNegInt,
+    skyOffsets:         TelescopeConfigGenerator,
+    exposuresPerOffset: PosInt
   ) extends Variant
 
   object Interleaved:
     val Default: Interleaved =
       Interleaved(
-        offsets    = TelescopeConfigGenerator.NoGenerator,
-        skyCount   = NonNegInt.MinValue,
-        skyOffsets = TelescopeConfigGenerator.NoGenerator
+        offsets            = TelescopeConfigGenerator.NoGenerator,
+        skyCount           = NonNegInt.MinValue,
+        skyOffsets         = TelescopeConfigGenerator.NoGenerator,
+        exposuresPerOffset = PosInt.MinValue
       )
 
     given HashBytes[Interleaved] with
@@ -110,6 +126,7 @@ object Variant:
         out.write(i.offsets.hashBytes)
         out.write(i.skyCount.hashBytes)
         out.write(i.skyOffsets.hashBytes)
+        out.write(exposuresPerOffsetHashBytes(i.exposuresPerOffset))
 
         out.close()
         bao.toByteArray
@@ -119,23 +136,26 @@ object Variant:
        (
           g.offsets,
           g.skyCount,
-          g.skyOffsets
+          g.skyOffsets,
+          g.exposuresPerOffset
         )
 
   case class PreImaging(
-    offset1: Offset,
-    offset2: Offset,
-    offset3: Offset,
-    offset4: Offset
+    offset1:            Offset,
+    offset2:            Offset,
+    offset3:            Offset,
+    offset4:            Offset,
+    exposuresPerOffset: PosInt
   ) extends Variant
 
   object PreImaging:
     val Default: PreImaging =
       PreImaging(
-        offset1 = Offset.Zero,
-        offset2 = Offset.Zero,
-        offset3 = Offset.Zero,
-        offset4 = Offset.Zero
+        offset1            = Offset.Zero,
+        offset2            = Offset.Zero,
+        offset3            = Offset.Zero,
+        offset4            = Offset.Zero,
+        exposuresPerOffset = PosInt.MinValue
       )
 
     given HashBytes[PreImaging] with
@@ -144,7 +164,8 @@ object Variant:
           p.offset1.hashBytes,
           p.offset2.hashBytes,
           p.offset3.hashBytes,
-          p.offset4.hashBytes
+          p.offset4.hashBytes,
+          exposuresPerOffsetHashBytes(p.exposuresPerOffset)
         )
 
     given Eq[PreImaging] =
@@ -153,48 +174,61 @@ object Variant:
           p.offset1,
           p.offset2,
           p.offset3,
-          p.offset4
+          p.offset4,
+          p.exposuresPerOffset
         )
 
   val offsets: Optional[Variant, TelescopeConfigGenerator] =
     Optional.apply[Variant, TelescopeConfigGenerator] {
-      case Variant.Grouped(_, o, _, _)    => o.some
-      case Variant.Interleaved(o, _, _)   => o.some
-      case Variant.PreImaging(_, _, _, _) => none
+      case Variant.Grouped(_, o, _, _, _)    => o.some
+      case Variant.Interleaved(o, _, _, _)   => o.some
+      case Variant.PreImaging(_, _, _, _, _) => none
     } { og => {
-      case v @ Variant.Grouped(_, _, _, _)    => v.copy(offsets = og)
-      case v @ Variant.Interleaved(_, _, _)   => v.copy(offsets = og)
-      case v @ Variant.PreImaging(_, _, _, _) => v
+      case v @ Variant.Grouped(_, _, _, _, _)    => v.copy(offsets = og)
+      case v @ Variant.Interleaved(_, _, _, _)   => v.copy(offsets = og)
+      case v @ Variant.PreImaging(_, _, _, _, _) => v
     }}
 
   val skyOffsets: Optional[Variant, TelescopeConfigGenerator] =
     Optional.apply[Variant, TelescopeConfigGenerator] {
-      case Variant.Grouped(_, _, _, s)    => s.some
-      case Variant.Interleaved(_, _, s)   => s.some
-      case Variant.PreImaging(_, _, _, _) => none
+      case Variant.Grouped(_, _, _, s, _)    => s.some
+      case Variant.Interleaved(_, _, s, _)   => s.some
+      case Variant.PreImaging(_, _, _, _, _) => none
     } { og => {
-      case v @ Variant.Grouped(_, _, _, _)    => v.copy(skyOffsets = og)
-      case v @ Variant.Interleaved(_, _, _)   => v.copy(skyOffsets = og)
-      case v @ Variant.PreImaging(_, _, _, _) => v
+      case v @ Variant.Grouped(_, _, _, _, _)    => v.copy(skyOffsets = og)
+      case v @ Variant.Interleaved(_, _, _, _)   => v.copy(skyOffsets = og)
+      case v @ Variant.PreImaging(_, _, _, _, _) => v
     }}
 
+  val exposuresPerOffset: Lens[Variant, PosInt] =
+    Lens[Variant, PosInt](
+      _.fold(_.exposuresPerOffset, _.exposuresPerOffset, _.exposuresPerOffset)
+    ) { k =>
+      _.fold[Variant](
+        _.copy(exposuresPerOffset = k),
+        _.copy(exposuresPerOffset = k),
+        _.copy(exposuresPerOffset = k)
+      )
+    }
+
   case class Fields(
-    variantType: ImagingVariantType,
-    order:       WavelengthOrder,
-    skyCount:    NonNegInt,
-    offset1:     Offset,
-    offset2:     Offset,
-    offset3:     Offset,
-    offset4:     Offset
+    variantType:        ImagingVariantType,
+    order:              WavelengthOrder,
+    skyCount:           NonNegInt,
+    exposuresPerOffset: PosInt,
+    offset1:            Offset,
+    offset2:            Offset,
+    offset3:            Offset,
+    offset4:            Offset
   ):
     def toVariant(
       objectGen: TelescopeConfigGenerator,
       skyGen:    TelescopeConfigGenerator
     ): Variant =
       variantType match
-        case ImagingVariantType.Grouped     => Grouped(order, objectGen, skyCount, skyGen)
-        case ImagingVariantType.Interleaved => Interleaved(objectGen, skyCount, skyGen)
-        case ImagingVariantType.PreImaging  => PreImaging(offset1, offset2, offset3, offset4)
+        case ImagingVariantType.Grouped     => Grouped(order, objectGen, skyCount, skyGen, exposuresPerOffset)
+        case ImagingVariantType.Interleaved => Interleaved(objectGen, skyCount, skyGen, exposuresPerOffset)
+        case ImagingVariantType.PreImaging  => PreImaging(offset1, offset2, offset3, offset4, exposuresPerOffset)
 
 
   given HashBytes[Variant] with
@@ -204,7 +238,7 @@ object Variant:
   given Eq[Variant] with
     def eqv(x: Variant, y: Variant): Boolean =
       (x, y) match
-        case (a @ Grouped(_, _, _, _),    b @ Grouped(_, _, _, _))    => a === b
-        case (a @ Interleaved(_, _, _),   b @ Interleaved(_, _, _))   => a === b
-        case (a @ PreImaging(_, _, _, _), b @ PreImaging(_, _, _, _)) => a === b
-        case _                                                        => false
+        case (a @ Grouped(_, _, _, _, _),    b @ Grouped(_, _, _, _, _))    => a === b
+        case (a @ Interleaved(_, _, _, _),   b @ Interleaved(_, _, _, _))   => a === b
+        case (a @ PreImaging(_, _, _, _, _), b @ PreImaging(_, _, _, _, _)) => a === b
+        case _                                                              => false
