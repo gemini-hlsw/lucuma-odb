@@ -69,32 +69,20 @@ object OdbTopic:
   // in fs2 or skunk that releases the portal too early and you get portal not found
   // asynchronously when doing other things. This is a workaround for now that just
   // interpolates the strings directly rather than preparing a statement.
-  def selectProgramUsers[F[_]: Tracer](
+  //
+  // Selects the program's audience in one round trip: each row holds either a
+  // linked user or a partner whose NGOs may read the program.
+  def selectProgramAudience[F[_]: Tracer](
     s:   Session[F],
     pid: Program.Id,
-  ): F[List[User.Id]] =
-    Tracer[F].span("topic.selectProgramUsers").surround:
+  ): F[List[(Option[User.Id], Option[Partner])]] =
+    Tracer[F].span("topic.selectProgramAudience").surround:
       s.execute(
         sql"""
-          select c_user_id from t_program_user where c_program_id = '#${pid.toString}' and c_user_id notnull
-        """.query(user_id)
-      )
-
-  // Partners requesting time (a non-zero partner split) or holding an allocation for
-  // the program, i.e. the NGOs who may read it.  Interpolated directly for the
-  // same reason as selectProgramUsers.
-  def selectProgramPartners[F[_]: Tracer](
-    s:   Session[F],
-    pid: Program.Id,
-  ): F[List[Partner]] =
-    Tracer[F].span("topic.selectProgramPartners").surround:
-      s.execute(
-        sql"""
-          select c_partner from t_partner_split where c_program_id = '#${pid.toString}' and c_percent > 0
-          union
-          select c_ta_category from t_allocation where c_program_id = '#${pid.toString}' and c_duration > 'PT'
-            and c_ta_category in (select c_tag from t_partner)
-        """.query(partner)
+          select c_user_id, null::d_tag from t_program_user where c_program_id = '#${pid.toString}' and c_user_id notnull
+          union all
+          select null, x from program_ngo_partners('#${pid.toString}') x
+        """.query(user_id.opt *: partner.opt)
       )
 
   /**
@@ -156,9 +144,8 @@ object OdbTopic:
       ): Stream[F, E] =
         for
           up <- updates(sessions.listen, maxQueued)
-          us <- Stream.eval(selectProgramUsers(sessions.lookup, pid(up)))
-          ps <- Stream.eval(selectProgramPartners(sessions.lookup, pid(up)))
-          e   = element(up, us, ps)
+          as <- Stream.eval(selectProgramAudience(sessions.lookup, pid(up)))
+          e   = element(up, as.flatMap(_._1), as.flatMap(_._2))
           _  <- Stream.eval(Logger[F].info(s"$name channel: $e"))
         yield e
 

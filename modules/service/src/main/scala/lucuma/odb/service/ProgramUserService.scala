@@ -636,6 +636,15 @@ object ProgramUserService:
         EXISTS (select c_duration from t_allocation where c_program_id = $program_id and c_ta_category=${lucuma.odb.util.Codecs.time_accounting_category} and c_duration > 'PT')
       """.apply(programId, partner.timeAccountingCategory)
 
+    /** NGO read access: the partner is among the program's NGO partners (see V1370). */
+    def existsNgoReadAccess(
+      programId: Program.Id,
+      partner:   Partner
+    ): AppliedFragment =
+      sql"""
+        ${lucuma.odb.util.Codecs.partner} IN (SELECT program_ngo_partners($program_id))
+      """.apply(partner, programId)
+
     def existsUserReadAccess(
       user:      User,
       programId: Program.Id
@@ -643,7 +652,7 @@ object ProgramUserService:
       user.role match
         case GuestRole                    => existsUserAsPi(programId, user.id).some
         case StandardRole.Pi(_)           => (void"(" |+| existsProgramUserInRole(programId, user.id, List(ProgramUserRole.Pi, ProgramUserRole.Coi, ProgramUserRole.CoiRO, ProgramUserRole.SupportPrimary, ProgramUserRole.SupportSecondary)) |+| void")").some
-        case StandardRole.Ngo(_, partner) => existsAllocationForPartner(programId, partner).some
+        case StandardRole.Ngo(_, partner) => existsNgoReadAccess(programId, partner).some
         case ServiceRole(_) |
              StandardRole.Admin(_) |
              StandardRole.Staff(_)        => none
@@ -727,7 +736,7 @@ object ProgramUserService:
      *  `"v_configuration_request.c_program_id"`) mirroring
      *  `ProgramPredicates.isVisibleTo`, the visibility the query WHEREs apply:
      *  guests and PIs see a program they are linked to (any role); NGOs see a
-     *  program in which their partner requests time or holds an allocation;
+     *  program whose `program_ngo_partners` (V1370) include their partner;
      *  staff and above see everything.
      */
     def correlatedIsVisibleTo(
@@ -738,10 +747,7 @@ object ProgramUserService:
         case GuestRole | StandardRole.Pi(_) =>
           sql"exists (select 1 from t_program_user pu where pu.c_program_id = #$programIdColumn and pu.c_user_id = $user_id)".apply(user.id)
         case StandardRole.Ngo(_, partner)   =>
-          sql"""(
-            exists (select 1 from t_partner_split ps where ps.c_program_id = #$programIdColumn and ps.c_partner = ${lucuma.odb.util.Codecs.partner} and ps.c_percent > 0) or
-            exists (select 1 from t_allocation a where a.c_program_id = #$programIdColumn and a.c_ta_category = ${lucuma.odb.util.Codecs.time_accounting_category} and a.c_duration > 'PT')
-          )""".apply(partner, partner.timeAccountingCategory)
+          sql"${lucuma.odb.util.Codecs.partner} in (select program_ngo_partners(#$programIdColumn))".apply(partner)
         case ServiceRole(_)        |
              StandardRole.Admin(_) |
              StandardRole.Staff(_)          =>

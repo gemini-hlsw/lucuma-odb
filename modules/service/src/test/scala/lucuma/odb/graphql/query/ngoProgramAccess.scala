@@ -5,6 +5,7 @@ package lucuma.odb.graphql
 package query
 
 import cats.effect.IO
+import cats.syntax.all.*
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
@@ -14,6 +15,7 @@ import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.syntax.timespan.*
+import lucuma.odb.data.OdbError
 import lucuma.odb.graphql.input.AllocationInput
 
 // NGO users may read, but not edit, programs in which their partner requests
@@ -35,11 +37,21 @@ class ngoProgramAccess extends OdbSuite {
       _   <- addPartnerSplits(pi, pid, partnerSplits = List((Partner.US, 100), (Partner.CA, 0)))
     yield pid
 
+  // The DD allocation is a time accounting category that is not a partner, so
+  // it must be ignored rather than decoded as one.
   def createProgramWithUsAllocation: IO[Program.Id] =
     for
       pid <- createProgramAs(pi)
-      _   <- setAllocationsAs(staff, pid, List(AllocationInput(TimeAccountingCategory.US, ScienceBand.Band1, 1.hourTimeSpan)))
+      _   <- setAllocationsAs(staff, pid, List(
+               AllocationInput(TimeAccountingCategory.US, ScienceBand.Band1, 1.hourTimeSpan),
+               AllocationInput(TimeAccountingCategory.DD, ScienceBand.Band1, 1.hourTimeSpan)
+             ))
     yield pid
+
+  def hasReadAccess(user: User, pid: Program.Id): IO[Boolean] =
+    withServices(user): s =>
+      s.session.transaction.use: xa =>
+        s.programUserService.userHasReadAccess(pid)(using xa)
 
   def expectProgram(user: User, pid: Program.Id, visible: Boolean): IO[Unit] =
     expect(
@@ -85,6 +97,26 @@ class ngoProgramAccess extends OdbSuite {
 
   test("a program with neither splits nor allocations is visible to no NGO"):
     createProgramAs(pi).flatMap(expectVisibility(_, us = false, ca = false))
+
+  test("partner splits stop counting once the proposal is deleted"):
+    for
+      pid <- createProgramWithUsSplit
+      _   <- deleteProposal(staff, pid).map(assert(_))
+      _   <- expectVisibility(pid, us = false, ca = false)
+    yield ()
+
+  // userHasReadAccess backs executionConfig and attachment downloads
+  test("service-level read access follows the same rule"):
+    for
+      split <- createProgramWithUsSplit
+      alloc <- createProgramWithUsAllocation
+      none  <- createProgramAs(pi)
+      rs    <- List(
+                 hasReadAccess(ngoUs, split), hasReadAccess(ngoCa, split),
+                 hasReadAccess(ngoUs, alloc), hasReadAccess(ngoCa, alloc),
+                 hasReadAccess(ngoUs, none)
+               ).sequence
+    yield assertEquals(rs, List(true, false, true, false, false))
 
   test("a program's observations are visible to the NGO"):
     for
@@ -146,6 +178,12 @@ class ngoProgramAccess extends OdbSuite {
     createProgramWithUsSplit.flatMap: pid =>
       expectProgramEditEvents(ngoCa, pid, Nil)
 
+  test("an NGO is notified of edits to a program its partner holds an allocation in"):
+    createProgramWithUsAllocation.flatMap: pid =>
+      expectProgramEditEvents(ngoUs, pid, List(
+        json"""{ "programEdit": { "editType": "UPDATED", "value": { "name": "renamed" } } }"""
+      ))
+
   test("an NGO cannot edit a program it can see"):
     createProgramWithUsSplit.flatMap: pid =>
       expect(
@@ -181,6 +219,42 @@ class ngoProgramAccess extends OdbSuite {
                """,
                expected = Right(json"""{ "updateObservations": { "observations": [] } }""")
              )
+    yield ()
+
+  test("an NGO cannot edit a note in a program it can see"):
+    for
+      pid <- createProgramWithUsSplit
+      nid <- createProgramNoteAs(pi, pid, "Note", "text".some)
+      _   <- expect(
+               user  = ngoUs,
+               query = s"""
+                 mutation {
+                   updateProgramNotes(input: {
+                     WHERE: { id: { EQ: "$nid" } }
+                     SET: { title: "ngo edit" }
+                   }) {
+                     programNotes { id }
+                   }
+                 }
+               """,
+               expected = Right(json"""{ "updateProgramNotes": { "programNotes": [] } }""")
+             )
+    yield ()
+
+  test("an NGO cannot clone a target in a program it can see"):
+    for
+      pid <- createProgramWithUsSplit
+      tid <- createTargetAs(pi, pid)
+      _   <- interceptOdbError(
+               query(ngoUs, s"""
+                 mutation {
+                   cloneTarget(input: { targetId: "$tid" }) {
+                     newTarget { id }
+                   }
+                 }
+               """)
+             ):
+               case OdbError.InvalidTarget(`tid`, _) => ()
     yield ()
 
 }

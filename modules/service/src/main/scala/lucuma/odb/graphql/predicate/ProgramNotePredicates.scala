@@ -17,14 +17,15 @@ class ProgramNotePredicates(path: Path):
   lazy val id        = LeafPredicates[ProgramNote.Id](path / "id")
   lazy val program   = ProgramPredicates(path / "program")
 
-  def isVisibleTo(user: User): Predicate =
-    And(
-      program.isVisibleTo(user),
-      Or(
-        Eql(path / "isPrivate", Const(false)),
-        if user.role.access >= Staff then True else False
-      )
+  // Private notes are for staff only.
+  private def isPublicOrStaff(user: User): Predicate =
+    Or(
+      Eql(path / "isPrivate", Const(false)),
+      if user.role.access >= Staff then True else False
     )
 
+  def isVisibleTo(user: User): Predicate =
+    And(program.isVisibleTo(user), isPublicOrStaff(user))
+
   def isWritableBy(user: User): Predicate =
-    isVisibleTo(user)
+    And(program.isWritableBy(user), isPublicOrStaff(user))
