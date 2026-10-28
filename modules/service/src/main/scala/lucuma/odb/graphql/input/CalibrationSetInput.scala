@@ -69,8 +69,16 @@ object CalibrationSetInput:
   private def zeroExposure(kind: CalibrationSetType, setup: InstrumentSetup): InstrumentSetup =
     if kind =!= CalibrationSetType.Bias then setup
     else setup match
-      case InstrumentSetup.GmosNorth(c) => InstrumentSetup.GmosNorth(c.copy(exposure = TimeSpan.Zero))
-      case InstrumentSetup.GmosSouth(c) => InstrumentSetup.GmosSouth(c.copy(exposure = TimeSpan.Zero))
+      case InstrumentSetup.GmosNorth(c)  => InstrumentSetup.GmosNorth(c.copy(exposure = TimeSpan.Zero))
+      case InstrumentSetup.GmosSouth(c)  => InstrumentSetup.GmosSouth(c.copy(exposure = TimeSpan.Zero))
+      case InstrumentSetup.Flamingos2(c) => InstrumentSetup.Flamingos2(c.copy(exposure = TimeSpan.Zero))
+
+  private def checkKind(kind: CalibrationSetType, setup: InstrumentSetup): Result[Unit] =
+    val allowed = setup.allowedKinds
+    if allowed.contains(kind) then Result.unit
+    else
+      val kinds = allowed.map(_.tag.toUpperCase).mkString(", ")
+      Result.failure(s"A ${setup.instrument.longName} calibration set must be one of $kinds, not ${kind.tag.toUpperCase}.")
 
   val MaxCount: Int = 1000
 
@@ -86,16 +94,18 @@ object CalibrationSetInput:
         CountBinding("count", rCount),
         GcalBinding.Option("gcal", rGcal),
         GmosNorthDynamicInput.Binding.Option("gmosNorth", rNorth),
-        GmosSouthDynamicInput.Binding.Option("gmosSouth", rSouth)
+        GmosSouthDynamicInput.Binding.Option("gmosSouth", rSouth),
+        Flamingos2DynamicInput.Binding.Option("flamingos2", rFlamingos2)
       ) =>
         val rSetup: Result[InstrumentSetup] =
-          (rNorth, rSouth).parFlatMapN:
-            case (Some(n), None) => InstrumentSetup.GmosNorth(n).success
-            case (None, Some(s)) => InstrumentSetup.GmosSouth(s).success
-            case _               => Result.failure("Exactly one instrument setup (`gmosNorth` or `gmosSouth`) must be given.")
+          (rNorth, rSouth, rFlamingos2).parFlatMapN:
+            case (Some(n), None, None) => InstrumentSetup.GmosNorth(n).success
+            case (None, Some(s), None) => InstrumentSetup.GmosSouth(s).success
+            case (None, None, Some(f)) => InstrumentSetup.Flamingos2(f).success
+            case _                     => Result.failure("Exactly one instrument setup (`gmosNorth`, `gmosSouth` or `flamingos2`) must be given.")
 
         (rKind, rCount, rGcal, rSetup).parFlatMapN: (kind, count, gcal, setup) =>
-          gcalFor(kind, gcal, setup.instrument).map: g =>
+          (checkKind(kind, setup), gcalFor(kind, gcal, setup.instrument)).parMapN: (_, g) =>
             CalibrationSet(kind, count, g, zeroExposure(kind, setup))
 
   /** The complaint, if any, about a set whose setup is not for the mode's instrument. */

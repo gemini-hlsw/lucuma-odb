@@ -12,9 +12,11 @@ import grackle.skunk.SkunkMapping
 import lucuma.core.enums.GcalArc
 
 import table.DaytimeCalibrationSetView
+import table.Flamingos2DynamicTables
 import table.GmosDynamicTables
 
 trait CalibrationSetMapping[F[_]] extends DaytimeCalibrationSetView[F]
+                                     with Flamingos2DynamicTables[F]
                                      with GmosDynamicTables[F]:
   this: SkunkMapping[F] =>
 
@@ -26,7 +28,8 @@ trait CalibrationSetMapping[F[_]] extends DaytimeCalibrationSetView[F]
       SqlField("count",     DaytimeCalibrationSetView.Count),
       SqlObject("gcal"),
       SqlObject("gmosNorth", Join(DaytimeCalibrationSetView.Id, GmosNorthCalibrationSetupTable.Id)),
-      SqlObject("gmosSouth", Join(DaytimeCalibrationSetView.Id, GmosSouthCalibrationSetupTable.Id))
+      SqlObject("gmosSouth", Join(DaytimeCalibrationSetView.Id, GmosSouthCalibrationSetupTable.Id)),
+      SqlObject("flamingos2", Join(DaytimeCalibrationSetView.Id, Flamingos2CalibrationSetupTable.Id))
     )
 
   lazy val CalibrationSetGcalMapping: ObjectMapping =

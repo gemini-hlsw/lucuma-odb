@@ -6334,9 +6334,9 @@ input DaytimeCalibrationInput {
 
   """
   Calibration sets, in order.  On an edit the whole list is replaced; omit it
-  to keep the existing rows.  Rows may only be set for GMOS_NORTH and
-  GMOS_SOUTH, and are rejected once the sequence has been materialized (first
-  visit or a hand edit).
+  to keep the existing rows.  Rows may only be set for GMOS_NORTH, GMOS_SOUTH
+  and FLAMINGOS2, and are rejected once the sequence has been materialized
+  (first visit or a hand edit).
   """
   calibrationSets: [CalibrationSetInput!]
 }
@@ -6380,6 +6380,12 @@ type CalibrationSet {
   GMOS South setup, when the instrument is GMOS South.
   """
   gmosSouth: GmosSouthDynamic
+
+  """
+  Flamingos 2 setup, when the instrument is Flamingos 2.  Its window cover
+  is exactly as entered; a set never defaults it.
+  """
+  flamingos2: Flamingos2Dynamic
 }
 
 """
@@ -6407,7 +6413,8 @@ type CalibrationSetGcal {
 Calibration set input.  Exactly one instrument setup must be given and it must
 match the mode's instrument.  A FLAT needs a `gcal` with a continuum lamp, an
 ARC one with at least one arc lamp; BIAS, DARK and DAYTIME_OBSERVE take none.
-A BIAS ignores the setup's exposure time and takes zero.
+A BIAS ignores the setup's exposure time and takes zero.  A Flamingos 2 set
+may only be a DARK, FLAT or ARC.
 """
 input CalibrationSetInput {
   kind: CalibrationSetType!
@@ -6425,6 +6432,8 @@ input CalibrationSetInput {
   gmosNorth: GmosNorthDynamicInput
 
   gmosSouth: GmosSouthDynamicInput
+
+  flamingos2: Flamingos2DynamicInput
 }
 
 """

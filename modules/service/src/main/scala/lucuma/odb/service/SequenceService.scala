@@ -453,7 +453,7 @@ object SequenceService:
           Instrument.Flamingos2,
           observationId,
           sequenceType,
-          sequence.map(Atom.steps.modify(_.map(s => Step.instrumentConfig.modify(Flamingos2SequenceService.withDarkWindowCover(s.stepConfig))(s)))),
+          sequence,
           AtomBatch.Next,
           Flamingos2SequenceService.Statements.insertDynamics
         )

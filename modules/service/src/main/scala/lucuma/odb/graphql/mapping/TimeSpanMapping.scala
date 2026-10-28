@@ -11,7 +11,7 @@ import lucuma.odb.graphql.table.ArchiveMatchView
 import lucuma.odb.graphql.table.ChronConditionsEntryView
 import lucuma.odb.graphql.table.ExchangeView
 import lucuma.odb.graphql.table.ExposureTimeModeView
-import lucuma.odb.graphql.table.Flamingos2DynamicView
+import lucuma.odb.graphql.table.Flamingos2DynamicTables
 import lucuma.odb.graphql.table.GhostDynamicTable
 import lucuma.odb.graphql.table.GhostIfuView
 import lucuma.odb.graphql.table.GhostStaticView
@@ -33,7 +33,7 @@ import lucuma.odb.graphql.table.VisitorTable
 trait TimeSpanMapping[F[_]] extends AllocationTable[F]
                                with ExchangeView[F]
                                with ExposureTimeModeView[F]
-                               with Flamingos2DynamicView[F]
+                               with Flamingos2DynamicTables[F]
                                with GhostDynamicTable[F]
                                with GnirsSpectroscopyView[F]
                                with ArchiveMatchView[F]
@@ -76,6 +76,7 @@ trait TimeSpanMapping[F[_]] extends AllocationTable[F]
       timeSpanMappingAtPath(StepRecordType / "gmosSouth" / "exposure", GmosSouthDynamicTable.ExposureTime)(GmosSouthDynamicTable.Id),
       timeSpanMappingAtPath(CalibrationSetType / "gmosNorth" / "exposure", GmosNorthCalibrationSetupTable.ExposureTime)(GmosNorthCalibrationSetupTable.Id),
       timeSpanMappingAtPath(CalibrationSetType / "gmosSouth" / "exposure", GmosSouthCalibrationSetupTable.ExposureTime)(GmosSouthCalibrationSetupTable.Id),
+      timeSpanMappingAtPath(CalibrationSetType / "flamingos2" / "exposure", Flamingos2CalibrationSetupTable.ExposureTime)(Flamingos2CalibrationSetupTable.Id),
       timeSpanMappingAtPath(StepRecordType / "igrins2" / "exposure", Igrins2DynamicTable.ExposureTime)(Igrins2DynamicTable.Id),
       timeSpanMappingAtPath(StepRecordType / "gnirs" / "exposure", GnirsDynamicView.ExposureTime)(GnirsDynamicView.Id),
       timeSpanMappingAtPath(TimeAndCountExposureTimeModeType / "time", TimeAndCount.Time)(TimeAndCount.SyntheticId),
