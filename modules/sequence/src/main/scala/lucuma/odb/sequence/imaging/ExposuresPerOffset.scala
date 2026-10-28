@@ -49,11 +49,12 @@ object ExposuresPerOffset:
     counts.toList.map(stopCount(_, k)).sum
 
   /**
-   * Repeats each offset `k` times, keeping just enough to cover `count`
-   * exposures.
+   * Repeats each offset once per exposure in its stop, covering `count`
+   * exposures `k` at a time.  There must be at least `stopCount(count, k)`
+   * offsets.
    */
   def repeat[A](offsets: List[A], k: PosInt, count: PosInt): List[A] =
-    offsets.iterator.flatMap(o => Iterator.fill(k.value)(o)).take(count.value).toList
+    offsets.zip(stopSizes(count, k)).flatMap((o, n) => List.fill(n)(o))
 
   /**
    * Plans an interleaved sequence.  Each filter's stops are divided among as
