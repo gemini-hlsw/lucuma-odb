@@ -715,10 +715,8 @@ object Generator:
             case ObservingModeType.Flamingos2LongSlit   =>
               go(freshAcq, ctxʹ.params.itcInput.toOption, streaming.generateFlamingos2LongSlit(ctxʹ))(sequenceService.resetFlamingos2Acquisition)
 
-            // N.B. there is no MOS acquisition yet, so there is nothing to reset.
-            // This becomes wrong once a MOS acquisition lands.
             case ObservingModeType.Flamingos2Mos        =>
-              EitherT.pure(())
+              go(freshAcq, ctxʹ.params.itcInput.toOption, streaming.generateFlamingos2Mos(ctxʹ))(sequenceService.resetFlamingos2Acquisition)
 
             // N.B. there is no imaging acquisition, but it should not blow up.
             case ObservingModeType.GhostIfu             =>
@@ -737,8 +735,11 @@ object Generator:
             case ObservingModeType.GmosSouthLongSlit    =>
               go(freshAcq, ctxʹ.params.itcInput.toOption, streaming.generateGmosSouthLongSlit(ctxʹ))(sequenceService.resetGmosSouthAcquisition)
 
-            case ObservingModeType.GmosNorthMos | ObservingModeType.GmosSouthMos  =>
-              EitherT.pure(())
+            case ObservingModeType.GmosNorthMos         =>
+              go(freshAcq, ctxʹ.params.itcInput.toOption, streaming.generateGmosNorthMos(ctxʹ))(sequenceService.resetGmosNorthAcquisition)
+
+            case ObservingModeType.GmosSouthMos         =>
+              go(freshAcq, ctxʹ.params.itcInput.toOption, streaming.generateGmosSouthMos(ctxʹ))(sequenceService.resetGmosSouthAcquisition)
 
             case ObservingModeType.GmosNorthIfu         =>
               go(freshAcq, ctxʹ.params.itcInput.toOption, streaming.generateGmosNorthIfu(ctxʹ))(sequenceService.resetGmosNorthAcquisition)
@@ -746,7 +747,7 @@ object Generator:
             case ObservingModeType.GmosSouthIfu         =>
               go(freshAcq, ctxʹ.params.itcInput.toOption, streaming.generateGmosSouthIfu(ctxʹ))(sequenceService.resetGmosSouthAcquisition)
             case ObservingModeType.GnirsImaging         =>
-              EitherT.pure(())
+              go(freshAcq, ctxʹ.params.itcInput.toOption, streaming.generateGnirsImaging(ctxʹ))(sequenceService.resetGnirsAcquisition)
 
             case ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu =>
               go(freshAcq, ctxʹ.params.itcInput.toOption, streaming.generateGnirsSpectroscopy(ctxʹ))(sequenceService.resetGnirsAcquisition)

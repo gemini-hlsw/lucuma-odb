@@ -7,7 +7,7 @@ package input
 import cats.Eq
 import cats.data.NonEmptyList
 import cats.derived.*
-import cats.syntax.eq.*
+import cats.syntax.order.*
 import cats.syntax.parallel.*
 import cats.syntax.traverse.*
 import grackle.Result
@@ -22,6 +22,7 @@ import lucuma.core.enums.GnirsPrism
 import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.GnirsWellDepth
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.model.Access
 import lucuma.core.model.SlitTelescopeConfigs
 import lucuma.core.model.TelluricType
 import lucuma.core.model.sequence.TelescopeConfig
@@ -201,6 +202,11 @@ object GnirsSpectroscopyInput:
   ) derives Eq:
     def observingModeType: Option[ObservingModeType] = fpu.map(modeTypeFor)
     def updatesAcquisition: Boolean = acquisition.isDefined
+
+    def limitToPreExecution(access: Access): Boolean =
+      // Staff can edit the acquisition info for ongoing observations
+      access <= Access.Pi ||
+        copy(acquisition = None) =!= Edit.AllUndefined
 
     def isScienceExposureTimeModeOnly: Boolean =
       centralWavelengths.exists(_.exists(_.exposureTimeMode.isDefined)) &&

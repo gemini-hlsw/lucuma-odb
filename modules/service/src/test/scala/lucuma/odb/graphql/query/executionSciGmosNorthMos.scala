@@ -5,6 +5,7 @@ package lucuma.odb.graphql.query
 
 import cats.effect.IO
 import cats.syntax.either.*
+import cats.syntax.foldable.*
 import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
@@ -17,12 +18,13 @@ import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.core.syntax.timespan.*
 import lucuma.itc.IntegrationTime
+import lucuma.odb.graphql.mutation.UpdateObservationsOps
 
 /**
  * GMOS North MOS science generation.
  * The sequence is the same as for longslit but with the custom mask for fpu.
  */
-class executionSciGmosNorthMos extends ExecutionTestSupportForGmos:
+class executionSciGmosNorthMos extends ExecutionTestSupportForGmos with UpdateObservationsOps:
 
   override def fakeItcSpectroscopyResult: IntegrationTime =
     IntegrationTime(
@@ -238,5 +240,70 @@ class executionSciGmosNorthMos extends ExecutionTestSupportForGmos:
              expected = List(
                "Argument 'input.SET.observingMode.gmosNorthMos.acquisition' is invalid: A GMOS North MOS acquisition exposure time mode must be Time & Count."
              ).asLeft
+           )
+    yield ()
+
+  test("reset restores an executed acquisition"):
+    for
+      p      <- createProgram
+      t      <- createTargetWithProfileAs(pi, p)
+      o      <- createGmosNorthMosObservationAs(pi, p, List(t))
+      v      <- recordVisitAs(serviceUser, o)
+      before <- acquisitionSequenceIds(pi, o)
+      _      <- before.values.flatten.toList.traverse_(addEndStepEvent(_, v))
+      _      <- acquisitionSequenceIds(pi, o).map(ids => assertEquals(ids.size, 0))
+      _      <- resetAcquisitionAs(serviceUser, o)
+      after  <- acquisitionSequenceIds(pi, o)
+      _       = assertEquals(after.values.map(_.size).toList, before.values.map(_.size).toList)
+      _       = assert(after.keySet.intersect(before.keySet).isEmpty)
+    yield ()
+
+  test("editing the acquisition of an ongoing observation regenerates it"):
+    val update = """
+      observingMode: {
+        gmosNorthMos: {
+          acquisition: {
+            exposureTimeMode: {
+              timeAndCount: {
+                time: { seconds: 45 }
+                count: 2
+                at: { picometers: 10000 }
+              }
+            }
+          }
+        }
+      }
+    """
+    for
+      o <- createOngoingGmosNorthMosObservation
+      _ <- query(staff, updateObservationsMutation(o, update, "observations { id }"))
+      _ <- expect(
+             user     = pi,
+             query    = s"""
+               query {
+                 executionConfig(observationId: "$o") {
+                   gmosNorth {
+                     acquisition {
+                       nextAtom {
+                         steps { instrumentConfig { exposure { seconds } } }
+                       }
+                     }
+                   }
+                 }
+               }
+             """,
+             expected = json"""
+               {
+                 "executionConfig": {
+                   "gmosNorth": {
+                     "acquisition": {
+                       "nextAtom": {
+                         "steps": [ { "instrumentConfig": { "exposure": { "seconds": 45.000000 } } } ]
+                       }
+                     }
+                   }
+                 }
+               }
+             """.asRight
            )
     yield ()

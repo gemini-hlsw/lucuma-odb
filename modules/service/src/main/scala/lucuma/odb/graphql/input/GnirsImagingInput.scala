@@ -16,6 +16,7 @@ import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.WavelengthOrder
 import lucuma.core.math.Offset
 import lucuma.core.math.syntax.int.*
+import lucuma.core.model.Access
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
@@ -95,6 +96,15 @@ object GnirsImagingInput extends ImagingFilterCheck:
       ObservingModeType.GnirsImaging
 
     def updatesAcquisition: Boolean = acquisition.isDefined
+
+    def limitToPreExecution(access: Access): Boolean =
+      // Staff can edit the acquisition info for ongoing observations
+      access <= Access.Pi        ||
+        filters.isDefined           ||
+        camera.isDefined            ||
+        explicitReadMode.isDefined  ||
+        explicitWellDepth.isDefined ||
+        variant.isDefined
 
     def toCreate: Result[Create] =
       (

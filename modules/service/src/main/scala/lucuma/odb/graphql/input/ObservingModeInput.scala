@@ -139,6 +139,11 @@ object ObservingModeInput:
       flamingos2Mos.exists(_.updatesAcquisition)      ||
       gmosNorthLongSlit.exists(_.updatesAcquisition)  ||
       gmosSouthLongSlit.exists(_.updatesAcquisition)  ||
+      gmosNorthMos.exists(_.updatesAcquisition)       ||
+      gmosSouthMos.exists(_.updatesAcquisition)       ||
+      gmosNorthIfu.exists(_.updatesAcquisition)       ||
+      gmosSouthIfu.exists(_.updatesAcquisition)       ||
+      gnirsImaging.exists(_.updatesAcquisition)       ||
       gnirsSpectroscopy.exists(_.updatesAcquisition)
 
     def limitToPreExecution(access: Access): Boolean =
@@ -152,10 +157,12 @@ object ObservingModeInput:
         gmosNorthLongSlit.exists(_.limitToPreExecution(access))  ||
         gmosSouthImaging.isDefined                               ||
         gmosSouthLongSlit.exists(_.limitToPreExecution(access))  ||
-        gmosNorthMos.isDefined                                   ||
-        gmosSouthMos.isDefined                                   ||
-        gnirsImaging.isDefined                                   ||
-        gnirsSpectroscopy.isDefined                              ||
+        gmosNorthMos.exists(_.limitToPreExecution(access))       ||
+        gmosSouthMos.exists(_.limitToPreExecution(access))       ||
+        gmosNorthIfu.exists(_.limitToPreExecution(access))       ||
+        gmosSouthIfu.exists(_.limitToPreExecution(access))       ||
+        gnirsImaging.exists(_.limitToPreExecution(access))       ||
+        gnirsSpectroscopy.exists(_.limitToPreExecution(access))  ||
         igrins2LongSlit.isDefined
 
     def needsStaffAccess: Boolean =
