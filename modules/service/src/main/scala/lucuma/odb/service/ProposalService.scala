@@ -1421,13 +1421,10 @@ object ProposalService {
         WHERE
           prog.c_program_id = $program_id
       """.apply(pid) |+|
-      // Only the proposal mutations use this context, so for an NGO it is a
-      // write gate: their partner must hold an allocation, not merely appear
-      // in the partner splits that grant them read access.
-      (user.role.access match
-        case Access.Ngo => ProgramUserService.Statements.andWhereUserWriteAccess(user, pid)
-        case _          => ProgramUserService.Statements.andWhereUserReadAccess(user, pid)
-      )
+      // Only the proposal mutations use this context, so it is gated on write
+      // access (which excludes read-only CoIs, and requires an NGO's partner to
+      // hold an allocation rather than merely appear in the partner splits).
+      ProgramUserService.Statements.andWhereUserWriteAccess(user, pid)
 
     // The ceiling acceptance gives a program that has none: 'none' for proposal
     // types that ordinarily may not have Targets of Opportunity, and otherwise

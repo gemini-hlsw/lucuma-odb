@@ -636,14 +636,19 @@ object ProgramUserService:
         EXISTS (select c_duration from t_allocation where c_program_id = $program_id and c_ta_category=${lucuma.odb.util.Codecs.time_accounting_category} and c_duration > 'PT')
       """.apply(programId, partner.timeAccountingCategory)
 
-    /** NGO read access: the partner is among the program's NGO partners (see V1370). */
+    /** The partner is among the NGO partners (see V1370) of the program identified by the `programId` SQL expression. */
+    private def isNgoPartnerOf(
+      partner:   Partner,
+      programId: AppliedFragment
+    ): AppliedFragment =
+      sql"${lucuma.odb.util.Codecs.partner} IN (SELECT program_ngo_partners("(partner) |+| programId |+| void"))"
+
+    /** NGO read access: the partner is among the program's NGO partners. */
     def existsNgoReadAccess(
       programId: Program.Id,
       partner:   Partner
     ): AppliedFragment =
-      sql"""
-        ${lucuma.odb.util.Codecs.partner} IN (SELECT program_ngo_partners($program_id))
-      """.apply(partner, programId)
+      isNgoPartnerOf(partner, sql"$program_id"(programId))
 
     def existsUserReadAccess(
       user:      User,
@@ -747,7 +752,7 @@ object ProgramUserService:
         case GuestRole | StandardRole.Pi(_) =>
           sql"exists (select 1 from t_program_user pu where pu.c_program_id = #$programIdColumn and pu.c_user_id = $user_id)".apply(user.id)
         case StandardRole.Ngo(_, partner)   =>
-          sql"${lucuma.odb.util.Codecs.partner} in (select program_ngo_partners(#$programIdColumn))".apply(partner)
+          isNgoPartnerOf(partner, sql"#$programIdColumn"(Void))
         case ServiceRole(_)        |
              StandardRole.Admin(_) |
              StandardRole.Staff(_)          =>
