@@ -4,6 +4,7 @@
 package lucuma.odb.sequence
 package imaging
 
+import cats.data.NonEmptyList
 import eu.timepit.refined.types.numeric.PosInt
 import munit.ScalaCheckSuite
 import org.scalacheck.Gen
@@ -13,47 +14,64 @@ class ExposuresPerOffsetSuite extends ScalaCheckSuite:
 
   import ExposuresPerOffset.*
 
-  private def k(n: Int): PosInt = PosInt.unsafeFrom(n)
+  private def p(n: Int): PosInt = PosInt.unsafeFrom(n)
 
   private val genK: Gen[PosInt] =
-    Gen.choose(1, 10).map(k)
+    Gen.choose(1, 10).map(p)
 
-  private val genCounts: Gen[List[(Int, Int)]] =
+  private val genCounts: Gen[List[(Int, PosInt)]] =
     for
       n  <- Gen.choose(1, 4)
-      cs <- Gen.listOfN(n, Gen.choose(1, 60))
+      cs <- Gen.listOfN(n, Gen.choose(1, 60).map(p))
     yield cs.zipWithIndex.map(_.swap)
 
   test("stopSizes"):
-    assertEquals(stopSizes(6, k(3)), List(3, 3))
-    assertEquals(stopSizes(7, k(3)), List(3, 3, 1))
-    assertEquals(stopSizes(2, k(3)), List(2))
-    assertEquals(stopSizes(4, k(1)), List(1, 1, 1, 1))
+    assertEquals(stopSizes(p(6), p(3)), List(3, 3))
+    assertEquals(stopSizes(p(7), p(3)), List(3, 3, 1))
+    assertEquals(stopSizes(p(2), p(3)), List(2))
+    assertEquals(stopSizes(p(4), p(1)), List(1, 1, 1, 1))
+
+  test("stopSizes, exposures per offset far exceeding the count"):
+    assertEquals(stopSizes(p(2), PosInt.MaxValue), List(2))
+    assertEquals(stopSizes(PosInt.MaxValue, PosInt.MaxValue), List(Int.MaxValue))
 
   property("stopSizes honors the count, with only the last stop short"):
-    forAll(Gen.choose(1, 100), genK) { (count, k) =>
+    forAll(Gen.choose(1, 100).map(p), genK) { (count, k) =>
       val sizes = stopSizes(count, k)
-      assertEquals(sizes.sum, count)
+      assertEquals(sizes.sum, count.value)
       assert(sizes.init.forall(_ == k.value))
       assert(sizes.last >= 1 && sizes.last <= k.value)
     }
 
   test("repeat"):
-    assertEquals(repeat(List("a", "b", "c"), k(2), 5), List("a", "a", "b", "b", "c"))
-    assertEquals(repeat(List("a", "b"), k(3), 2), List("a", "a"))
+    assertEquals(repeat(List("a", "b", "c"), p(2), p(5)), List("a", "a", "b", "b", "c"))
+    assertEquals(repeat(List("a", "b"), p(3), p(2)), List("a", "a"))
+
+  test("repeat, exposures per offset far exceeding the count"):
+    assertEquals(repeat(List("a"), PosInt.MaxValue, p(3)), List("a", "a", "a"))
+
+  test("offset counts, exposures per offset far exceeding the count"):
+    assertEquals(groupedOffsetCount(NonEmptyList.of(p(2), p(4)), PosInt.MaxValue), 1)
+    assertEquals(interleavedOffsetCount(NonEmptyList.of(p(2), p(4)), PosInt.MaxValue), 2)
 
   test("interleave, science example"):
     // N(A) = 2, N(B) = 4, n = 3
     assertEquals(
-      interleave(List("A" -> 2, "B" -> 4), k(3)),
+      interleave(List("A" -> p(2), "B" -> p(4)), p(3)),
       List(List("A" -> 2, "B" -> 3, "B" -> 1))
+    )
+
+  test("interleave, exposures per offset far exceeding the count"):
+    assertEquals(
+      interleave(List("A" -> p(2), "B" -> p(4)), PosInt.MaxValue),
+      List(List("A" -> 2, "B" -> 4))
     )
 
   test("interleave, one exposure per offset"):
     // The behavior that predates exposuresPerOffset: as many groups as the
     // smallest count, with the remainder spread over the first groups.
     assertEquals(
-      interleave(List("A" -> 2, "B" -> 5), k(1)),
+      interleave(List("A" -> p(2), "B" -> p(5)), p(1)),
       List(
         List("A" -> 1, "B" -> 1, "B" -> 1, "B" -> 1),
         List("A" -> 1, "B" -> 1, "B" -> 1)

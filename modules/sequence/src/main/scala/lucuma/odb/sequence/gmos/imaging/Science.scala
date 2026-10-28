@@ -91,7 +91,7 @@ object Science:
           sky <- skyOffsets
                    .traverse: offset =>
                      scienceStep(offset, ObserveClass.Science)
-          obj <- ExposuresPerOffset.repeat(offsets, exposuresPerOffset, integrationTime.frameCount.value)
+          obj <- ExposuresPerOffset.repeat(offsets, exposuresPerOffset, integrationTime.frameCount)
                    .traverse: offset =>
                      scienceStep(offset, ObserveClass.Science)
         yield
@@ -132,7 +132,7 @@ object Science:
           yield s
 
       val plan: List[List[(L, Int)]] =
-        ExposuresPerOffset.interleave(filters.fproduct(filterTimes(_).frameCount.value), exposuresPerOffset)
+        ExposuresPerOffset.interleave(filters.fproduct(filterTimes(_).frameCount), exposuresPerOffset)
 
       // the dynamic config and size of each stop in a group
       def oneGroup(group: List[(L, Int)]): State[D, List[(D, Int)]] =
@@ -195,9 +195,9 @@ object Science:
           offsets0:   TelescopeConfigGenerator,
           skyCount:   NonNegInt,
           skyOffsets: TelescopeConfigGenerator
-        )(f: List[Int] => Int): F[(List[TelescopeConfig], List[TelescopeConfig])] =
+        )(f: NonEmptyList[PosInt] => Int): F[(List[TelescopeConfig], List[TelescopeConfig])] =
 
-          val cnt     = NonNegInt.unsafeFrom(f(nem.toNel.toList.map((_,  zipper) => zipper.focus._2.frameCount.value)))
+          val cnt     = NonNegInt.unsafeFrom(f(nem.toNel.map((_, zipper) => zipper.focus._2.frameCount)))
           val offsets = offsets0 match
             case TelescopeConfigGenerator.NoGenerator =>
               TelescopeConfigGenerator.Enumerated(NonEmptyList.fromListUnsafe(List.fill(cnt.value)(TelescopeConfig.Default)))
