@@ -71,16 +71,14 @@ object CalibrationSetInput:
     else setup match
       case InstrumentSetup.GmosNorth(c)  => InstrumentSetup.GmosNorth(c.copy(exposure = TimeSpan.Zero))
       case InstrumentSetup.GmosSouth(c)  => InstrumentSetup.GmosSouth(c.copy(exposure = TimeSpan.Zero))
-      case f: InstrumentSetup.Flamingos2 => f
+      case InstrumentSetup.Flamingos2(c) => InstrumentSetup.Flamingos2(c.copy(exposure = TimeSpan.Zero))
 
-  private def allowedKinds(instrument: Instrument): Set[CalibrationSetType] =
-    instrument match
-      case Instrument.Flamingos2 => Set(CalibrationSetType.Dark, CalibrationSetType.Flat, CalibrationSetType.Arc)
-      case _                     => CalibrationSetType.values.toSet
-
-  private def checkKind(kind: CalibrationSetType, instrument: Instrument): Result[Unit] =
-    if allowedKinds(instrument).contains(kind) then Result.unit
-    else Result.failure(s"A ${instrument.longName} calibration set must be one of ${allowedKinds(instrument).toList.sortBy(_.ordinal).map(_.tag.toUpperCase).mkString(", ")}, not ${kind.tag.toUpperCase}.")
+  private def checkKind(kind: CalibrationSetType, setup: InstrumentSetup): Result[Unit] =
+    val allowed = setup.allowedKinds
+    if allowed.contains(kind) then Result.unit
+    else
+      val kinds = allowed.map(_.tag.toUpperCase).mkString(", ")
+      Result.failure(s"A ${setup.instrument.longName} calibration set must be one of $kinds, not ${kind.tag.toUpperCase}.")
 
   val MaxCount: Int = 1000
 
@@ -107,7 +105,7 @@ object CalibrationSetInput:
             case _                     => Result.failure("Exactly one instrument setup (`gmosNorth`, `gmosSouth` or `flamingos2`) must be given.")
 
         (rKind, rCount, rGcal, rSetup).parFlatMapN: (kind, count, gcal, setup) =>
-          (checkKind(kind, setup.instrument), gcalFor(kind, gcal, setup.instrument)).parMapN: (_, g) =>
+          (checkKind(kind, setup), gcalFor(kind, gcal, setup.instrument)).parMapN: (_, g) =>
             CalibrationSet(kind, count, g, zeroExposure(kind, setup))
 
   /** The complaint, if any, about a set whose setup is not for the mode's instrument. */

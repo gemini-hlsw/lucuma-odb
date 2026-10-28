@@ -42,7 +42,7 @@ INNER JOIN t_f2_filter f ON t.c_filter = f.c_tag;
 
 -- A set with a Flamingos 2 setup is a dark, a flat or an arc.  The kind lives
 -- on the set row, so this is a cross-table check and goes in a constraint
--- trigger, fired from either side.
+-- trigger, fired from either side.  The list mirrors InstrumentSetup.allowedKinds.
 CREATE OR REPLACE FUNCTION check_flamingos_2_daytime_calibration_set_kind()
   RETURNS trigger AS $$
 DECLARE

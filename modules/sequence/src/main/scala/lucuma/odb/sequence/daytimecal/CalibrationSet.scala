@@ -55,6 +55,15 @@ enum InstrumentSetup:
       case GmosNorth(_)  => lucuma.core.enums.Instrument.GmosNorth
       case GmosSouth(_)  => lucuma.core.enums.Instrument.GmosSouth
 
+  /**
+   * The set kinds this instrument may be given.  The Flamingos 2 list is
+   * mirrored by the kind trigger in V1372, keep them in step.
+   */
+  def allowedKinds: List[CalibrationSetType] =
+    this match
+      case Flamingos2(_)               => List(CalibrationSetType.Dark, CalibrationSetType.Flat, CalibrationSetType.Arc)
+      case GmosNorth(_) | GmosSouth(_) => CalibrationSetType.values.toList
+
 object InstrumentSetup:
 
   given Eq[InstrumentSetup] =
