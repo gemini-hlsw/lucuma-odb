@@ -128,10 +128,6 @@ trait GuideService[F[_]] {
     checked: AccessControl.CheckedWithId[SetGuideTargetNameInput, Observation.Id]
   )(using NoTransaction[F]): F[Result[Observation.Id]]
 
-  def getGuideTargetName(pid: Program.Id, oid: Observation.Id)(using
-    NoTransaction[F], SuperUserAccess
-  ): F[Result[Option[NonEmptyString]]]
-
   /** Default, explicit, and effective guide probe for each observation. */
   def getGuideProbes(oids: List[Observation.Id])(using
     NoTransaction[F]
@@ -1228,9 +1224,8 @@ object GuideService {
         scienceTime:            Timestamp,
         scienceDuration:        TimeSpan
       )(using SuperUserAccess): F[Result[Option[GuideStarSelection]]] =
-        // If we got here, we either have the name but need to get all the details (they queried for more
-        // than name), or the name wasn't set or wasn't valid and we need to find all the candidates and
-        // select the best. None means AGS found nothing usable.
+        // A stored name is looked up by id and checked; otherwise all the candidates are searched and
+        // the best selected. None means the stored star, or every candidate, is unusable.
         (for {
 
           visitEnd      <- ResultT.fromResult(
@@ -1313,13 +1308,6 @@ object GuideService {
                                           ).asProblem
                                         )
           } yield result).value
-
-      override def getGuideTargetName(pid: Program.Id, oid: Observation.Id)(
-        using NoTransaction[F], SuperUserAccess
-      ): F[Result[Option[NonEmptyString]]] =
-        ResultT(getObservationInfo(oid))
-          .map(_.guideStarName.map(_.toNonEmptyString))
-          .value
 
       override def resolveGuideStar(oid: Observation.Id)(
         using NoTransaction[F], SuperUserAccess

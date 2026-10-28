@@ -12,7 +12,7 @@ Everything lives in `GuideService`. The automatic guide star search (AGS) itself
 |---|---|---|
 | `targetEnvironment.guideEnvironment` | `getGuideEnvironment` | The star and position angle the observation will guide with, as a `GuideEnvironment`. Errors when none is usable. |
 | `targetEnvironment.guideAvailability(start, end)` | `getGuideAvailability` | Which position angles have a usable star over a period, as `GuideAvailabilityPeriod`s. |
-| `targetEnvironment.guideTargetName` | `getGuideTargetName` | The override, or null once it is stale. |
+| `targetEnvironment.guideTargetName` | (column `c_guide_target_name`) | The override, if any. |
 | `targetEnvironment.guideProbe`, `defaultGuideProbe`, `explicitGuideProbe` | `getGuideProbes` | Which probe the search uses (see `docs/adr/0019-explicit-guide-probe.md`). |
 | `altair.fieldLens`, `altair.defaultFieldLens` | `resolveGuideStar` | NGS derives the field lens from the resolved star's separation. |
 | `setGuideTargetName` mutation | `setGuideTargetName` | Stores or clears the override. |
@@ -21,7 +21,7 @@ The sequence generator is the other caller: behind Altair it resolves the star i
 
 ## Inputs the Search Reads
 
-`getObservationInfo` reads one row of `t_observation`: constraints, position angle constraint, explicit base, observation time and duration, the stored override name and hash, the explicit guide probe and the Altair configuration.
+`getObservationInfo` reads one row of `t_observation`: constraints, position angle constraint, explicit base, observation time and duration, the stored override name, the explicit guide probe and the Altair configuration.
 
 `getGeneratorInfo` runs the sequence generator (`digestWithParams`) and keeps the parts the search needs: the generator parameters, setup time, full time estimate, and the acquisition and science offsets of the generated sequence. The offsets matter because AGS checks that the guide probe does not vignette the science field at every offset position.
 
@@ -35,8 +35,7 @@ flowchart TD
     B --> C[getGeneratorInfo: run the generator]
     C --> D{calibration role without guiding?}
     D -- twilight, daytime pinhole --> E[empty environment / NotGuided]
-    D -- no --> F[overrideHash: hash the search inputs]
-    F --> G{stored override hash matches?}
+    D -- no --> G{override stored?}
     G -- yes --> H[getGuideStarFromGaia: fetch that one star by id]
     G -- no --> I[getAllCandidates: Gaia cone query over the visit]
     H --> J[lookupGuideStar]
@@ -46,7 +45,7 @@ flowchart TD
     L --> M[Ags.agsAnalysis over candidates x angles]
     M --> N{usable position?}
     N -- best --> O[GuideEnvironment / Resolved]
-    N -- none, override --> P[error: Guidestar X is not usable / SelectedStarUnusable]
+    N -- none, override --> P[error: The selected guide star X is not usable / SelectedStarUnusable]
     N -- none, automatic --> Q[error: No usable guidestars / NoUsableStar]
 ```
 
@@ -59,28 +58,27 @@ Details worth knowing:
 
 ## Guide Star Override
 
-The user names a Gaia star with `setGuideTargetName`. It is stored in `t_observation.c_guide_target_name` together with `c_guide_target_hash`, a hash of the search inputs at the time (ADR 0030). The override is honoured only while that hash still matches; otherwise the automatic search runs as if nothing were stored, and `guideTargetName` reads as null.
+The user names a Gaia star with `setGuideTargetName`. It is stored in `t_observation.c_guide_target_name` and holds until the user clears it (`targetName: null`) or names another star. No edit to the observation, and no deploy, discards it.
 
 ```mermaid
 flowchart TD
     A[setGuideTargetName name] --> B{name given?}
-    B -- null --> C[clear name and hash]
+    B -- null --> C[clear name]
     B -- yes --> D[parse as Gaia source id]
     D --> E[getParams: generator parameters]
-    E --> F[overrideHash from params, targets, obs info]
-    F --> G[write name and hash]
+    E --> G[write name]
     G --> H{Altair?}
     H -- no --> I[done]
     H -- yes --> J[run the generator: digest]
     J -- star usable --> I
-    J -- unusable or failure --> K[restore previous name and hash, report]
+    J -- unusable or failure --> K[restore previous name, report]
 ```
 
-What the hash covers, via `ObservationInfo.overrideHash` and `SearchSettings.hash`: the `AgsParams`, AGS wavelength, offsets as defined on the observing mode (not as generated), Altair settings, explicit probe, constraints, explicit base, target and blind offset positions, the position angle constraint, and observation time and duration. It leaves out the generated sequence, the ITC result and the code version, so executing steps and deploying do not drop an override. The availability cache adds the code version, since it stores results rather than a choice.
+Validation of the override happens every time it is used: if the named star is not usable with the current settings, `guideEnvironment` errors with `selectedStarUnusableMessage` ("The selected guide star X is not usable; select another guide star or return to automatic selection.") and the generator (behind Altair) refuses to produce a sequence, instead of silently falling back to automatic selection.
 
-Validation of the override happens every time it is used: if the named star is no longer usable, `guideEnvironment` errors with "Guidestar X is not usable" and the generator (behind Altair) refuses to produce a sequence, instead of silently falling back to automatic selection.
+`SearchSettings.hash` (the `AgsParams`, AGS wavelength and offsets as defined on the observing mode) is used only as part of the availability cache key below.
 
-For Altair the mutation runs the generator after writing, since only a generation can tell whether the star works with the sequence it shapes. The generator runs outside the transaction (it calls Gaia and the ITC), so on failure the previous name and hash are written back by hand. The mutation reads the digest through `Generator.digest`, which reports the LGS+P1 problem the generator records against the sequence; `digestWithParams`, which the guide star search itself uses, leaves it out.
+For Altair the mutation runs the generator after writing, since only a generation can tell whether the star works with the sequence it shapes. The generator runs outside the transaction (it calls Gaia and the ITC), so on failure the previous name is written back by hand. The mutation reads the digest through `Generator.digest`, which reports the LGS+P1 problem the generator records against the sequence; `digestWithParams`, which the guide star search itself uses, leaves it out.
 
 ## Availability
 
@@ -131,7 +129,7 @@ flowchart TD
 
 | Table / column | Holds |
 |---|---|
-| `t_observation.c_guide_target_name`, `c_guide_target_hash` | The override and the hash it is valid for. Both set or both null. |
+| `t_observation.c_guide_target_name` | The override, if any. |
 | `t_observation.c_explicit_guide_probe` | The probe override. |
 | `t_guide_availability` | One row per observation: the hash the cached periods were computed under. |
 | `t_guide_availability_period` | Contiguous periods with the usable position angles for each. |
