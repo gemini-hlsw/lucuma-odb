@@ -334,6 +334,15 @@ class daytimeCalibrationSets_flamingos2 extends OdbSuite with DatabaseOperations
       )
     yield ()
 
+  test("materializing keeps a dark's window cover unset"):
+    val atoms = List(atom("Dark", 1, "DARK", 5, Json.Null, Json.Null))
+    for
+      pid <- createProgramAs(staff)
+      oid <- createWithSets(pid, s"{ kind: DARK, count: 1, ${setup(5)} }")
+      _   <- recordVisitAs(serviceUser, oid)
+      _   <- expect(staff, executionQuery(oid), expectedExecution(atoms).asRight)
+    yield ()
+
   test("rows are cloned with the observation"):
     for
       pid <- createProgramAs(staff)
