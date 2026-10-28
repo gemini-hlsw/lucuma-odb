@@ -421,6 +421,50 @@ class executionSciGmosNorthImaging extends ExecutionTestSupportForGmos:
         expected = expectedResult(json).asRight
       )
 
+  test("grouped, offsets, exposuresPerOffset far exceeding the exposure count"):
+    // There is no ceiling on exposuresPerOffset.  Any value at or above a
+    // filter's exposure count simply takes all of that filter's exposures at
+    // the first offset position.
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createObservation(p, t, Site.GN):
+          s"""{
+            gmosNorthImaging: {
+              variant: {
+                grouped: {
+                  offsets: {
+                    ${enumerated((0 until 2).toList.fproduct(identity) *)}
+                  }
+                  skyCount: 0
+                  exposuresPerOffset: 1000000000
+                }
+              }
+              filters: [
+                { filter: G_PRIME },
+                { filter: I_PRIME },
+                { filter: Y       }
+              ]
+            }
+          }"""
+      yield o
+
+    val json: List[Json] =
+      List(
+        GmosNorthFilter.GPrime -> Time120x06,
+        GmosNorthFilter.IPrime -> Time060x12,
+        GmosNorthFilter.Y      -> Time030x30
+      ).flatMap: (f, t) =>
+        List.fill(t.frameCount.value)(gnAtom(Step(f, t).withOffset(0, 0)))
+
+    setup.flatMap: oid =>
+      expect(
+        user     = pi,
+        query    = gmosNorthScienceQuery(oid, 100.some),
+        expected = expectedResult(json).asRight
+      )
+
   test("grouped, no offsets, sky"):
     val setup: IO[Observation.Id] =
       for
@@ -642,6 +686,28 @@ class executionSciGmosNorthImaging extends ExecutionTestSupportForGmos:
         user     = pi,
         query    = gmosNorthScienceQuery(oid, 100.some),
         expected = expectedResult(group0 ++ group1).asRight
+      )
+
+  test("interleaved, offsets, exposuresPerOffset far exceeding the exposure count"):
+    // Every filter fits in a single stop, so there is one group with each
+    // filter's exposures at its own offset position.
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createObservation(p, t, Site.GN)(interleavedMode(3, Int.MaxValue))
+      yield o
+
+    val json: List[Json] =
+      stop(GmosNorthFilter.GPrime, Time120x06,  6, 0) ++
+      stop(GmosNorthFilter.IPrime, Time060x12, 12, 1) ++
+      stop(GmosNorthFilter.Y,      Time030x30, 30, 2)
+
+    setup.flatMap: oid =>
+      expect(
+        user     = pi,
+        query    = gmosNorthScienceQuery(oid, 100.some),
+        expected = expectedResult(json).asRight
       )
 
   test("interleaved, no offsets, sky"):

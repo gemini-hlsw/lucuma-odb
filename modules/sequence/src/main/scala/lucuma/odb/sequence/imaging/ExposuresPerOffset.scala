@@ -4,6 +4,7 @@
 package lucuma.odb.sequence
 package imaging
 
+import cats.data.NonEmptyList
 import cats.syntax.functor.*
 import eu.timepit.refined.types.numeric.PosInt
 
@@ -21,38 +22,39 @@ object ExposuresPerOffset:
    * Number of stops (and therefore offset positions) needed to take `count`
    * exposures, `k` at a time.
    */
-  def stopCount(count: Int, k: PosInt): Int =
-    (count + k.value - 1) / k.value
+  def stopCount(count: PosInt, k: PosInt): Int =
+    (count.value - 1) / k.value + 1
 
   /**
    * Size of each stop needed to take `count` exposures, `k` at a time.  All
    * but the last are of size `k`.
    */
-  def stopSizes(count: Int, k: PosInt): List[Int] =
-    List.tabulate(stopCount(count, k))(i => k.value min (count - i * k.value))
+  def stopSizes(count: PosInt, k: PosInt): List[Int] =
+    List.tabulate(stopCount(count, k))(i => k.value min (count.value - i * k.value))
 
   /**
    * Number of offset positions needed for grouped (and pre-) imaging, where
    * each filter repeats the same pattern of positions, given the exposure count
    * of each filter.
    */
-  def groupedOffsetCount(counts: List[Int], k: PosInt): Int =
-    stopCount(counts.maxOption.getOrElse(0), k)
+  def groupedOffsetCount(counts: NonEmptyList[PosInt], k: PosInt): Int =
+    stopCount(counts.toList.maxBy(_.value), k)
 
   /**
    * Number of offset positions needed for interleaved imaging, where the
    * pattern of positions spans the whole sequence, given the exposure count of
    * each filter.
    */
-  def interleavedOffsetCount(counts: List[Int], k: PosInt): Int =
-    counts.map(stopCount(_, k)).sum
+  def interleavedOffsetCount(counts: NonEmptyList[PosInt], k: PosInt): Int =
+    counts.toList.map(stopCount(_, k)).sum
 
   /**
-   * Repeats each offset `k` times, keeping just enough to cover `count`
-   * exposures.
+   * Repeats each offset once per exposure in its stop, covering `count`
+   * exposures `k` at a time.  There must be at least `stopCount(count, k)`
+   * offsets.
    */
-  def repeat[A](offsets: List[A], k: PosInt, count: Int): List[A] =
-    offsets.flatMap(List.fill(k.value)(_)).take(count)
+  def repeat[A](offsets: List[A], k: PosInt, count: PosInt): List[A] =
+    offsets.zip(stopSizes(count, k)).flatMap((o, n) => List.fill(n)(o))
 
   /**
    * Plans an interleaved sequence.  Each filter's stops are divided among as
@@ -63,7 +65,7 @@ object ExposuresPerOffset:
    * @param filters filters in the order they are visited within a group,
    *                paired with the exposure count for each
    */
-  def interleave[L](filters: List[(L, Int)], k: PosInt): List[List[(L, Int)]] =
+  def interleave[L](filters: List[(L, PosInt)], k: PosInt): List[List[(L, Int)]] =
     val stops      = filters.map((f, count) => f -> stopSizes(count, k))
     val groupCount = stops.map(_._2.size).minOption.getOrElse(0)
 
