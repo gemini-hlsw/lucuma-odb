@@ -63,9 +63,6 @@ class TelluricStaleSearchSuite extends TelluricTargetsServiceSuiteSupport:
         sql"SELECT count(*) FROM t_target WHERE c_program_id = $program_id AND c_calibration_role = 'telluric'".query(skunk.codec.all.int8)
       session.unique(query)(pid)
 
-  def markUserDefined(oid: Observation.Id): IO[Unit] =
-    withTelluricTargetsServiceTransactionally(_.markUserDefined(oid))
-
   // Linking a star records the acting user, so the service user must exist.
   def resolve(pending: TelluricTargets.Pending): IO[Option[TelluricTargets.Meta]] =
     withServices(serviceUser): services =>
@@ -98,20 +95,6 @@ class TelluricStaleSearchSuite extends TelluricTargetsServiceSuiteSupport:
       assertEquals(targets, row.resolvedTargetId.toList)
       assertEquals(count, 1L)
 
-  test("a search that finishes after conversion to user-defined leaves the asterism alone"):
-    for
-      (pid, oid, pending) <- setup
-      _                   <- markUserDefined(oid)
-      meta                <- resolve(pending)
-      state               <- calculationState(oid)
-      targets             <- asterism(oid)
-      count               <- telluricTargetCount(pid)
-    yield
-      assertEquals(meta, None)
-      assertEquals(state, CalculationState.Ready)
-      assertEquals(targets, Nil)
-      assertEquals(count, 0L)
-
   test("a search that finishes after a science edit links nothing and requeues"):
     for
       (pid, oid, pending) <- setup
@@ -126,17 +109,9 @@ class TelluricStaleSearchSuite extends TelluricTargetsServiceSuiteSupport:
       assertEquals(targets, Nil)
       assertEquals(count, 0L)
 
-  test("reset sends a calculating user-defined row to ready, a generated one to pending"):
+  test("reset sends a calculating row back to pending"):
     for
-      (pid, oid, _) <- setup
-      sid           <- selectMeta(oid).map(_.get.scienceObservationId)
-      other         <- createTelluricCalibrationObservation(pi, pid)
-      _             <- insertPending(createPendingEntry(pid, other, sid, 30.minTimeSpan))
-      _             <- loadObs(other)
-      _             <- markUserDefined(oid)
-      _             <- reset
-      converted     <- calculationState(oid)
-      generated     <- calculationState(other)
-    yield
-      assertEquals(converted, CalculationState.Ready)
-      assertEquals(generated, CalculationState.Pending)
+      (_, oid, _) <- setup
+      _           <- reset
+      state       <- calculationState(oid)
+    yield assertEquals(state, CalculationState.Pending)
