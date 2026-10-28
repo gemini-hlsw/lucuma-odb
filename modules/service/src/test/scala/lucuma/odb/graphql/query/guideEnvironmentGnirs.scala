@@ -284,8 +284,7 @@ class guideEnvironmentGnirsAltair extends ExecutionTestSupportForGnirs
     withServices(pi): services =>
       Services.asSuperUser(services.guideService.resolveGuideStar(oid)).flatMap(_.get)
 
-  // Behind the mutation's back, which would reject a star the generator rules out. The hash
-  // leaves the name out, so the override stays current.
+  // Behind the mutation's back, which would reject a star the generator rules out.
   private def storeGuideStarName(oid: Observation.Id, name: String): IO[Unit] =
     withSession: s =>
       s.execute(
@@ -360,7 +359,7 @@ class guideEnvironmentGnirsAltair extends ExecutionTestSupportForGnirs
     yield assertResolvedStar(resolution, aowfsStarName, aowfsStarSeparation, aowfsStarRBrightness)
 
   // LGS+P1 guides with PWFS1, whose probe arm would vignette a star as close in as the AOWFS one,
-  // so the stored star is current but no longer usable.
+  // so the stored star is not usable.
   test("a stored star the current parameters rule out resolves as unusable"):
     for
       oid        <- observationWithAltair("{ mode: LGS_P1 }")

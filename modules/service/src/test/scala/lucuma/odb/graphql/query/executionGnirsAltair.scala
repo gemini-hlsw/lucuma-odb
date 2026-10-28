@@ -444,15 +444,15 @@ class executionGnirsAltairFailedSet extends AltairItcRecording:
       if gaiaDown.get then Resource.eval(IO.raiseError(new IOException("Gaia unavailable")))
       else super.httpRequestHandler(request)
 
-  private def storedGuideStar(oid: Observation.Id): IO[Option[(Option[String], Option[String])]] =
+  private def storedGuideStar(oid: Observation.Id): IO[Option[String]] =
     withSession: s =>
-      s.option(
+      s.unique(
         sql"""
-          SELECT c_guide_target_name, c_guide_target_hash
+          SELECT c_guide_target_name
           FROM t_observation
           WHERE c_observation_id = $observation_id
-        """.query(guide_target_name.opt *: md5_hash.opt)
-      )(oid).map(_.map((name, hash) => (name.map(_.value.value), hash.map(_.toHex))))
+        """.query(guide_target_name.opt)
+      )(oid).map(_.map(_.value.value))
 
   test("a guide star set the generator cannot complete leaves the stored selection alone"):
     for
@@ -462,7 +462,7 @@ class executionGnirsAltairFailedSet extends AltairItcRecording:
       failed   <- setGuideTargetName(pi, oid, otherTargetName.some).attempt
       after    <- storedGuideStar(oid)
     yield
-      assert(before.exists((name, hash) => name.contains(aowfsStarName) && hash.isDefined), s"expected a stored selection, found $before")
+      assertEquals(before, aowfsStarName.some, "expected a stored selection")
       assert(failed.isLeft, "the mutation should fail while Gaia is unreachable")
       assertEquals(after, before)
 
@@ -477,10 +477,10 @@ class executionGnirsAltairFailedSet extends AltairItcRecording:
       after    <- storedGuideStar(oid)
     yield
       assert(
-        failed.left.exists(_.getMessage.contains("no longer usable")),
+        failed.left.exists(_.getMessage.contains("is not usable")),
         s"expected an unusable guide star error, found $failed"
       )
-      assertEquals(after, (none[String], none[String]).some)
+      assertEquals(after, none[String])
 
 // The default candidate table is built for the PWFS patrol field; none of its stars lies inside
 // the much smaller AOWFS one, so AGS has nothing to offer Altair.

@@ -6547,7 +6547,8 @@ input SetGuideTargetNameInput {
 
   """
   The name of the guide star. This must satisfy the regular expression "^Gaia DR3 (-?\d+)$" where the
-  numeric part is the Gaia source_id. Omit or set to null to delete.
+  numeric part is the Gaia source_id. Omit or set to null to delete the
+  selection and return to automatic guide star selection.
   """
   targetName: NonEmptyString
 }
@@ -22129,10 +22130,12 @@ type TargetEnvironment {
 
   """
   The guide target(s) and related information.
-  If a guide target has been set via `guideTargetName`, that target will be
-  returned. If it not found or not usable, an error will be returned.
-  If no guide target has been set, or it has been invalidated by observation/target
-  changes, Gaia will be searched for the best guide target available.
+  If a guide target has been selected via `setGuideTargetName`, that target will
+  be returned. If it is not found or not usable, an error naming it will be
+  returned; select another guide target or clear the selection to return to
+  automatic selection. A selection is never discarded by observation or target
+  changes. If no guide target has been selected, Gaia will be searched for the
+  best guide target available.
   """
   guideEnvironment: GuideEnvironment!
 
@@ -22155,9 +22158,9 @@ type TargetEnvironment {
   explicitBase: Coordinates
 
   """
-  The name of the guide target, if any, set by `setGuideTargetName`.
-  If the name is no longer valid or a sequence cannot be generated, null will
-  be returned.
+  The name of the guide target, if any, selected by `setGuideTargetName`. The
+  selection is returned until it is cleared or replaced, whether or not the
+  star is usable with the current observation settings.
   """
   guideTargetName: NonEmptyString
 

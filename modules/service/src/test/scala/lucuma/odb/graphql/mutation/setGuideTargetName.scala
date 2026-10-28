@@ -266,7 +266,7 @@ class setGuideTargetName extends query.ExecutionTestSupportForGmos {
     yield ()
   }
 
-  test("changing observation time resets") {
+  test("changing observation time keeps the selection") {
     for
       pid <- createProgramAs(pi)
       tid <- createTargetWithProfileAs(pi, pid)
@@ -274,7 +274,7 @@ class setGuideTargetName extends query.ExecutionTestSupportForGmos {
       _   <- setObservationTimeAndDuration(pi, oid, Now.some, none)
       _   <- setName(staff, oid.some, none, targetName1.some, expectName(targetName1))
       _   <- setObservationTimeAndDuration(pi, oid, Later.some, none)
-      _   <- justQuery(pi, oid, none)
+      _   <- justQuery(pi, oid, targetName1.some)
     yield ()
   }
 

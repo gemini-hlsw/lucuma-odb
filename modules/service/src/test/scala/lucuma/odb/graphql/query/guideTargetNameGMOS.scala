@@ -46,10 +46,10 @@ class guideTargetNameGMOS extends ExecutionTestSupportForGmos with GuideTargetNa
       .flatMap: oid =>
         expect(pi, guideTargetNameQuery(oid), expected = guideTargetNameResult(targetName1.some))
 
-  test("changing the focal plane unit invalidates name"):
+  test("changing the focal plane unit keeps name"):
     nameAfter(updateLongSlit(_, "fpu: LONG_SLIT_1_00"))
       .flatMap: oid =>
-        expect(pi, guideTargetNameQuery(oid), expected = guideTargetNameResult(none))
+        expect(pi, guideTargetNameQuery(oid), expected = guideTargetNameResult(targetName1.some))
 
   // Exposures per offset only regroups exposures over the same offset positions.
   test("changing imaging exposures per offset keeps name"):
