@@ -8,6 +8,8 @@ import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Json
 import io.circe.literal.*
+import io.circe.syntax.*
+import lucuma.core.enums.Partner
 import lucuma.odb.data.OdbError
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
 
@@ -15,8 +17,33 @@ class createConfigurationRequest extends OdbSuite with ObservingModeSetupOperati
 
   val pi      = TestUsers.Standard.pi(1, 30)
   val admin   = TestUsers.Standard.admin(2, 32)
+  val ngo     = TestUsers.Standard.ngo(3, 33, Partner.US)
 
-  val validUsers = List(pi, admin).toList
+  val validUsers = List(pi, admin, ngo).toList
+
+  test("an NGO cannot create a configuration request, even in a program it can read") {
+    for
+      cfpid <- createGeminiCallForProposalsAs(admin)
+      pid   <- createProgramAs(pi, "Foo")
+      _     <- addProposal(pi, pid, Some(cfpid), None)
+      _     <- addPartnerSplits(pi, pid, partnerSplits = List((Partner.US, 100)))
+      tid   <- createTargetWithProfileAs(pi, pid)
+      oid   <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      _     <- expect(
+                 user     = ngo,
+                 query    = s"""query { observation(observationId: "$oid") { id } }""",
+                 expected = Right(Json.obj("observation" -> Json.obj("id" -> oid.asJson)))
+               )
+      _     <- interceptOdbError(
+                 query(ngo, s"""
+                   mutation {
+                     createConfigurationRequest(input: { observationId: "$oid" }) { status }
+                   }
+                 """)
+               ):
+                 case OdbError.NotAuthorized(_, _) => ()
+    yield ()
+  }
 
   test("create and select configuration request for fully-configured observation") {
     createGeminiCallForProposalsAs(admin).flatMap { cfpid =>
