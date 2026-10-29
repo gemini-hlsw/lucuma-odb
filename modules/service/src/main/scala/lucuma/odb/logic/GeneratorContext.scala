@@ -125,10 +125,7 @@ object GeneratorContext:
     GeneratorError.sequenceUnavailable(oid, "Altair needs a guide star but none is usable.")
 
   private def selectedStarUnusable(oid: Observation.Id, name: GuideStarName): OdbError =
-    GeneratorError.sequenceUnavailable(
-      oid,
-      s"The selected guide star ${name.value.value} is no longer usable; choose another or return to automatic selection."
-    )
+    GeneratorError.sequenceUnavailable(oid, GuideService.selectedStarUnusableMessage(name))
 
   private def unsettled(oid: Observation.Id): String =
     s"$oid: The Altair guide star selection did not settle after $MaxAltairGuideStarPasses passes; using the last selection."

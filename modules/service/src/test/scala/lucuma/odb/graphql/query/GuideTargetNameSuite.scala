@@ -136,7 +136,7 @@ trait GuideTargetNameSuite extends ExecutionTestSupport {
     }
   }
 
-  test("removing targets invalidates name") {
+  test("removing targets keeps name") {
     val setup: IO[Observation.Id] =
       for {
         p <- createProgramAs(pi)
@@ -150,11 +150,11 @@ trait GuideTargetNameSuite extends ExecutionTestSupport {
       expect(
         pi,
         guideTargetNameQuery(oid),
-        expected = guideTargetNameResult(none))
+        expected = guideTargetNameResult(targetName1.some))
     }
   }
 
-  test("unsetting guide target name invalidates name") {
+  test("unsetting guide target name clears name") {
     val setup: IO[Observation.Id] =
       for {
         p <- createProgramAs(pi)
@@ -172,7 +172,7 @@ trait GuideTargetNameSuite extends ExecutionTestSupport {
     }
   }
 
-  test("unsetting observation time invalidates name") {
+  test("unsetting observation time keeps name") {
     val setup: IO[Observation.Id] =
       for {
         p <- createProgramAs(pi)
@@ -186,11 +186,11 @@ trait GuideTargetNameSuite extends ExecutionTestSupport {
       expect(
         pi,
         guideTargetNameQuery(oid),
-        expected = guideTargetNameResult(none))
+        expected = guideTargetNameResult(targetName1.some))
     }
   }
 
-  test("changing observation time invalidates name") {
+  test("changing observation time keeps name") {
     val setup: IO[Observation.Id] =
       for {
         p <- createProgramAs(pi)
@@ -204,11 +204,11 @@ trait GuideTargetNameSuite extends ExecutionTestSupport {
       expect(
         pi,
         guideTargetNameQuery(oid),
-        expected = guideTargetNameResult(none))
+        expected = guideTargetNameResult(targetName1.some))
     }
   }
 
-  test("changing observation duration invalidates name") {
+  test("changing observation duration keeps name") {
     val setup: IO[Observation.Id] =
       for {
         p <- createProgramAs(pi)
@@ -222,11 +222,11 @@ trait GuideTargetNameSuite extends ExecutionTestSupport {
       expect(
         pi,
         guideTargetNameQuery(oid),
-        expected = guideTargetNameResult(none))
+        expected = guideTargetNameResult(targetName1.some))
     }
   }
 
-  test("moving a target invalidates name"):
+  test("moving a target keeps name"):
     val setup: IO[Observation.Id] =
       for {
         p <- createProgramAs(pi)
@@ -252,7 +252,39 @@ trait GuideTargetNameSuite extends ExecutionTestSupport {
       expect(
         pi,
         guideTargetNameQuery(oid),
-        expected = guideTargetNameResult(none))
+        expected = guideTargetNameResult(targetName1.some))
+
+  private def nameAfterObservationEdit(set: String): IO[Observation.Id] =
+    for {
+      p <- createProgramAs(pi)
+      t <- createTargetWithProfileAs(pi, p)
+      o <- createObservationAs(pi, p, List(t))
+      _ <- setObservationTimeAndDuration(pi, o, ObsTime.some, none)
+      _ <- setGuideTargetName(pi, o, targetName1.some)
+      _ <- query(
+             pi,
+             s"""
+               mutation {
+                 updateObservations(input: {
+                   SET: { $set }
+                   WHERE: { id: { EQ: "$o" } }
+                 }) {
+                   observations { id }
+                 }
+               }
+             """
+           )
+    } yield o
+
+  test("changing the position angle keeps name"):
+    nameAfterObservationEdit("posAngleConstraint: { mode: FIXED, angle: { degrees: 90 } }")
+      .flatMap: oid =>
+        expect(pi, guideTargetNameQuery(oid), expected = guideTargetNameResult(targetName1.some))
+
+  test("changing the constraints keeps name"):
+    nameAfterObservationEdit("constraintSet: { imageQuality: POINT_ONE, cloudExtinction: ZERO }")
+      .flatMap: oid =>
+        expect(pi, guideTargetNameQuery(oid), expected = guideTargetNameResult(targetName1.some))
 
   test("re-linking the catalog entry keeps name"):
     val setup: IO[Observation.Id] =

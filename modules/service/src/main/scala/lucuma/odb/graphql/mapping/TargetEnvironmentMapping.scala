@@ -8,7 +8,6 @@ package mapping
 import cats.effect.Resource
 import cats.effect.Temporal
 import cats.syntax.all.*
-import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Env
 import grackle.Query
 import grackle.Query.*
@@ -17,7 +16,6 @@ import grackle.Result
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
 import grackle.syntax.*
-import io.circe.refined.given
 import lucuma.catalog.clients.GaiaClient
 import lucuma.core.enums.AltairMode
 import lucuma.core.enums.CassRotator
@@ -109,7 +107,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
       EffectField("basePosition", basePositionQueryHandler, List("id")),
       EffectField("guideEnvironment", guideEnvironmentQueryHandler, List("id", "programId")),
       EffectField("guideAvailability", guideAvailabilityQueryHandler, List("id", "programId")),
-      EffectField("guideTargetName", guideTargetNameQueryHandler, List("id", "programId"))
+      SqlField("guideTargetName", ObservationView.GuideTargetName)
     )
 
   lazy val AltairMapping: ObjectMapping =
@@ -271,18 +269,4 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
 
   private lazy val guideProbeHandler: EffectHandler[F] =
     probeSelectionHandler(_.effective)
-
-  def guideTargetNameQueryHandler: EffectHandler[F] = {
-    val readEnv: Env => Result[Unit] = _ => ().success
-
-    val calculate: User ?=> (Program.Id, Observation.Id, Unit) => F[Result[Option[NonEmptyString]]] =
-      (pid, oid, _) =>
-        services.use { implicit s =>
-          Services.asSuperUser:
-            s.guideService
-              .getGuideTargetName(pid, oid)
-        }
-
-    effectHandler(readEnv, calculate)
-  }
 }

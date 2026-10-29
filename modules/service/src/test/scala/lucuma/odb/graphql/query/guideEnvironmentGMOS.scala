@@ -20,6 +20,7 @@ import lucuma.core.model.User
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.odb.graphql.mutation.UpdateObservationsOps
+import lucuma.odb.service.GuideService
 import org.http4s.Request
 import org.http4s.Response
 
@@ -503,16 +504,52 @@ class guideEnvironmentGMOS extends ExecutionTestSupportForGmos with GuideEnviron
       )
     }
 
-  test("explicit guide probe change discards the cached guide star"):
+  // The selection is checked against the new probe rather than discarded, so an unusable star is
+  // reported by name instead of AGS quietly picking another.
+  test("explicit guide probe change keeps the selected guide star"):
     val setup: IO[Observation.Id] =
       for {
         p <- createProgramAs(pi)
         t <- createTargetWithProfileAs(pi, p)
         o <- createObservationAs(pi, p, List(t))
         _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
-        // Pins the star and writes c_guide_target_hash with no explicit probe.
         _ <- setGuideTargetName(pi, o, defaultTargetName.some)
         _ <- updateObservation(pi, o, "targetEnvironment: { explicitGuideProbe: PWFS2 }", "observations { id }", json"""{ "updateObservations": { "observations": [ { "id": $o } ] } }""".asRight)
+      } yield o
+    setup.flatMap: oid =>
+      expect(
+        pi,
+        s"""
+          query {
+            observation(observationId: "$oid") {
+              targetEnvironment { guideTargetName }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "observation": {
+              "targetEnvironment": { "guideTargetName": $defaultTargetName }
+            }
+          }
+        """.asRight
+      ) >>
+      expect(
+        pi,
+        guideEnvironmentQuery(oid),
+        expected = List(GuideService.selectedStarUnusableMessage(GuideStarName.unsafeFrom(defaultTargetName))).asLeft
+      )
+
+  test("clearing an unusable selection returns to automatic selection"):
+    val setup: IO[Observation.Id] =
+      for {
+        p <- createProgramAs(pi)
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createObservationAs(pi, p, List(t))
+        _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
+        _ <- setGuideTargetName(pi, o, defaultTargetName.some)
+        _ <- updateObservation(pi, o, "targetEnvironment: { explicitGuideProbe: PWFS2 }", "observations { id }", json"""{ "updateObservations": { "observations": [ { "id": $o } ] } }""".asRight)
+        _ <- setGuideTargetName(pi, o, none)
       } yield o
     setup.flatMap: oid =>
       query(
@@ -521,7 +558,7 @@ class guideEnvironmentGMOS extends ExecutionTestSupportForGmos with GuideEnviron
           query {
             observation(observationId: "$oid") {
               targetEnvironment {
-                guideProbe
+                guideTargetName
                 guideEnvironment {
                   guideTargets { name probe }
                 }
@@ -533,11 +570,7 @@ class guideEnvironmentGMOS extends ExecutionTestSupportForGmos with GuideEnviron
         val env = json.hcursor
           .downField("observation")
           .downField("targetEnvironment")
-        assertEquals(env.downField("guideProbe").as[String].toOption, "PWFS2".some)
+        assertEquals(env.downField("guideTargetName").as[Option[String]].toOption, none[String].some)
         val targets = env.downField("guideEnvironment").downField("guideTargets").as[List[Json]].toOption.get
         assertEquals(targets.map(_.hcursor.downField("probe").as[String].toOption), List("PWFS2".some))
-        assert(
-          !targets.exists(_.hcursor.downField("name").as[String].toOption.contains(defaultTargetName)),
-          "cached guide star was reused after the explicit guide probe changed"
-        )
 }

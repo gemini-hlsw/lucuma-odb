@@ -269,7 +269,7 @@ _Avoid_: copy sequence flag, duplicate sequence, regenerate.
 ### Guide Stars
 
 **Guide Star Override**:
-A guide star a user named for an observation, used in place of the one the automatic search would choose. It holds until the user clears it or an input that decides which stars can guide the observation changes; executing the observation is not such a change.
+A guide star a user named for an observation, used in place of the one the automatic search would choose. It holds until the user clears or replaces it; no edit to the observation and no deploy discards it. If it stops being usable, that is reported rather than silently replaced.
 _Avoid_: manually selected guide star, selected guide star, guide target name, pick, selection.
 
 ### Daytime Calibrations
