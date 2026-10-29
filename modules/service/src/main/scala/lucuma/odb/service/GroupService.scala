@@ -305,13 +305,8 @@ object GroupService {
             Statements.updateGroups(SET, which, accessPredicate).traverse: af =>
               session.prepareR(af.fragment.query(group_id)).use { pq => pq.stream(af.argument, 512).compile.toList }
             .map(moreIds => Result(moreIds.foldLeft(ids)((a, b) => (a ++ b).distinct)))
-            .recoverWith { case SqlState.CheckViolation(ex) =>
-              val msg = ex.constraintName match
-                case Some("group_same_night_check") =>
-                  "Same night and maximum interval are mutually exclusive."
-                case _ =>
-                  "Minimum interval must be less than or equal maximum interval."
-              Result.failure(msg).pure
+            .recoverWith { case SqlState.CheckViolation(ex) if ex.constraintName.exists(Statements.CheckViolationMessages.contains) =>
+              Result.failure(Statements.CheckViolationMessages(ex.constraintName.get)).pure
             }
 
         // Validate against the groups' current contents before touching anything.
@@ -335,7 +330,7 @@ object GroupService {
           def mapChildren(children: List[GroupTree.Child]): List[GroupTree.Child] =
             children.map {
               case l@GroupTree.Leaf(_)                                 => l
-              case b@GroupTree.Branch(_, _, _, _, _, _, _, _, _, _, _) => mapBranch(b)
+              case b: GroupTree.Branch => mapBranch(b)
             }
 
           def mapBranch(p: GroupTree.Branch): GroupTree.Branch =
@@ -400,7 +395,9 @@ object GroupService {
         c_existence,
         c_system,
         c_calibration_roles,
-        c_same_night
+        c_same_night,
+        c_min_obs_per_night,
+        c_max_obs_per_night
       ) values (
         $program_id,
         ${group_id.opt},
@@ -414,7 +411,9 @@ object GroupService {
         $existence,
         $bool,
         ${_calibration_role},
-        $bool
+        $bool,
+        ${int2_pos.opt},
+        ${int2_pos.opt}
       ) returning c_group_id
       """.query(group_id)
          .contramap[Program.Id ~ GroupPropertiesInput.Create ~ NonNegShort ~ Boolean ~ List[CalibrationRole]] { case ((((pid, c), index), system), calibrationRoles) => (
@@ -430,7 +429,9 @@ object GroupService {
           c.existence,
           system,
           calibrationRoles,
-          c.sameNight
+          c.sameNight,
+          c.minimumObservationsPerNight,
+          c.maximumObservationsPerNight
         )}
 
     val OpenHole: Query[(Program.Id, Option[Group.Id], Option[NonNegShort]), NonNegShort] =
@@ -447,6 +448,8 @@ object GroupService {
           SET.minimumInterval.toOptionOption.map(sql"c_min_interval = ${time_span.opt}"),
           SET.maximumInterval.toOptionOption.map(sql"c_max_interval = ${time_span.opt}"),
           SET.sameNight.map(sql"c_same_night = $bool"),
+          SET.minimumObservationsPerNight.toOptionOption.map(sql"c_min_obs_per_night = ${int2_pos.opt}"),
+          SET.maximumObservationsPerNight.toOptionOption.map(sql"c_max_obs_per_night = ${int2_pos.opt}"),
           SET.existence.map(sql"c_existence = $existence"),
         ).flatten
 
@@ -474,6 +477,15 @@ object GroupService {
         WHERE c_group_id IN (
       """ |+| which |+| void")" |+| accessPredicate
 
+    /** Messages for the row checks on t_group that an edit can violate. */
+    val CheckViolationMessages: Map[String, String] =
+      Map(
+        "t_group_check"                        -> "Minimum interval must be less than or equal maximum interval.",
+        "group_same_night_check"               -> "Same night and maximum interval are mutually exclusive.",
+        "group_obs_per_night_order_check"      -> GroupPropertiesInput.ObservationsPerNightOutOfOrder,
+        "group_obs_per_night_same_night_check" -> GroupPropertiesInput.ObservationsPerNightSameNight
+      )
+
     def selectProgramsOf(which: AppliedFragment): AppliedFragment =
       void"""
         SELECT DISTINCT c_program_id
@@ -489,9 +501,9 @@ object GroupService {
       """.apply(gid, index) |+| which |+| access |+| void")"
 
     val branch: Decoder[GroupTree.Branch] =
-      (group_id *: text_nonempty.opt *: text_nonempty.opt *: int2_nonneg.opt *: bool *:  time_span.opt *: time_span.opt *: bool *: _calibration_role *: bool).map {
-        case (gid, name, description, minRequired, ordered, minInterval, maxInterval, system, calibrationRoles, sameNight) =>
-          GroupTree.Branch(gid, minRequired, ordered, Nil, name, description, minInterval, maxInterval, system, calibrationRoles, sameNight)
+      (group_id *: text_nonempty.opt *: text_nonempty.opt *: int2_nonneg.opt *: bool *:  time_span.opt *: time_span.opt *: bool *: _calibration_role *: bool *: int2_pos.opt *: int2_pos.opt).map {
+        case (gid, name, description, minRequired, ordered, minInterval, maxInterval, system, calibrationRoles, sameNight, minObsPerNight, maxObsPerNight) =>
+          GroupTree.Branch(gid, minRequired, ordered, Nil, name, description, minInterval, maxInterval, system, calibrationRoles, sameNight, minObsPerNight, maxObsPerNight)
       }
 
     def SelectGroups(pid: Program.Id, filter: AppliedFragment): AppliedFragment =
@@ -508,7 +520,9 @@ object GroupService {
           c_max_interval,
           c_system,
           c_calibration_roles,
-          c_same_night
+          c_same_night,
+          c_min_obs_per_night,
+          c_max_obs_per_night
         FROM
           t_group
         WHERE
@@ -609,7 +623,9 @@ object GroupService {
           c_existence,
           c_system,
           c_calibration_roles,
-          c_same_night
+          c_same_night,
+          c_min_obs_per_night,
+          c_max_obs_per_night
         FROM
           t_group
         WHERE
@@ -627,9 +643,11 @@ object GroupService {
           existence ~
           bool ~
           _calibration_role ~
-          bool
+          bool ~
+          int2_pos.opt ~
+          int2_pos.opt
         ).map:
-          case pid ~ gid ~ gix ~ nam ~ des ~ mre ~ ord ~ min ~ max ~ exi ~ sys ~ roles ~ sn =>
+          case pid ~ gid ~ gix ~ nam ~ des ~ mre ~ ord ~ min ~ max ~ exi ~ sys ~ roles ~ sn ~ minN ~ maxN =>
             (CreateGroupInput(
               programId = Some(pid),
               proposalReference = None,
@@ -642,6 +660,8 @@ object GroupService {
                 minimumInterval = min,
                 maximumInterval = max,
                 sameNight = sn,
+                minimumObservationsPerNight = minN,
+                maximumObservationsPerNight = maxN,
                 parentGroupId = gid,
                 parentGroupIndex = Some(gix),
                 existence = exi,

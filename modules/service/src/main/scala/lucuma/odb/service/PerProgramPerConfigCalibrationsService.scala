@@ -110,6 +110,8 @@ object PerProgramPerConfigCalibrationsService:
                               minimumInterval = none,
                               maximumInterval = none,
                               sameNight = false,
+                              minimumObservationsPerNight = none,
+                              maximumObservationsPerNight = none,
                               parentGroupId = none,
                               parentGroupIndex = none,
                               existence = Existence.Present

@@ -9,6 +9,7 @@ import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.numeric.PosBigDecimal
 import eu.timepit.refined.types.numeric.PosInt
+import eu.timepit.refined.types.numeric.PosShort
 import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Encoder
 import io.circe.Json
@@ -217,6 +218,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F]:
       LeafMapping[PosAngleConstraintMode](PosAngleConstraintModeType),
       LeafMapping[PosBigDecimal](PosBigDecimalType),
       LeafMapping[PosInt](PosIntType),
+      LeafMapping[PosShort](PosShortType),
       LeafMapping[Program.Id](ProgramIdType),
       LeafMapping[ProgramNote.Id](ProgramNoteIdType),
       LeafMapping[ProgramStatus](ProgramStatusType),
