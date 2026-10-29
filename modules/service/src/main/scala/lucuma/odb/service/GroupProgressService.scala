@@ -83,6 +83,12 @@ object GroupProgressService:
         // Where it was observed, if it has been; otherwise its instrument's site.
         oid -> ObservationFacts(state, inactive, start, completion, visitSite.orElse(inst.map(_.site)))
 
+    // A visitor instrument visit has only slews, and time accounting charges
+    // it until the next visit at the site starts or the night ends (see
+    // TimeAccountingService.VisitInfo.visitorEnd).  So for a visitor
+    // observation, execution starts with the first slew and finishes where the
+    // charge ends, once time accounting has recorded it (until then, at the
+    // slew).  Only visitor visits record a charge end.
     val SelectFacts: Query[List[Observation.Id], (Observation.Id, ObservationFacts)] =
       sql"""
         SELECT
@@ -91,8 +97,23 @@ object GroupProgressService:
           o.c_calibration_role,
           o.c_workflow_user_state,
           s.c_workflow_user_state,
-          t.c_start_time,
-          t.c_completion_time,
+          COALESCE(
+            t.c_start_time,
+            (
+              SELECT MIN(v.c_start)
+              FROM   t_visit v
+              JOIN   t_instrument i ON i.c_tag = v.c_instrument
+              WHERE  v.c_observation_id = o.c_observation_id
+                AND  i.c_is_visitor
+            )
+          ),
+          CASE WHEN t.c_completion_time IS NOT NULL THEN
+            (
+              SELECT MAX(GREATEST(v.c_end, v.c_ta_visitor_end))
+              FROM   t_visit v
+              WHERE  v.c_observation_id = o.c_observation_id
+            )
+          END,
           (
             SELECT v.c_site
             FROM   t_visit v

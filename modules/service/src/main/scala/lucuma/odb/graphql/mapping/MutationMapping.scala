@@ -374,6 +374,9 @@ trait MutationMapping[F[_]] extends AccessControl[F] with UserEnv {
                   Predicates.cloneGroupResult.newGroup.id.eql(id),
                   child
                 )
+      .recover:
+        case SqlState.RaiseException(ex) =>
+          OdbError.InconsistentGroupError(Some(ex.message)).asFailure
 
   private lazy val CloneObservation: MutationField =
     MutationField("cloneObservation", CloneObservationInput.Binding): (input, child) =>

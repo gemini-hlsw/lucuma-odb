@@ -15893,6 +15893,24 @@ type Group {
   """
   sameNight: Boolean!
 
+  """
+  On any night when at least one of this group's observations completes, at
+  least this many must complete that night.  Nights on which none complete are
+  unconstrained.  Null means no minimum.  Every completion counts, including an
+  OR group's extras, through the night the group completes; later ones don't.
+  A per-observation calibration group (a science observation with its
+  calibrations) counts as one observation.  Mutually exclusive with
+  `sameNight`.
+  """
+  minimumObservationsPerNight: PosShort
+
+  """
+  No more than this many of this group's observations may complete on any one
+  night.  Null means no maximum.  Counted as for `minimumObservationsPerNight`.
+  Mutually exclusive with `sameNight`.
+  """
+  maximumObservationsPerNight: PosShort
+
   "Contained elements"
   elements(includeDeleted: Boolean! = false): [GroupElement!]!
 
@@ -15943,8 +15961,9 @@ observe, has started, is complete, or can no longer be completed.
 """
 enum GroupStatus {
   """
-  The group has nothing to observe: no elements, or only inactive observations
-  and empty subgroups.  Its parent group leaves it out.
+  The group has nothing to observe: no elements, or only inactive observations,
+  observations declared complete without ever having been observed, and empty
+  subgroups.  Its parent group leaves it out.
   """
   EMPTY
 
@@ -15995,6 +16014,21 @@ enum GroupConstraintViolation {
   "A same-night group has observations at more than one site."
   SAME_NIGHT_MULTIPLE_SITES
 
+  """
+  A night on which at least one of the group's observations completed ended
+  with fewer than the group's minimum observations per night.
+  """
+  OBSERVATIONS_PER_NIGHT_MINIMUM
+
+  "More than the group's maximum observations per night completed on one night."
+  OBSERVATIONS_PER_NIGHT_MAXIMUM
+
+  """
+  A group with observations-per-night limits has observations at more than one
+  site, so its nights are ambiguous.
+  """
+  OBSERVATIONS_PER_NIGHT_MULTIPLE_SITES
+
   "Too few viable (non-inactive) elements remain to reach the minimum."
   INSUFFICIENT_ELEMENTS
 
@@ -16009,12 +16043,18 @@ period and each observation's timing windows also apply, and are left to the
 scheduler to combine with it.
 """
 type GroupWindow {
-  "The earliest time the next element may start, per the minimum interval."
+  """
+  The earliest time the next element may start, per the minimum interval, or
+  the end of the night in progress once it holds the group's maximum
+  observations per night.
+  """
   start: Timestamp!
 
   """
-  The latest time the next element may finish, per the maximum interval or the
-  end of the night for a same-night group.  Null if there is no such limit.
+  The latest time the next element may finish, per the maximum interval, the
+  end of the night for a same-night group, or the end of the night in progress
+  while it is short of the group's minimum observations per night.  Null if
+  there is no such limit.
   Fitting an observation into the window (say, by its time estimate) is left to
   the scheduler.
   """
@@ -16030,7 +16070,8 @@ type GroupProgress {
   counting as one element.  An ordered group's elements after the first
   `required` don't count, nor do an unordered group's completions after it is
   complete.  Always zero while empty or pending, and fewer than `required` while
-  ongoing.
+  ongoing, except in a group with a minimum observations per night whose night
+  in progress is short of it and may still take an extra observation.
   """
   completed: NonNegInt!
 
@@ -16100,6 +16141,22 @@ input GroupPropertiesInput {
   Only valid for AND groups.
   """
   sameNight: Boolean
+
+  """
+  On any night when at least one of the group's observations completes, at
+  least this many must complete that night.  Null means no minimum.  A group
+  with either per-night limit may contain only observations (and the
+  per-observation calibration groups the ODB creates).  Mutually exclusive with
+  `sameNight`.
+  """
+  minimumObservationsPerNight: PosShort
+
+  """
+  No more than this many of the group's observations may complete on any one
+  night.  Null means no maximum.  May not be less than
+  `minimumObservationsPerNight`.  Mutually exclusive with `sameNight`.
+  """
+  maximumObservationsPerNight: PosShort
 
   "Parent group (optional). If specified then parent index must also be specified."
   parentGroup: GroupId

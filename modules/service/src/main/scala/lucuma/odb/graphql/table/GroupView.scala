@@ -25,6 +25,8 @@ trait GroupView[F[_]] extends BaseMapping[F]:
     val MinIntervalId = col("c_min_interval_id", group_id.embedded)
     val MaxIntervalId = col("c_max_interval_id", group_id.embedded)
     val SameNight     = col("c_same_night", bool)
+    val MinObsPerNight   = col("c_min_obs_per_night", int2_pos.opt)
+    val MaxObsPerNight   = col("c_max_obs_per_night", int2_pos.opt)
     val Existence        = col("c_existence", existence)
     val System           = col("c_system", bool)
     val CalibrationRoles = col("c_calibration_roles", _calibration_role)

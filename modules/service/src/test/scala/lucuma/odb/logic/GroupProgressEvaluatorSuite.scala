@@ -7,6 +7,7 @@ import cats.data.NonEmptySet
 import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.numeric.PosInt
+import eu.timepit.refined.types.numeric.PosShort
 import lucuma.core.enums.ExecutionState
 import lucuma.core.enums.GroupConstraintViolation
 import lucuma.core.enums.GroupConstraintViolation.*
@@ -68,7 +69,9 @@ class GroupProgressEvaluatorSuite extends FunSuite:
     ordered:   Boolean          = false,
     minI:      Option[TimeSpan] = None,
     maxI:      Option[TimeSpan] = None,
-    sameNight: Boolean          = false
+    sameNight: Boolean          = false,
+    minN:      Option[Int]      = None,
+    maxN:      Option[Int]      = None
   ): Node =
     Node(
       GroupTree.Branch(
@@ -82,7 +85,9 @@ class GroupProgressEvaluatorSuite extends FunSuite:
         maxInterval      = maxI,
         system           = false,
         calibrationRoles = Nil,
-        sameNight        = sameNight
+        sameNight        = sameNight,
+        minObsPerNight   = minN.map(m => PosShort.unsafeFrom(m.toShort)),
+        maxObsPerNight   = maxN.map(m => PosShort.unsafeFrom(m.toShort))
       ),
       children.flatMap(_.facts).toMap
     )
@@ -149,8 +154,18 @@ class GroupProgressEvaluatorSuite extends FunSuite:
 
   test("declared complete counts as complete"):
     assertEquals(
-      eval(branch(1, List(leaf(1, ExecutionState.DeclaredComplete)))).status,
+      eval(branch(1, List(leaf(1, ExecutionState.DeclaredComplete, Some(t0))))).status,
       GroupStatus.Complete
+    )
+
+  test("declared complete without ever having been observed is left out"):
+    assertEquals(
+      eval(branch(1, List(done(1, t0), leaf(2, ExecutionState.DeclaredComplete)))),
+      complete(1, 1)
+    )
+    assertEquals(
+      eval(branch(1, List(leaf(1, ExecutionState.DeclaredComplete)))),
+      GroupProgress.Empty
     )
 
   test("inactive observations don't count toward 'all required'"):
@@ -332,9 +347,9 @@ class GroupProgressEvaluatorSuite extends FunSuite:
     val g = branch(1, List(done(1, t0), done(2, t0 +| hours(48)), leaf(3)), minI = Some(TimeSpan.Zero), maxI = Some(TimeSpan.Zero))
     assertEquals(eval(g, now = t0 +| hours(100)), ongoing(2, 3))
 
-  test("declared complete without a time is counted but not interval-checked"):
+  test("declared complete without a time is neither counted nor interval-checked"):
     val g = branch(1, List(done(1, t0), leaf(2, ExecutionState.DeclaredComplete)), maxI = Some(hours(1)))
-    assertEquals(eval(g, now = t0 +| hours(5)), complete(2, 2))
+    assertEquals(eval(g, now = t0 +| hours(5)), complete(1, 1))
 
   test("declared complete with a time is checked like any other completion"):
     val declared = leaf(2, ExecutionState.DeclaredComplete, Some(t0 +| hours(2)), start = Some(t0 +| hours(2)))
@@ -343,17 +358,18 @@ class GroupProgressEvaluatorSuite extends FunSuite:
       unschedulable(2, 2, MaximumInterval)
     )
 
-  test("a subgroup's completion counts an untimed completion but takes no time from it"):
+  test("a subgroup's minimum isn't met by an untimed completion"):
     // Observation 2 is declared complete without ever executing, so the
-    // subgroup's minimum of two was met by observation 3, not observation 4.
+    // subgroup's minimum of two is met only by observation 4, too late.
     val sub    = branch(2, List(leaf(2, ExecutionState.DeclaredComplete), done(3, t0 +| minutes(30)), done(4, t0 +| hours(5))), min = Some(2))
     val parent = branch(1, List(done(1, t0), sub), maxI = Some(hours(1)))
-    assertEquals(eval(parent, now = t0 +| hours(6)), complete(2, 2))
+    assertEquals(eval(parent, now = t0 +| hours(6)), unschedulable(2, 2, MaximumInterval))
 
-  test("a subgroup completed only by untimed completions has no completion time"):
+  test("a subgroup of only untimed completions is left out"):
     val sub    = branch(2, List(leaf(2, ExecutionState.DeclaredComplete), leaf(3, ExecutionState.DeclaredComplete)))
     val parent = branch(1, List(done(1, t0), sub), maxI = Some(hours(1)))
-    assertEquals(eval(parent, now = t0 +| hours(6)), complete(2, 2))
+    assertEquals(evalAll(parent, now = t0 +| hours(6))(gid(2)), GroupProgress.Empty)
+    assertEquals(eval(parent, now = t0 +| hours(6)), complete(1, 1))
 
   // Same night
 
@@ -376,9 +392,9 @@ class GroupProgressEvaluatorSuite extends FunSuite:
       unschedulable(1, 2, SameNight)
     )
 
-  test("same night: a completion without data isn't named"):
+  test("same night: a completion without a time is left out"):
     val g = branch(1, List(done(1, t0), done(2, ts("2026-10-17T05:00:00Z")), leaf(3, ExecutionState.DeclaredComplete)), sameNight = true)
-    assertEquals(eval(g), unschedulable(3, 3, SameNight))
+    assertEquals(eval(g), unschedulable(2, 2, SameNight))
 
   test("same night: observations at more than one site"):
     val g = branch(1, List(done(1, t0, Site.GN), done(2, t0 +| hours(1), Site.GS)), sameNight = true)
@@ -434,6 +450,110 @@ class GroupProgressEvaluatorSuite extends FunSuite:
   test("same night: a complete group isn't sunk by the minimum interval"):
     val g = branch(1, List(done(1, t0), leaf(2)), min = Some(1), minI = Some(hours(20)), sameNight = true)
     assertEquals(eval(g, now = t0 +| hours(1)), complete(1, 1))
+
+  // Observations per night
+
+  // The GN night of 15-16 October ends at 00:00 UT on the 17th, and t1 falls in
+  // the next one.
+  val night0End: Timestamp = ts("2026-10-17T00:00:00Z")
+  val t1: Timestamp        = ts("2026-10-17T05:00:00Z")
+
+  test("per night: enough on one night"):
+    val g = branch(1, List(done(1, t0), done(2, t0 +| hours(1))), minN = Some(2))
+    assertEquals(eval(g), complete(2, 2))
+
+  test("per night: a night in progress short of the minimum ends the window with the night"):
+    val g = branch(1, List(done(1, t0), leaf(2), leaf(3)), minN = Some(2))
+    assertEquals(
+      eval(g, now = t0 +| hours(1)),
+      ongoing(1, 3, nextWindow = Some(TimestampInterval.between(t0, night0End)))
+    )
+
+  test("per night: a night that ended short of the minimum"):
+    val g = branch(1, List(done(1, t0), done(2, t1), done(3, t1 +| hours(1)), leaf(4)), minN = Some(2))
+    assertEquals(eval(g, now = t1 +| hours(2)), unschedulable(3, 4, ObservationsPerNightMinimum))
+
+  test("per night: a night short of the minimum once the minimum interval passes its end"):
+    val g = branch(1, List(done(1, t0), leaf(2), leaf(3)), minI = Some(hours(20)), minN = Some(2))
+    assertEquals(eval(g, now = t0 +| hours(1)), unschedulable(1, 3, ObservationsPerNightMinimum))
+
+  test("per night: a group with enough completions stays ongoing while its night may take an extra"):
+    val g = branch(1, List(done(1, t0), done(2, t0 +| hours(1)), leaf(3)), min = Some(2), minN = Some(3), maxN = Some(3))
+    assertEquals(
+      eval(g, now = t0 +| hours(2)),
+      ongoing(2, 2, nextWindow = Some(TimestampInterval.between(t0 +| hours(1), night0End)))
+    )
+
+  test("per night: a short night in progress is settled when no extras remain"):
+    val g = branch(1, List(done(1, t0), done(2, t0 +| hours(1))), minN = Some(3))
+    assertEquals(eval(g, now = t0 +| hours(2)), unschedulable(2, 2, ObservationsPerNightMinimum))
+
+  test("per night: more than the maximum on one night"):
+    val g = branch(1, List(done(1, t0), done(2, t0 +| hours(1)), leaf(3)), maxN = Some(1))
+    assertEquals(eval(g, now = t0 +| hours(2)), unschedulable(2, 3, ObservationsPerNightMaximum))
+
+  test("per night: a night at the maximum starts the window with the next night"):
+    val g = branch(1, List(done(1, t0), leaf(2)), maxN = Some(1))
+    assertEquals(
+      eval(g, now = t0 +| hours(1)),
+      ongoing(1, 2, nextWindow = Some(TimestampInterval.between(night0End, Timestamp.Max)))
+    )
+
+  test("per night: whether the nights to come can satisfy the limits isn't predicted"):
+    // Neither 5 observations at exactly 2 per night, nor 1 at 2 per night, can
+    // ever complete, but nothing is flagged until a night comes up short.
+    assertEquals(eval(branch(1, List.tabulate(5)(i => leaf(i + 1)), minN = Some(2), maxN = Some(2))), pending(5))
+    assertEquals(eval(branch(1, List(leaf(1)), minN = Some(2))), pending(1))
+
+  test("per night: an OR group's extras pad out its last night"):
+    // 3 of 5 with 2 per night: 2 on the first night, then 2 more, one extra.
+    val g = branch(1, List(done(1, t0), done(2, t0 +| hours(1)), leaf(3), leaf(4), leaf(5)), min = Some(3), minN = Some(2))
+    assertEquals(eval(g, now = t1).violationList, Nil)
+
+  test("per night: an OR group completing on a short night must take an extra"):
+    val night1End = ts("2026-10-18T00:00:00Z")
+    val g = branch(1, List(done(1, t0), done(2, t0 +| hours(1)), done(3, t1), leaf(4), leaf(5)), min = Some(3), minN = Some(2))
+    assertEquals(
+      eval(g, now = t1 +| hours(1)),
+      ongoing(3, 3, nextWindow = Some(TimestampInterval.between(t1, night1End)))
+    )
+
+  test("per night: an extra on the night an OR group completes counts toward the minimum"):
+    val g = branch(1, List(done(1, t0), done(2, t0 +| hours(1)), done(3, t1), done(4, t1 +| hours(1)), leaf(5)), min = Some(3), minN = Some(2))
+    assertEquals(eval(g, now = t1 +| hours(2)), complete(3, 3))
+
+  test("per night: an extra on the night an OR group completes counts toward the maximum"):
+    val g = branch(1, List(done(1, t0), done(2, t0 +| hours(1)), done(3, t0 +| hours(2))), min = Some(2), maxN = Some(2))
+    assertEquals(eval(g, now = t0 +| hours(3)), unschedulable(2, 2, ObservationsPerNightMaximum))
+
+  test("per night: extras after the night an OR group completes are ignored"):
+    val g = branch(1, List(done(1, t0), done(2, t0 +| hours(1)), done(3, t1)), min = Some(2), minN = Some(2))
+    assertEquals(eval(g, now = t1 +| hours(1)), complete(2, 2))
+
+  test("per night: an OR group without extras to pad out its last night ends short"):
+    // 3 of 4 with 2 per night, one inactive: after 2, one is required and only
+    // one remains, so its night can't reach the minimum.
+    val g = branch(1, List(done(1, t0), done(2, t0 +| hours(1)), leaf(3), leaf(4, inactive = true)), min = Some(3), minN = Some(2))
+    assertEquals(eval(g, now = t1), ongoing(2, 3, nextWindow = Some(TimestampInterval.between(t0 +| hours(1), Timestamp.Max))))
+    val h = branch(1, List(done(1, t0), done(2, t0 +| hours(1)), done(3, t1), leaf(4, inactive = true)), min = Some(3), minN = Some(2))
+    assertEquals(eval(h, now = t1 +| hours(1)), unschedulable(3, 3, ObservationsPerNightMinimum))
+
+  test("per night: a legal night that leaves a remainder no night can take"):
+    // 9 divides as 4 + 5, but after 6 on the first night 3 remain, and their
+    // night is short as soon as the last of them completes.
+    val first = List.tabulate(6)(i => done(i + 1, t0 +| minutes(i * 10)))
+    val rest  = List.tabulate(3)(i => done(i + 7, t1 +| minutes(i * 10)))
+    val g     = branch(1, first ++ rest, minN = Some(4), maxN = Some(6))
+    assertEquals(eval(g, now = t1 +| hours(1)), unschedulable(9, 9, ObservationsPerNightMinimum))
+
+  test("per night: observations at more than one site"):
+    val g = branch(1, List(leaf(1, site = Site.GN), leaf(2, site = Site.GS)), minN = Some(2))
+    assertEquals(eval(g), unschedulable(0, 2, ObservationsPerNightMultipleSites))
+
+  test("per night: a calibration subgroup counts as one, on the night it completes"):
+    val sub = branch(2, List(done(2, t0), done(3, t0 +| hours(1))))
+    val g   = branch(1, List(done(1, t0 +| hours(2)), sub), minN = Some(2), maxN = Some(2))
+    assertEquals(eval(g, now = t0 +| hours(3)), complete(2, 2))
 
   // Subgroups
 

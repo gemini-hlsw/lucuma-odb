@@ -29,8 +29,9 @@ import lucuma.odb.data.GroupTree
  * The rules:
  *
  *   - An inactive observation that isn't complete is left out of its group
- *     entirely, as is a subgroup left with no elements.  A group with no
- *     elements is empty.
+ *     entirely, as is a complete one with no completion time (declared
+ *     complete without ever having been observed) and a subgroup left with no
+ *     elements.  A group with no elements is empty.
  *   - A group requires `minRequired` elements, or all of them when unset.
  *     An ordered group requires the first ones, in order.  A subgroup counts
  *     as one element, complete when its own status is complete.
@@ -38,8 +39,8 @@ import lucuma.odb.data.GroupTree
  *     group's elements after the first `minRequired` never count.  An
  *     unordered group counts all of its elements until enough are complete,
  *     and from then on only the completions that met its minimum (in
- *     completion order, a completion with no known time first): anything
- *     observed afterwards is extra, and can't make the group unschedulable.
+ *     completion order): anything observed afterwards is extra, and can't
+ *     make the group unschedulable.
  *     A complete subgroup is summarized for its parent (its start, nights and
  *     sites) from the elements that counted.
  *   - Zero intervals are treated as unset.  The intervals are checked between
@@ -47,23 +48,36 @@ import lucuma.odb.data.GroupTree
  *     earlier than the minimum interval after the earlier one completes, and
  *     complete no later than the maximum interval after it.  An element still
  *     executing is checked against the last completion as soon as it starts.
- *     Completions with no known time are counted but not checked.
  *   - A same-night group must have all of its observations at one site, and
  *     its completions must fall on the same observing night there.
+ *   - A group with observations-per-night limits must likewise have all of
+ *     its observations at one site.  Every completion of its elements falls
+ *     on the observing night of its completion time there (a subgroup, which
+ *     is only ever a per-observation calibration group, completing with the
+ *     last of its own), extras included, through the night the group
+ *     completes.  Later ones are ignored.  A night with any completions must
+ *     end with at least the minimum, and none may hold more than the maximum.
+ *     Whether the nights to come can satisfy the limits isn't predicted: a
+ *     group that can't finish is unschedulable once a night comes up short.
+ *     A group with enough completions stays ongoing while the night in
+ *     progress (that of the last completion, until it ends) is short of the
+ *     minimum and may still take an extra.
  *   - Any violation makes the group unschedulable, including a deadline that
  *     `now` has passed: the maximum interval since the last completion, or the
  *     end of the completions' night with elements still to observe.  A night
  *     that ends before the minimum interval has passed is missed already.
+ *     A night in progress short of the minimum is settled once the group has
+ *     enough completions and too few elements remain to make up the night.
  */
 object GroupProgressEvaluator:
 
   /**
    * What the evaluator needs to know about an observation.  `inactive` is
    * true when a user has set it inactive (or declined it, for a telluric).
-   * `startTime` is the time of its first execution event other than a slew,
-   * once it has started.  `completionTime` is the time of its last execution
-   * event once it is complete, if known.  `site` is where it was or would be
-   * observed, if known.
+   * `startTime` is when it started executing, once it has started.
+   * `completionTime` is when it finished, once it is complete, and is unknown
+   * only for an observation declared complete without ever having been
+   * observed.  `site` is where it was or would be observed, if known.
    */
   final case class ObservationFacts(
     executionState: ExecutionState,
@@ -90,18 +104,21 @@ object GroupProgressEvaluator:
 
   // A group element as its parent sees it: an observation, or a subgroup
   // summarized.  `excluded` elements are left out of the group entirely.
-  // `nights` are the nights of the completions it counts, and `sites` the
-  // sites of the observations it holds.
+  // `completion` is when it completed, once it has.  `nights` are the nights
+  // of the completions it counts, and `sites` the sites of the observations
+  // it holds.
   private final case class Element(
-    excluded:       Boolean,
-    complete:       Boolean,
-    unschedulable:  Boolean,
-    started:        Boolean,
-    startTime:      Option[Timestamp],
-    completionTime: Option[Timestamp],
-    nights:         Set[LocalObservingNight],
-    sites:          Set[Site]
+    excluded:      Boolean,
+    completion:    Option[Timestamp],
+    unschedulable: Boolean,
+    started:       Boolean,
+    startTime:     Option[Timestamp],
+    nights:        Set[LocalObservingNight],
+    sites:         Set[Site]
   ):
+    def complete: Boolean =
+      completion.isDefined
+
     def isRemaining: Boolean =
       !complete && !unschedulable
 
@@ -113,18 +130,18 @@ object GroupProgressEvaluator:
     val started  = leaf.executionState match
       case NotDefined | NotStarted => false
       case _                       => true
-    val excluded = leaf.inactive && !complete
     val time     = Option.when(complete)(leaf.completionTime).flatten
+    // Left out when inactive and incomplete, or complete with no known time.
+    val excluded = if complete then time.isEmpty else leaf.inactive
 
     Element(
-      excluded       = excluded,
-      complete       = complete,
-      unschedulable  = false,
-      started        = started,
-      startTime      = Option.when(started)(leaf.startTime).flatten,
-      completionTime = time,
-      nights         = (for t <- time; s <- leaf.site yield night(s, t)).toSet,
-      sites          = if excluded then Set.empty else leaf.site.toSet
+      excluded      = excluded,
+      completion    = time,
+      unschedulable = false,
+      started       = started,
+      startTime     = Option.when(started)(leaf.startTime).flatten,
+      nights        = (for t <- time; s <- leaf.site yield night(s, t)).toSet,
+      sites         = if excluded then Set.empty else leaf.site.toSet
     )
 
   private def night(site: Site, time: Timestamp): LocalObservingNight =
@@ -158,14 +175,13 @@ object GroupProgressEvaluator:
   // An empty group, which its parent leaves out.
   private val EmptyElement: Element =
     Element(
-      excluded       = true,
-      complete       = false,
-      unschedulable  = false,
-      started        = false,
-      startTime      = None,
-      completionTime = None,
-      nights         = Set.empty,
-      sites          = Set.empty
+      excluded      = true,
+      completion    = None,
+      unschedulable = false,
+      started       = false,
+      startTime     = None,
+      nights        = Set.empty,
+      sites         = Set.empty
     )
 
   private def evaluateElements(
@@ -184,28 +200,27 @@ object GroupProgressEvaluator:
     // The elements that count toward the group, which everything below
     // considers.  An ordered group requires its first `required` elements, so
     // later ones never count.  An unordered group counts all of them until
-    // enough are complete, and then only the completions that met the
-    // minimum: those without a known time (which count but give no time),
-    // then the earliest timed ones.
+    // enough are complete, and then only the earliest completions that met
+    // the minimum.
     val elements: List[Element] =
       if branch.ordered then viable.toList.take(required.value)
       else
-        val (untimed, timedDone) = viable.filter(_.complete).partition(_.completionTime.isEmpty)
-        if untimed.size + timedDone.size < required.value then viable.toList
-        else untimed ++ timedDone.sortBy(_.completionTime).take(required.value - untimed.size)
+        val done = viable.filter(_.complete)
+        if done.size < required.value then viable.toList
+        else done.sortBy(_.completion).take(required.value)
 
-    val completed = elements.filter(_.complete)
-    val remaining = elements.filter(_.isRemaining)
+    // The completions, in order.
+    val completions: List[(Timestamp, Element)] =
+      elements.mapFilter(e => e.completion.tupleRight(e)).sortBy(_._1)
 
-    // Completion times, in order.
-    val timed: List[Timestamp] =
-      completed.flatMap(_.completionTime).sorted
+    val completed: List[Element]  = completions.map(_._2)
+    val timed: List[Timestamp]    = completions.map(_._1)
+    val remaining: List[Element]  = elements.filter(_.isRemaining)
 
-    // Each completion but the first, in completion order, with the time of
-    // the completion before it.
+    // Each completion but the first, with the time of the completion before
+    // it.
     val consecutive: List[(Timestamp, Element)] =
-      val byCompletion = completed.mapFilter(e => e.completionTime.tupleRight(e)).sortBy(_._1)
-      byCompletion.zip(byCompletion.drop(1)).map { case ((t0, _), (_, e1)) => (t0, e1) }
+      completions.zip(completions.drop(1)).map { case ((t0, _), (_, e1)) => (t0, e1) }
 
     val nights: Set[LocalObservingNight] =
       completed.flatMap(_.nights).toSet
@@ -224,6 +239,63 @@ object GroupProgressEvaluator:
 
     val completedCount: NonNegInt = NonNegInt.unsafeFrom(completed.size)
 
+    // Whether enough of the elements that count are complete (for an ordered
+    // group, those are its first `required`, so all of them).
+    val countMet: Boolean =
+      completed.size >= required.value
+
+    // Observations per night.  The limits apply only at a single site, where
+    // each completion falls on one night.  Every completion of the group's
+    // elements counts toward its night, extras included, until the group
+    // completes, and then those on the night it completes.  The night in
+    // progress, if any, is that of the last of these, until it ends.
+    val perNight: Boolean =
+      branch.minObsPerNight.isDefined || branch.maxObsPerNight.isDefined
+
+    val minPerNight: Int         = branch.minObsPerNight.fold(1)(_.value.toInt)
+    val maxPerNight: Option[Int] = branch.maxObsPerNight.map(_.value.toInt)
+
+    // The elements still to observe, extras included.
+    val available: Int =
+      viable.toList.count(_.isRemaining)
+
+    val perNightCompletions: List[(Timestamp, Element)] =
+      val all = viable.toList.mapFilter(e => e.completion.tupleRight(e))
+      if !countMet then all
+      else
+        (for
+          s <- Option.when(sites.size == 1)(sites.head)
+          t <- timed.lastOption
+          e  = nightEnd(night(s, t), s)
+        yield all.filter(_._1 < e)).getOrElse(completions)
+
+    val perNightSites: Set[Site] =
+      if countMet then sites ++ perNightCompletions.flatMap(_._2.sites)
+      else viable.toList.flatMap(_.sites).toSet
+
+    val perNightSite: Option[Site] =
+      Option.when(perNight && perNightSites.size == 1)(perNightSites.head)
+
+    val countsByNight: Map[LocalObservingNight, Int] =
+      perNightSite.fold(Map.empty): s =>
+        perNightCompletions.groupMapReduce((t, _) => night(s, t))(_ => 1)(_ + _)
+
+    val openNight: Option[(LocalObservingNight, Timestamp)] =
+      for
+        s <- perNightSite
+        t <- perNightCompletions.map(_._1).maxOption
+        n  = night(s, t)
+        e  = nightEnd(n, s)
+        if now < e
+      yield (n, e)
+
+    val openCount: Int =
+      openNight.fold(0)((n, _) => countsByNight.getOrElse(n, 0))
+
+    // The night in progress is short of the minimum, and so must take more.
+    val openNightShort: Boolean =
+      openNight.isDefined && openCount < minPerNight
+
     // Whether `later` started before the minimum interval had passed since a
     // completion at `t`.
     def startedTooSoon(t: Timestamp, later: Element): Boolean =
@@ -236,11 +308,8 @@ object GroupProgressEvaluator:
     // still incomplete or it completed later.
     def outOfOrder: Boolean =
       elements.zipWithIndex.exists: (later, j) =>
-        later.complete && elements.take(j).exists: earlier =>
-          !earlier.complete || (for
-            te <- earlier.completionTime
-            tl <- later.completionTime
-          yield te > tl).getOrElse(false)
+        later.completion.exists: tl =>
+          elements.take(j).exists(_.completion.forall(_ > tl))
 
     // The earliest the next element may start, per the minimum interval.
     val nextStart: Option[Timestamp] =
@@ -254,19 +323,33 @@ object GroupProgressEvaluator:
     // ends swapped, but then the group is unschedulable anyway: the minimum
     // interval never exceeds the maximum, and a night that ends too soon is a
     // violation below.)
+    //
+    // A night in progress short of the minimum must take the next element, so
+    // it limits the window's end, and one at the maximum can't, so the window
+    // starts when it ends.
     val nextWindow: Option[TimestampInterval] =
+      val perNightEnd: Option[Timestamp] =
+        openNight.collect { case (_, e) if openCount < minPerNight => e }
+      val perNightStart: Option[Timestamp] =
+        openNight.collect { case (_, e) if maxPerNight.exists(openCount >= _) => e }
       for
-        last  <- timed.lastOption
-        start <- nextStart
-        if minInterval.isDefined || maxInterval.isDefined || branch.sameNight
-        end    = (maxInterval.map(last +| _).toList ++ sameNightEnd.toList).minOption.getOrElse(Timestamp.Max)
+        last   <- timed.lastOption
+        start0 <- nextStart
+        if minInterval.isDefined || maxInterval.isDefined || branch.sameNight || perNight
+        start   = (start0 :: perNightStart.toList).max
+        end     = (maxInterval.map(last +| _).toList ++ sameNightEnd.toList ++ perNightEnd.toList).minOption.getOrElse(Timestamp.Max)
         if start <= end
       yield TimestampInterval.between(start, end)
 
-    // Whether enough of the elements that count are complete (for an ordered
-    // group, those are its first `required`, so all of them).
-    val countMet: Boolean =
-      completed.size >= required.value
+    // A night short of the minimum: one that has ended, or the night in
+    // progress once it can take no more (the minimum interval reaches past its
+    // end, or the group has enough completions and too few elements remain to
+    // make up the night).
+    def perNightShort: Boolean =
+      countsByNight.exists: (n, c) =>
+        c < minPerNight && openNight.forall { (o, e) =>
+          o =!= n || nextStart.exists(_ >= e) || (countMet && available < minPerNight - c)
+        }
 
     import GroupConstraintViolation.*
 
@@ -289,7 +372,7 @@ object GroupProgressEvaluator:
         Order                  -> (branch.ordered && outOfOrder),
         MinimumInterval        -> (
           consecutive.exists(startedTooSoon) ||
-          timed.lastOption.exists(t => remaining.exists(e => e.started && startedTooSoon(t, e)))
+          timed.lastOption.exists(t => remaining.exists(startedTooSoon(t, _)))
         ),
         MaximumInterval        -> (
           maxInterval.exists: max =>
@@ -302,13 +385,16 @@ object GroupProgressEvaluator:
             nights.size > 1 ||
             (!countMet && sameNightEnd.exists(end => now >= end || nextStart.exists(_ >= end)))
           )
-        )
+        ),
+        ObservationsPerNightMultipleSites -> (perNight && perNightSites.size > 1),
+        ObservationsPerNightMinimum       -> (perNight && perNightShort),
+        ObservationsPerNightMaximum       -> (perNight && maxPerNight.exists(max => countsByNight.values.exists(_ > max)))
       ).collect { case (v, true) => v }
 
     val progress: GroupProgress =
       NonEmptyList.fromList(violations) match
         case Some(vs)         => GroupProgress.Unschedulable(completedCount, required, vs.toNes)
-        case None if countMet => GroupProgress.Complete(completedCount, required)
+        case None if countMet && !openNightShort => GroupProgress.Complete(completedCount, required)
         case None if started  => GroupProgress.Ongoing(completedCount, required, nextWindow)
         case None             => GroupProgress.Pending(required)
 
@@ -316,16 +402,15 @@ object GroupProgressEvaluator:
 
     // Its start, nights and sites, for its parent, are those of the elements
     // that counted, and it completed with the last of the completions that
-    // counted (if any had a time).
+    // counted.  (Complete, it has at least one.)
     val element = Element(
-      excluded       = false,
-      complete       = status === GroupStatus.Complete,
-      unschedulable  = status === GroupStatus.Unschedulable,
-      started        = started,
-      startTime      = elements.flatMap(_.startTime).minOption,
-      completionTime = Option.when(status === GroupStatus.Complete)(timed.lastOption).flatten,
-      nights         = nights,
-      sites          = sites
+      excluded      = false,
+      completion    = Option.when(status === GroupStatus.Complete)(timed.lastOption).flatten,
+      unschedulable = status === GroupStatus.Unschedulable,
+      started       = started,
+      startTime     = elements.flatMap(_.startTime).minOption,
+      nights        = nights,
+      sites         = sites
     )
 
     (progress, element)

@@ -66,6 +66,8 @@ trait GroupMapping[F[_]] extends GroupView[F] with ProgramView[F] with GroupElem
       SqlObject("minimumInterval"),
       SqlObject("maximumInterval"),
       SqlField("sameNight", GroupView.SameNight),
+      SqlField("minimumObservationsPerNight", GroupView.MinObsPerNight),
+      SqlField("maximumObservationsPerNight", GroupView.MaxObsPerNight),
       SqlObject("elements", Join(GroupView.Id, GroupElementView.GroupId)),
       SqlObject("program", Join(GroupView.ProgramId, ProgramView.Id)),
 
