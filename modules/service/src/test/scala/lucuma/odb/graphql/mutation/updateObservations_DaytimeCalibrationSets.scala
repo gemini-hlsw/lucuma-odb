@@ -231,6 +231,13 @@ class updateObservations_DaytimeCalibrationSets extends OdbSuite with DatabaseOp
       _   <- expectRejected(pid, s"{ kind: FLAT, count: 1, $arcGcal, ${gmosNorthSetup(1)} }", "continuum lamp and no arc")
     yield ()
 
+  test("a flat may not use the 100W lamp outside GHOST"):
+    val qh100Flat = s"{ kind: FLAT, count: 1, gcal: { continuum: QUARTZ_HALOGEN100, filter: ND10, shutter: OPEN }, ${gmosNorthSetup(1)} }"
+    for
+      pid <- createProgramAs(staff)
+      _   <- expectRejected(pid, qh100Flat, "available for GHOST only")
+    yield ()
+
   test("an arc needs a gcal with arc lamps"):
     for
       pid <- createProgramAs(staff)
