@@ -53,6 +53,8 @@ object CalibrationSetInput:
     (kind, fields) match
       case (CalibrationSetType.Flat, Some(g)) =>
         (g.continuum, g.arcs) match
+          case (Some(GcalContinuum.QuartzHalogen100W), Nil) if instrument =!= Instrument.Ghost =>
+            Result.failure("The 100W Quartz Halogen lamp is available for GHOST only.")
           case (Some(c), Nil) => Gcal(Lamp.fromContinuum(c), g.filter, g.diffuser.getOrElse(defaultDiffuser(instrument)), g.shutter).some.success
           case _              => Result.failure("A FLAT calibration set needs a continuum lamp and no arc lamps.")
       case (CalibrationSetType.Arc, Some(g))  =>
