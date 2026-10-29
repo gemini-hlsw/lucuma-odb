@@ -214,8 +214,8 @@ class daytimeCalibrationSets_flamingos2 extends OdbSuite with DatabaseOperations
   test("a bias or daytime observe is rejected"):
     for
       pid <- createProgramAs(staff)
-      _   <- expectRejected(pid, s"{ kind: BIAS, count: 1, ${setup(0)} }", "must be one of DARK, FLAT, ARC, not BIAS")
-      _   <- expectRejected(pid, s"{ kind: DAYTIME_OBSERVE, count: 1, ${setup(1)} }", "must be one of DARK, FLAT, ARC, not DAYTIME_OBSERVE")
+      _   <- expectRejected(pid, s"{ kind: BIAS, count: 1, ${setup(0)} }", "must be one of DARK, FLAT, ARC, SMART_FLAT, SMART_ARC, DAY_BASELINE, not BIAS")
+      _   <- expectRejected(pid, s"{ kind: DAYTIME_OBSERVE, count: 1, ${setup(1)} }", "must be one of DARK, FLAT, ARC, SMART_FLAT, SMART_ARC, DAY_BASELINE, not DAYTIME_OBSERVE")
     yield ()
 
   test("the setup must be for the mode's instrument"):
@@ -350,3 +350,19 @@ class daytimeCalibrationSets_flamingos2 extends OdbSuite with DatabaseOperations
       cid <- cloneObservationAs(staff, oid)
       _   <- expect(staff, executionQuery(cid), expectedExecution(mockupAtoms).asRight)
     yield ()
+
+  test("smart kinds are accepted on Flamingos 2"):
+    for
+      pid <- createProgramAs(staff)
+      oid <- createWithSets(pid, s"{ kind: SMART_FLAT, ${setup(1, slit = true)} }, { kind: DAY_BASELINE, ${setup(1, slit = true)} }")
+      res <- query(staff, s"""
+        query {
+          observation(observationId: ${oid.asJson}) {
+            observingMode { daytimeCalibration { calibrationSets { kind gcal { continuum } } } }
+          }
+        }
+      """)
+    yield assertEquals(
+      res.hcursor.downFields("observation", "observingMode", "daytimeCalibration", "calibrationSets").focus.get,
+      json"""[ { "kind": "SMART_FLAT", "gcal": null }, { "kind": "DAY_BASELINE", "gcal": null } ]"""
+    )

@@ -6344,6 +6344,11 @@ input DaytimeCalibrationInput {
 """
 The kind of exposure a calibration set produces.  DAYTIME_OBSERVE is an
 exposure with the dome closed and no lamp, such as a pupil or bubble image.
+SMART_FLAT, SMART_ARC and DAY_BASELINE are resolved through the Smart GCAL
+tables when the sequence is generated: the lookup supplies the lamp
+configuration, exposure time and exposure count.  SMART_FLAT and SMART_ARC
+select by lamp type; DAY_BASELINE selects every row of the day baseline,
+flats and arcs alike (the OT's "Day Baseline GCAL").
 """
 enum CalibrationSetType {
   BIAS
@@ -6351,20 +6356,26 @@ enum CalibrationSetType {
   FLAT
   ARC
   DAYTIME_OBSERVE
+  SMART_FLAT
+  SMART_ARC
+  DAY_BASELINE
 }
 
 """
 One row of a daytime calibration: a kind, an exposure count, the GCAL
 configuration (flats and arcs only) and one instrument setup.  The generator
-expands it into one atom holding `count` identical DAY_CAL steps.
+expands it into one atom: `count` identical DAY_CAL steps for a manual kind,
+the steps the Smart GCAL lookup returns for a smart kind.
 """
 type CalibrationSet {
   kind: CalibrationSetType!
 
   """
-  Exposures taken with this setup.
+  Exposures taken with this setup: as requested for a manual kind, as the
+  Smart GCAL lookup resolves it for a smart kind, or null when the lookup
+  finds no mapping for the setup.
   """
-  count: PosInt!
+  count: PosInt
 
   """
   GCAL lamp configuration, present for FLAT and ARC only.
@@ -6413,16 +6424,19 @@ type CalibrationSetGcal {
 Calibration set input.  Exactly one instrument setup must be given and it must
 match the mode's instrument.  A FLAT needs a `gcal` with a continuum lamp, an
 ARC one with at least one arc lamp; BIAS, DARK and DAYTIME_OBSERVE take none.
-A BIAS ignores the setup's exposure time and takes zero.  A Flamingos 2 set
-may only be a DARK, FLAT or ARC.
+A BIAS ignores the setup's exposure time and takes zero.  A smart kind
+(SMART_FLAT, SMART_ARC, DAY_BASELINE) takes neither `count` nor `gcal` and
+ignores the setup's exposure time: the Smart GCAL lookup supplies all three.
+A Flamingos 2 set may not be a BIAS or a DAYTIME_OBSERVE.
 """
 input CalibrationSetInput {
   kind: CalibrationSetType!
 
   """
-  Exposures taken with this setup, at most 1000.
+  Exposures taken with this setup, at most 1000.  Required for a manual kind,
+  rejected for a smart kind.
   """
-  count: PosInt!
+  count: PosInt
 
   """
   GCAL lamp configuration, required for FLAT and ARC, rejected otherwise.

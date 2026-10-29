@@ -203,7 +203,7 @@ object DaytimeCalibrationService:
 
     val calibration_set: Decoder[CalibrationSet[InstrumentSetup]] =
       (calibration_set_type    *:
-       pos_int                 *:
+       pos_int.opt             *:
        gcal_opt                *:
        gmos_north_dynamic.opt  *:
        gmos_south_dynamic.opt  *:
@@ -281,7 +281,7 @@ object DaytimeCalibrationService:
           $observation_id,
           $int4,
           $calibration_set_type,
-          $pos_int,
+          ${pos_int.opt},
           $gcal_opt
         )
         RETURNING c_set_id
