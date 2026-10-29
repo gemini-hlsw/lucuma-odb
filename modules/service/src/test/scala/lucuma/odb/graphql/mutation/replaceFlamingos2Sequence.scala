@@ -354,12 +354,17 @@ class replaceFlamingos2Sequence extends query.ExecutionTestSupportForFlamingos2 
         val inputString = input(oid, SequenceType.Science, atomInput("Foo", stepInput(Flamingos2Filter.J, wc.some)))
         expect(pi, windowCoverQuery(inputString), windowCoverResult(wc.some).asRight)
 
-  test("dark window cover defaults to close"):
+  test("dark window cover defaults to null"):
     createWindowCoverObservation.flatMap: oid =>
       val inputString = input(oid, SequenceType.Science, atomInput("Foo", stepInput(Flamingos2Filter.J, stepConfig = "dark: true")))
-      expect(pi, windowCoverQuery(inputString), windowCoverResult(Flamingos2WindowCover.Close.some).asRight)
+      expect(pi, windowCoverQuery(inputString), windowCoverResult(none).asRight)
 
   test("dark window cover keeps an explicit open"):
     createWindowCoverObservation.flatMap: oid =>
       val inputString = input(oid, SequenceType.Science, atomInput("Foo", stepInput(Flamingos2Filter.J, Flamingos2WindowCover.Open.some, "dark: true")))
       expect(pi, windowCoverQuery(inputString), windowCoverResult(Flamingos2WindowCover.Open.some).asRight)
+
+  test("dark window cover keeps an explicit close"):
+    createWindowCoverObservation.flatMap: oid =>
+      val inputString = input(oid, SequenceType.Science, atomInput("Foo", stepInput(Flamingos2Filter.J, Flamingos2WindowCover.Close.some, "dark: true")))
+      expect(pi, windowCoverQuery(inputString), windowCoverResult(Flamingos2WindowCover.Close.some).asRight)

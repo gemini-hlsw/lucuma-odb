@@ -304,7 +304,7 @@ class daytimeCalibrationSets_flamingos2 extends OdbSuite with DatabaseOperations
                 "observeClass": "DAY_CAL",
                 "stepConfig": { "stepType": "DARK" },
                 "telescopeConfig": { "guiding": "DISABLED" },
-                "instrumentConfig": { "exposure": { "seconds": 20.000000 }, "filter": "J", "windowCover": "CLOSE", "fpu": null }
+                "instrumentConfig": { "exposure": { "seconds": 20.000000 }, "filter": "J", "windowCover": null, "fpu": null }
               }
             ]
           }
