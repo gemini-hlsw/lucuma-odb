@@ -44,6 +44,8 @@ object DaytimeCalibration:
       case (CalibrationSetType.Dark, _)                                => StepConfig.Dark.asRight
       case (CalibrationSetType.DaytimeObserve, _)                      => StepConfig.Science.asRight
       case (CalibrationSetType.Flat | CalibrationSetType.Arc, Some(g)) => g.asRight
+      case (k, Some(_))                                                   =>
+        OdbError.SequenceUnavailable(oid, s"Calibration set $index (${k.name}) not supported yet.".some).asLeft
       case (k, None)                                                   =>
         OdbError.SequenceUnavailable(oid, s"Calibration set $index (${k.name}) has no GCAL configuration.".some).asLeft
 
