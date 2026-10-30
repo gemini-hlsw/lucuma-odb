@@ -25,6 +25,9 @@ trait VisitTable[F[_]] extends BaseMapping[F]:
     val Site: ColumnRef           = col("c_site",            site)
     val Chargeable: ColumnRef     = col("c_chargeable",      bool)
     val IdempotencyKey: ColumnRef = col("c_idempotency_key", idempotency_key.opt)
+    val Start: ColumnRef          = col("c_start",           core_timestamp.opt)
+    val End: ColumnRef            = col("c_end",             core_timestamp.opt)
+    val VisitorEnd: ColumnRef     = col("c_ta_visitor_end",  core_timestamp.opt)
 
     object Raw:
       val NonChargedTime = col("c_raw_non_charged_time", time_span)
