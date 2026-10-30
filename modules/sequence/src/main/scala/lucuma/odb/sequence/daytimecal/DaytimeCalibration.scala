@@ -32,7 +32,7 @@ import java.util.UUID
 
 /**
  * Generates a daytime calibration sequence from its Calibration Sets: one
- * atom per set, never guided.  A manual set's atom holds `count` identical
+ * atom per set, never guided.  A manual set's atom holds `explicitCount` identical
  * DAY_CAL steps; a smart set's atom holds one smart GCAL step the caller
  * expands with the instrument's SmartGcalExpander before building atoms.
  * Nothing here is instrument-specific.
@@ -63,7 +63,7 @@ object DaytimeCalibration:
         unavailable(oid, index, k, "has no GCAL configuration.").asLeft
 
   private def stepCount(oid: Observation.Id, index: Int, set: CalibrationSet[?]): Either[OdbError, Int] =
-    (set.kind.isSmart, set.count) match
+    (set.kind.isSmart, set.explicitCount) match
       case (true, _)        => 1.asRight
       case (false, Some(n)) => n.value.asRight
       case (false, None)    => unavailable(oid, index, set.kind, "has no exposure count.").asLeft

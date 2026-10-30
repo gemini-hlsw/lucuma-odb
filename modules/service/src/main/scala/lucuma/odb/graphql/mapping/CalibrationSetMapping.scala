@@ -41,7 +41,7 @@ trait CalibrationSetMapping[F[_]: Concurrent] extends DaytimeCalibrationSetView[
       SqlField("observationId", DaytimeCalibrationSetView.ObservationId, hidden = true),
       SqlField("position",      DaytimeCalibrationSetView.Position, hidden = true),
       SqlField("kind",          DaytimeCalibrationSetView.Kind),
-      SqlField("explicitCount", DaytimeCalibrationSetView.Count),
+      SqlField("explicitCount", DaytimeCalibrationSetView.ExplicitCount),
       EffectField("count",      countHandler, List("observationId", "position")),
       SqlObject("gcal"),
       SqlObject("gmosNorth", Join(DaytimeCalibrationSetView.Id, GmosNorthCalibrationSetupTable.Id)),

@@ -285,7 +285,7 @@ object DaytimeCalibrationService:
           $gcal_opt
         )
         RETURNING c_set_id
-      """.query(int8).contramap((oid, pos, set) => (oid, pos, set.kind, set.count, set.gcal))
+      """.query(int8).contramap((oid, pos, set) => (oid, pos, set.kind, set.explicitCount, set.gcal))
 
     private def insertSetup(site: String): Fragment[Void] =
       sql"""

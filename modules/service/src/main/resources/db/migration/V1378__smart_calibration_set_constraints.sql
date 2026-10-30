@@ -1,8 +1,7 @@
--- Smart calibration sets (ADR 0038): the kinds V1376 added take their lamp
--- configuration, exposure time and exposure count from the Smart GCAL lookup,
--- so a smart row carries no count.  The constraints live apart from the enum
--- change because a new enum value cannot be used in the transaction that
--- adds it.
+-- Smart calibration sets take their lamp configuration, exposure time and 
+-- exposure count from the Smart GCAL lookup, so a smart row carries no count.
+-- The constraints live apart from the enum change because a new enum value 
+-- cannot be used in the transaction that adds it.
 
 ALTER TABLE t_daytime_calibration_set
   DROP CONSTRAINT t_daytime_calibration_set_c_count_check,
