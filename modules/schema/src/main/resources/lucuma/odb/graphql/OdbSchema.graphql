@@ -6371,11 +6371,17 @@ type CalibrationSet {
   kind: CalibrationSetType!
 
   """
-  Exposures taken with this setup: as requested for a manual kind, as the
-  Smart GCAL lookup resolves it for a smart kind, or null when the lookup
-  finds no mapping for the setup.
+  Exposures requested for this setup, as given on input.  Always present for
+  a manual kind, always null for a smart kind.
   """
   count: PosInt
+
+  """
+  Steps this set contributes to the sequence: `count` for a manual kind, the
+  number of steps the Smart GCAL lookup returns for a smart kind, or null when
+  the lookup finds no mapping for the setup.  Read only.
+  """
+  stepCount: PosInt
 
   """
   GCAL lamp configuration, present for FLAT and ARC only.

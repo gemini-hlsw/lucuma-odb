@@ -132,7 +132,56 @@ class daytimeCalibrationSets_smart extends ExecutionTestSupportForGmos with Dayt
       _   <- expectRejected(pid, s"{ kind: DARK, ${setup()} }", "needs a `count`")
     yield ()
 
-  test("smart rows store no gcal and a zero exposure; count is the lookup's"):
+  test("a row read back round-trips into an update unchanged"):
+    for
+      pid <- createProgramAs(staff)
+      oid <- createWithSets(pid, s"{ kind: SMART_FLAT, ${setup()} }, { kind: DARK, count: 4, ${setup()} }")
+      _   <- expect(
+        user     = staff,
+        query    = s"""
+          mutation {
+            updateObservations(input: {
+              SET: {
+                observingMode: {
+                  daytimeCalibration: {
+                    instrument: GMOS_NORTH
+                    calibrationSets: [
+                      { kind: SMART_FLAT, count: null, gcal: null, ${setup(exposureSeconds = 0)} },
+                      { kind: DARK, count: 4, gcal: null, ${setup()} }
+                    ]
+                  }
+                }
+              }
+              WHERE: { id: { EQ: ${oid.asJson} } }
+            }) {
+              observations {
+                observingMode { daytimeCalibration { calibrationSets { kind count stepCount } } }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "updateObservations": {
+              "observations": [
+                {
+                  "observingMode": {
+                    "daytimeCalibration": {
+                      "calibrationSets": [
+                        { "kind": "SMART_FLAT", "count": null, "stepCount": 1 },
+                        { "kind": "DARK",       "count": 4,    "stepCount": 4 }
+                      ]
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        """.asRight
+      )
+    yield ()
+
+  test("smart rows store no count or gcal and a zero exposure; stepCount is the lookup's"):
     for
       pid <- createProgramAs(staff)
       oid <- createWithSets(pid, s"{ kind: SMART_FLAT, ${setup()} }, { kind: DAY_BASELINE, ${setup()} }, { kind: SMART_ARC, ${setup(mapped = false)} }, { kind: DARK, count: 4, ${setup()} }")
@@ -141,7 +190,7 @@ class daytimeCalibrationSets_smart extends ExecutionTestSupportForGmos with Dayt
           observation(observationId: ${oid.asJson}) {
             observingMode {
               daytimeCalibration {
-                calibrationSets { kind count gcal { continuum } gmosNorth { exposure { seconds } } }
+                calibrationSets { kind count stepCount gcal { continuum } gmosNorth { exposure { seconds } } }
               }
             }
           }
@@ -151,10 +200,10 @@ class daytimeCalibrationSets_smart extends ExecutionTestSupportForGmos with Dayt
       res.hcursor.downFields("observation", "observingMode", "daytimeCalibration", "calibrationSets").focus.get,
       json"""
         [
-          { "kind": "SMART_FLAT",   "count": 1,    "gcal": null, "gmosNorth": { "exposure": { "seconds": 0.000000 } } },
-          { "kind": "DAY_BASELINE", "count": 1,    "gcal": null, "gmosNorth": { "exposure": { "seconds": 0.000000 } } },
-          { "kind": "SMART_ARC",    "count": null, "gcal": null, "gmosNorth": { "exposure": { "seconds": 0.000000 } } },
-          { "kind": "DARK",         "count": 4,    "gcal": null, "gmosNorth": { "exposure": { "seconds": 7.000000 } } }
+          { "kind": "SMART_FLAT",   "count": null, "stepCount": 1,    "gcal": null, "gmosNorth": { "exposure": { "seconds": 0.000000 } } },
+          { "kind": "DAY_BASELINE", "count": null, "stepCount": 1,    "gcal": null, "gmosNorth": { "exposure": { "seconds": 0.000000 } } },
+          { "kind": "SMART_ARC",    "count": null, "stepCount": null, "gcal": null, "gmosNorth": { "exposure": { "seconds": 0.000000 } } },
+          { "kind": "DARK",         "count": 4,    "stepCount": 4,    "gcal": null, "gmosNorth": { "exposure": { "seconds": 7.000000 } } }
         ]
       """
     )
