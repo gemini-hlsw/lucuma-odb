@@ -41,17 +41,18 @@ trait CalibrationSetMapping[F[_]: Concurrent] extends DaytimeCalibrationSetView[
       SqlField("observationId", DaytimeCalibrationSetView.ObservationId, hidden = true),
       SqlField("position",      DaytimeCalibrationSetView.Position, hidden = true),
       SqlField("kind",          DaytimeCalibrationSetView.Kind),
-      EffectField("count",      countHandler, List("observationId", "position")),
+      SqlField("count",         DaytimeCalibrationSetView.Count),
+      EffectField("stepCount",  stepCountHandler, List("observationId", "position")),
       SqlObject("gcal"),
       SqlObject("gmosNorth", Join(DaytimeCalibrationSetView.Id, GmosNorthCalibrationSetupTable.Id)),
       SqlObject("gmosSouth", Join(DaytimeCalibrationSetView.Id, GmosSouthCalibrationSetupTable.Id)),
       SqlObject("flamingos2", Join(DaytimeCalibrationSetView.Id, Flamingos2CalibrationSetupTable.Id))
     )
 
-  // A manual set's count is its own; a smart set's is what the Smart GCAL
-  // lookup returns, resolved per observation so one lookup pass serves every
-  // row of it.
-  private lazy val countHandler: EffectHandler[F] =
+  // A manual set's step count is its count; a smart set's is what the Smart
+  // GCAL lookup returns, resolved per observation so one lookup pass serves
+  // every row of it.
+  private lazy val stepCountHandler: EffectHandler[F] =
     keyedBatchEffectHandler[(Observation.Id, Int), Option[PosInt]](
       c => (c.fieldAs[Observation.Id]("observationId"), c.fieldAs[Int]("position")).tupled,
       (keys, _) =>
