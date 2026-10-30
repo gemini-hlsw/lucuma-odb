@@ -5,6 +5,7 @@ package lucuma.odb.sequence.flamingos2.spectroscopy
 
 import cats.Eval
 import cats.data.NonEmptyList
+import cats.data.NonEmptySet
 import cats.syntax.either.*
 import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.PosInt
@@ -14,12 +15,14 @@ import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.Flamingos2Fpu
 import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.Flamingos2TelluricOffsetPreset
+import lucuma.core.enums.GcalArc
 import lucuma.core.enums.GcalContinuum
 import lucuma.core.enums.GcalDiffuser
 import lucuma.core.enums.GcalFilter
 import lucuma.core.enums.GcalShutter
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.enums.SmartGcalType
 import lucuma.core.enums.StepGuideState
 import lucuma.core.math.Angle
 import lucuma.core.math.SignalToNoise
@@ -85,8 +88,11 @@ class MosTelluricSuite extends FunSuite:
     )
 
   private val expander: SmartGcalExpander[Eval, Flamingos2StaticConfig, Flamingos2DynamicConfig] =
-    SmartGcalExpander.pure[Eval, Flamingos2StaticConfig, Flamingos2DynamicConfig]: (_, _, d) =>
-      (d, StepConfig.Gcal(StepConfig.Gcal.Lamp.fromContinuum(GcalContinuum.QuartzHalogen5W), GcalFilter.None, GcalDiffuser.Ir, GcalShutter.Open), ObserveClass.NightCal)
+    SmartGcalExpander.pure[Eval, Flamingos2StaticConfig, Flamingos2DynamicConfig]: (t, _, d) =>
+      val lamp = t match
+        case SmartGcalType.Arc => StepConfig.Gcal.Lamp.fromArcs(NonEmptySet.one(GcalArc.ArArc))
+        case _                 => StepConfig.Gcal.Lamp.fromContinuum(GcalContinuum.QuartzHalogen5W)
+      (d, StepConfig.Gcal(lamp, GcalFilter.None, GcalDiffuser.Ir, GcalShutter.Open), ObserveClass.NightCal)
 
   private val estimator: StepTimeEstimateCalculator[Flamingos2StaticConfig, Flamingos2DynamicConfig] =
     new StepTimeEstimateCalculator[Flamingos2StaticConfig, Flamingos2DynamicConfig]:
@@ -116,11 +122,17 @@ class MosTelluricSuite extends FunSuite:
   private def titles(as: List[Atom[Flamingos2DynamicConfig]]): List[String] =
     as.map(_.description.fold("")(_.value))
 
-  test("the science sequence is one telluric atom followed by an arc"):
+  private def isArc(s: Step[Flamingos2DynamicConfig]): Boolean =
+    s.stepConfig match
+      case g: StepConfig.Gcal => g.lamp.arcs.isDefined
+      case _                  => false
+
+  test("the science sequence is one telluric atom followed by a flat and an arc"):
     val atoms = generate().science.toList
 
     assertEquals(titles(atoms), List("Telluric", "Nighttime Calibrations"))
-    assertEquals(atoms.map(_.steps.length), List(6, 1))
+    assertEquals(atoms.map(_.steps.length), List(6, 2))
+    assertEquals(atoms.last.steps.toList.map(isArc), List(false, true))
 
   test("the standard is stepped down the slit at p = 0"):
     val steps = generate().science.toList.head.steps.toList
@@ -129,20 +141,20 @@ class MosTelluricSuite extends FunSuite:
     assertEquals(steps.map(_.telescopeConfig.offset.p.toAngle.toMicroarcseconds).toSet, Set(0L))
     assertEquals(steps.map(_.telescopeConfig.guiding).toSet, Set(StepGuideState.Enabled))
 
-  test("science steps are night calibrations, and so is the arc"):
+  test("science steps are night calibrations, and so are the flat and arc"):
     val atoms = generate().science.toList
 
     assertEquals(atoms.head.steps.toList.map(_.observeClass).toSet, Set(ObserveClass.NightCal))
-    assertEquals(atoms.last.steps.head.observeClass, ObserveClass.NightCal)
+    assertEquals(atoms.last.steps.toList.map(_.observeClass).toSet, Set(ObserveClass.NightCal))
 
-  test("the arc is taken unguided at the last science offset"):
-    val arc = generate().science.toList.last.steps.head
+  test("the flat and arc are taken unguided at the last science offset"):
+    val cals = generate().science.toList.last.steps.toList
 
-    assertEquals(qArcsec(arc), -60.0)
-    assertEquals(arc.telescopeConfig.guiding, StepGuideState.Disabled)
-    assert(arc.stepConfig.isInstanceOf[StepConfig.Gcal])
+    assertEquals(cals.map(qArcsec), List(-60.0, -60.0))
+    assertEquals(cals.map(_.telescopeConfig.guiding).toSet, Set(StepGuideState.Disabled))
+    assert(cals.forall(_.stepConfig.isInstanceOf[StepConfig.Gcal]))
 
-  test("the arc closes the sequence however many cycles the ITC asks for"):
+  test("the calibrations close the sequence however many cycles the ITC asks for"):
     // 13 exposures over a 6 position pattern rounds up to three cycles.
     val atoms = generate(exposures = 13).science.toList
 

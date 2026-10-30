@@ -192,11 +192,12 @@ trait ExecutionTestSupportForFlamingos2 extends ExecutionTestSupport:
   lazy val Flamingos2Science: Flamingos2DynamicConfig =
     flamingos2Science(fakeItcSpectroscopyResult.exposureTime)
 
+  // Every Flamingos 2 calibration is taken in Bright read mode.
   lazy val Flamingos2Arc: Flamingos2DynamicConfig =
-    flamingos2Science(f2_arc_JH1.instrumentConfig.exposureTime)
+    flamingos2Science(f2_arc_JH1.instrumentConfig.exposureTime, Flamingos2ReadMode.Bright)
 
   lazy val Flamingos2Flat: Flamingos2DynamicConfig =
-    flamingos2Science(f2_flat_JH1.instrumentConfig.exposureTime)
+    flamingos2Science(f2_flat_JH1.instrumentConfig.exposureTime, Flamingos2ReadMode.Bright)
 
   lazy val Flamingos2AcqImage: Flamingos2DynamicConfig =
     Flamingos2Science.copy(

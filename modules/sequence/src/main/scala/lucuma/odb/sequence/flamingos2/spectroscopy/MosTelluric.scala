@@ -42,7 +42,7 @@ import java.util.UUID
  * Thus the calibration observation is essentially a long slit one.
  *
  * The star is stepped along that slit following the mode's telescope configs, and
- * an arc taken at the last position closes the sequence.
+ * a flat and an arc taken at the last position close the sequence.
  *
  * This is not exactly how a long slit observation's own telluric is generated. That
  * one keeps the ABBA cadence and its interleaved calibrations.
@@ -52,12 +52,12 @@ object MosTelluric:
   val ScienceAtomTitle: NonEmptyString =
     NonEmptyString.unsafeFrom("Telluric")
 
-  val ArcAtomTitle: NonEmptyString =
+  val CalAtomTitle: NonEmptyString =
     NonEmptyString.unsafeFrom("Nighttime Calibrations")
 
   case class StepDefinition(
     science: NonEmptyList[ProtoStep[F2]],
-    arc:     NonEmptyList[ProtoStep[F2]]
+    cals:    NonEmptyList[ProtoStep[F2]]
   ):
     def cycleCount(t: IntegrationTime): Either[String, NonNegInt] =
       calculateCycleCount[F2](s => s.telescopeConfig.guiding.isGuided, science.toList, t)
@@ -65,16 +65,16 @@ object MosTelluric:
   private object StepComputer extends SequenceState[F2] with Flamingos2InitialDynamicConfig:
 
     /**
-     * Builds the science steps and the still unexpanded SmartGcal arc.  The
-     * decker comes from the equivalent long slit rather than from the config,
-     * whose MOS decker would vignette the slit.
+     * Builds the science steps and the still unexpanded SmartGcal flat and arc.
+     * The decker comes from the equivalent long slit rather than from the
+     * config, whose MOS decker would vignette the slit.
      */
     def compute(
       config:   Config,
       time:     IntegrationTime,
       readMode: Flamingos2ReadMode,
       calRole:  Option[CalibrationRole]
-    ): (NonEmptyList[ProtoStep[F2]], ProtoStep[F2]) =
+    ): (NonEmptyList[ProtoStep[F2]], ProtoStep[F2], ProtoStep[F2]) =
 
       // The explicit read mode if set, else the ITC's (its choice in S/N mode, the
       // requested one in time-and-count mode).
@@ -94,17 +94,20 @@ object MosTelluric:
           _  <- F2.readoutMode := config.readoutMode
           _  <- F2.reads       := config.explicitReads.getOrElse(resolvedReadMode.readCount)
           ss <- config.telescopeConfigs.traverse(scienceStep(_, calRole.sciClass))
-          r  <- arcStep(ss.last.telescopeConfig.copy(guiding = Disabled), calRole.gcalClass)
-        yield (ss, r)
+          at  = ss.last.telescopeConfig.copy(guiding = Disabled)
+          f  <- flatStep(at, calRole.gcalClass)
+          r  <- arcStep(at, calRole.gcalClass)
+        yield (ss, f, r)
 
   private def expand[F[_]: Monad](
     static:   Flamingos2StaticConfig,
     expander: SmartGcalExpander[F, Flamingos2StaticConfig, F2],
     science:  NonEmptyList[ProtoStep[F2]],
+    flat:     ProtoStep[F2],
     arc:      ProtoStep[F2]
   ): EitherT[F, String, StepDefinition] =
-    EitherT(expander.expandStep(static, arc))
-      .map(as => StepDefinition(science, as))
+    EitherT(expander.expandFlatAndOrArc(static, flat, arc))
+      .map(cs => StepDefinition(science, cs))
 
   private case class Generator(
     steps:      StepDefinition,
@@ -116,7 +119,7 @@ object MosTelluric:
       builder.buildStream:
         Stream.emits:
           List.fill(1.max(goalCycles.value))(ProtoAtom(ScienceAtomTitle.some, steps.science)) :+
-            ProtoAtom(ArcAtomTitle.some, steps.arc)
+            ProtoAtom(CalAtomTitle.some, steps.cals)
 
   def instantiate[F[_]: Monad](
     observationId: Observation.Id,
@@ -136,7 +139,7 @@ object MosTelluric:
                         zeroExposureTime(observationId, modeName)
                       )
        r         <- EitherT.fromEither[F](itcReadMode(t).leftMap(definitionError(observationId, _)))
-       (ss, arc)  = StepComputer.compute(config, t, r, calRole)
-       d         <- expand(static, expander, ss, arc).leftMap(definitionError(observationId, _))
+       (ss, f, a) = StepComputer.compute(config, t, r, calRole)
+       d         <- expand(static, expander, ss, f, a).leftMap(definitionError(observationId, _))
        c         <- EitherT.fromEither[F](d.cycleCount(t).leftMap(definitionError(observationId, _)))
      yield Generator(d, AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Science), c): SequenceGenerator[F2]).value

@@ -21,14 +21,13 @@ import lucuma.itc.IntegrationTime
 
 class insertSmartGcal_Flamingos2 extends query.ExecutionTestSupportForFlamingos2 with InsertSmartGcalOps with ReplaceSequenceOps:
 
-  // Long enough that the science read mode differs from that of the (much
-  // shorter) smart GCAL lamp exposures.
+  // Long enough that the science read mode is not Bright.
   val ExposureTime: TimeSpan = 5.minTimeSpan
 
   override def fakeItcSpectroscopyResult: IntegrationTime =
     IntegrationTime(ExposureTime, PosInt.unsafeFrom(4))
 
-  test("a calibration's read mode follows its own exposure time, not the science step's"):
+  test("a calibration is taken in Bright read mode, not the science step's"):
     for
       p    <- createProgram
       t    <- createTargetWithProfileAs(pi, p)

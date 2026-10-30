@@ -49,9 +49,9 @@ object SmartGcalRules:
    * The smart GCAL tables are keyed on builtin FPUs, so a custom mask is
    * calibrated as the builtin long slit of the same width.  A custom slit
    * width without one cannot be calibrated.  Searching with the custom mask
-   * itself would match the entries for configurations without an FPU.  A
-   * calibration step's exposure time comes from the lookup, so its read mode is
-   * recomputed rather than inherited from the step being calibrated.
+   * itself would match the entries for configurations without an FPU.  Every
+   * Flamingos 2 arc and flat is taken in Bright read mode, whatever the read
+   * mode of the step being calibrated.
    */
   val flamingos2: SmartGcalRules[Flamingos2DynamicConfig] =
     new SmartGcalRules[Flamingos2DynamicConfig]:
@@ -65,8 +65,7 @@ object SmartGcalRules:
             d.asRight
 
       def calibrationConfig(d: Flamingos2DynamicConfig): Flamingos2DynamicConfig =
-        val mode = Flamingos2ReadMode.forExposureTime(d.exposure)
-        d.copy(readMode = mode, reads = mode.readCount)
+        d.copy(readMode = Flamingos2ReadMode.Bright, reads = Flamingos2ReadMode.Bright.readCount)
 
   val ghost: SmartGcalRules[GhostDynamicConfig] =
     identityRules
