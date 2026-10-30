@@ -66,6 +66,13 @@ enum InstrumentSetup:
       case Flamingos2(_)               => CalibrationSetType.values.toList.filterNot(k => k === CalibrationSetType.Bias || k === CalibrationSetType.DaytimeObserve)
       case GmosNorth(_) | GmosSouth(_) => CalibrationSetType.values.toList
 
+  /** Whether the setup disperses light, which an arc requires. */
+  def hasDisperser: Boolean =
+    this match
+      case Flamingos2(c) => c.disperser.isDefined
+      case GmosNorth(c)  => c.gratingConfig.isDefined
+      case GmosSouth(c)  => c.gratingConfig.isDefined
+
 object InstrumentSetup:
 
   given Eq[InstrumentSetup] =
