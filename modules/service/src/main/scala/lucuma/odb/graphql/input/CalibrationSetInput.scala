@@ -85,12 +85,16 @@ object CalibrationSetInput:
       case InstrumentSetup.GmosSouth(c)  => InstrumentSetup.GmosSouth(c.copy(exposure = TimeSpan.Zero))
       case InstrumentSetup.Flamingos2(c) => InstrumentSetup.Flamingos2(c.copy(exposure = TimeSpan.Zero))
 
+  // A smart arc on an undispersed setup can never resolve, so it is refused up
+  // front rather than at generation.
   private def checkKind(kind: CalibrationSetType, setup: InstrumentSetup): Result[Unit] =
     val allowed = setup.allowedKinds
-    if allowed.contains(kind) then Result.unit
-    else
+    if !allowed.contains(kind) then
       val kinds = allowed.map(_.tag.toUpperCase).mkString(", ")
       Result.failure(s"A ${setup.instrument.longName} calibration set must be one of $kinds, not ${kind.tag.toUpperCase}.")
+    else if kind === CalibrationSetType.SmartArc && !setup.hasDisperser then
+      Result.failure("A SMART_ARC calibration set needs a disperser.")
+    else Result.unit
 
   val MaxCount: Int = 1000
 
@@ -124,7 +128,7 @@ object CalibrationSetInput:
   def instrumentMismatch(instrument: Instrument, sets: List[CalibrationSet[InstrumentSetup]]): Option[String] =
     sets.zipWithIndex.collectFirst:
       case (s, i) if s.setup.instrument =!= instrument =>
-        s"Calibration set $i is for ${s.setup.instrument.longName} but the daytime calibration is for ${instrument.longName}."
+        s"Calibration set ${i + 1} is for ${s.setup.instrument.longName} but the daytime calibration is for ${instrument.longName}."
 
   def validateInstrument(instrument: Instrument, sets: List[CalibrationSet[InstrumentSetup]]): Result[Unit] =
     instrumentMismatch(instrument, sets).fold(Result.unit)(Result.failure)

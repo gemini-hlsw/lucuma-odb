@@ -256,7 +256,7 @@ class updateObservations_DaytimeCalibrationSets extends OdbSuite with DatabaseOp
       pid <- createProgramAs(staff)
       _   <- expectRejected(pid, "{ kind: DARK, count: 1 }", "Exactly one instrument setup")
       _   <- expectRejected(pid, s"{ kind: DARK, count: 1, ${gmosNorthSetup(1)}, $gmosSouthSetup }", "Exactly one instrument setup")
-      _   <- expectRejected(pid, s"{ kind: DARK, count: 1, $gmosSouthSetup }", "is for GMOS South but")
+      _   <- expectRejected(pid, s"{ kind: DARK, count: 1, $gmosSouthSetup }", "Calibration set 1 is for GMOS South but")
     yield ()
 
   test("the instrument may not change under rows for another instrument"):

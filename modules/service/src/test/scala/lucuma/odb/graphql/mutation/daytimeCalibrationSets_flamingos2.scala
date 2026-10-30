@@ -351,6 +351,12 @@ class daytimeCalibrationSets_flamingos2 extends OdbSuite with DatabaseOperations
       _   <- expect(staff, executionQuery(cid), expectedExecution(mockupAtoms).asRight)
     yield ()
 
+  test("a smart arc needs a disperser"):
+    for
+      pid <- createProgramAs(staff)
+      _   <- expectRejected(pid, s"{ kind: SMART_ARC, ${setup(1)} }", "A SMART_ARC calibration set needs a disperser")
+    yield ()
+
   test("smart kinds are accepted on Flamingos 2"):
     for
       pid <- createProgramAs(staff)
