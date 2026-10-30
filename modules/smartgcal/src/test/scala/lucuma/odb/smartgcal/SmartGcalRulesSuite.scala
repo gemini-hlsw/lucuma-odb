@@ -82,9 +82,9 @@ class SmartGcalRulesSuite extends ScalaCheckSuite:
       "Flamingos 2 has no builtin FPU equivalent to the 'Other' custom slit width".asLeft
     )
 
-  property("Flamingos 2: a calibration's read mode and reads follow its exposure time"):
+  property("Flamingos 2: a calibration is always taken in Bright read mode"):
     forAll: (d: Flamingos2DynamicConfig) =>
-      val mode = Flamingos2ReadMode.forExposureTime(d.exposure)
+      val mode = Flamingos2ReadMode.Bright
       assertEquals(SmartGcalRules.flamingos2.calibrationConfig(d), d.copy(readMode = mode, reads = mode.readCount))
 
   property("GNIRS: the lookup uses the step's own configuration"):
