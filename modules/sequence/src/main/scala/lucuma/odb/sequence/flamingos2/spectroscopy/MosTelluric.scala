@@ -52,9 +52,6 @@ object MosTelluric:
   val ScienceAtomTitle: NonEmptyString =
     NonEmptyString.unsafeFrom("Telluric")
 
-  val CalAtomTitle: NonEmptyString =
-    NonEmptyString.unsafeFrom("Nighttime Calibrations")
-
   case class StepDefinition(
     science: NonEmptyList[ProtoStep[F2]],
     cals:    NonEmptyList[ProtoStep[F2]]
@@ -119,7 +116,7 @@ object MosTelluric:
       builder.buildStream:
         Stream.emits:
           List.fill(1.max(goalCycles.value))(ProtoAtom(ScienceAtomTitle.some, steps.science)) :+
-            ProtoAtom(CalAtomTitle.some, steps.cals)
+            ProtoAtom(Science.NighttimeCalTitle.some, steps.cals)
 
   def instantiate[F[_]: Monad](
     observationId: Observation.Id,
