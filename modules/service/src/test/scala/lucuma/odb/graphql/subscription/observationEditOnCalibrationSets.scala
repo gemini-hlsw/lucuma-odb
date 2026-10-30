@@ -48,7 +48,7 @@ class observationEditOnCalibrationSets extends OdbSuite with DaytimeCalibrationO
                     calibrationSets: [
                       {
                         kind: DARK
-                        count: 2
+                        explicitCount: 2
                         gmosNorth: {
                           exposure: { seconds: 10 }
                           readout: { xBin: TWO, yBin: TWO, ampCount: TWELVE, ampGain: LOW, ampReadMode: SLOW }

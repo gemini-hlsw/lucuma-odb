@@ -52,9 +52,9 @@ class daytimeCalibrationSets_flamingos2 extends OdbSuite with DatabaseOperations
 
   private val mockupSets: String =
     List(
-      s"{ kind: DARK, count: 10, ${setup(60, windowCover = "CLOSE".some)} }",
-      s"{ kind: FLAT, count: 3, $flatGcal, ${setup(15, slit = true)} }",
-      s"{ kind: ARC, count: 2, $arcGcal, ${setup(10, slit = true)} }"
+      s"{ kind: DARK, explicitCount: 10, ${setup(60, windowCover = "CLOSE".some)} }",
+      s"{ kind: FLAT, explicitCount: 3, $flatGcal, ${setup(15, slit = true)} }",
+      s"{ kind: ARC, explicitCount: 2, $arcGcal, ${setup(10, slit = true)} }"
     ).mkString(", ")
 
   private def createQuery(pid: Program.Id, sets: String): String =
@@ -203,7 +203,7 @@ class daytimeCalibrationSets_flamingos2 extends OdbSuite with DatabaseOperations
   test("a dark without a window cover stays unset"):
     for
       pid <- createProgramAs(staff)
-      oid <- createWithSets(pid, s"{ kind: DARK, count: 1, ${setup(5)} }")
+      oid <- createWithSets(pid, s"{ kind: DARK, explicitCount: 1, ${setup(5)} }")
       _   <- expect(
         staff,
         executionQuery(oid),
@@ -214,8 +214,8 @@ class daytimeCalibrationSets_flamingos2 extends OdbSuite with DatabaseOperations
   test("a bias or daytime observe is rejected"):
     for
       pid <- createProgramAs(staff)
-      _   <- expectRejected(pid, s"{ kind: BIAS, count: 1, ${setup(0)} }", "must be one of DARK, FLAT, ARC, SMART_FLAT, SMART_ARC, DAY_BASELINE, not BIAS")
-      _   <- expectRejected(pid, s"{ kind: DAYTIME_OBSERVE, count: 1, ${setup(1)} }", "must be one of DARK, FLAT, ARC, SMART_FLAT, SMART_ARC, DAY_BASELINE, not DAYTIME_OBSERVE")
+      _   <- expectRejected(pid, s"{ kind: BIAS, explicitCount: 1, ${setup(0)} }", "must be one of DARK, FLAT, ARC, SMART_FLAT, SMART_ARC, DAY_BASELINE, not BIAS")
+      _   <- expectRejected(pid, s"{ kind: DAYTIME_OBSERVE, explicitCount: 1, ${setup(1)} }", "must be one of DARK, FLAT, ARC, SMART_FLAT, SMART_ARC, DAY_BASELINE, not DAYTIME_OBSERVE")
     yield ()
 
   test("the setup must be for the mode's instrument"):
@@ -223,7 +223,7 @@ class daytimeCalibrationSets_flamingos2 extends OdbSuite with DatabaseOperations
       pid <- createProgramAs(staff)
       _   <- expectRejected(
         pid,
-        "{ kind: DARK, count: 1, gmosNorth: { exposure: { seconds: 1 }, readout: { xBin: ONE, yBin: ONE, ampCount: TWELVE, ampGain: LOW, ampReadMode: SLOW }, dtax: ZERO, roi: FULL_FRAME } }",
+        "{ kind: DARK, explicitCount: 1, gmosNorth: { exposure: { seconds: 1 }, readout: { xBin: ONE, yBin: ONE, ampCount: TWELVE, ampGain: LOW, ampReadMode: SLOW }, dtax: ZERO, roi: FULL_FRAME } }",
         "is for GMOS North but"
       )
     yield ()
@@ -338,7 +338,7 @@ class daytimeCalibrationSets_flamingos2 extends OdbSuite with DatabaseOperations
     val atoms = List(atom("Dark", 1, "DARK", 5, Json.Null, Json.Null))
     for
       pid <- createProgramAs(staff)
-      oid <- createWithSets(pid, s"{ kind: DARK, count: 1, ${setup(5)} }")
+      oid <- createWithSets(pid, s"{ kind: DARK, explicitCount: 1, ${setup(5)} }")
       _   <- recordVisitAs(serviceUser, oid)
       _   <- expect(staff, executionQuery(oid), expectedExecution(atoms).asRight)
     yield ()

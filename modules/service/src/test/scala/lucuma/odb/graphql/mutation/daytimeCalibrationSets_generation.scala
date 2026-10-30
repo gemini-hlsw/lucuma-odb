@@ -37,12 +37,12 @@ class daytimeCalibrationSets_generation extends OdbSuite with DatabaseOperations
 
   private val mockupSets: String =
     List(
-      s"{ kind: FLAT, count: 3, gcal: { continuum: QUARTZ_HALOGEN5, filter: ND10, shutter: OPEN }, ${setup(15, slit = true)} }",
-      s"{ kind: ARC, count: 5, gcal: { arcs: [AR_ARC], filter: ND10, shutter: CLOSED }, ${setup(10, slit = true)} }",
-      s"{ kind: DARK, count: 10, ${setup(1)} }",
-      s"{ kind: DARK, count: 10, ${setup(60)} }",
-      s"{ kind: BIAS, count: 5, ${setup(0, "ONE")} }",
-      s"{ kind: BIAS, count: 5, ${setup(0)} }"
+      s"{ kind: FLAT, explicitCount: 3, gcal: { continuum: QUARTZ_HALOGEN5, filter: ND10, shutter: OPEN }, ${setup(15, slit = true)} }",
+      s"{ kind: ARC, explicitCount: 5, gcal: { arcs: [AR_ARC], filter: ND10, shutter: CLOSED }, ${setup(10, slit = true)} }",
+      s"{ kind: DARK, explicitCount: 10, ${setup(1)} }",
+      s"{ kind: DARK, explicitCount: 10, ${setup(60)} }",
+      s"{ kind: BIAS, explicitCount: 5, ${setup(0, "ONE")} }",
+      s"{ kind: BIAS, explicitCount: 5, ${setup(0)} }"
     ).mkString(", ")
 
   private def createWithSets(pid: Program.Id, sets: String): IO[Observation.Id] =
@@ -263,7 +263,7 @@ class daytimeCalibrationSets_generation extends OdbSuite with DatabaseOperations
                        daytimeCalibration: {
                          instrument: GMOS_SOUTH
                          calibrationSets: [{
-                           kind: DARK, count: 2,
+                           kind: DARK, explicitCount: 2,
                            gmosSouth: {
                              exposure: { seconds: 5 }
                              readout: { xBin: ONE, yBin: ONE, ampCount: TWELVE, ampGain: LOW, ampReadMode: SLOW }
@@ -320,7 +320,7 @@ class daytimeCalibrationSets_generation extends OdbSuite with DatabaseOperations
       _   <- query(staff, s"""
                mutation {
                  updateObservations(input: {
-                   SET: { observingMode: { daytimeCalibration: { calibrationSets: [{ kind: DARK, count: 1, ${setup(1)} }] } } }
+                   SET: { observingMode: { daytimeCalibration: { calibrationSets: [{ kind: DARK, explicitCount: 1, ${setup(1)} }] } } }
                    WHERE: { id: { EQ: ${oid.asJson} } }
                  }) { observations { id } }
                }
@@ -336,7 +336,7 @@ class daytimeCalibrationSets_generation extends OdbSuite with DatabaseOperations
           mutation {
             createObservation(input: {
               programId: ${pid.asJson}
-              SET: { observingMode: { daytimeCalibration: { instrument: GMOS_NORTH, calibrationSets: [{ kind: DARK, count: 1001, ${setup(1)} }] } } }
+              SET: { observingMode: { daytimeCalibration: { instrument: GMOS_NORTH, calibrationSets: [{ kind: DARK, explicitCount: 1001, ${setup(1)} }] } } }
             }) { observation { id } }
           }
         """,
