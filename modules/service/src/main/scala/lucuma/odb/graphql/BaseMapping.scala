@@ -372,6 +372,7 @@ trait BaseMapping[F[_]]
   lazy val PosAngleConstraintType                  = schema.ref("PosAngleConstraint")
   lazy val PosBigDecimalType                       = schema.ref("PosBigDecimal")
   lazy val PosIntType                              = schema.ref("PosInt")
+  lazy val PosShortType                            = schema.ref("PosShort")
   lazy val ProgramEditType                         = schema.ref("ProgramEdit")
   lazy val ProgramIdType                           = schema.ref("ProgramId")
   lazy val ProgramNoteIdType                       = schema.ref("ProgramNoteId")

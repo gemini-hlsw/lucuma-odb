@@ -10,8 +10,11 @@ import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
 import io.circe.literal.*
+import io.circe.syntax.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ObservationWorkflowState
+import lucuma.core.enums.SlewStage
+import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -97,6 +100,12 @@ class groupProgress extends ExecutionTestSupportForGmos:
     withFreshSession: s =>
       s.execute(
         sql"update t_visit set c_site = #$site where c_observation_id = $observation_id".command
+      )(oid).void
+
+  def setVisitorEndDirectly(oid: Observation.Id, after: TimeSpan): IO[Unit] =
+    withFreshSession: s =>
+      s.execute(
+        sql"update t_visit set c_ta_visitor_end = c_end + make_interval(secs => #${(after.toMicroseconds / 1000000).toString}) where c_observation_id = $observation_id".command
       )(oid).void
 
   test("pending: nothing started"):
@@ -299,6 +308,37 @@ class groupProgress extends ExecutionTestSupportForGmos:
     yield assertEquals(
       js.hcursor.downFields("violations").focus.get,
       json"""["SAME_NIGHT_MULTIPLE_SITES"]"""
+    )
+
+  test("an observation declared complete without ever having been observed is left out"):
+    for
+      p  <- createProgram
+      o1 <- newObservation(p)
+      o2 <- newObservation(p)
+      g  <- group(p, List(o1, o2))
+      _  <- declareCompleteDirectly(o1)
+      _  <- completeObservation(o2)
+      js <- progress(g)
+    yield assertEquals(
+      (js.hcursor.downField("status").focus, js.hcursor.downField("required").focus),
+      (Some(Json.fromString("COMPLETE")), Some(Json.fromInt(1)))
+    )
+
+  test("a visitor observation completes where its time charge ends"):
+    for
+      p  <- createProgram
+      t  <- createTargetWithProfileAs(pi, p)
+      o1 <- createVisitorModeObservationAs(pi, p, VisitorObservingModeType.ZorroSpeckle, t)
+      o2 <- newObservation(p)
+      g  <- group(p, List(o1, o2), minI = Some(1.hrTimeSpan))
+      _  <- addSlewEventAs(serviceUser, o1, SlewStage.StartSlew)
+      _  <- declareCompleteDirectly(o1)
+      _  <- setVisitorEndDirectly(o1, 2.hrTimeSpan)
+      c  <- completionTime(o1) // the slew
+      js <- progress(g)
+    yield assertEquals(
+      js.hcursor.downFields("nextWindow", "start").focus,
+      Some(c +| 3.hrTimeSpan).map(_.asJson)
     )
 
   test("empty: a group with only inactive observations"):

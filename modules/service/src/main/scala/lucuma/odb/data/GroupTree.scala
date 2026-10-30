@@ -6,6 +6,7 @@ package lucuma.odb.data
 import cats.syntax.eq.*
 import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.NonNegShort
+import eu.timepit.refined.types.numeric.PosShort
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.model.Group
@@ -148,7 +149,9 @@ object GroupTree {
     maxInterval:      Option[TimeSpan],
     system:           Boolean,
     calibrationRoles: List[CalibrationRole],
-    sameNight:        Boolean
+    sameNight:        Boolean,
+    minObsPerNight:   Option[PosShort],
+    maxObsPerNight:   Option[PosShort]
   ) extends Parent with Child
 
   /**
