@@ -49,16 +49,16 @@ class updateObservations_DaytimeCalibrationSets extends OdbSuite with DatabaseOp
     "gcal: { arcs: [AR_ARC, CU_AR_ARC], filter: ND10, diffuser: IR, shutter: CLOSED }"
 
   private val bias: String =
-    s"{ kind: BIAS, count: 5, ${gmosNorthSetup(10, "CCD2")} }"
+    s"{ kind: BIAS, explicitCount: 5, ${gmosNorthSetup(10, "CCD2")} }"
 
   private val dark: String =
-    s"{ kind: DARK, count: 2, ${gmosNorthSetup(60)} }"
+    s"{ kind: DARK, explicitCount: 2, ${gmosNorthSetup(60)} }"
 
   private val flat: String =
-    s"{ kind: FLAT, count: 3, $flatGcal, ${gmosNorthSetup(15)} }"
+    s"{ kind: FLAT, explicitCount: 3, $flatGcal, ${gmosNorthSetup(15)} }"
 
   private val arc: String =
-    s"{ kind: ARC, count: 1, $arcGcal, ${gmosNorthSetup(10)} }"
+    s"{ kind: ARC, explicitCount: 1, $arcGcal, ${gmosNorthSetup(10)} }"
 
   private val setsSelection: String =
     """
@@ -227,12 +227,12 @@ class updateObservations_DaytimeCalibrationSets extends OdbSuite with DatabaseOp
   test("a flat needs a gcal with a continuum lamp"):
     for
       pid <- createProgramAs(staff)
-      _   <- expectRejected(pid, s"{ kind: FLAT, count: 1, ${gmosNorthSetup(1)} }", "needs a `gcal`")
-      _   <- expectRejected(pid, s"{ kind: FLAT, count: 1, $arcGcal, ${gmosNorthSetup(1)} }", "continuum lamp and no arc")
+      _   <- expectRejected(pid, s"{ kind: FLAT, explicitCount: 1, ${gmosNorthSetup(1)} }", "needs a `gcal`")
+      _   <- expectRejected(pid, s"{ kind: FLAT, explicitCount: 1, $arcGcal, ${gmosNorthSetup(1)} }", "continuum lamp and no arc")
     yield ()
 
   test("a flat may not use the 100W lamp outside GHOST"):
-    val qh100Flat = s"{ kind: FLAT, count: 1, gcal: { continuum: QUARTZ_HALOGEN100, filter: ND10, shutter: OPEN }, ${gmosNorthSetup(1)} }"
+    val qh100Flat = s"{ kind: FLAT, explicitCount: 1, gcal: { continuum: QUARTZ_HALOGEN100, filter: ND10, shutter: OPEN }, ${gmosNorthSetup(1)} }"
     for
       pid <- createProgramAs(staff)
       _   <- expectRejected(pid, qh100Flat, "available for GHOST only")
@@ -241,22 +241,22 @@ class updateObservations_DaytimeCalibrationSets extends OdbSuite with DatabaseOp
   test("an arc needs a gcal with arc lamps"):
     for
       pid <- createProgramAs(staff)
-      _   <- expectRejected(pid, s"{ kind: ARC, count: 1, $flatGcal, ${gmosNorthSetup(1)} }", "at least one arc lamp")
+      _   <- expectRejected(pid, s"{ kind: ARC, explicitCount: 1, $flatGcal, ${gmosNorthSetup(1)} }", "at least one arc lamp")
     yield ()
 
   test("a bias, dark or daytime observe takes no gcal"):
     for
       pid <- createProgramAs(staff)
-      _   <- expectRejected(pid, s"{ kind: BIAS, count: 1, $flatGcal, ${gmosNorthSetup(1)} }", "takes no `gcal`")
-      _   <- expectRejected(pid, s"{ kind: DAYTIME_OBSERVE, count: 1, $flatGcal, ${gmosNorthSetup(1)} }", "takes no `gcal`")
+      _   <- expectRejected(pid, s"{ kind: BIAS, explicitCount: 1, $flatGcal, ${gmosNorthSetup(1)} }", "takes no `gcal`")
+      _   <- expectRejected(pid, s"{ kind: DAYTIME_OBSERVE, explicitCount: 1, $flatGcal, ${gmosNorthSetup(1)} }", "takes no `gcal`")
     yield ()
 
   test("exactly one setup, for the mode's instrument"):
     for
       pid <- createProgramAs(staff)
-      _   <- expectRejected(pid, "{ kind: DARK, count: 1 }", "Exactly one instrument setup")
-      _   <- expectRejected(pid, s"{ kind: DARK, count: 1, ${gmosNorthSetup(1)}, $gmosSouthSetup }", "Exactly one instrument setup")
-      _   <- expectRejected(pid, s"{ kind: DARK, count: 1, $gmosSouthSetup }", "Calibration set 1 is for GMOS South but")
+      _   <- expectRejected(pid, "{ kind: DARK, explicitCount: 1 }", "Exactly one instrument setup")
+      _   <- expectRejected(pid, s"{ kind: DARK, explicitCount: 1, ${gmosNorthSetup(1)}, $gmosSouthSetup }", "Exactly one instrument setup")
+      _   <- expectRejected(pid, s"{ kind: DARK, explicitCount: 1, $gmosSouthSetup }", "Calibration set 1 is for GMOS South but")
     yield ()
 
   test("the instrument may not change under rows for another instrument"):
@@ -270,7 +270,7 @@ class updateObservations_DaytimeCalibrationSets extends OdbSuite with DatabaseOp
       )
       _   <- expect(
         user     = staff,
-        query    = updateQuery(oid, s"{ instrument: GMOS_SOUTH, calibrationSets: [{ kind: DARK, count: 1, $gmosSouthSetup }] }"),
+        query    = updateQuery(oid, s"{ instrument: GMOS_SOUTH, calibrationSets: [{ kind: DARK, explicitCount: 1, $gmosSouthSetup }] }"),
         expected = json"""
           {
             "updateObservations": {
@@ -361,7 +361,7 @@ class updateObservations_DaytimeCalibrationSets extends OdbSuite with DatabaseOp
       pid <- createProgramAs(staff)
       _   <- expect(
         user     = staff,
-        query    = createQuery(pid, "GMOS_SOUTH", s"{ kind: DAYTIME_OBSERVE, count: 2, $gmosSouthSetup }"),
+        query    = createQuery(pid, "GMOS_SOUTH", s"{ kind: DAYTIME_OBSERVE, explicitCount: 2, $gmosSouthSetup }"),
         expected = json"""
           {
             "createObservation": {

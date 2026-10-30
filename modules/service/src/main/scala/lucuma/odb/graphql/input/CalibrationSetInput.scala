@@ -72,8 +72,8 @@ object CalibrationSetInput:
 
   private def countFor(kind: CalibrationSetType, count: Option[PosInt]): Result[Option[PosInt]] =
     (kind.isSmart, count) match
-      case (true, Some(_)) => Result.failure(s"A ${kind.tag.toUpperCase} calibration set takes no `count`, Smart GCAL supplies it.")
-      case (false, None)   => Result.failure(s"A ${kind.tag.toUpperCase} calibration set needs a `count`.")
+      case (true, Some(_)) => Result.failure(s"A ${kind.tag.toUpperCase} calibration set takes no `explicitCount`, Smart GCAL supplies it.")
+      case (false, None)   => Result.failure(s"A ${kind.tag.toUpperCase} calibration set needs an `explicitCount`.")
       case _               => count.success
 
   // A bias takes no exposure and a smart kind gets its exposure time from the
@@ -107,7 +107,7 @@ object CalibrationSetInput:
     ObjectFieldsBinding.rmap:
       case List(
         CalibrationSetTypeBinding("kind", rKind),
-        CountBinding.Option("count", rCount),
+        CountBinding.Option("explicitCount", rCount),
         GcalBinding.Option("gcal", rGcal),
         GmosNorthDynamicInput.Binding.Option("gmosNorth", rNorth),
         GmosSouthDynamicInput.Binding.Option("gmosSouth", rSouth),

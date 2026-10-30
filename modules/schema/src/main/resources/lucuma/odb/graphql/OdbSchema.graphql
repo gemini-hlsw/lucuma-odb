@@ -3008,12 +3008,12 @@ input WarningDismissalInput {
   One of programId, proposalReference, and programReference must be supplied.
   """
   programId: ProgramId
-  
+
   """
   One of programId, proposalReference, and programReference must be supplied.
   """
   proposalReference: ProposalReferenceLabel
-  
+
   """
   One of programId, proposalReference, and programReference must be supplied.
   """
@@ -6345,10 +6345,7 @@ input DaytimeCalibrationInput {
 The kind of exposure a calibration set produces.  DAYTIME_OBSERVE is an
 exposure with the dome closed and no lamp, such as a pupil or bubble image.
 SMART_FLAT, SMART_ARC and DAY_BASELINE are resolved through the Smart GCAL
-tables when the sequence is generated: the lookup supplies the lamp
-configuration, exposure time and exposure count.  SMART_FLAT and SMART_ARC
-select by lamp type; DAY_BASELINE selects every row of the day baseline,
-flats and arcs alike (the OT's "Day Baseline GCAL").
+tables.
 """
 enum CalibrationSetType {
   BIAS
@@ -6371,17 +6368,17 @@ type CalibrationSet {
   kind: CalibrationSetType!
 
   """
-  Exposures requested for this setup, as given on input.  Always present for
-  a manual kind, always null for a smart kind.
+  Steps this set contributes to the sequence: `explicitCount` for a manual
+  step, the number of steps the Smart GCAL lookup returns for a smart step, or
+  null when the lookup finds no mapping for the setup.
   """
   count: PosInt
 
   """
-  Steps this set contributes to the sequence: `count` for a manual kind, the
-  number of steps the Smart GCAL lookup returns for a smart kind, or null when
-  the lookup finds no mapping for the setup.  Read only.
+  Exposures requested for this setup, as given on input.  Always present for
+  a manual step, always null for a smart step.
   """
-  stepCount: PosInt
+  explicitCount: PosInt
 
   """
   GCAL lamp configuration, present for FLAT and ARC only.
@@ -6428,21 +6425,16 @@ type CalibrationSetGcal {
 
 """
 Calibration set input.  Exactly one instrument setup must be given and it must
-match the mode's instrument.  A FLAT needs a `gcal` with a continuum lamp, an
-ARC one with at least one arc lamp; BIAS, DARK and DAYTIME_OBSERVE take none.
-A BIAS ignores the setup's exposure time and takes zero.  A smart kind
-(SMART_FLAT, SMART_ARC, DAY_BASELINE) takes neither `count` nor `gcal` and
-ignores the setup's exposure time: the Smart GCAL lookup supplies all three.
-A Flamingos 2 set may not be a BIAS or a DAYTIME_OBSERVE.
+match the mode's instrument.
 """
 input CalibrationSetInput {
   kind: CalibrationSetType!
 
   """
   Exposures taken with this setup, at most 1000.  Required for a manual kind,
-  rejected for a smart kind.
+  rejected for a smart kind, whose count comes from the Smart GCAL lookup.
   """
-  count: PosInt
+  explicitCount: PosInt
 
   """
   GCAL lamp configuration, required for FLAT and ARC, rejected otherwise.
