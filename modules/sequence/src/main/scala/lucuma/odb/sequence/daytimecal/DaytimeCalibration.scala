@@ -42,12 +42,13 @@ object DaytimeCalibration:
   private val Telescope: TelescopeConfig =
     TelescopeConfig(Offset.Zero, StepGuideState.Disabled)
 
+  // Numbered from one, as the user sees the rows.
   private def unavailable(oid: Observation.Id, index: Int, kind: CalibrationSetType, msg: String): OdbError =
-    OdbError.SequenceUnavailable(oid, s"Calibration set $index (${kind.tag.toUpperCase}) $msg".some)
+    OdbError.SequenceUnavailable(oid, s"Calibration set ${index + 1} (${kind.name}) $msg".some)
 
   /** The complaint for a smart set whose lookup failed. */
   def lookupFailed(oid: Observation.Id, index: Int, kind: CalibrationSetType, error: String): OdbError =
-    unavailable(oid, index, kind, s"could not be resolved: $error.")
+    OdbError.SequenceUnavailable(oid, s"Calibration set ${index + 1} (${kind.name}): $error.".some)
 
   private def stepConfig(oid: Observation.Id, index: Int, set: CalibrationSet[?]): Either[OdbError, StepConfig] =
     (set.kind, set.gcal) match
