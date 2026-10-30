@@ -70,7 +70,7 @@ object CalibrationSetInput:
       case (_, None) =>
         none.success
 
-  private def countFor(kind: CalibrationSetType, count: Option[PosInt]): Result[Option[PosInt]] =
+  private def explicitCountFor(kind: CalibrationSetType, count: Option[PosInt]): Result[Option[PosInt]] =
     (kind.isSmart, count) match
       case (true, Some(_)) => Result.failure(s"A ${kind.tag.toUpperCase} calibration set takes no `explicitCount`, Smart GCAL supplies it.")
       case (false, None)   => Result.failure(s"A ${kind.tag.toUpperCase} calibration set needs an `explicitCount`.")
@@ -121,7 +121,7 @@ object CalibrationSetInput:
             case _                     => Result.failure("Exactly one instrument setup (`gmosNorth`, `gmosSouth` or `flamingos2`) must be given.")
 
         (rKind, rCount, rGcal, rSetup).parFlatMapN: (kind, count, gcal, setup) =>
-          (checkKind(kind, setup), countFor(kind, count), gcalFor(kind, gcal, setup.instrument)).parMapN: (_, n, g) =>
+          (checkKind(kind, setup), explicitCountFor(kind, count), gcalFor(kind, gcal, setup.instrument)).parMapN: (_, n, g) =>
             CalibrationSet(kind, n, g, zeroExposure(kind, setup))
 
   /** The complaint, if any, about a set whose setup is not for the mode's instrument. */

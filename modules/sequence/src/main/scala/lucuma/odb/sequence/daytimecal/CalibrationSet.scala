@@ -15,21 +15,21 @@ import lucuma.odb.sequence.util.HashBytes
 
 /**
  * One generator row of a daytime calibration: the parameters that produce one
- * atom of DAY_CAL steps taken with this setup.  A manual kind takes `count`
- * identical steps with its own `gcal`; a smart kind has neither, since the
- * Smart GCAL lookup supplies the steps.
+ * atom of DAY_CAL steps taken with this setup.  A manual kind takes
+ * `explicitCount` identical steps with its own `gcal`; a smart kind has
+ * neither, since the Smart GCAL lookup supplies the steps.
  */
 final case class CalibrationSet[D](
-  kind:  CalibrationSetType,
-  count: Option[PosInt],
-  gcal:  Option[StepConfig.Gcal],
-  setup: D
+  kind:          CalibrationSetType,
+  explicitCount: Option[PosInt],
+  gcal:          Option[StepConfig.Gcal],
+  setup:         D
 )
 
 object CalibrationSet:
 
   given [D](using Eq[D]): Eq[CalibrationSet[D]] =
-    Eq.by(s => (s.kind, s.count.map(_.value), s.gcal, s.setup))
+    Eq.by(s => (s.kind, s.explicitCount.map(_.value), s.gcal, s.setup))
 
   private given HashBytes[StepConfig.Gcal] =
     HashBytes.forJsonEncoder
@@ -38,7 +38,7 @@ object CalibrationSet:
     def hashBytes(s: CalibrationSet[D]): Array[Byte] =
       Array.concat(
         HashBytes[CalibrationSetType].hashBytes(s.kind),
-        HashBytes[Option[PosInt]].hashBytes(s.count),
+        HashBytes[Option[PosInt]].hashBytes(s.explicitCount),
         HashBytes[Option[StepConfig.Gcal]].hashBytes(s.gcal),
         HashBytes[D].hashBytes(s.setup)
       )

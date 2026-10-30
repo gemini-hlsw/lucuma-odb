@@ -44,7 +44,7 @@ object DaytimeCalibrationExpansion:
       .value
 
   /**
-   * The exposure count of each set, in order: a manual set's own count, the
+   * The exposure count of each set, in order: a manual set's explicit count, the
    * number of steps a smart set's lookup returns, or none when the lookup
    * finds nothing.
    */
@@ -59,7 +59,7 @@ object DaytimeCalibrationExpansion:
         DaytimeCalibration.protoStep(oid, index, set).toOption.flatTraverse: step =>
           expander.expandStep(static, step).map(_.toOption.flatMap(s => PosInt.from(s.length).toOption))
       else
-        set.count.pure[F]
+        set.explicitCount.pure[F]
 
   /** `setCounts` for a whole daytime calibration, dispatching on its instrument. */
   def setCounts[F[_]: Monad](
@@ -71,4 +71,4 @@ object DaytimeCalibrationExpansion:
       case Instrument.Flamingos2 => setCounts(exp.flamingos2, DaytimeStatics.Flamingos2, oid, cfg.flamingos2Sets)
       case Instrument.GmosNorth  => setCounts(exp.gmosNorth,  DaytimeStatics.GmosNorth,  oid, cfg.gmosNorthSets)
       case Instrument.GmosSouth  => setCounts(exp.gmosSouth,  DaytimeStatics.GmosSouth,  oid, cfg.gmosSouthSets)
-      case _                     => cfg.sets.map(_.count).pure[F]
+      case _                     => cfg.sets.map(_.explicitCount).pure[F]
