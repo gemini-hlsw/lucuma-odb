@@ -4,6 +4,7 @@
 package lucuma.odb.sequence.daytimecal
 
 import cats.data.NonEmptyList
+import cats.syntax.apply.*
 import cats.syntax.either.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
@@ -13,6 +14,7 @@ import fs2.Stream
 import lucuma.core.enums.CalibrationSetType
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
+import lucuma.core.enums.SmartGcalType
 import lucuma.core.enums.StepGuideState
 import lucuma.core.math.Offset
 import lucuma.core.model.Observation
@@ -30,7 +32,9 @@ import java.util.UUID
 
 /**
  * Generates a daytime calibration sequence from its Calibration Sets: one
- * atom per set holding `count` identical DAY_CAL steps, never guided.
+ * atom per set, never guided.  A manual set's atom holds `explicitCount` identical
+ * DAY_CAL steps; a smart set's atom holds one smart GCAL step the caller
+ * expands with the instrument's SmartGcalExpander before building atoms.
  * Nothing here is instrument-specific.
  */
 object DaytimeCalibration:
@@ -38,45 +42,64 @@ object DaytimeCalibration:
   private val Telescope: TelescopeConfig =
     TelescopeConfig(Offset.Zero, StepGuideState.Disabled)
 
+  // Numbered from one, as the user sees the rows.
+  private def unavailable(oid: Observation.Id, index: Int, kind: CalibrationSetType, msg: String): OdbError =
+    OdbError.SequenceUnavailable(oid, s"Calibration set ${index + 1} (${kind.name}) $msg".some)
+
+  /** The complaint for a smart set whose lookup failed. */
+  def lookupFailed(oid: Observation.Id, index: Int, kind: CalibrationSetType, error: String): OdbError =
+    OdbError.SequenceUnavailable(oid, s"Calibration set ${index + 1} (${kind.name}): $error.".some)
+
   private def stepConfig(oid: Observation.Id, index: Int, set: CalibrationSet[?]): Either[OdbError, StepConfig] =
     (set.kind, set.gcal) match
       case (CalibrationSetType.Bias, _)                                => StepConfig.Bias.asRight
       case (CalibrationSetType.Dark, _)                                => StepConfig.Dark.asRight
       case (CalibrationSetType.DaytimeObserve, _)                      => StepConfig.Science.asRight
+      case (CalibrationSetType.SmartFlat, _)                           => StepConfig.SmartGcal(SmartGcalType.Flat).asRight
+      case (CalibrationSetType.SmartArc, _)                            => StepConfig.SmartGcal(SmartGcalType.Arc).asRight
+      case (CalibrationSetType.DayBaseline, _)                         => StepConfig.SmartGcal(SmartGcalType.DayBaseline).asRight
       case (CalibrationSetType.Flat | CalibrationSetType.Arc, Some(g)) => g.asRight
-      case (k, Some(_))                                                   =>
-        OdbError.SequenceUnavailable(oid, s"Calibration set $index (${k.name}) not supported yet.".some).asLeft
       case (k, None)                                                   =>
-        OdbError.SequenceUnavailable(oid, s"Calibration set $index (${k.name}) has no GCAL configuration.".some).asLeft
+        unavailable(oid, index, k, "has no GCAL configuration.").asLeft
+
+  private def stepCount(oid: Observation.Id, index: Int, set: CalibrationSet[?]): Either[OdbError, Int] =
+    (set.kind.isSmart, set.explicitCount) match
+      case (true, _)        => 1.asRight
+      case (false, Some(n)) => n.value.asRight
+      case (false, None)    => unavailable(oid, index, set.kind, "has no exposure count.").asLeft
+
+  private def description(set: CalibrationSet[?], count: Int): Option[NonEmptyString] =
+    val s = if set.kind.isSmart then set.kind.name else s"${set.kind.name} x$count"
+    NonEmptyString.from(s).toOption
+
+  /** The step a smart set looks up, or the step a manual set repeats. */
+  def protoStep[D](oid: Observation.Id, index: Int, set: CalibrationSet[D]): Either[OdbError, ProtoStep[D]] =
+    stepConfig(oid, index, set).map(sc => ProtoStep(set.setup, sc, Telescope, ObserveClass.DayCal))
 
   def protoAtom[D](oid: Observation.Id, index: Int, set: CalibrationSet[D]): Either[OdbError, ProtoAtom[ProtoStep[D]]] =
-    stepConfig(oid, index, set).map: sc =>
-      val step = ProtoStep(set.setup, sc, Telescope, ObserveClass.DayCal)
-      ProtoAtom(
-        NonEmptyString.from(s"${set.kind.name} x${set.count.value}").toOption,
-        NonEmptyList(step, List.fill(set.count.value - 1)(step))
-      )
+    (protoStep(oid, index, set), stepCount(oid, index, set)).mapN: (step, count) =>
+      ProtoAtom(description(set, count), NonEmptyList(step, List.fill(count - 1)(step)))
+
+  def protoAtoms[D](oid: Observation.Id, sets: List[CalibrationSet[D]]): Either[OdbError, List[ProtoAtom[ProtoStep[D]]]] =
+    sets.zipWithIndex.traverse((s, i) => protoAtom(oid, i, s))
 
   def generator[S, D](
-    oid:       Observation.Id,
     estimator: StepTimeEstimateCalculator[S, D],
     static:    S,
     namespace: UUID,
-    sets:      List[CalibrationSet[D]]
-  ): Either[OdbError, SequenceGenerator[D]] =
-    sets.zipWithIndex.traverse((s, i) => protoAtom(oid, i, s)).map: atoms =>
-      new SequenceGenerator[D]:
-        override def generate =
-          AtomBuilder
-            .instantiate(estimator, static, namespace, SequenceType.Science)
-            .buildStream(Stream.emits(atoms))
+    atoms:     List[ProtoAtom[ProtoStep[D]]]
+  ): SequenceGenerator[D] =
+    new SequenceGenerator[D]:
+      override def generate =
+        AtomBuilder
+          .instantiate(estimator, static, namespace, SequenceType.Science)
+          .buildStream(Stream.emits(atoms))
 
+  /** The execution config of already expanded atoms: no smart steps remain. */
   def executionConfig[S, D](
-    oid:       Observation.Id,
     estimator: StepTimeEstimateCalculator[S, D],
     static:    S,
     namespace: UUID,
-    sets:      List[CalibrationSet[D]]
-  ): Either[OdbError, StreamingExecutionConfig[Pure, S, D]] =
-    generator(oid, estimator, static, namespace, sets).map: g =>
-      StreamingExecutionConfig(static, SequenceGenerator.empty.generate, g.generate)
+    atoms:     List[ProtoAtom[ProtoStep[D]]]
+  ): StreamingExecutionConfig[Pure, S, D] =
+    StreamingExecutionConfig(static, SequenceGenerator.empty.generate, generator(estimator, static, namespace, atoms).generate)

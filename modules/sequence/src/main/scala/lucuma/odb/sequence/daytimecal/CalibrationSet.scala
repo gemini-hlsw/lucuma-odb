@@ -15,19 +15,21 @@ import lucuma.odb.sequence.util.HashBytes
 
 /**
  * One generator row of a daytime calibration: the parameters that produce one
- * atom of `count` identical DAY_CAL steps taken with this setup.
+ * atom of DAY_CAL steps taken with this setup.  A manual kind takes
+ * `explicitCount` identical steps with its own `gcal`; a smart kind has
+ * neither, since the Smart GCAL lookup supplies the steps.
  */
 final case class CalibrationSet[D](
-  kind:  CalibrationSetType,
-  count: PosInt,
-  gcal:  Option[StepConfig.Gcal],
-  setup: D
+  kind:          CalibrationSetType,
+  explicitCount: Option[PosInt],
+  gcal:          Option[StepConfig.Gcal],
+  setup:         D
 )
 
 object CalibrationSet:
 
   given [D](using Eq[D]): Eq[CalibrationSet[D]] =
-    Eq.by(s => (s.kind, s.count.value, s.gcal, s.setup))
+    Eq.by(s => (s.kind, s.explicitCount.map(_.value), s.gcal, s.setup))
 
   private given HashBytes[StepConfig.Gcal] =
     HashBytes.forJsonEncoder
@@ -36,7 +38,7 @@ object CalibrationSet:
     def hashBytes(s: CalibrationSet[D]): Array[Byte] =
       Array.concat(
         HashBytes[CalibrationSetType].hashBytes(s.kind),
-        HashBytes[PosInt].hashBytes(s.count),
+        HashBytes[Option[PosInt]].hashBytes(s.explicitCount),
         HashBytes[Option[StepConfig.Gcal]].hashBytes(s.gcal),
         HashBytes[D].hashBytes(s.setup)
       )
@@ -57,12 +59,19 @@ enum InstrumentSetup:
 
   /**
    * The set kinds this instrument may be given.  The Flamingos 2 list is
-   * mirrored by the kind trigger in V1372, keep them in step.
+   * mirrored by the kind trigger in V1377, keep them in step.
    */
   def allowedKinds: List[CalibrationSetType] =
     this match
-      case Flamingos2(_)               => List(CalibrationSetType.Dark, CalibrationSetType.Flat, CalibrationSetType.Arc)
+      case Flamingos2(_)               => CalibrationSetType.values.toList.filterNot(k => k === CalibrationSetType.Bias || k === CalibrationSetType.DaytimeObserve)
       case GmosNorth(_) | GmosSouth(_) => CalibrationSetType.values.toList
+
+  /** Whether the setup disperses light, which an arc requires. */
+  def hasDisperser: Boolean =
+    this match
+      case Flamingos2(c) => c.disperser.isDefined
+      case GmosNorth(c)  => c.gratingConfig.isDefined
+      case GmosSouth(c)  => c.gratingConfig.isDefined
 
 object InstrumentSetup:
 
