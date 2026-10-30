@@ -1602,4 +1602,99 @@ class timeAccounting extends OdbSuite with DatabaseOperations with ExecutionTest
       _           <- assertIO(visitFinalProgramTime(v), 100.sec)
     yield ()
 
+  // The visit's own interval alongside the one its time charge was measured
+  // over.
+  def intervalsQuery(oid: Observation.Id): String =
+    s"""
+      query {
+        observation(observationId: "$oid") {
+          execution {
+            visits {
+              matches {
+                interval { start end }
+                timeChargeInvoice { interval { start end } }
+              }
+            }
+          }
+        }
+      }
+    """
+
+  def intervalsExpected(
+    visit:   Option[TimestampInterval],
+    charged: Option[TimestampInterval]
+  ): Either[List[String], Json] =
+    def interval(i: Option[TimestampInterval]): Json =
+      i.fold(Json.Null): i =>
+        Json.obj("start" -> i.start.asJson, "end" -> i.end.asJson)
+
+    json"""
+      {
+        "observation": {
+          "execution": {
+            "visits": {
+              "matches": [
+                {
+                  "interval": ${interval(visit)},
+                  "timeChargeInvoice": { "interval": ${interval(charged)} }
+                }
+              ]
+            }
+          }
+        }
+      }
+    """.asRight
+
+  test("timeChargeInvoice interval (no events)"):
+    for
+      _ <- cleanup
+      v <- recordVisit(pi, serviceUser, mode, visitTime, 1, 1, 1, 3900)
+      _ <- expect(pi, intervalsQuery(v.oid), intervalsExpected(None, None))
+    yield ()
+
+  test("timeChargeInvoice interval (ordinary visit)"):
+    val i = TimestampInterval.between(t00, t10)
+    for
+      _ <- cleanup
+      v <- recordVisit(pi, serviceUser, mode, visitTime, 1, 1, 1, 3950)
+      _ <- insertSequence(v, t00, t10)
+      _ <- runTimeAccounting(v.oid)
+      _ <- expect(pi, intervalsQuery(v.oid), intervalsExpected(i.some, i.some))
+    yield ()
+
+  test("visitor: timeChargeInvoice interval runs to dawn once the night is over"):
+    val t0 = (-20).fromNightEnd
+    val t1 = (-10).fromNightEnd
+    for
+      _         <- cleanup
+      (p, o, v) <- recordVisitorVisit(visitTime)
+      _         <- insertSlew(p, o, v, t0, t1)
+      _         <- runTimeAccounting(o)
+      _         <- expect(pi, intervalsQuery(o), intervalsExpected(
+                     TimestampInterval.between(t0, t1).some,
+                     TimestampInterval.between(t0, 0.fromNightEnd).some
+                   ))
+    yield ()
+
+  test("visitor: timeChargeInvoice interval runs to the next visit"):
+    val slew = TimestampInterval.between(future(0), future(10))
+    for
+      _         <- cleanup
+      (p, o, v) <- recordVisitorVisit(futureTime)
+      _         <- insertSlew(p, o, v, slew.start, slew.end)
+      _         <- runTimeAccounting(o)
+
+      // While the night is in progress, only the slew is charged.
+      _         <- expect(pi, intervalsQuery(o), intervalsExpected(slew.some, slew.some))
+
+      next      <- recordVisit(pi, serviceUser, mode, futureTime, 1, 1, 1, 4000)
+      _         <- insertSequence(next, future(30), future(40))
+      _         <- assertIO(runVisitorSweep, 1)
+      _         <- runTimeAccounting(o)
+      _         <- expect(pi, intervalsQuery(o), intervalsExpected(
+                     slew.some,
+                     TimestampInterval.between(future(0), future(30)).some
+                   ))
+    yield ()
+
 }

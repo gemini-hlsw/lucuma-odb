@@ -22425,6 +22425,17 @@ time along with any automatically applied discounts (e.g., for bad weather)
 and manual adjustments made by staff.
 """
 type TimeChargeInvoice {
+  """
+  The interval over which the raw 'executionTime' was measured, before any
+  discounts.  For most visits this is the same as the visit's own 'interval',
+  from its first execution event to its last.  Visitor instrument visits,
+  which record only slew events, are charged from the slew until the next
+  chargeable visit at the site starts or, once the night is over, until
+  nautical dawn, so for them it extends to that point.  Null if the visit has
+  no events.
+  """
+  interval: TimestampInterval
+
   "Raw execution time."
   executionTime: CategorizedTime!
 
@@ -22665,7 +22676,11 @@ type Visit {
   "Site of the visit."
   site: Site!
 
-  "Time interval during which this visit executed."
+  """
+  Time interval from the visit's first execution event to its last.  For the
+  interval over which time is charged, which differs for visitor instrument
+  visits, see 'timeChargeInvoice.interval'.
+  """
   interval: TimestampInterval
 
   "Executed (or at least partially executed) atom records for this visit."
