@@ -242,7 +242,7 @@ class daytimeCalibrationSets_smart extends ExecutionTestSupportForGmos with Dayt
       _   <- expectOdbError(
         user     = staff,
         query    = executionQuery(oid),
-        expected = { case OdbError.SequenceUnavailable(_, Some(m)) if m.startsWith("Calibration set 1 (SMART_ARC) could not be resolved: missing Smart GCAL mapping") => () }
+        expected = { case OdbError.SequenceUnavailable(_, Some(m)) if m.startsWith("Calibration set 2 (Smart Arc): missing Smart GCAL mapping") => () }
       )
       _   <- runObscalcUpdate(pid, oid)
       res <- query(staff, workflowQuery(oid))
