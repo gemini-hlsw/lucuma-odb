@@ -82,11 +82,13 @@ object GroupProgressEvaluator:
   /**
    * What the evaluator needs to know about an observation.  `calibrationRole`
    * is its role, if it is a calibration.  `inactive` is true when a user has
-   * set it inactive (or declined it, for a telluric).
-   * `startTime` is when it started executing, once it has started.
-   * `completionTime` is when it finished, once it is complete, and is unknown
-   * only for an observation declared complete without ever having been
-   * observed.  `site` is where it was or would be observed, if known.
+   * set it inactive (or declined it, for a telluric).  `startTime` is when it
+   * started executing, once it has started.  `completionTime` is when it
+   * finished, once it is complete, and is unknown only for an observation
+   * declared complete without ever having been observed.  (For a visitor
+   * instrument, which records only slews, both come from its time charge; see
+   * `GroupProgressService.Statements.SelectFacts`.)  `site` is where it was or
+   * would be observed, if known.
    */
   final case class ObservationFacts(
     executionState:  ExecutionState,

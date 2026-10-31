@@ -16063,7 +16063,18 @@ type GroupWindow {
   end: Timestamp
 }
 
-"A group's progress toward satisfying its constraints."
+"""
+A group's progress toward satisfying its constraints.
+
+An observation's timing is taken from its execution: it starts with its first
+execution event other than a slew, and completes with its last event, as in
+`ExecutionTimestamps`.  A visitor instrument observation, which records only
+slews, is instead timed by its time charge: it starts with its first slew and
+completes where its charge ends, as in its visits'
+`timeChargeInvoice.interval`.  The charge end is recorded some time after the
+fact (the charge runs until the next chargeable visit at the site starts or the
+night ends), and until then the observation completes at its slew.
+"""
 type GroupProgress {
   status: GroupStatus!
 
