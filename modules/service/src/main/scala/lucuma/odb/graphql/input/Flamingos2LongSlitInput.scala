@@ -74,6 +74,8 @@ object Flamingos2LongSlitInput:
     def observingModeType: ObservingModeType =
       ObservingModeType.Flamingos2LongSlit
 
+    def needsStaffAccess: Boolean = fpu.isPinhole
+
     private val stored = explicitTelescopeConfigs.map(storedSlitTelescopeConfigs)
 
     val explicitSlitOffsetMode = stored.map(_.slitOffsetMode)
@@ -157,6 +159,8 @@ object Flamingos2LongSlitInput:
 
     val observingModeType: ObservingModeType =
       ObservingModeType.Flamingos2LongSlit
+
+    def needsStaffAccess: Boolean = fpu.exists(_.isPinhole)
 
     private val stored = explicitTelescopeConfigs.map(storedSlitTelescopeConfigs)
 
