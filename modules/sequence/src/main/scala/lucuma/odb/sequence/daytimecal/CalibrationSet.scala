@@ -59,7 +59,7 @@ enum InstrumentSetup:
 
   /**
    * The set kinds this instrument may be given.  The Flamingos 2 list is
-   * mirrored by the kind trigger in V1377, keep them in step.
+   * mirrored by the kind trigger in V1378, keep them in step.
    */
   def allowedKinds: List[CalibrationSetType] =
     this match

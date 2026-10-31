@@ -44,11 +44,11 @@ object DaytimeCalibration:
 
   // Numbered from one, as the user sees the rows.
   private def unavailable(oid: Observation.Id, index: Int, kind: CalibrationSetType, msg: String): OdbError =
-    OdbError.SequenceUnavailable(oid, s"Calibration set ${index + 1} (${kind.name}) $msg".some)
+    OdbError.SequenceUnavailable(oid, s"Calibration set ${index + 1} (${kind.name})$msg".some)
 
   /** The complaint for a smart set whose lookup failed. */
   def lookupFailed(oid: Observation.Id, index: Int, kind: CalibrationSetType, error: String): OdbError =
-    OdbError.SequenceUnavailable(oid, s"Calibration set ${index + 1} (${kind.name}): $error.".some)
+    unavailable(oid, index, kind, s": $error.")
 
   private def stepConfig(oid: Observation.Id, index: Int, set: CalibrationSet[?]): Either[OdbError, StepConfig] =
     (set.kind, set.gcal) match
@@ -60,13 +60,13 @@ object DaytimeCalibration:
       case (CalibrationSetType.DayBaseline, _)                         => StepConfig.SmartGcal(SmartGcalType.DayBaseline).asRight
       case (CalibrationSetType.Flat | CalibrationSetType.Arc, Some(g)) => g.asRight
       case (k, None)                                                   =>
-        unavailable(oid, index, k, "has no GCAL configuration.").asLeft
+        unavailable(oid, index, k, " has no GCAL configuration.").asLeft
 
   private def stepCount(oid: Observation.Id, index: Int, set: CalibrationSet[?]): Either[OdbError, Int] =
     (set.kind.isSmart, set.explicitCount) match
       case (true, _)        => 1.asRight
       case (false, Some(n)) => n.value.asRight
-      case (false, None)    => unavailable(oid, index, set.kind, "has no exposure count.").asLeft
+      case (false, None)    => unavailable(oid, index, set.kind, " has no exposure count.").asLeft
 
   private def description(set: CalibrationSet[?], count: Int): Option[NonEmptyString] =
     val s = if set.kind.isSmart then set.kind.name else s"${set.kind.name} x$count"

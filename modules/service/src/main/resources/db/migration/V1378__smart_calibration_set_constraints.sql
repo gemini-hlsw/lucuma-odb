@@ -1,6 +1,6 @@
--- Smart calibration sets take their lamp configuration, exposure time and 
+-- Smart calibration sets take their lamp configuration, exposure time and
 -- exposure count from the Smart GCAL lookup, so a smart row carries no count.
--- The constraints live apart from the enum change because a new enum value 
+-- The constraints live apart from the enum change because a new enum value
 -- cannot be used in the transaction that adds it.
 
 ALTER TABLE t_daytime_calibration_set
@@ -9,7 +9,7 @@ ALTER TABLE t_daytime_calibration_set
   ADD CONSTRAINT t_daytime_calibration_set_count_check CHECK (
     CASE
       WHEN c_kind IN ('smart_flat', 'smart_arc', 'day_baseline') THEN c_count IS NULL
-      ELSE c_count > 0
+      ELSE c_count IS NOT NULL AND c_count > 0
     END
   );
 

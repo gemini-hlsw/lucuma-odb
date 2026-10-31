@@ -62,7 +62,10 @@ trait CalibrationSetMapping[F[_]: Concurrent] extends DaytimeCalibrationSetView[
             cfgs.toList.traverse: (oid, cfg) =>
               DaytimeCalibrationExpansion.setCounts(exp, oid, cfg).map: counts =>
                 counts.zipWithIndex.map((n, i) => (oid, i) -> n.success)
-            .map(_.flatten.toMap),
+            .map: all =>
+              // A set removed between the two reads answers null, not an error.
+              val found = all.flatten.toMap
+              keys.map(k => k -> found.getOrElse(k, none[PosInt].success)).toMap,
       (_, n) => n.map(_.value).asJson.success
     )
 

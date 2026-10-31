@@ -25,28 +25,31 @@ import lucuma.odb.sequence.daytimecal.StaticConfigs as DaytimeStatics
  */
 object DaytimeCalibrationExpansion:
 
+  /** One set's atom with its smart step resolved; the error names the set. */
+  def expandSet[F[_]: Monad, S, D](
+    expander: SmartGcalExpander[F, S, D],
+    static:   S,
+    oid:      Observation.Id,
+    index:    Int,
+    set:      CalibrationSet[D]
+  ): F[Either[OdbError, ProtoAtom[ProtoStep[D]]]] =
+    DaytimeCalibration.protoAtom(oid, index, set) match
+      case Right(atom) if set.kind.isSmart =>
+        expander.expandAtom(static, atom).map(_.leftMap(DaytimeCalibration.lookupFailed(oid, index, set.kind, _)))
+      case other                           =>
+        other.pure[F]
+
   def expandAtoms[F[_]: Monad, S, D](
     expander: SmartGcalExpander[F, S, D],
     static:   S,
     oid:      Observation.Id,
     sets:     List[CalibrationSet[D]]
   ): F[Either[OdbError, List[ProtoAtom[ProtoStep[D]]]]] =
-    EitherT
-      .fromEither[F](DaytimeCalibration.protoAtoms(oid, sets))
-      .flatMap: atoms =>
-        atoms.zip(sets).zipWithIndex.traverse: (pair, index) =>
-          val (atom, set) = pair
-          if set.kind.isSmart then
-            EitherT(expander.expandAtom(static, atom))
-              .leftMap(e => DaytimeCalibration.lookupFailed(oid, index, set.kind, e))
-          else
-            EitherT.rightT[F, OdbError](atom)
-      .value
+    sets.zipWithIndex.traverse((set, index) => EitherT(expandSet(expander, static, oid, index, set))).value
 
   /**
-   * The exposure count of each set, in order: a manual set's explicit count, the
-   * number of steps a smart set's lookup returns, or none when the lookup
-   * finds nothing.
+   * The step count of each set, in order, read off the same expansion that
+   * builds its atom: none when the set cannot be expanded.
    */
   def setCounts[F[_]: Monad, S, D](
     expander: SmartGcalExpander[F, S, D],
@@ -55,11 +58,7 @@ object DaytimeCalibrationExpansion:
     sets:     List[CalibrationSet[D]]
   ): F[List[Option[PosInt]]] =
     sets.zipWithIndex.traverse: (set, index) =>
-      if set.kind.isSmart then
-        DaytimeCalibration.protoStep(oid, index, set).toOption.flatTraverse: step =>
-          expander.expandStep(static, step).map(_.toOption.flatMap(s => PosInt.from(s.length).toOption))
-      else
-        set.explicitCount.pure[F]
+      expandSet(expander, static, oid, index, set).map(_.toOption.flatMap(a => PosInt.from(a.steps.length).toOption))
 
   /** `setCounts` for a whole daytime calibration, dispatching on its instrument. */
   def setCounts[F[_]: Monad](
