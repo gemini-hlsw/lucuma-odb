@@ -271,6 +271,8 @@ fragment Group on Group {
   }
   ordered
   sameNight
+  minimumObservationsPerNight
+  maximumObservationsPerNight
 }
 
 fragment Observation on Observation {
