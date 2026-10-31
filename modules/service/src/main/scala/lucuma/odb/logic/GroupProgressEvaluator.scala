@@ -164,6 +164,93 @@ object GroupProgressEvaluator:
   private def nightEnd(n: LocalObservingNight, site: Site): Timestamp =
     Timestamp.fromInstantTruncatedAndBounded(n.atSite(site).end)
 
+  // A group's observations per night, given its limits: `min` (1 when unset)
+  // and `max`.  `completions` are those that count toward the group, in order,
+  // and `sites` the sites of the elements that count.
+  //
+  // The limits apply only at a single site, where each completion falls on one
+  // night.  Every completion of the group's elements counts toward its night,
+  // extras included, until the group completes, and then those on the night it
+  // completes.  The night in progress, if any, is that of the last of these,
+  // until it ends.
+  private final class ObservationsPerNight(
+    min:         Int,
+    max:         Option[Int],
+    viable:      List[Element],
+    completions: List[(Timestamp, Element)],
+    sites:       Set[Site],
+    countMet:    Boolean,
+    nextStart:   Option[Timestamp],
+    now:         Timestamp
+  ):
+
+    // The completions counted toward their nights.
+    private val counted: List[(Timestamp, Element)] =
+      val all = viable.mapFilter(e => e.completion.tupleRight(e))
+      if !countMet then all
+      else
+        (for
+          s <- Option.when(sites.size == 1)(sites.head)
+          t <- completions.lastOption.map(_._1)
+          e  = nightEnd(night(s, t), s)
+        yield all.filter(_._1 < e)).getOrElse(completions)
+
+    private val allSites: Set[Site] =
+      if countMet then sites ++ counted.flatMap(_._2.sites)
+      else viable.flatMap(_.sites).toSet
+
+    private val site: Option[Site] =
+      Option.when(allSites.size == 1)(allSites.head)
+
+    private val countsByNight: Map[LocalObservingNight, Int] =
+      site.fold(Map.empty): s =>
+        counted.groupMapReduce((t, _) => night(s, t))(_ => 1)(_ + _)
+
+    private val openNight: Option[(LocalObservingNight, Timestamp)] =
+      for
+        s <- site
+        t <- counted.map(_._1).maxOption
+        n  = night(s, t)
+        e  = nightEnd(n, s)
+        if now < e
+      yield (n, e)
+
+    private val openCount: Int =
+      openNight.fold(0)((n, _) => countsByNight.getOrElse(n, 0))
+
+    // The elements still to observe, extras included.
+    private val available: Int =
+      viable.count(_.isRemaining)
+
+    // Its observations are at more than one site, so its nights are ambiguous.
+    val multipleSites: Boolean =
+      allSites.size > 1
+
+    // The night in progress is short of the minimum, and so must take more.
+    val openNightShort: Boolean =
+      openNight.isDefined && openCount < min
+
+    // A night short of the minimum: one that has ended, or the night in
+    // progress once it can't be made up (the minimum interval reaches past its
+    // end, or too few elements remain).
+    val minimumViolated: Boolean =
+      countsByNight.exists: (n, c) =>
+        c < min && openNight.forall { (o, e) =>
+          o =!= n || nextStart.exists(_ >= e) || available < min - c
+        }
+
+    val maximumViolated: Boolean =
+      max.exists(m => countsByNight.values.exists(_ > m))
+
+    // A night in progress short of the minimum must take the next element, so
+    // it limits the window's end, and one at the maximum can't, so the window
+    // starts when it ends.
+    val windowEnd: Option[Timestamp] =
+      openNight.collect { case (_, e) if openNightShort => e }
+
+    val windowStart: Option[Timestamp] =
+      openNight.collect { case (_, e) if max.exists(openCount >= _) => e }
+
   private def evaluateBranch(
     branch: GroupTree.Branch,
     facts:  Map[Observation.Id, ObservationFacts],
@@ -258,58 +345,6 @@ object GroupProgressEvaluator:
     val countMet: Boolean =
       completed.size >= required.value
 
-    // Observations per night.  The limits apply only at a single site, where
-    // each completion falls on one night.  Every completion of the group's
-    // elements counts toward its night, extras included, until the group
-    // completes, and then those on the night it completes.  The night in
-    // progress, if any, is that of the last of these, until it ends.
-    val perNight: Boolean =
-      branch.minObsPerNight.isDefined || branch.maxObsPerNight.isDefined
-
-    val minPerNight: Int         = branch.minObsPerNight.fold(1)(_.value.toInt)
-    val maxPerNight: Option[Int] = branch.maxObsPerNight.map(_.value.toInt)
-
-    // The elements still to observe, extras included.
-    val available: Int =
-      viable.toList.count(_.isRemaining)
-
-    val perNightCompletions: List[(Timestamp, Element)] =
-      val all = viable.toList.mapFilter(e => e.completion.tupleRight(e))
-      if !countMet then all
-      else
-        (for
-          s <- Option.when(sites.size == 1)(sites.head)
-          t <- timed.lastOption
-          e  = nightEnd(night(s, t), s)
-        yield all.filter(_._1 < e)).getOrElse(completions)
-
-    val perNightSites: Set[Site] =
-      if countMet then sites ++ perNightCompletions.flatMap(_._2.sites)
-      else viable.toList.flatMap(_.sites).toSet
-
-    val perNightSite: Option[Site] =
-      Option.when(perNight && perNightSites.size == 1)(perNightSites.head)
-
-    val countsByNight: Map[LocalObservingNight, Int] =
-      perNightSite.fold(Map.empty): s =>
-        perNightCompletions.groupMapReduce((t, _) => night(s, t))(_ => 1)(_ + _)
-
-    val openNight: Option[(LocalObservingNight, Timestamp)] =
-      for
-        s <- perNightSite
-        t <- perNightCompletions.map(_._1).maxOption
-        n  = night(s, t)
-        e  = nightEnd(n, s)
-        if now < e
-      yield (n, e)
-
-    val openCount: Int =
-      openNight.fold(0)((n, _) => countsByNight.getOrElse(n, 0))
-
-    // The night in progress is short of the minimum, and so must take more.
-    val openNightShort: Boolean =
-      openNight.isDefined && openCount < minPerNight
-
     // Whether `later` started before the minimum interval had passed since a
     // completion at `t`.
     def startedTooSoon(t: Timestamp, later: Element): Boolean =
@@ -332,37 +367,35 @@ object GroupProgressEvaluator:
     val started: Boolean =
       elements.exists(_.started)
 
+    // Observations per night, for a group with either limit.
+    val perNight: Option[ObservationsPerNight] =
+      Option.when(branch.minObsPerNight.isDefined || branch.maxObsPerNight.isDefined)(
+        ObservationsPerNight(
+          min         = branch.minObsPerNight.fold(1)(_.value.toInt),
+          max         = branch.maxObsPerNight.map(_.value.toInt),
+          viable      = viable.toList,
+          completions = completions,
+          sites       = sites,
+          countMet    = countMet,
+          nextStart   = nextStart,
+          now         = now
+        )
+      )
+
     // The window ends at `Timestamp.Max` when nothing limits its end.  (There
     // is no window that would end before it starts, rather than one with its
     // ends swapped, but then the group is unschedulable anyway: the minimum
     // interval never exceeds the maximum, and a night that ends too soon is a
     // violation below.)
-    //
-    // A night in progress short of the minimum must take the next element, so
-    // it limits the window's end, and one at the maximum can't, so the window
-    // starts when it ends.
     val nextWindow: Option[TimestampInterval] =
-      val perNightEnd: Option[Timestamp] =
-        openNight.collect { case (_, e) if openCount < minPerNight => e }
-      val perNightStart: Option[Timestamp] =
-        openNight.collect { case (_, e) if maxPerNight.exists(openCount >= _) => e }
       for
         last   <- timed.lastOption
         start0 <- nextStart
-        if minInterval.isDefined || maxInterval.isDefined || branch.sameNight || perNight
-        start   = (start0 :: perNightStart.toList).max
-        end     = (maxInterval.map(last +| _).toList ++ sameNightEnd.toList ++ perNightEnd.toList).minOption.getOrElse(Timestamp.Max)
+        if minInterval.isDefined || maxInterval.isDefined || branch.sameNight || perNight.isDefined
+        start   = (start0 :: perNight.flatMap(_.windowStart).toList).max
+        end     = (maxInterval.map(last +| _).toList ++ sameNightEnd.toList ++ perNight.flatMap(_.windowEnd).toList).minOption.getOrElse(Timestamp.Max)
         if start <= end
       yield TimestampInterval.between(start, end)
-
-    // A night short of the minimum: one that has ended, or the night in
-    // progress once it can't be made up (the minimum interval reaches past its
-    // end, or too few elements remain).
-    def perNightShort: Boolean =
-      countsByNight.exists: (n, c) =>
-        c < minPerNight && openNight.forall { (o, e) =>
-          o =!= n || nextStart.exists(_ >= e) || available < minPerNight - c
-        }
 
     import GroupConstraintViolation.*
 
@@ -399,15 +432,15 @@ object GroupProgressEvaluator:
             (!countMet && sameNightEnd.exists(end => now >= end || nextStart.exists(_ >= end)))
           )
         ),
-        ObservationsPerNightMultipleSites -> (perNight && perNightSites.size > 1),
-        ObservationsPerNightMinimum       -> (perNight && perNightShort),
-        ObservationsPerNightMaximum       -> (perNight && maxPerNight.exists(max => countsByNight.values.exists(_ > max)))
+        ObservationsPerNightMultipleSites -> perNight.exists(_.multipleSites),
+        ObservationsPerNightMinimum       -> perNight.exists(_.minimumViolated),
+        ObservationsPerNightMaximum       -> perNight.exists(_.maximumViolated)
       ).collect { case (v, true) => v }
 
     val progress: GroupProgress =
       NonEmptyList.fromList(violations) match
         case Some(vs)         => GroupProgress.Unschedulable(completedCount, required, vs.toNes)
-        case None if countMet && !openNightShort => GroupProgress.Complete(completedCount, required)
+        case None if countMet && !perNight.exists(_.openNightShort) => GroupProgress.Complete(completedCount, required)
         case None if started  => GroupProgress.Ongoing(completedCount, required, nextWindow)
         case None             => GroupProgress.Pending(required)
 
