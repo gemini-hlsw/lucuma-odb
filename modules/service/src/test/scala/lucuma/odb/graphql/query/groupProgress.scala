@@ -272,12 +272,11 @@ class groupProgress extends ExecutionTestSupportForGmos:
       js            <- progress(g)
     yield assertEquals(statusAndRequired(js), ("PENDING", 1))
 
-  test("a daytime pinhole set inactive itself still follows its active science observation"):
+  test("a daytime pinhole is left out of its calibration group"):
     for
-      (g, _, cal) <- calibrationGroup(CalibrationRole.DaytimePinhole)
-      _             <- inactivateDirectly(cal)
-      js            <- progress(g)
-    yield assertEquals(statusAndRequired(js), ("PENDING", 2))
+      (g, _, _) <- calibrationGroup(CalibrationRole.DaytimePinhole)
+      js        <- progress(g)
+    yield assertEquals(statusAndRequired(js), ("PENDING", 1))
 
   test("an observation that starts within the minimum interval sinks the group at once"):
     for

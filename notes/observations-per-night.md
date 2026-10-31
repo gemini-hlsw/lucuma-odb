@@ -35,7 +35,11 @@ the simple case.)
   observation was, so forbidding it would rule out per-night limits for those
   instruments, and would make calibration generation fail.  It counts as one
   observation that completes when the group completes, on that night.  The
-  calibrations inside it are not counted separately.  Calibration observations
+  calibrations inside it are not counted separately.  Group progress ignores
+  daytime calibrations (`DAYTIME_PINHOLE`, `DAYTIME_CALIBRATION`) everywhere,
+  since a flat may be taken the following afternoon, on the next observing
+  night.  So the group completes with its science observation and any
+  tellurics, all taken at night.  Calibration observations
   are never direct children of a user group otherwise.
 - **Counted completions**: every completion of a counted observation, on any
   night up to and including the night the group completes.  This includes an
@@ -88,8 +92,9 @@ least this many must complete that night.  Nights on which none complete are
 unconstrained.  Null means no minimum.  Every completion counts, including an
 OR group's extras, through the night the group completes; later ones don't.
 A per-observation calibration group (a science observation with its
-calibrations) counts as one observation.  Mutually exclusive with
-`sameNight`.
+calibrations) counts as one observation.  Daytime calibrations are ignored,
+so it completes with its science observation and any tellurics.  Mutually
+exclusive with `sameNight`.
 """
 minimumObservationsPerNight: PosShort
 

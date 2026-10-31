@@ -81,7 +81,7 @@ object GroupProgressService:
         // Inactive as the workflow decides it.
         val inactive = ObservationValidationInfo.effectiveUserState(role, own, science).contains(ObservationWorkflowState.Inactive)
         // Where it was observed, if it has been; otherwise its instrument's site.
-        oid -> ObservationFacts(state, inactive, start, completion, visitSite.orElse(inst.map(_.site)))
+        oid -> ObservationFacts(state, role, inactive, start, completion, visitSite.orElse(inst.map(_.site)))
 
     // A visitor instrument visit has only slews, and time accounting charges
     // it until the next visit at the site starts or the night ends (see

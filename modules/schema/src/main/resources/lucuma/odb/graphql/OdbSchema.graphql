@@ -15899,8 +15899,9 @@ type Group {
   unconstrained.  Null means no minimum.  Every completion counts, including an
   OR group's extras, through the night the group completes; later ones don't.
   A per-observation calibration group (a science observation with its
-  calibrations) counts as one observation.  Mutually exclusive with
-  `sameNight`.
+  calibrations) counts as one observation.  Daytime calibrations are ignored,
+  so it completes with its science observation and any tellurics.  Mutually
+  exclusive with `sameNight`.
   """
   minimumObservationsPerNight: PosShort
 
@@ -15962,8 +15963,9 @@ observe, has started, is complete, or can no longer be completed.
 enum GroupStatus {
   """
   The group has nothing to observe: no elements, or only inactive observations,
-  observations declared complete without ever having been observed, and empty
-  subgroups.  Its parent group leaves it out.
+  observations declared complete without ever having been observed, daytime
+  calibrations, and empty subgroups.  Its parent group leaves it out.  (Group
+  progress ignores daytime calibrations, which may be taken the following day.)
   """
   EMPTY
 

@@ -8,6 +8,7 @@ import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.numeric.PosShort
+import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ExecutionState
 import lucuma.core.enums.GroupConstraintViolation
 import lucuma.core.enums.GroupConstraintViolation.*
@@ -50,13 +51,14 @@ class GroupProgressEvaluatorSuite extends FunSuite:
 
   def leaf(
     n:        Long,
-    state:    ExecutionState    = ExecutionState.NotStarted,
-    time:     Option[Timestamp] = None,
-    site:     Site              = Site.GN,
-    inactive: Boolean           = false,
-    start:    Option[Timestamp] = None
+    state:    ExecutionState          = ExecutionState.NotStarted,
+    time:     Option[Timestamp]       = None,
+    site:     Site                    = Site.GN,
+    inactive: Boolean                 = false,
+    start:    Option[Timestamp]       = None,
+    role:     Option[CalibrationRole] = None
   ): Node =
-    obs(n, ObservationFacts(state, inactive, start, time, Some(site)))
+    obs(n, ObservationFacts(state, role, inactive, start, time, Some(site)))
 
   // A completed observation, by default started and completed at `t`.
   def done(n: Long, t: Timestamp, site: Site = Site.GN, start: Option[Timestamp] = None): Node =
@@ -549,6 +551,48 @@ class GroupProgressEvaluatorSuite extends FunSuite:
   test("per night: observations at more than one site"):
     val g = branch(1, List(leaf(1, site = Site.GN), leaf(2, site = Site.GS)), minN = Some(2))
     assertEquals(eval(g), unschedulable(0, 2, ObservationsPerNightMultipleSites))
+
+  // A GNIRS calibration group: science observation `n` completed at `t`, a
+  // telluric `n + 1` completed at `telluric`, if any, and a daytime pinhole
+  // flat `n + 2` completed at `pinhole`, if it has been.
+  def gnirsCalibrationGroup(g: Long, n: Long, t: Timestamp, telluric: Option[Timestamp] = None, pinhole: Option[Timestamp] = None): Node =
+    branch(
+      g,
+      List(done(n, t)) ++
+      telluric.toList.map(tt => leaf(n + 1, ExecutionState.Completed, Some(tt), start = Some(tt), role = Some(CalibrationRole.Telluric))) :+
+      leaf(
+        n + 2,
+        pinhole.fold(ExecutionState.NotStarted)(_ => ExecutionState.Completed),
+        pinhole,
+        start = pinhole,
+        role  = Some(CalibrationRole.DaytimePinhole)
+      )
+    )
+
+  // 15:00 HST on 16 October, the afternoon after t0's night: the next night.
+  val nextAfternoon: Timestamp = ts("2026-10-17T01:00:00Z")
+
+  test("a daytime calibration taken the next afternoon leaves its group on the science observation's night"):
+    val sub = gnirsCalibrationGroup(2, 2, t0, pinhole = Some(nextAfternoon))
+    val g   = branch(1, List(done(1, t0 +| hours(1)), sub), minN = Some(2))
+    assertEquals(eval(g, now = nextAfternoon +| hours(1)), complete(2, 2))
+
+  test("a daytime calibration still to do doesn't hold up its group"):
+    val sub = gnirsCalibrationGroup(2, 2, t0)
+    val g   = branch(1, List(done(1, t0 +| hours(1)), sub), minN = Some(2))
+    val all = evalAll(g, now = night0End +| hours(1))
+    assertEquals(all(gid(2)), complete(1, 1))
+    assertEquals(all(gid(1)), complete(2, 2))
+
+  test("same night: a daytime calibration taken the next afternoon is ignored"):
+    val sub = gnirsCalibrationGroup(2, 2, t0, pinhole = Some(nextAfternoon))
+    val g   = branch(1, List(done(1, t0 +| hours(1)), sub), sameNight = true)
+    assertEquals(eval(g, now = nextAfternoon +| hours(1)), complete(2, 2))
+
+  test("a telluric observed after its science observation completes the calibration group"):
+    val sub = gnirsCalibrationGroup(2, 2, t0 +| minutes(30), telluric = Some(t0 +| hours(2)), pinhole = Some(nextAfternoon))
+    val g   = branch(1, List(done(1, t0), sub), maxI = Some(hours(1)))
+    assertEquals(eval(g, now = nextAfternoon +| hours(1)), unschedulable(2, 2, MaximumInterval))
 
   test("per night: a calibration subgroup counts as one, on the night it completes"):
     val sub = branch(2, List(done(2, t0), done(3, t0 +| hours(1))))

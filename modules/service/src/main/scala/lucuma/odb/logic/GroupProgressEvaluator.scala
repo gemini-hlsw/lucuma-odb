@@ -10,6 +10,7 @@ import cats.syntax.functorFilter.*
 import cats.syntax.order.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.PosInt
+import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ExecutionState
 import lucuma.core.enums.GroupConstraintViolation
 import lucuma.core.enums.GroupStatus
@@ -30,8 +31,11 @@ import lucuma.odb.data.GroupTree
  *
  *   - An inactive observation that isn't complete is left out of its group
  *     entirely, as is a complete one with no completion time (declared
- *     complete without ever having been observed) and a subgroup left with no
- *     elements.  A group with no elements is empty.
+ *     complete without ever having been observed), a daytime calibration and
+ *     a subgroup left with no elements.  A group with no elements is empty.
+ *     Daytime calibrations may be taken the following day, on another
+ *     observing night, so a per-observation calibration group is just its
+ *     science observation and any tellurics, all taken at night.
  *   - A group requires `minRequired` elements, or all of them when unset.
  *     An ordered group requires the first ones, in order.  A subgroup counts
  *     as one element, complete when its own status is complete.
@@ -71,25 +75,31 @@ import lucuma.odb.data.GroupTree
  */
 object GroupProgressEvaluator:
 
+  /** Calibrations taken in the daytime, which group progress ignores. */
+  val DaytimeCalibrationRoles: Set[CalibrationRole] =
+    Set(CalibrationRole.DaytimePinhole, CalibrationRole.DaytimeCalibration)
+
   /**
-   * What the evaluator needs to know about an observation.  `inactive` is
-   * true when a user has set it inactive (or declined it, for a telluric).
+   * What the evaluator needs to know about an observation.  `calibrationRole`
+   * is its role, if it is a calibration.  `inactive` is true when a user has
+   * set it inactive (or declined it, for a telluric).
    * `startTime` is when it started executing, once it has started.
    * `completionTime` is when it finished, once it is complete, and is unknown
    * only for an observation declared complete without ever having been
    * observed.  `site` is where it was or would be observed, if known.
    */
   final case class ObservationFacts(
-    executionState: ExecutionState,
-    inactive:       Boolean,
-    startTime:      Option[Timestamp],
-    completionTime: Option[Timestamp],
-    site:           Option[Site]
+    executionState:  ExecutionState,
+    calibrationRole: Option[CalibrationRole],
+    inactive:        Boolean,
+    startTime:       Option[Timestamp],
+    completionTime:  Option[Timestamp],
+    site:            Option[Site]
   )
 
   object ObservationFacts:
     val NotStarted: ObservationFacts =
-      ObservationFacts(ExecutionState.NotStarted, false, None, None, None)
+      ObservationFacts(ExecutionState.NotStarted, None, false, None, None, None)
 
   /**
    * Evaluates every group in each of the trees, which should hold no deleted
@@ -131,8 +141,10 @@ object GroupProgressEvaluator:
       case NotDefined | NotStarted => false
       case _                       => true
     val time     = Option.when(complete)(leaf.completionTime).flatten
-    // Left out when inactive and incomplete, or complete with no known time.
-    val excluded = if complete then time.isEmpty else leaf.inactive
+    // Left out when a daytime calibration, inactive and incomplete, or
+    // complete with no known time.
+    val daytime  = leaf.calibrationRole.exists(DaytimeCalibrationRoles.contains)
+    val excluded = daytime || (if complete then time.isEmpty else leaf.inactive)
 
     Element(
       excluded      = excluded,
