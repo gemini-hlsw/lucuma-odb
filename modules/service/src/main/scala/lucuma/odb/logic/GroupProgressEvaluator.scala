@@ -70,8 +70,8 @@ import lucuma.odb.data.GroupTree
  *     `now` has passed: the maximum interval since the last completion, or the
  *     end of the completions' night with elements still to observe.  A night
  *     that ends before the minimum interval has passed is missed already.
- *     A night in progress short of the minimum is settled once the group has
- *     enough completions and too few elements remain to make up the night.
+ *     A night in progress short of the minimum is settled once too few
+ *     elements remain to make it up.
  */
 object GroupProgressEvaluator:
 
@@ -356,13 +356,12 @@ object GroupProgressEvaluator:
       yield TimestampInterval.between(start, end)
 
     // A night short of the minimum: one that has ended, or the night in
-    // progress once it can take no more (the minimum interval reaches past its
-    // end, or the group has enough completions and too few elements remain to
-    // make up the night).
+    // progress once it can't be made up (the minimum interval reaches past its
+    // end, or too few elements remain).
     def perNightShort: Boolean =
       countsByNight.exists: (n, c) =>
         c < minPerNight && openNight.forall { (o, e) =>
-          o =!= n || nextStart.exists(_ >= e) || (countMet && available < minPerNight - c)
+          o =!= n || nextStart.exists(_ >= e) || available < minPerNight - c
         }
 
     import GroupConstraintViolation.*

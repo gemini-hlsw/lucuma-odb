@@ -67,10 +67,11 @@ the simple case.)
     2, and if only one of those counted, that night would be short.
   - After the night the group completes, nothing counts.  Otherwise a single
     extra observed later would be a short night.
-- A group with enough completions stays `ONGOING` while the night in progress
-  is short of the minimum and an observation remains that could make it up.
-  Its window ends with that night.  If the night ends short, or no observation
-  remains to make it up, that is `OBSERVATIONS_PER_NIGHT_MINIMUM`.
+- While the night in progress is short of the minimum, the group's window ends
+  with that night, and a group with enough completions stays `ONGOING`.  If the
+  night ends short, or too few observations remain to make it up, that is
+  `OBSERVATIONS_PER_NIGHT_MINIMUM`, whether or not the group has enough
+  completions.
 - Only observed nights are constrained.  A night on which nothing in the group
   is observed never violates either limit.  The minimum does **not** mean
   "observe something every night."
@@ -146,8 +147,8 @@ Whether the nights still to come can satisfy the limits is deliberately not
 predicted.  A group that can never finish, such as 5 observations with
 minimum = maximum = 2, or one observation with a minimum of 2, is not flagged
 in advance.  It becomes `OBSERVATIONS_PER_NIGHT_MINIMUM` once a night comes up
-short: when that night ends, or earlier, once the group has enough
-completions and no observation remains that could make the night up.  The
+short: when that night ends, or earlier, once too few observations remain to
+make the night up.  The
 scheduler sees such a group's window close regardless.  (An earlier design
 flagged `OBSERVATIONS_PER_NIGHT_INFEASIBLE` up front; the arithmetic, with
 extras and the night in progress, was the riskiest part of the evaluator for

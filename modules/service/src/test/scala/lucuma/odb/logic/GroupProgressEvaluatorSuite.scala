@@ -490,6 +490,11 @@ class GroupProgressEvaluatorSuite extends FunSuite:
     val g = branch(1, List(done(1, t0), done(2, t0 +| hours(1))), minN = Some(3))
     assertEquals(eval(g, now = t0 +| hours(2)), unschedulable(2, 2, ObservationsPerNightMinimum))
 
+  test("per night: a short night in progress is settled when too few remain, even short of the count"):
+    // One done tonight and only one left, so tonight can reach 2 of 3 at best.
+    val g = branch(1, List(done(1, t0), leaf(2)), minN = Some(3))
+    assertEquals(eval(g, now = t0 +| hours(1)), unschedulable(1, 2, ObservationsPerNightMinimum))
+
   test("per night: more than the maximum on one night"):
     val g = branch(1, List(done(1, t0), done(2, t0 +| hours(1)), leaf(3)), maxN = Some(1))
     assertEquals(eval(g, now = t0 +| hours(2)), unschedulable(2, 3, ObservationsPerNightMaximum))
