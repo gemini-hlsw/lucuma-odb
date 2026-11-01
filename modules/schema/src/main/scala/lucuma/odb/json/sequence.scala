@@ -346,7 +346,7 @@ trait SequenceCodec {
   given (using Encoder[Offset], Encoder[TimeSpan], Encoder[Wavelength]): Encoder[InstrumentExecutionConfig.Gnirs] =
     rootEncoder(_.executionConfig)
 
-  given (using Encoder[Offset], Encoder[TimeSpan]): Encoder[InstrumentExecutionConfig.Igrins2] =
+  given (using Encoder[Offset], Encoder[TimeSpan], Encoder[Wavelength]): Encoder[InstrumentExecutionConfig.Igrins2] =
     rootEncoder(_.executionConfig)
 
   given Encoder[InstrumentExecutionConfig.Visitor] = v =>

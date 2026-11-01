@@ -95,6 +95,10 @@ sealed trait GeneratorStreaming[F[_]]:
     context: GeneratorContext
   )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, Igrins2Static, Igrins2Dynamic]]]
 
+  def generateDaytimeIgrins2(
+    context: GeneratorContext
+  ): F[Either[OdbError, StreamingExecutionConfig[F, Igrins2Static, Igrins2Dynamic]]]
+
   def selectOrGenerateFlamingos2LongSlit(
     context: GeneratorContext
   )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, Flamingos2Static, Flamingos2Dynamic]]]
@@ -419,7 +423,12 @@ object GeneratorStreaming:
       override def selectDaytimeIgrins2(
         context: GeneratorContext
       )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, Igrins2Static, Igrins2Dynamic]]] =
-        selectOrEmpty(DaytimeStatics.Igrins2, sequenceService.selectIgrins2Sequence(context.oid, _, _))
+        selectDaytime(DaytimeStatics.Igrins2, sequenceService.selectIgrins2Sequence(context.oid, _, _), generateDaytimeIgrins2(context))
+
+      override def generateDaytimeIgrins2(
+        context: GeneratorContext
+      ): F[Either[OdbError, StreamingExecutionConfig[F, Igrins2Static, Igrins2Dynamic]]] =
+        generateDaytime(context, calculator.igrins2Step, DaytimeStatics.Igrins2, exp.igrins2, _.igrins2Sets)
 
       override def selectOrGenerateFlamingos2LongSlit(
         context: GeneratorContext

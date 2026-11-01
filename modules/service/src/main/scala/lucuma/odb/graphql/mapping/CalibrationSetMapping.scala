@@ -26,10 +26,12 @@ import Services.Syntax.*
 import table.DaytimeCalibrationSetView
 import table.Flamingos2DynamicTables
 import table.GmosDynamicTables
+import table.Igrins2DynamicTable
 
 trait CalibrationSetMapping[F[_]: Concurrent] extends DaytimeCalibrationSetView[F]
                                                  with Flamingos2DynamicTables[F]
                                                  with GmosDynamicTables[F]
+                                                 with Igrins2DynamicTable[F]
                                                  with KeyValueEffectHandler[F]:
   this: SkunkMapping[F] =>
 
@@ -46,7 +48,8 @@ trait CalibrationSetMapping[F[_]: Concurrent] extends DaytimeCalibrationSetView[
       SqlObject("gcal"),
       SqlObject("gmosNorth", Join(DaytimeCalibrationSetView.Id, GmosNorthCalibrationSetupTable.Id)),
       SqlObject("gmosSouth", Join(DaytimeCalibrationSetView.Id, GmosSouthCalibrationSetupTable.Id)),
-      SqlObject("flamingos2", Join(DaytimeCalibrationSetView.Id, Flamingos2CalibrationSetupTable.Id))
+      SqlObject("flamingos2", Join(DaytimeCalibrationSetView.Id, Flamingos2CalibrationSetupTable.Id)),
+      SqlObject("igrins2", Join(DaytimeCalibrationSetView.Id, Igrins2CalibrationSetupTable.Id))
     )
 
   // A manual set's count is its explicit one; a smart set's is what the Smart
