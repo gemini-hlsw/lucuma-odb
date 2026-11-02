@@ -37,7 +37,6 @@ trait Igrins2Codec:
     Decoder.instance:
       _.downField("exposure").as[TimeSpan].map(Igrins2DynamicConfig.apply)
 
-  // The central wavelength is fixed, so it is emitted rather than stored.
   given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[Igrins2DynamicConfig] =
     Encoder.instance: a =>
       Json.obj(
