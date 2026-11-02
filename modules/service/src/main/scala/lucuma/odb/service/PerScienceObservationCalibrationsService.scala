@@ -162,6 +162,8 @@ object PerScienceObservationCalibrationsService:
                   minimumInterval = none,
                   maximumInterval = TimeSpan.Zero.some,
                   sameNight = false,
+                  minimumObservationsPerNight = none,
+                  maximumObservationsPerNight = none,
                   parentGroupId = parentGroupId,
                   parentGroupIndex = parentIndex,
                   existence = Existence.Present
