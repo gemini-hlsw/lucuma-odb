@@ -462,6 +462,83 @@ class createObservation_GnirsLongSlit extends OdbSuite:
           """)
         )
 
+  test("create GNIRS Long Slit with long camera and SXD defaults to the short camera XD decker"):
+    createProgramAs(staff).flatMap: pid =>
+      createTargetAs(staff, pid).flatMap: tid =>
+        expect(
+          user  = staff,
+          query =
+            s"""
+              mutation {
+                createObservation(input: {
+                  programId: "$pid"
+                  SET: {
+                    targetEnvironment: { asterism: [ "$tid" ] }
+                    scienceRequirements: {
+                      spectroscopy: {
+                        wavelength: { nanometers: 1650 }
+                        resolution: 500
+                        wavelengthCoverage: { nanometers: 1300 }
+                        focalPlane: SINGLE_SLIT
+                        focalPlaneAngle: { microarcseconds: 0 }
+                      }
+                    }
+                    observingMode: {
+                      gnirsSpectroscopy: {
+                        grating: D32
+                        prism: SXD
+                        camera: LONG_BLUE
+                        slit: { fpu: LONG_SLIT_0_30 }
+                        filter: CROSS_DISPERSED
+                        centralWavelengths: [
+                          {
+                            centralWavelength: { nanometers: 1650 }
+                            exposureTimeMode: {
+                              timeAndCount: {
+                                time: { seconds: 10.0 }
+                                count: 5
+                                at: { nanometers: 1650 }
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }) {
+                  observation {
+                    observingMode {
+                      gnirsSpectroscopy {
+                        prism
+                        camera
+                        decker
+                        defaultDecker
+                        explicitDecker
+                      }
+                    }
+                  }
+                }
+              }
+            """,
+          expected = Right(json"""
+            {
+              "createObservation": {
+                "observation": {
+                  "observingMode": {
+                    "gnirsSpectroscopy": {
+                      "prism": "SXD",
+                      "camera": "LONG_BLUE",
+                      "decker": "SHORT_CAM_CROSS_DISPERSED",
+                      "defaultDecker": "SHORT_CAM_CROSS_DISPERSED",
+                      "explicitDecker": null
+                    }
+                  }
+                }
+              }
+            }
+          """)
+        )
+
   test("update GNIRS Long Slit — set explicit overrides"):
     createProgramAs(pi).flatMap: pid =>
       createTargetAs(pi, pid).flatMap: tid =>
