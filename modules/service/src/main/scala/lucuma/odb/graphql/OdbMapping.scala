@@ -8,6 +8,7 @@ import _root_.skunk.Session
 import cats.ApplicativeThrow
 import cats.Monoid
 import cats.Parallel
+import cats.Reducible
 import cats.effect.*
 import cats.effect.std.SecureRandom
 import cats.effect.std.Supervisor
@@ -845,11 +846,19 @@ object OdbMapping {
           override implicit def Fragments: SqlFragment[AppliedFragment] =
             val delegate = super.Fragments
             new SqlFragment[AppliedFragment]:
-              export delegate.{ sqlTypeName => _, * }
+              export delegate.{ sqlTypeName => _, in => _, * }
               def sqlTypeName(codec: Codec): Option[String] =
                 codec._1 match
                   case DomainCodec(name, _) => Some(name)
                   case _ => delegate.sqlTypeName(codec)
+
+              // Grackle builds `x IN (...)` by folding `|+|` over one fragment per value, which
+              // nests the skunk encoder a level deeper per value.  Encoding recurses through every
+              // level, so a few thousand values overflow the stack.  A list encoder is flat.
+              def in[G[_]: Reducible, A](f: AppliedFragment, fs: G[A], enc: Encoder): AppliedFragment =
+                val as = fs.toList
+                val e  = enc.asInstanceOf[_root_.skunk.Encoder[A]].list(as.length)
+                f |+| delegate.const(" IN (") |+| delegate.bind(e, as) |+| delegate.const(")")
 
         }
 

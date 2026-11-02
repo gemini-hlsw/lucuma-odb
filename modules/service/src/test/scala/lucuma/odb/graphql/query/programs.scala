@@ -434,4 +434,13 @@ class programs extends OdbSuite {
       assertEquals(notActive.toSet, Set(pidComplete, pidExplicit, pidDerived))
       assertEquals(inOrOut.toSet, Set(pidComplete, pidExplicit, pidDerived))
 
+  // [sc-10520] Grackle's `IN` nested the skunk encoder one level per value, so
+  // encoding a list this long overflowed the stack.
+  test("[sc-10520] program selection via a very long id IN list"):
+    for
+      pid <- createProgramAs(pi)
+      ids  = pid :: (1 until 20000).toList.map(n => Program.Id.fromLong(1000000L + n).get)
+      res <- programsWhere(pi, s"id: { IN: [${ids.map(_.asJson.noSpaces).mkString(", ")}] }")
+    yield assertEquals(res, List(pid))
+
 }
