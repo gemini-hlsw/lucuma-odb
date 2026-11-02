@@ -14,6 +14,7 @@ import cats.syntax.traverse.*
 import coulomb.Quantity
 import grackle.Result
 import grackle.syntax.*
+import lucuma.core.enums.FilterType
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.GmosFpuType
@@ -163,6 +164,9 @@ object GmosLongSlitInput extends AcquisitionFilterCheck:
       def observingModeType: ObservingModeType =
         ObservingModeType.GmosNorthLongSlit
 
+      def needsStaffAccess: Boolean =
+        filter.exists(_.filterType === FilterType.Engineering)
+
     object North:
 
       val Binding: Matcher[North] =
@@ -211,6 +215,9 @@ object GmosLongSlitInput extends AcquisitionFilterCheck:
     ) extends Create[GmosSouthGrating, GmosSouthFilter, GmosSouthFpu] derives Eq:
       def observingModeType: ObservingModeType =
         ObservingModeType.GmosSouthLongSlit
+
+      def needsStaffAccess: Boolean =
+        filter.exists(_.filterType === FilterType.Engineering)
 
     object South:
 
@@ -319,6 +326,9 @@ object GmosLongSlitInput extends AcquisitionFilterCheck:
       val observingModeType: ObservingModeType =
         ObservingModeType.GmosNorthLongSlit
 
+      def needsStaffAccess: Boolean =
+        filter.toOption.exists(_.filterType === FilterType.Engineering)
+
       val toCreate: Result[Create.North] =
         (
           required(Site.GN, grating, "grating"),
@@ -384,6 +394,9 @@ object GmosLongSlitInput extends AcquisitionFilterCheck:
 
       val observingModeType: ObservingModeType =
         ObservingModeType.GmosSouthLongSlit
+
+      def needsStaffAccess: Boolean =
+        filter.toOption.exists(_.filterType === FilterType.Engineering)
 
       val toCreate: Result[Create.South] =
         (

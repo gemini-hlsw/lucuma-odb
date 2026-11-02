@@ -60,7 +60,15 @@ object ObservingModeInput:
         .orElse(visitor.map(_.mode))
 
     def needsStaffAccess: Boolean =
-      daytimeCalibration.isDefined || gnirsSpectroscopy.exists(_.needsStaffAccess)
+      daytimeCalibration.isDefined                    ||
+        flamingos2LongSlit.exists(_.needsStaffAccess) ||
+        gmosNorthIfu.exists(_.needsStaffAccess)       ||
+        gmosNorthLongSlit.exists(_.needsStaffAccess)  ||
+        gmosNorthMos.exists(_.needsStaffAccess)       ||
+        gmosSouthIfu.exists(_.needsStaffAccess)       ||
+        gmosSouthLongSlit.exists(_.needsStaffAccess)  ||
+        gmosSouthMos.exists(_.needsStaffAccess)       ||
+        gnirsSpectroscopy.exists(_.needsStaffAccess)
 
   object Create:
 
@@ -166,7 +174,15 @@ object ObservingModeInput:
         igrins2LongSlit.isDefined
 
     def needsStaffAccess: Boolean =
-      daytimeCalibration.isDefined || gnirsSpectroscopy.exists(_.needsStaffAccess)
+      daytimeCalibration.isDefined                    ||
+        flamingos2LongSlit.exists(_.needsStaffAccess) ||
+        gmosNorthIfu.exists(_.needsStaffAccess)       ||
+        gmosNorthLongSlit.exists(_.needsStaffAccess)  ||
+        gmosNorthMos.exists(_.needsStaffAccess)       ||
+        gmosSouthIfu.exists(_.needsStaffAccess)       ||
+        gmosSouthLongSlit.exists(_.needsStaffAccess)  ||
+        gmosSouthMos.exists(_.needsStaffAccess)       ||
+        gnirsSpectroscopy.exists(_.needsStaffAccess)
 
     /**
      * The observing mode types a telluric must have to accept this edit, or empty when the
