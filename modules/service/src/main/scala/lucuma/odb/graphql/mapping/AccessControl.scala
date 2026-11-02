@@ -416,12 +416,15 @@ trait AccessControl[F[_]] extends Predicates[F] {
         then ObservationWorkflowState.allButComplete
         else ObservationWorkflowState.fullSet         // always ok
 
-      // A telluric calibration is otherwise read-only, but accepts an edit to its science
-      // exposure time mode alone, and only from a SET for its own observing mode.
+      // Calibration observations are otherwise read-only, with two exceptions:
+      // any calibration accepts an edit that only sets or clears the QA state
+      // override (staff only), and a telluric calibration accepts an edit to
+      // its science exposure time mode alone, from a SET for its own observing
+      // mode.
       selectForObservationUpdateImpl(
         input.includeDeleted,
         input.WHERE,
-        includeCalibrations,
+        includeCalibrations || input.SET.onlyOverridesQaState,
         allowedStates,
         admittedTelluricModes = input.SET.admittedTelluricModes
       ).nestMap: oids =>

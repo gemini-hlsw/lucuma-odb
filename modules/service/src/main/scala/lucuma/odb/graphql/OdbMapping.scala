@@ -223,6 +223,7 @@ object OdbMapping {
           with GnirsImagingMapping[F]
           with GnirsSpectroscopyMapping[F]
           with ArchiveDuplicationMapping[F]
+          with ObservationQaMapping[F]
           with GnirsDynamicMapping[F]
           with GnirsAcquisitionMirrorOutMapping[F]
           with GnirsStaticMapping[F]
@@ -499,6 +500,8 @@ object OdbMapping {
                 GroupEditMapping,
                 ArchiveDuplicationMapping,
                 ArchiveMatchMapping,
+                ObservationQaMapping,
+                DatasetQaCountsMapping,
                 GroupElementMapping,
                 Igrins2LongSlitMapping,
                 Igrins2StaticMapping,

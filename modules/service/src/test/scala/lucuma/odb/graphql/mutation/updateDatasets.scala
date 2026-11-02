@@ -287,7 +287,7 @@ class updateDatasets extends OdbSuite with query.DatasetSetupOperations with que
               "c_new_file_date"             : null,
               "c_new_file_index"            : null,
               "c_new_filename"              : null,
-              "c_new_qa_state"              : "Pass",
+              "c_new_qa_state"              : "pass",
               "c_new_start_time"            : null,
               "c_new_end_time"              : null,
               "c_new_observation_id"        : null,
