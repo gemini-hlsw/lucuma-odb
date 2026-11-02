@@ -4,6 +4,7 @@
 package lucuma.odb.graphql
 package mapping
 
+import grackle.Path
 import io.circe.syntax.given
 import lucuma.core.model.sequence.igrins2.CentralWavelength
 import lucuma.odb.json.wavelength.query.given
@@ -12,9 +13,18 @@ import table.Igrins2DynamicTable
 
 trait Igrins2DynamicMapping[F[_]] extends Igrins2DynamicTable[F]:
 
-  lazy val Igrins2DynamicMapping: TypeMapping =
-    ObjectMapping(StepRecordType / "igrins2")(
-      SqlField("id", Igrins2DynamicTable.Id, key = true, hidden = true),
+  private def dynamicMappingAtPath(
+    path:  Path,
+    table: Igrins2DynamicTable[?]
+  ): ObjectMapping =
+    ObjectMapping(path)(
+      SqlField("id", table.Id, key = true, hidden = true),
       SqlObject("exposure"),
       CirceField("centralWavelength", CentralWavelength.asJson)
+    )
+
+  lazy val Igrins2DynamicMappings: List[TypeMapping] =
+    List(
+      dynamicMappingAtPath(StepRecordType / "igrins2", Igrins2DynamicTable),
+      dynamicMappingAtPath(CalibrationSetType / "igrins2", Igrins2CalibrationSetupTable)
     )

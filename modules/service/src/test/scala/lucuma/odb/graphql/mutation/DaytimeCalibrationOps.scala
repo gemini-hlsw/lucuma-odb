@@ -99,6 +99,15 @@ trait DaytimeCalibrationOps extends ReplaceSequenceOps:
       }
     """
 
+  def igrins2DarkStep: String =
+    """
+      {
+        instrumentConfig: { exposure: { seconds: 20 } }
+        stepConfig: { dark: true }
+        observeClass: DAY_CAL
+      }
+    """
+
   def workflowQuery(oid: Observation.Id): String =
     s"""
       query {

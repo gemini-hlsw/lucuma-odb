@@ -15,6 +15,7 @@ import ArbIgrins2DynamicConfig.given
 import ArbIgrins2StaticConfig.given
 import igrins2.given
 import time.query.given
+import wavelength.query.given
 
 class Igrins2Suite extends DisciplineSuite with ArbitraryInstances:
 

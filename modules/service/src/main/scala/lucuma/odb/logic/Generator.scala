@@ -874,8 +874,8 @@ object Generator:
             case _: ExchangeObservingModeType         =>
               EitherT.pure(())
 
-            // Only GMOS and Flamingos 2 daytime calibrations generate from
-            // Calibration Sets so far.  A stored sequence wins, and with no
+            // Only GMOS, Flamingos 2 and IGRINS-2 daytime calibrations generate
+            // from Calibration Sets so far.  A stored sequence wins, and with no
             // sets there is nothing to materialize: doing so anyway would
             // freeze the rows behind a visit that produced nothing.
             case _: DaytimeCalibrationObservingModeType =>
@@ -896,6 +896,10 @@ object Generator:
                   unlessMaterialized:
                     EitherT(streaming.generateDaytimeGmosSouth(ctx))
                       .flatMap(s => EitherT.liftF(sequenceService.materializeGmosSouthExecutionConfig(oid, s, sequenceTypes)))
+                case Instrument.Igrins2 =>
+                  unlessMaterialized:
+                    EitherT(streaming.generateDaytimeIgrins2(ctx))
+                      .flatMap(s => EitherT.liftF(sequenceService.materializeIgrins2ExecutionConfig(oid, s, sequenceTypes)))
                 case _                    =>
                   EitherT.pure(())
 

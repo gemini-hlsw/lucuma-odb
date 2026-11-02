@@ -16,7 +16,7 @@ trait DaytimeCalibrationSetView[F[_]] extends BaseMapping[F]:
     val ObservationId: ColumnRef = col("c_observation_id", observation_id)
     val Position: ColumnRef      = col("c_position",       int4)
     val Kind: ColumnRef          = col("c_kind",           calibration_set_type)
-    val Count: ColumnRef         = col("c_count",          int4_pos)
+    val ExplicitCount: ColumnRef = col("c_count",          int4_pos.opt)
 
     object Gcal:
       val SyntheticId: ColumnRef = col("c_gcal_id",        int8.embedded)

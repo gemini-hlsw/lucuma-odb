@@ -10,24 +10,27 @@ import lucuma.core.enums.CalibrationSetType
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig
+import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig
 import lucuma.odb.json.all.transport.given
 import lucuma.odb.sequence.util.HashBytes
 
 /**
  * One generator row of a daytime calibration: the parameters that produce one
- * atom of `count` identical DAY_CAL steps taken with this setup.
+ * atom of DAY_CAL steps taken with this setup.  A manual kind takes
+ * `explicitCount` identical steps with its own `gcal`; a smart kind has
+ * neither, since the Smart GCAL lookup supplies the steps.
  */
 final case class CalibrationSet[D](
-  kind:  CalibrationSetType,
-  count: PosInt,
-  gcal:  Option[StepConfig.Gcal],
-  setup: D
+  kind:          CalibrationSetType,
+  explicitCount: Option[PosInt],
+  gcal:          Option[StepConfig.Gcal],
+  setup:         D
 )
 
 object CalibrationSet:
 
   given [D](using Eq[D]): Eq[CalibrationSet[D]] =
-    Eq.by(s => (s.kind, s.count.value, s.gcal, s.setup))
+    Eq.by(s => (s.kind, s.explicitCount.map(_.value), s.gcal, s.setup))
 
   private given HashBytes[StepConfig.Gcal] =
     HashBytes.forJsonEncoder
@@ -36,7 +39,7 @@ object CalibrationSet:
     def hashBytes(s: CalibrationSet[D]): Array[Byte] =
       Array.concat(
         HashBytes[CalibrationSetType].hashBytes(s.kind),
-        HashBytes[PosInt].hashBytes(s.count),
+        HashBytes[Option[PosInt]].hashBytes(s.explicitCount),
         HashBytes[Option[StepConfig.Gcal]].hashBytes(s.gcal),
         HashBytes[D].hashBytes(s.setup)
       )
@@ -48,21 +51,32 @@ enum InstrumentSetup:
   case Flamingos2(config: Flamingos2DynamicConfig)
   case GmosNorth(config: DynamicConfig.GmosNorth)
   case GmosSouth(config: DynamicConfig.GmosSouth)
+  case Igrins2(config: Igrins2DynamicConfig)
 
   def instrument: lucuma.core.enums.Instrument =
     this match
       case Flamingos2(_) => lucuma.core.enums.Instrument.Flamingos2
       case GmosNorth(_)  => lucuma.core.enums.Instrument.GmosNorth
       case GmosSouth(_)  => lucuma.core.enums.Instrument.GmosSouth
+      case Igrins2(_)    => lucuma.core.enums.Instrument.Igrins2
 
   /**
-   * The set kinds this instrument may be given.  The Flamingos 2 list is
-   * mirrored by the kind trigger in V1372, keep them in step.
+   * The set kinds this instrument may be given.  The Flamingos 2 and
+   * IGRINS-2 lists are mirrored by the kind triggers in V1378 and V1379, keep
+   * them in step.
    */
   def allowedKinds: List[CalibrationSetType] =
     this match
-      case Flamingos2(_)               => List(CalibrationSetType.Dark, CalibrationSetType.Flat, CalibrationSetType.Arc)
+      case Flamingos2(_) | Igrins2(_)  => CalibrationSetType.values.toList.filterNot(k => k === CalibrationSetType.Bias || k === CalibrationSetType.DaytimeObserve)
       case GmosNorth(_) | GmosSouth(_) => CalibrationSetType.values.toList
+
+  /** Whether the setup disperses light, which an arc requires. */
+  def hasDisperser: Boolean =
+    this match
+      case Flamingos2(c) => c.disperser.isDefined
+      case GmosNorth(c)  => c.gratingConfig.isDefined
+      case GmosSouth(c)  => c.gratingConfig.isDefined
+      case Igrins2(_)    => true
 
 object InstrumentSetup:
 
@@ -71,11 +85,13 @@ object InstrumentSetup:
       case (Flamingos2(a), Flamingos2(b)) => a === b
       case (GmosNorth(a), GmosNorth(b))   => a === b
       case (GmosSouth(a), GmosSouth(b))   => a === b
+      case (Igrins2(a), Igrins2(b))       => a === b
       case _                              => false
 
   private given HashBytes[Flamingos2DynamicConfig] = HashBytes.forJsonEncoder
   private given HashBytes[DynamicConfig.GmosNorth] = HashBytes.forJsonEncoder
   private given HashBytes[DynamicConfig.GmosSouth] = HashBytes.forJsonEncoder
+  private given HashBytes[Igrins2DynamicConfig]    = HashBytes.forJsonEncoder
 
   given HashBytes[InstrumentSetup] with
     def hashBytes(s: InstrumentSetup): Array[Byte] =
@@ -83,3 +99,4 @@ object InstrumentSetup:
         case GmosNorth(c)  => Array.concat(Array[Byte](0), HashBytes[DynamicConfig.GmosNorth].hashBytes(c))
         case GmosSouth(c)  => Array.concat(Array[Byte](1), HashBytes[DynamicConfig.GmosSouth].hashBytes(c))
         case Flamingos2(c) => Array.concat(Array[Byte](2), HashBytes[Flamingos2DynamicConfig].hashBytes(c))
+        case Igrins2(c)    => Array.concat(Array[Byte](3), HashBytes[Igrins2DynamicConfig].hashBytes(c))

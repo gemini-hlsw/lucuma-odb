@@ -37,6 +37,7 @@ import lucuma.odb.data.ItcScience
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.sequence.ObservingMode.Syntax.*
+import lucuma.odb.sequence.SmartGcalExpander
 import lucuma.odb.sequence.StepTimeEstimateCalculator
 import lucuma.odb.sequence.data.StreamingExecutionConfig
 import lucuma.odb.sequence.daytimecal.StaticConfigs as DaytimeStatics
@@ -93,6 +94,10 @@ sealed trait GeneratorStreaming[F[_]]:
   def selectDaytimeIgrins2(
     context: GeneratorContext
   )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, Igrins2Static, Igrins2Dynamic]]]
+
+  def generateDaytimeIgrins2(
+    context: GeneratorContext
+  ): F[Either[OdbError, StreamingExecutionConfig[F, Igrins2Static, Igrins2Dynamic]]]
 
   def selectOrGenerateFlamingos2LongSlit(
     context: GeneratorContext
@@ -371,13 +376,14 @@ object GeneratorStreaming:
         context:   GeneratorContext,
         estimator: StepTimeEstimateCalculator[S, D],
         static:    S,
+        expander:  SmartGcalExpander[F, S, D],
         sets:      lucuma.odb.sequence.daytimecal.Config => List[lucuma.odb.sequence.daytimecal.CalibrationSet[D]]
       ): F[Either[OdbError, StreamingExecutionConfig[F, S, D]]] =
         import lucuma.odb.sequence.daytimecal.DaytimeCalibration
         (for
-          cfg <- extractMode(ObservingMode.DaytimeCalibrationName, context)(_.asDaytimeCalibration)
-          gen <- EitherT.fromEither[F](DaytimeCalibration.executionConfig(context.oid, estimator, static, context.namespace, sets(cfg)))
-        yield gen.covary[F]).value
+          cfg   <- extractMode(ObservingMode.DaytimeCalibrationName, context)(_.asDaytimeCalibration)
+          atoms <- EitherT(DaytimeCalibrationExpansion.expandAtoms(expander, static, context.oid, sets(cfg)))
+        yield DaytimeCalibration.executionConfig(estimator, static, context.namespace, atoms).covary[F]).value
 
       override def selectDaytimeFlamingos2(
         context: GeneratorContext
@@ -387,7 +393,7 @@ object GeneratorStreaming:
       override def generateDaytimeFlamingos2(
         context: GeneratorContext
       ): F[Either[OdbError, StreamingExecutionConfig[F, Flamingos2Static, Flamingos2Dynamic]]] =
-        generateDaytime(context, calculator.flamingos2Step, DaytimeStatics.Flamingos2, _.flamingos2Sets)
+        generateDaytime(context, calculator.flamingos2Step, DaytimeStatics.Flamingos2, exp.flamingos2, _.flamingos2Sets)
 
       override def selectDaytimeGmosNorth(
         context: GeneratorContext
@@ -397,7 +403,7 @@ object GeneratorStreaming:
       override def generateDaytimeGmosNorth(
         context: GeneratorContext
       ): F[Either[OdbError, StreamingExecutionConfig[F, GmosNorthStatic, GmosNorthDynamic]]] =
-        generateDaytime(context, calculator.gmosNorthStep, DaytimeStatics.GmosNorth, _.gmosNorthSets)
+        generateDaytime(context, calculator.gmosNorthStep, DaytimeStatics.GmosNorth, exp.gmosNorth, _.gmosNorthSets)
 
       override def selectDaytimeGmosSouth(
         context: GeneratorContext
@@ -407,7 +413,7 @@ object GeneratorStreaming:
       override def generateDaytimeGmosSouth(
         context: GeneratorContext
       ): F[Either[OdbError, StreamingExecutionConfig[F, GmosSouthStatic, GmosSouthDynamic]]] =
-        generateDaytime(context, calculator.gmosSouthStep, DaytimeStatics.GmosSouth, _.gmosSouthSets)
+        generateDaytime(context, calculator.gmosSouthStep, DaytimeStatics.GmosSouth, exp.gmosSouth, _.gmosSouthSets)
 
       override def selectDaytimeGnirs(
         context: GeneratorContext
@@ -417,7 +423,12 @@ object GeneratorStreaming:
       override def selectDaytimeIgrins2(
         context: GeneratorContext
       )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, Igrins2Static, Igrins2Dynamic]]] =
-        selectOrEmpty(DaytimeStatics.Igrins2, sequenceService.selectIgrins2Sequence(context.oid, _, _))
+        selectDaytime(DaytimeStatics.Igrins2, sequenceService.selectIgrins2Sequence(context.oid, _, _), generateDaytimeIgrins2(context))
+
+      override def generateDaytimeIgrins2(
+        context: GeneratorContext
+      ): F[Either[OdbError, StreamingExecutionConfig[F, Igrins2Static, Igrins2Dynamic]]] =
+        generateDaytime(context, calculator.igrins2Step, DaytimeStatics.Igrins2, exp.igrins2, _.igrins2Sets)
 
       override def selectOrGenerateFlamingos2LongSlit(
         context: GeneratorContext

@@ -8,6 +8,8 @@ import io.circe.Encoder
 import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.enums.Igrins2SlitOffsetPreset
+import lucuma.core.math.Wavelength
+import lucuma.core.model.sequence.igrins2.CentralWavelength
 import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig
 import lucuma.core.model.sequence.igrins2.Igrins2SVCImages
 import lucuma.core.model.sequence.igrins2.Igrins2StaticConfig
@@ -35,8 +37,11 @@ trait Igrins2Codec:
     Decoder.instance:
       _.downField("exposure").as[TimeSpan].map(Igrins2DynamicConfig.apply)
 
-  given (using Encoder[TimeSpan]): Encoder[Igrins2DynamicConfig] =
+  given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[Igrins2DynamicConfig] =
     Encoder.instance: a =>
-      Json.obj("exposure" -> a.exposure.asJson)
+      Json.obj(
+        "exposure"          -> a.exposure.asJson,
+        "centralWavelength" -> CentralWavelength.asJson
+      )
 
 object igrins2 extends Igrins2Codec
