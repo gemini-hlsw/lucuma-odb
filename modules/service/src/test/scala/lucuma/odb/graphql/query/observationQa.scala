@@ -24,10 +24,13 @@ import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
 import lucuma.core.syntax.string.*
+import lucuma.core.util.CalculationState
 import lucuma.odb.data.OdbError
+import lucuma.odb.graphql.subscription.SubscriptionUtils
 
 class observationQa extends OdbSuite with ExecutionQuerySetupOperations
-                                     with ExecutionTestSupportForGmos {
+                                     with ExecutionTestSupportForGmos
+                                     with SubscriptionUtils {
 
   val mode: ObservingModeType = ObservingModeType.GmosNorthLongSlit
 
@@ -303,5 +306,60 @@ class observationQa extends OdbSuite with ExecutionQuerySetupOperations
       _        <- assertIO(ids("{ datasets: { total: { EQ: 0 } } }"), Set(oD))
       _        <- assertIO(ids("{ datasets: { fail: { GTE: 1 } }, state: { NEQ: PASS } }"), Set(oA))
     yield ()
+
+  def observationEditSubscription(oid: Observation.Id): String =
+    s"""
+      subscription {
+        observationEdit(input: { observationId: "$oid" }) {
+          editType
+        }
+      }
+    """
+
+  val observationUpdated: Json =
+    json"""{ "observationEdit": { "editType": "UPDATED" } }"""
+
+  // Neither change crosses the boundary at which time accounting (and with it
+  // obscalc) is invalidated, yet each moves the calculated state.  A bulk edit
+  // of several datasets sends a single event.
+  test("dataset QA changes notify observationEdit subscribers"):
+    setup(150, 2).flatMap: (oid, ds) =>
+      subscriptionExpect(
+        user      = pi,
+        query     = observationEditSubscription(oid),
+        mutations = Right(
+          sleep >> setQa(DatasetQaState.Pass, ds)  >>  // null   -> PASS
+          sleep >> setQa(DatasetQaState.Usable, ds) >> // PASS   -> USABLE
+          sleep >> setQa(DatasetQaState.Fail, ds)      // USABLE -> FAIL
+        ),
+        expected  = List.fill(3)(observationUpdated)
+      )
+
+  def setSubtitle(oid: Observation.Id): IO[Unit] =
+    query(staff, s"""
+      mutation {
+        updateObservations(input: {
+          SET: { subtitle: "edited" }
+          WHERE: { id: { EQ: "$oid" } }
+        }) {
+          observations { id }
+        }
+      }
+    """).void
+
+  test("setting only the override does not invalidate obscalc"):
+    for
+      pid    <- createProgramAs(pi)
+      tid    <- createTargetWithProfileAs(pi, pid)
+      oid    <- createObservationAs(pi, pid, mode.some, tid)
+      _      <- setObscalcState(oid, CalculationState.Ready)
+      _      <- setOverride(staff, oid, Pass.some)
+      _      <- setOverride(staff, oid, None)
+      after  <- obscalcRow(oid).map(_._1)
+      _      <- setSubtitle(oid)
+      edited <- obscalcRow(oid).map(_._1)
+    yield
+      assertEquals(after, CalculationState.Ready)
+      assertEquals(edited, CalculationState.Pending)
 
 }

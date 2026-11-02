@@ -62,3 +62,36 @@ CROSS JOIN LATERAL (
       ELSE                                            'usable'
     END::e_observation_qa_state AS c_computed
 ) q;
+
+-- The rollup reads datasets, so a change to one that can move it (its QA
+-- state, or its being written) must tell observationEdit subscribers.  Postgres
+-- delivers one notification per distinct payload per transaction, so a bulk
+-- QA edit sends one per observation rather than one per dataset.
+CREATE TRIGGER dataset_qa_observation_edit_trigger
+  AFTER UPDATE ON t_dataset
+  FOR EACH ROW
+  WHEN (OLD.c_qa_state IS DISTINCT FROM NEW.c_qa_state
+     OR OLD.c_end_time IS DISTINCT FROM NEW.c_end_time)
+  EXECUTE FUNCTION ch_observation_edit_by_observation();
+
+-- Nothing obscalc computes depends on the override, so setting it alone should
+-- not queue a recalculation.  This replaces obsid_obscalc_invalidate (V0988)
+-- for t_observation only, comparing the rows without the override.
+CREATE FUNCTION observation_obscalc_invalidate()
+  RETURNS TRIGGER AS $$
+BEGIN
+  IF TG_OP = 'DELETE' THEN
+    CALL invalidate_obscalc(OLD.c_observation_id);
+  ELSIF TG_OP = 'INSERT' OR
+        (to_jsonb(NEW) - 'c_qa_state_override') IS DISTINCT FROM
+        (to_jsonb(OLD) - 'c_qa_state_override') THEN
+    CALL invalidate_obscalc(NEW.c_observation_id);
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE TRIGGER observation_invalidate_trigger
+  AFTER INSERT OR UPDATE OR DELETE ON t_observation
+  FOR EACH ROW EXECUTE FUNCTION observation_obscalc_invalidate();
