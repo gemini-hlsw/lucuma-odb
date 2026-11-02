@@ -490,6 +490,9 @@ trait Codecs extends CoreCodecs {
   val observation_priority: Codec[ObservationPriority] =
     enumerated(Type("e_observation_priority"))
 
+  val observation_qa_state: Codec[ObservationQaState] =
+    enumerated(Type("e_observation_qa_state"))
+
   val offset_generator_role: Codec[TelescopeConfigGeneratorRole] =
     enumerated(Type("e_offset_generator_role"))
 

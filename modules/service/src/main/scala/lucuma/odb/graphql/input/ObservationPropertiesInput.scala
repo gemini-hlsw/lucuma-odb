@@ -13,6 +13,7 @@ import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
 import grackle.syntax.*
 import lucuma.core.enums.ObservationPriority
+import lucuma.core.enums.ObservationQaState
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ScienceBand
 import lucuma.core.model.Attachment
@@ -65,10 +66,11 @@ object ObservationPropertiesInput {
     group:               Option[Group.Id],
     groupIndex:          Option[NonNegShort],
     observerNotes:       Option[NonEmptyString],
-    priority:            Option[ObservationPriority]
+    priority:            Option[ObservationPriority],
+    qaStateOverride:     Option[ObservationQaState]
   ) extends AsterismInput:
     def needsStaffAccess: Boolean =
-      observingMode.exists(_.needsStaffAccess)
+      observingMode.exists(_.needsStaffAccess) || qaStateOverride.isDefined
 
   object Create {
 
@@ -90,7 +92,8 @@ object ObservationPropertiesInput {
         group               = None,
         groupIndex          = None,
         observerNotes       = None,
-        priority            = None
+        priority            = None,
+        qaStateOverride     = None
       )
 
     val Binding: Matcher[Create] =
@@ -111,6 +114,7 @@ object ObservationPropertiesInput {
           NonNegShortBinding.Option("groupIndex", rGroupIndex),
           NonEmptyStringBinding.Option("observerNotes", rObserverNotes),
           ObservationPriorityBinding.NonNullable("priority", rPriority),
+          ObservationQaStateBinding.Option("qaStateOverride", rQaStateOverride)
         ) =>
           (rSubtitle,
             rScienceBand,
@@ -130,6 +134,7 @@ object ObservationPropertiesInput {
             rGroupIndex,
             rObserverNotes,
             rPriority,
+            rQaStateOverride
           ).parMapN(Create.apply)
       }
 
@@ -150,12 +155,21 @@ object ObservationPropertiesInput {
     groupIndex:          Option[NonNegShort],
     observerNotes:       Nullable[NonEmptyString],
     priority:            Option[ObservationPriority],
+    qaStateOverride:     Nullable[ObservationQaState]
   ) extends AsterismInput:
     def updatesAcquisition: Boolean =
       observingMode.toOption.exists(_.updatesAcquisition)
 
     def needsStaffAccess: Boolean =
-      observingMode.toOption.exists(_.needsStaffAccess)
+      observingMode.toOption.exists(_.needsStaffAccess) || !qaStateOverride.isAbsent
+
+    /**
+     * Whether this edit does nothing but set or clear the QA state override.
+     * Calibration observations are otherwise read-only, but they are executed
+     * and assessed like any other, so staff may override their QA state.
+     */
+    def onlyOverridesQaState: Boolean =
+      !qaStateOverride.isAbsent && copy(qaStateOverride = Nullable.Absent) === Edit.Empty
 
     /**
      * The observing mode types of the tellurics this edit may touch: a science
@@ -184,7 +198,8 @@ object ObservationPropertiesInput {
         group =               Nullable.Absent,
         groupIndex =          None,
         observerNotes =       Nullable.Absent,
-        priority =            None
+        priority =            None,
+        qaStateOverride =     Nullable.Absent
       )
 
     val Binding: Matcher[Edit] =
@@ -204,7 +219,8 @@ object ObservationPropertiesInput {
           GroupIdBinding.Nullable("groupId", rGroupId),
           NonNegShortBinding.NonNullable("groupIndex", rGroupIndex),
           NonEmptyStringBinding.Nullable("observerNotes", rObserverNotes),
-          ObservationPriorityBinding.NonNullable("priority", rPriority)
+          ObservationPriorityBinding.NonNullable("priority", rPriority),
+          ObservationQaStateBinding.Nullable("qaStateOverride", rQaStateOverride)
         ) =>
           (rSubtitle,
             rScienceBand,
@@ -226,6 +242,7 @@ object ObservationPropertiesInput {
             rGroupIndex,
             rObserverNotes,
             rPriority,
+            rQaStateOverride
           ).parMapN(apply)
       }
   }

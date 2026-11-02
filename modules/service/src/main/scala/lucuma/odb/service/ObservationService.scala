@@ -26,6 +26,7 @@ import lucuma.core.enums.FocalPlane
 import lucuma.core.enums.GuideProbe
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservationPriority
+import lucuma.core.enums.ObservationQaState
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.SchedulingMode
 import lucuma.core.enums.ScienceBand
@@ -1012,7 +1013,8 @@ object ObservationService {
           calibrationRole.orElse(SET.observingMode.flatMap(_.daytimeCalibration).as(CalibrationRole.DaytimeCalibration)),
           SET.scheduling.flatMap(_.schedulingModeToWrite).getOrElse(SchedulingMode.Unconstrained),
           SET.scheduling.flatMap(_.tooActivation).getOrElse(TooActivation.None),
-          SET.priority.getOrElse(ObservationPriority.Medium)
+          SET.priority.getOrElse(ObservationPriority.Medium),
+          SET.qaStateOverride
         )
       }
 
@@ -1038,7 +1040,8 @@ object ObservationService {
       calibrationRole:     Option[CalibrationRole],
       schedulingMode:      SchedulingMode,
       tooActivation:       TooActivation,
-      priority:            ObservationPriority
+      priority:            ObservationPriority,
+      qaStateOverride:     Option[ObservationQaState]
     ): AppliedFragment = {
 
       val insert: AppliedFragment = {
@@ -1090,7 +1093,8 @@ object ObservationService {
            calibrationRole                                                                                                        ,
            schedulingMode                                                                                                          ,
            tooActivation                                                                                                           ,
-           priority
+           priority                                                                                                                ,
+           qaStateOverride
         )
       }
 
@@ -1144,7 +1148,8 @@ object ObservationService {
       Option[CalibrationRole]          ,
       SchedulingMode                   ,
       TooActivation                    ,
-      ObservationPriority
+      ObservationPriority              ,
+      Option[ObservationQaState]
     )] =
       sql"""
         INSERT INTO t_observation (
@@ -1189,7 +1194,8 @@ object ObservationService {
           c_calibration_role,
           c_scheduling_mode,
           c_too_activation,
-          c_priority
+          c_priority,
+          c_qa_state_override
         )
         SELECT
           $program_id,
@@ -1233,7 +1239,8 @@ object ObservationService {
           ${calibration_role.opt},
           $scheduling_mode,
           $too_activation,
-          $observation_priority
+          $observation_priority,
+          ${observation_qa_state.opt}
       """
 
     def selectObservingModes(
@@ -1386,6 +1393,7 @@ object ObservationService {
       val upSchedulingMode    = sql"c_scheduling_mode = $scheduling_mode"
       val upPriority          = sql"c_priority = $observation_priority"
       val upTooActivation     = sql"c_too_activation = $too_activation"
+      val upQaStateOverride   = sql"c_qa_state_override = ${observation_qa_state.opt}"
 
       val ups: List[AppliedFragment] =
         List(
@@ -1396,7 +1404,8 @@ object ObservationService {
           SET.targetEnvironment.flatMap(_.useBlindOffset).map(upUseBlindOffset),
           SET.scheduling.fold(SchedulingMode.Unconstrained.some, none, _.schedulingModeToWrite).map(upSchedulingMode),
           SET.scheduling.fold(TooActivation.None.some, none, _.tooActivation).map(upTooActivation),
-          SET.priority.map(upPriority)
+          SET.priority.map(upPriority),
+          SET.qaStateOverride.foldPresent(upQaStateOverride)
         ).flatten
 
       val posAngleConstraint: List[AppliedFragment] =

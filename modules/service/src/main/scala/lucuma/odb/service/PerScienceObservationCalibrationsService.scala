@@ -227,7 +227,8 @@ object PerScienceObservationCalibrationsService:
           group = groupId.some,
           groupIndex = telluricIndex.some,
           observerNotes = none,
-          priority = none
+          priority = none,
+          qaStateOverride = none
         )
         observationService
           .createObservation(
@@ -465,7 +466,8 @@ object PerScienceObservationCalibrationsService:
           group               = gid.some,
           groupIndex          = none,
           observerNotes       = none,
-          priority            = none
+          priority            = none,
+          qaStateOverride     = none
         )
         observationService
           .createObservation(

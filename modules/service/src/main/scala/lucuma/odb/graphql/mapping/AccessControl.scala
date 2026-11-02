@@ -421,7 +421,7 @@ trait AccessControl[F[_]] extends Predicates[F] {
       selectForObservationUpdateImpl(
         input.includeDeleted,
         input.WHERE,
-        includeCalibrations,
+        includeCalibrations || input.SET.onlyOverridesQaState,
         allowedStates,
         admittedTelluricModes = input.SET.admittedTelluricModes
       ).nestMap: oids =>

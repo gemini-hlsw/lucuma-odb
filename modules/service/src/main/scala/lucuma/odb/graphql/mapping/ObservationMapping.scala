@@ -41,6 +41,7 @@ import table.AttachmentTable
 import table.ArchiveDuplicationView
 import table.ObsAttachmentAssignmentTable
 import table.ObscalcTable
+import table.ObservationQaView
 import table.ObservationReferenceView
 import table.ProgramView
 import Services.Syntax.*
@@ -54,6 +55,7 @@ trait ObservationMapping[F[_]]
      with ObsAttachmentAssignmentTable[F]
      with ArchiveDuplicationView[F]
      with ObscalcTable[F]
+     with ObservationQaView[F]
      with ObservationReferenceView[F] {
 
   def itcClient: ItcClient[F]
@@ -96,7 +98,8 @@ trait ObservationMapping[F[_]]
       SqlObject("configuration"),
       EffectField("configurationRequests", configurationRequestsQueryHandler, List("id", "programId")),
       SqlObject("workflow", Join(ObservationView.Id, ObscalcTable.ObservationId)),
-      SqlObject("archiveDuplication", Join(ObservationView.Id, ArchiveDuplicationView.ObservationId))
+      SqlObject("archiveDuplication", Join(ObservationView.Id, ArchiveDuplicationView.ObservationId)),
+      SqlObject("qa", Join(ObservationView.Id, ObservationQaView.ObservationId))
     )
 
   lazy val ObservationElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
