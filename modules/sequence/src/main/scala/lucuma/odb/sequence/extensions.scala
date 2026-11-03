@@ -3,35 +3,22 @@
 
 package lucuma.odb.sequence
 
+import cats.syntax.eq.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.StepGuideState
 
-// Calibration roles taken as day calibrations: unguided, uncharged, DayCal class.
-val DayCalibrationRoles: Set[CalibrationRole] =
-  Set(
-    CalibrationRole.DaytimeArc,
-    CalibrationRole.DaytimeCalibration,
-    CalibrationRole.DaytimeFlat,
-    CalibrationRole.DaytimePinhole,
-    CalibrationRole.Twilight
-  )
-
 extension(role: Option[CalibrationRole])
   def isDayCalibration: Boolean =
-    role.exists(DayCalibrationRoles.contains)
+    role.exists(_.observeClass === ObserveClass.DayCal)
 
   // observe class for the science steps of a particular calibration role
   def sciClass: ObserveClass =
-    if isDayCalibration then ObserveClass.DayCal
-    else role match
-      case Some(CalibrationRole.SpectroPhotometric) |
-           Some(CalibrationRole.Telluric)           => ObserveClass.NightCal
-      case _                                        => ObserveClass.Science
+    role.fold(ObserveClass.Science)(_.observeClass)
 
   // observe class for the gcal steps of a particular calibration role
   def gcalClass: ObserveClass =
-    if isDayCalibration then ObserveClass.DayCal else ObserveClass.NightCal
+    role.fold(ObserveClass.NightCal)(_.observeClass)
 
   def sciGuiding: StepGuideState =
     if isDayCalibration then StepGuideState.Disabled else StepGuideState.Enabled
