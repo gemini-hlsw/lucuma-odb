@@ -28,20 +28,33 @@ $$ LANGUAGE sql IMMUTABLE;
 -- observation, so the backfill below looks at the program's observations whose
 -- configuration matches the request on every exactly-stored field (the target,
 -- matched in Scala by radius or region, is left out).
+--
+-- Requests are only made for active observations (`SelectActiveNonCalibrations`),
+-- so those are the ones counted, and inactive observations cannot outvote the one
+-- a request was made for.  Only when no active observation matches (say, all were
+-- deactivated after approval) are the inactive ones used instead, so that the
+-- request keeps their values rather than an arbitrary default and they stay covered
+-- if reactivated.
 CREATE FUNCTION pg_temp.matching_observations(cr t_configuration_request)
   RETURNS SETOF d_observation_id AS $$
-  SELECT o.c_observation_id
-    FROM t_observation o
-   WHERE o.c_program_id          = cr.c_program_id
-     AND o.c_existence           = 'present'
-     AND o.c_calibration_role    IS NULL
-     AND o.c_observing_mode_type = cr.c_observing_mode_type
-     AND o.c_cloud_extinction    = cr.c_cloud_extinction
-     AND o.c_image_quality       = cr.c_image_quality
-     AND o.c_sky_background      = cr.c_sky_background
-     AND o.c_water_vapor         = cr.c_water_vapor
-     AND o.c_altair_mode IS NOT DISTINCT FROM cr.c_altair_mode
-     AND o.c_scheduling_mode     = cr.c_scheduling_mode;
+  WITH m AS (
+    SELECT o.c_observation_id,
+           o.c_workflow_user_state IS DISTINCT FROM 'inactive' AS active
+      FROM t_observation o
+     WHERE o.c_program_id          = cr.c_program_id
+       AND o.c_existence           = 'present'
+       AND o.c_calibration_role    IS NULL
+       AND o.c_observing_mode_type = cr.c_observing_mode_type
+       AND o.c_cloud_extinction    = cr.c_cloud_extinction
+       AND o.c_image_quality       = cr.c_image_quality
+       AND o.c_sky_background      = cr.c_sky_background
+       AND o.c_water_vapor         = cr.c_water_vapor
+       AND o.c_altair_mode IS NOT DISTINCT FROM cr.c_altair_mode
+       AND o.c_scheduling_mode     = cr.c_scheduling_mode
+  )
+  SELECT c_observation_id
+    FROM m
+   WHERE active OR NOT EXISTS (SELECT 1 FROM m WHERE active);
 $$ LANGUAGE sql STABLE;
 
 -- Each backfill below finds a request's matching observations once, in a
