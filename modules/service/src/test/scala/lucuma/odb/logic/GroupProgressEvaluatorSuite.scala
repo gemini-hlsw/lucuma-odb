@@ -13,6 +13,7 @@ import lucuma.core.enums.ExecutionState
 import lucuma.core.enums.GroupConstraintViolation
 import lucuma.core.enums.GroupConstraintViolation.*
 import lucuma.core.enums.GroupStatus
+import lucuma.core.enums.ObservationQaState
 import lucuma.core.enums.Site
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
@@ -56,9 +57,10 @@ class GroupProgressEvaluatorSuite extends FunSuite:
     site:     Site                    = Site.GN,
     inactive: Boolean                 = false,
     start:    Option[Timestamp]       = None,
-    role:     Option[CalibrationRole] = None
+    role:     Option[CalibrationRole] = None,
+    qa:       Option[ObservationQaState] = None
   ): Node =
-    obs(n, ObservationFacts(state, role, inactive, start, time, Some(site)))
+    obs(n, ObservationFacts(state, role, inactive, qa, start, time, Some(site)))
 
   // A completed observation, by default started and completed at `t`.
   def done(n: Long, t: Timestamp, site: Site = Site.GN, start: Option[Timestamp] = None): Node =
@@ -187,6 +189,145 @@ class GroupProgressEvaluatorSuite extends FunSuite:
       eval(branch(1, List(leaf(1), leaf(2, inactive = true), leaf(3)), min = Some(3))),
       unschedulable(0, 3, InsufficientElements)
     )
+
+  // QA
+
+  // A completed observation, started and completed at `t`, with QA state `qa`.
+  def assessed(n: Long, t: Timestamp, qa: ObservationQaState, role: Option[CalibrationRole] = None): Node =
+    leaf(n, ExecutionState.Completed, Some(t), start = Some(t), role = role, qa = Some(qa))
+
+  test("a usable completion doesn't count, but the group has started"):
+    assertEquals(
+      eval(branch(1, List(assessed(1, t0, ObservationQaState.Usable), leaf(2)), min = Some(1))),
+      ongoing(0, 1)
+    )
+
+  test("a failed completion doesn't count"):
+    assertEquals(
+      eval(branch(1, List(assessed(1, t0, ObservationQaState.Fail), leaf(2, ExecutionState.Ongoing)), min = Some(1))),
+      ongoing(0, 1)
+    )
+
+  test("passing and unassessed completions count"):
+    assertEquals(
+      eval(branch(1, List(assessed(1, t0, ObservationQaState.Pass), done(2, t0 +| hours(1))))),
+      complete(2, 2)
+    )
+
+  test("a rejected completion can leave too few viable elements"):
+    assertEquals(
+      eval(branch(1, List(assessed(1, t0, ObservationQaState.Usable), leaf(2)), min = Some(2))),
+      unschedulable(0, 2, InsufficientElements)
+    )
+
+  test("a rejected completion isn't checked against the intervals"):
+    val g = branch(
+      1,
+      List(done(1, t0), assessed(2, t0 +| minutes(30), ObservationQaState.Fail), done(3, t0 +| hours(2))),
+      min  = Some(2),
+      minI = Some(hours(1))
+    )
+    assertEquals(eval(g, now = t0 +| hours(3)), complete(2, 2))
+
+  test("an observation still executing counts as started whatever its QA so far"):
+    assertEquals(
+      eval(branch(1, List(leaf(1, ExecutionState.Ongoing, qa = Some(ObservationQaState.Fail))))),
+      ongoing(0, 1)
+    )
+
+  test("with no minimum, a rejected completion is still required"):
+    assertEquals(
+      eval(branch(1, List(done(1, t0), assessed(2, t0 +| hours(1), ObservationQaState.Usable))), t0 +| hours(2)),
+      unschedulable(1, 2, InsufficientElements)
+    )
+
+  test("with no minimum, a group with only rejected completions is unschedulable, not empty"):
+    assertEquals(
+      eval(branch(1, List(assessed(1, t0, ObservationQaState.Usable), assessed(2, t0, ObservationQaState.Fail))), t0 +| hours(1)),
+      unschedulable(0, 2, InsufficientElements)
+    )
+
+  test("with no minimum, a replacement doesn't make up for a rejected completion"):
+    assertEquals(
+      eval(branch(1, List(done(1, t0), assessed(2, t0, ObservationQaState.Fail), done(3, t0 +| hours(1)))), t0 +| hours(2)),
+      unschedulable(2, 3, InsufficientElements)
+    )
+
+  test("ordered with no minimum, a rejected completion is still required"):
+    assertEquals(
+      eval(branch(1, List(assessed(1, t0, ObservationQaState.Fail), done(2, t0 +| hours(1))), ordered = true), t0 +| hours(2)),
+      unschedulable(1, 2, InsufficientElements)
+    )
+
+  test("with a minimum, a replacement takes a rejected completion's place"):
+    val g = (third: Node) => branch(1, List(done(1, t0), assessed(2, t0, ObservationQaState.Fail), third), min = Some(2))
+    assertEquals(eval(g(leaf(3)), t0 +| hours(1)), ongoing(1, 2))
+    assertEquals(eval(g(done(3, t0 +| hours(1))), t0 +| hours(2)), complete(2, 2))
+
+  test("ordered with a minimum, a replacement takes a rejected completion's place"):
+    val g = (third: Node) => branch(1, List(assessed(1, t0, ObservationQaState.Fail), done(2, t0 +| hours(1)), third), min = Some(2), ordered = true)
+    assertEquals(eval(g(leaf(3)), t0 +| hours(2)), ongoing(1, 2))
+    assertEquals(eval(g(done(3, t0 +| hours(2))), t0 +| hours(3)), complete(2, 2))
+
+  test("a calibration group goes with its rejected science observation"):
+    val telluric = leaf(3, ExecutionState.Completed, Some(t0 +| hours(1)), start = Some(t0 +| hours(1)), role = Some(CalibrationRole.Telluric))
+    val sub      = branch(2, List(assessed(2, t0, ObservationQaState.Usable), telluric))
+    val all      = evalAll(branch(1, List(done(1, t0), sub)), t0 +| hours(2))
+    assertEquals(all(gid(2)), unschedulable(0, 2, InsufficientElements))
+    assertEquals(all(gid(1)), unschedulable(1, 2, InsufficientElements))
+
+  test("a rejected calibration group is left out of a parent with a minimum"):
+    val telluric = leaf(3, ExecutionState.Completed, Some(t0 +| hours(1)), start = Some(t0 +| hours(1)), role = Some(CalibrationRole.Telluric))
+    val sub      = branch(2, List(assessed(2, t0, ObservationQaState.Usable), telluric))
+    val all      = evalAll(branch(1, List(sub, done(1, t0)), min = Some(1), ordered = true), t0 +| hours(2))
+    assertEquals(all(gid(1)), complete(1, 1))
+
+  test("a calibration group's telluric still to do goes with its rejected science observation"):
+    val telluric = leaf(3, role = Some(CalibrationRole.Telluric))
+    val sub      = branch(2, List(assessed(2, t0, ObservationQaState.Fail), telluric))
+    val all      = evalAll(branch(1, List(sub, leaf(4)), min = Some(1)), t0 +| hours(1))
+    assertEquals(all(gid(2)), unschedulable(0, 2, InsufficientElements))
+    assertEquals(all(gid(1)), ongoing(0, 1))
+
+  test("a calibration group goes with its science observation declared complete without being observed"):
+    val telluric = leaf(3, role = Some(CalibrationRole.Telluric))
+    val sub      = (qa: Option[ObservationQaState]) => branch(2, List(leaf(2, ExecutionState.DeclaredComplete, qa = qa), telluric))
+    List(None, Some(ObservationQaState.Fail)).foreach: qa =>
+      val all = evalAll(branch(1, List(done(1, t0), sub(qa))), t0 +| hours(1))
+      assertEquals(all(gid(2)), GroupProgress.Empty, clue(qa))
+      assertEquals(all(gid(1)), complete(1, 1), clue(qa))
+
+  test("a completed telluric goes with its inactive science observation"):
+    val telluric = leaf(3, ExecutionState.Completed, Some(t0), start = Some(t0), role = Some(CalibrationRole.Telluric))
+    val all      = evalAll(branch(1, List(done(1, t0), branch(2, List(leaf(2, inactive = true), telluric)))), t0 +| hours(1))
+    assertEquals(all(gid(2)), GroupProgress.Empty)
+    assertEquals(all(gid(1)), complete(1, 1))
+
+  test("a telluric's own QA doesn't affect its calibration group"):
+    val telluric = assessed(3, t0 +| hours(1), ObservationQaState.Fail, role = Some(CalibrationRole.Telluric))
+    val sub      = branch(2, List(done(2, t0), telluric))
+    assertEquals(eval(sub, t0 +| hours(2)), complete(2, 2))
+
+  test("an observation declared complete is rejected for its QA like a completed one"):
+    val declared = leaf(1, ExecutionState.DeclaredComplete, Some(t0), start = Some(t0), qa = Some(ObservationQaState.Usable))
+    assertEquals(
+      eval(branch(1, List(declared, done(2, t0 +| hours(1)))), t0 +| hours(2)),
+      unschedulable(1, 2, InsufficientElements)
+    )
+
+  test("a subgroup with only rejected observations is rejected in its parent"):
+    val sub = branch(2, List(assessed(2, t0, ObservationQaState.Fail), assessed(3, t0, ObservationQaState.Usable)))
+    val all = evalAll(branch(1, List(done(1, t0), sub)), t0 +| hours(1))
+    assertEquals(all(gid(2)), unschedulable(0, 2, InsufficientElements))
+    assertEquals(all(gid(1)), unschedulable(1, 2, InsufficientElements))
+    // Left out of an ordered parent with a minimum, rather than blocking it.
+    assertEquals(eval(branch(1, List(sub, done(1, t0)), min = Some(1), ordered = true), t0 +| hours(1)), complete(1, 1))
+
+  test("a subgroup with some rejected observations is unschedulable, not rejected, in its parent"):
+    val sub = branch(2, List(done(2, t0), assessed(3, t0, ObservationQaState.Fail)))
+    val all = evalAll(branch(1, List(sub, done(1, t0)), min = Some(1), ordered = true), t0 +| hours(1))
+    assertEquals(all(gid(2)), unschedulable(1, 2, InsufficientElements))
+    assertEquals(all(gid(1)), unschedulable(0, 1, SubgroupUnschedulable))
 
   test("a group with nothing viable is empty, and its parent leaves it out"):
     val empty  = branch(2, List(leaf(2, inactive = true), leaf(3, inactive = true)))
@@ -556,6 +697,36 @@ class GroupProgressEvaluatorSuite extends FunSuite:
   test("per night: observations at more than one site"):
     val g = branch(1, List(leaf(1, site = Site.GN), leaf(2, site = Site.GS)), minN = Some(2))
     assertEquals(eval(g), unschedulable(0, 2, ObservationsPerNightMultipleSites))
+
+  // QA and time constraints: the completions left after a rejection are
+  // checked without it, and a replacement observed later can't undo that.
+
+  test("a rejection can leave a night that has ended short of the minimum"):
+    val g = (qa: ObservationQaState) =>
+      branch(1, List(done(1, t0), assessed(2, t0 +| hours(1), qa), done(3, t1), done(4, t1 +| hours(1)), leaf(5)), min = Some(4), minN = Some(2))
+    assertEquals(eval(g(ObservationQaState.Pass), now = t1 +| hours(2)), complete(4, 4))
+    assertEquals(eval(g(ObservationQaState.Usable), now = t1 +| hours(2)), unschedulable(3, 4, ObservationsPerNightMinimum))
+
+  test("a rejection in a same-night group can't be replaced on another night"):
+    val g = (qa: ObservationQaState) =>
+      branch(1, List(done(1, t0), assessed(2, t0 +| hours(1), qa), done(3, t1)), min = Some(2), sameNight = true)
+    assertEquals(eval(g(ObservationQaState.Pass), now = t1 +| hours(1)), complete(2, 2))
+    assertEquals(eval(g(ObservationQaState.Fail), now = t1 +| hours(1)), unschedulable(2, 2, SameNight))
+
+  test("a rejection can leave completions further apart than the maximum interval"):
+    val g = (qa: ObservationQaState) =>
+      branch(1, List(done(1, t0), assessed(2, t0 +| hours(1), qa), done(3, t0 +| hours(3))), min = Some(2), maxI = Some(hours(2)))
+    assertEquals(eval(g(ObservationQaState.Pass), now = t0 +| hours(4)), complete(2, 2))
+    assertEquals(eval(g(ObservationQaState.Fail), now = t0 +| hours(4)), unschedulable(2, 2, MaximumInterval))
+
+  test("an ordered group's replacement can't take a rejected element's place once a later one is complete"):
+    val rejected = assessed(1, t0, ObservationQaState.Fail)
+    val later    = done(2, t0 +| hours(1))
+    val inPlace  = branch(1, List(rejected, leaf(3), later), min = Some(2), ordered = true)
+    val appended = (r: Node) => branch(1, List(rejected, later, r), min = Some(2), ordered = true)
+    assertEquals(eval(inPlace, now = t0 +| hours(2)), unschedulable(1, 2, Order))
+    assertEquals(eval(appended(leaf(3)), now = t0 +| hours(2)), ongoing(1, 2))
+    assertEquals(eval(appended(done(3, t0 +| hours(2))), now = t0 +| hours(3)), complete(2, 2))
 
   // A GNIRS calibration group: science observation `n` completed at `t`, a
   // telluric `n + 1` completed at `telluric`, if any, and a daytime pinhole
