@@ -199,7 +199,7 @@ object ObsExtract:
   // set discriminates such a group from the per-program "Calibrations" group,
   // whose roles (twilight, spectrophotometric) are disjoint from these.  Keep
   // that disjointness invariant when adding roles.
-  val PerObservationCalibrationRoles = List(CalibrationRole.Telluric, CalibrationRole.DaytimePinhole)
+  val PerObservationCalibrationRoles = List(CalibrationRole.Telluric, CalibrationRole.DaytimePinhole, CalibrationRole.DaytimeFlat)
 
   def perObsFilter: PartialFunction[ObsExtract[ObservingMode], ObsExtract[ObservingMode]] =
     case d @ ObsExtract(data = _: Flamingos2Config)    => d

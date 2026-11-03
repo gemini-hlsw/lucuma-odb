@@ -574,6 +574,23 @@ class GroupProgressEvaluatorSuite extends FunSuite:
       )
     )
 
+  // A Flamingos-2 imaging calibration group: science observation `n` completed
+  // at `t` and a daytime flat `n + 1` completed at `flat`, if it has been.
+  def f2ImagingCalibrationGroup(g: Long, n: Long, t: Timestamp, flat: Option[Timestamp] = None): Node =
+    branch(
+      g,
+      List(
+        done(n, t),
+        leaf(
+          n + 1,
+          flat.fold(ExecutionState.NotStarted)(_ => ExecutionState.Completed),
+          flat,
+          start = flat,
+          role  = Some(CalibrationRole.DaytimeFlat)
+        )
+      )
+    )
+
   // 15:00 HST on 16 October, the afternoon after t0's night: the next night.
   val nextAfternoon: Timestamp = ts("2026-10-17T01:00:00Z")
 
@@ -584,6 +601,18 @@ class GroupProgressEvaluatorSuite extends FunSuite:
 
   test("a daytime calibration still to do doesn't hold up its group"):
     val sub = gnirsCalibrationGroup(2, 2, t0)
+    val g   = branch(1, List(done(1, t0 +| hours(1)), sub), minN = Some(2))
+    val all = evalAll(g, now = night0End +| hours(1))
+    assertEquals(all(gid(2)), complete(1, 1))
+    assertEquals(all(gid(1)), complete(2, 2))
+
+  test("a daytime flat taken the next afternoon leaves its group on the science observation's night"):
+    val sub = f2ImagingCalibrationGroup(2, 2, t0, flat = Some(nextAfternoon))
+    val g   = branch(1, List(done(1, t0 +| hours(1)), sub), minN = Some(2))
+    assertEquals(eval(g, now = nextAfternoon +| hours(1)), complete(2, 2))
+
+  test("a daytime flat still to do doesn't hold up its group"):
+    val sub = f2ImagingCalibrationGroup(2, 2, t0)
     val g   = branch(1, List(done(1, t0 +| hours(1)), sub), minN = Some(2))
     val all = evalAll(g, now = night0End +| hours(1))
     assertEquals(all(gid(2)), complete(1, 1))

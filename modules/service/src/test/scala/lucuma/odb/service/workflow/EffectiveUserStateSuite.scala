@@ -33,3 +33,7 @@ class EffectiveUserStateSuite extends FunSuite:
   test("a daytime pinhole always inherits, even if set inactive itself"):
     assertEquals(effectiveUserState(Some(CalibrationRole.DaytimePinhole), inactive, ready), ready)
     assertEquals(effectiveUserState(Some(CalibrationRole.DaytimePinhole), None, inactive), inactive)
+
+  test("a daytime flat always inherits, even if set inactive itself"):
+    assertEquals(effectiveUserState(Some(CalibrationRole.DaytimeFlat), inactive, ready), ready)
+    assertEquals(effectiveUserState(Some(CalibrationRole.DaytimeFlat), None, inactive), inactive)
