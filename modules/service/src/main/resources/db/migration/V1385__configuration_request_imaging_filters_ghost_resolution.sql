@@ -94,6 +94,18 @@ $$ LANGUAGE sql STABLE;
 -- approved configurations were judged acceptable.  A faithful backfill would have
 -- to run in Scala, where target coverage can be computed.
 
+-- The backfill records what each request already covered; it is not an edit.  So
+-- it must neither stamp c_updated_at with the deploy time (losing the last real
+-- edit staff see) nor send a configuration request edit event for every row.  The
+-- Flamingos-2, GNIRS and GHOST rows all change (their new columns start out NULL),
+-- so those two triggers are disabled until the backfill is done.  The obscalc
+-- invalidation trigger stays on: observations of a program whose requests changed
+-- must be re-evaluated under the new rules.  GMOS rows are only rewritten where
+-- their filters actually change, so programs with nothing new are not invalidated.
+ALTER TABLE t_configuration_request
+  DISABLE TRIGGER ch_update_updated_at_trigger,
+  DISABLE TRIGGER ch_configuration_request_edit_trigger;
+
 -- Imaging filters: the union of the stored filters (GMOS only) and those of the
 -- matching observations.  Under sc-8036 any filter was approved, so widening to
 -- every filter in use keeps each existing observation covered rather than turning
@@ -107,12 +119,18 @@ WITH matched AS MATERIALIZED (
     LEFT JOIN LATERAL unnest(m.c_filters) AS f ON true
    WHERE cr.c_observing_mode_type = 'gmos_north_imaging'
    GROUP BY 1
+), widened AS (
+  SELECT cr.c_configuration_request_id AS id,
+         pg_temp.canonical_tags(cr.c_gmos_north_imaging_filters || COALESCE(m.filters, '{}'::_d_tag)) AS filters
+    FROM t_configuration_request cr
+    LEFT JOIN matched m ON m.id = cr.c_configuration_request_id
+   WHERE cr.c_observing_mode_type = 'gmos_north_imaging'
 )
 UPDATE t_configuration_request cr
-   SET c_gmos_north_imaging_filters = pg_temp.canonical_tags(
-         cr.c_gmos_north_imaging_filters ||
-         COALESCE((SELECT filters FROM matched WHERE id = cr.c_configuration_request_id), '{}'::_d_tag))
- WHERE cr.c_observing_mode_type = 'gmos_north_imaging';
+   SET c_gmos_north_imaging_filters = w.filters
+  FROM widened w
+ WHERE w.id = cr.c_configuration_request_id
+   AND cr.c_gmos_north_imaging_filters IS DISTINCT FROM w.filters;
 
 WITH matched AS MATERIALIZED (
   SELECT cr.c_configuration_request_id AS id,
@@ -123,12 +141,18 @@ WITH matched AS MATERIALIZED (
     LEFT JOIN LATERAL unnest(m.c_filters) AS f ON true
    WHERE cr.c_observing_mode_type = 'gmos_south_imaging'
    GROUP BY 1
+), widened AS (
+  SELECT cr.c_configuration_request_id AS id,
+         pg_temp.canonical_tags(cr.c_gmos_south_imaging_filters || COALESCE(m.filters, '{}'::_d_tag)) AS filters
+    FROM t_configuration_request cr
+    LEFT JOIN matched m ON m.id = cr.c_configuration_request_id
+   WHERE cr.c_observing_mode_type = 'gmos_south_imaging'
 )
 UPDATE t_configuration_request cr
-   SET c_gmos_south_imaging_filters = pg_temp.canonical_tags(
-         cr.c_gmos_south_imaging_filters ||
-         COALESCE((SELECT filters FROM matched WHERE id = cr.c_configuration_request_id), '{}'::_d_tag))
- WHERE cr.c_observing_mode_type = 'gmos_south_imaging';
+   SET c_gmos_south_imaging_filters = w.filters
+  FROM widened w
+ WHERE w.id = cr.c_configuration_request_id
+   AND cr.c_gmos_south_imaging_filters IS DISTINCT FROM w.filters;
 
 WITH matched AS MATERIALIZED (
   SELECT cr.c_configuration_request_id AS id,
@@ -183,6 +207,10 @@ UPDATE t_configuration_request cr
    SET c_ghost_ifu_resolution_mode = COALESCE(
          (SELECT resolution_mode FROM matched WHERE id = cr.c_configuration_request_id), 'standard')
  WHERE cr.c_observing_mode_type = 'ghost_ifu';
+
+ALTER TABLE t_configuration_request
+  ENABLE TRIGGER ch_update_updated_at_trigger,
+  ENABLE TRIGGER ch_configuration_request_edit_trigger;
 
 DROP FUNCTION pg_temp.matching_observations(t_configuration_request);
 DROP FUNCTION pg_temp.canonical_tags(_d_tag);
