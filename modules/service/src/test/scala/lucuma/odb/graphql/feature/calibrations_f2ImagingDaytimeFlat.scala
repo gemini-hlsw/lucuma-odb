@@ -6,16 +6,33 @@ package feature
 
 import cats.effect.IO
 import cats.syntax.all.*
+import eu.timepit.refined.types.numeric.PosInt
+import eu.timepit.refined.types.numeric.PosLong
 import io.circe.Decoder
 import io.circe.Json
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.Flamingos2Filter
+import lucuma.core.enums.GcalBaselineType
+import lucuma.core.enums.GcalContinuum
+import lucuma.core.enums.GcalDiffuser
+import lucuma.core.enums.GcalFilter
+import lucuma.core.enums.GcalShutter
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
+import lucuma.core.model.sequence.StepConfig.Gcal
+import lucuma.core.util.TimeSpan
 import lucuma.odb.graphql.query.ExecutionTestSupportForFlamingos2
+import lucuma.odb.service.Services
+import lucuma.odb.smartgcal.data.Flamingos2
+import lucuma.odb.smartgcal.data.SmartGcalValue
+import lucuma.odb.smartgcal.data.SmartGcalValue.LegacyInstrumentConfig
+import lucuma.odb.util.Codecs.observation_id
+import skunk.Session
+import skunk.codec.all.text
+import skunk.syntax.all.*
 
 import java.time.Instant
 import java.time.LocalDateTime
@@ -27,6 +44,73 @@ class calibrations_f2ImagingDaytimeFlat
   with TelluricCalibrationsTestSupport:
 
   val when: Instant = LocalDateTime.of(2024, 1, 1, 12, 0, 0).toInstant(ZoneOffset.UTC)
+
+  // Imaging day flats, lamp on and off, as in Flamingos2_FLAT.csv.  K-long has
+  // no row, there or here.
+  private def imagingDayFlat(shutter: GcalShutter): SmartGcalValue[LegacyInstrumentConfig] =
+    SmartGcalValue(
+      Gcal(
+        Gcal.Lamp.fromContinuum(GcalContinuum.IrGreyBodyHigh),
+        GcalFilter.Nd45,
+        GcalDiffuser.Ir,
+        shutter
+      ),
+      GcalBaselineType.Day,
+      PosInt.unsafeFrom(1),
+      LegacyInstrumentConfig(TimeSpan.unsafeFromMicroseconds(3_000_000L))
+    )
+
+  override def dbInitialization: Option[Session[IO] => IO[Unit]] = Some: s =>
+    val rows: List[Flamingos2.TableRow] =
+      for
+        filter  <- List(Flamingos2Filter.Y, Flamingos2Filter.J, Flamingos2Filter.H)
+        shutter <- List(GcalShutter.Open, GcalShutter.Closed)
+      yield Flamingos2.TableRow(PosLong.unsafeFrom(1), Flamingos2.TableKey(none, filter, none), imagingDayFlat(shutter))
+
+    super.dbInitialization.traverse_(_(s)) *>
+      servicesFor(pi).map(_(s)).use: services =>
+        services.transactionally:
+          rows.zipWithIndex.traverse_ : (r, i) =>
+            Services.asSuperUser:
+              services.smartGcalService.insertFlamingos2(100 + i, r)
+
+  case class FlatAtom(description: String, observeClass: String, steps: List[(String, String)])
+
+  private val atomQuery: String =
+    """
+      description
+      observeClass
+      steps {
+        stepConfig { stepType }
+        observeClass
+      }
+    """
+
+  private def decodeAtom(j: Json): Either[io.circe.DecodingFailure, FlatAtom] =
+    val c = j.hcursor
+    for
+      d  <- c.downField("description").as[String]
+      o  <- c.downField("observeClass").as[String]
+      ss <- c.downField("steps").as[List[Json]]
+      st <- ss.traverse: s =>
+              (s.hcursor.downFields("stepConfig", "stepType").as[String], s.hcursor.downField("observeClass").as[String]).tupled
+    yield FlatAtom(d, o, st)
+
+  private def queryScienceAtoms(oid: Observation.Id): IO[List[FlatAtom]] =
+    query(pi, executionConfigQuery(oid, "flamingos2", "science", atomQuery, 100.some)).flatMap: c =>
+      val sci = c.hcursor.downFields("executionConfig", "flamingos2", "science")
+      (for
+        next   <- sci.downField("nextAtom").as[Json]
+        future <- sci.downField("possibleFuture").as[List[Json]]
+        atoms  <- (next :: future).traverse(decodeAtom)
+      yield atoms).leftMap(f => new RuntimeException(f.message)).liftTo[IO]
+
+  private def hasScienceAtom(oid: Observation.Id): IO[Boolean] =
+    query(pi, executionConfigQuery(oid, "flamingos2", "science", "observeClass", none)).map:
+      _.hcursor.downFields("executionConfig", "flamingos2", "science", "nextAtom").focus.exists(!_.isNull)
+
+  private def queryObscalcState(oid: Observation.Id): IO[String] =
+    session.use(_.unique(sql"SELECT c_obscalc_state::text FROM t_obscalc WHERE c_observation_id = $observation_id".query(text))(oid))
 
   case class GroupNameAndRoles(name: String, calibrationRoles: List[CalibrationRole]) derives Decoder
 
@@ -72,8 +156,9 @@ class calibrations_f2ImagingDaytimeFlat
         .leftMap(f => new RuntimeException(f.message))
         .liftTo[IO]
 
-  private def setImagingFilters(oid: Observation.Id, filters: List[Flamingos2Filter]): IO[Unit] =
-    val fs = filters.map(f => s"{ filter: ${f.tag.toUpperCase} }").mkString("[", ", ", "]")
+  // Filters by their GraphQL enum names, e.g. K_LONG.
+  private def setImagingFilters(oid: Observation.Id, filters: List[String]): IO[Unit] =
+    val fs = filters.map(f => s"{ filter: $f }").mkString("[", ", ", "]")
     query(
       pi,
       s"""mutation {
@@ -167,7 +252,7 @@ class calibrations_f2ImagingDaytimeFlat
   test("a science filter edit is copied to the daytime flat"):
     for
       (pid, oid, flat) <- setup
-      _                <- setImagingFilters(oid, List(Flamingos2Filter.H, Flamingos2Filter.J))
+      _                <- setImagingFilters(oid, List("H", "J"))
       _                <- runObscalcUpdate(pid, oid)
       _                <- recalculateCalibrations(pid, when, oid)
       sciFilters       <- queryImagingFilters(oid)
@@ -215,3 +300,58 @@ class calibrations_f2ImagingDaytimeFlat
       (_, _, flat) <- setup
       result       <- setObservationWorkflowState(pi, flat, ObservationWorkflowState.Inactive).attempt
     yield assert(result.isLeft, "a daytime flat must not be declinable")
+
+  private val dayFlatSteps: List[(String, String)] =
+    List(("GCAL", "DAY_CAL"), ("GCAL", "DAY_CAL"))
+
+  test("daytime flat sequence is one smart gcal flat atom per filter"):
+    for
+      (_, oid, flat) <- setup
+      filters        <- queryImagingFilters(flat)
+      atoms          <- queryScienceAtoms(flat)
+    yield assertEquals(atoms, filters.map(f => FlatAtom(s"Daytime Flat $f", "DAY_CAL", dayFlatSteps)))
+
+  test("daytime flat of a one-filter science observation has a bare title"):
+    for
+      (pid, oid, flat) <- setup
+      _                <- setImagingFilters(oid, List("H"))
+      _                <- recalculateCalibrations(pid, when, oid)
+      atoms            <- queryScienceAtoms(flat)
+    yield assertEquals(atoms, List(FlatAtom("Daytime Flat", "DAY_CAL", dayFlatSteps)))
+
+  test("daytime flat goes pending when a science filter edit is copied to it"):
+    for
+      (pid, oid, flat) <- setup
+      _                <- runObscalcUpdate(pid, flat)
+      before           <- queryObscalcState(flat)
+      _                <- setImagingFilters(oid, List("H"))
+      _                <- recalculateCalibrations(pid, when, oid)
+      after            <- queryObscalcState(flat)
+    yield
+      assertEquals(before, "ready")
+      assertEquals(after, "pending")
+
+  test("a filter without a smart gcal row fails only the daytime flat sequence"):
+    for
+      (pid, oid, flat) <- setup
+      _                <- setImagingFilters(oid, List("K_LONG"))
+      _                <- recalculateCalibrations(pid, when, oid)
+      flatResult       <- queryScienceAtoms(flat).attempt
+      sciAtom          <- hasScienceAtom(oid)
+    yield
+      assert(flatResult.left.exists(_.getMessage.contains(s"Could not generate a sequence for $flat: missing Smart GCAL mapping")), flatResult.toString)
+      assert(sciAtom, "the science sequence still generates")
+
+  test("daytime flat with a visit survives the science leaving f2 imaging"):
+    for
+      (pid, oid, flat) <- setup
+      gid              <- queryObservation(oid).map(_.groupId.get)
+      _                <- recordVisitAs(serviceUser, flat)
+      _                <- switchToGmosNorthLongSlit(oid)
+      (_, removed)     <- recalculateCalibrations(pid, when, oid)
+      flatExists       <- queryObservationExists(flat)
+      groupExists      <- queryGroupExists(gid)
+    yield
+      assertEquals(removed, Nil)
+      assert(flatExists, "a visited daytime flat must be kept")
+      assert(groupExists, "the group holding it must be kept")

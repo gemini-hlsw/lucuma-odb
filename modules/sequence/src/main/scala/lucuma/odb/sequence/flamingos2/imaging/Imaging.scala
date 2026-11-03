@@ -8,6 +8,7 @@ package imaging
 import cats.data.EitherT
 import cats.effect.Sync
 import fs2.Pure
+import lucuma.core.enums.CalibrationRole
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
@@ -32,11 +33,13 @@ object Imaging:
     observationId: Observation.Id,
     estimator:     StepTimeEstimateCalculator[Flamingos2StaticConfig, Flamingos2DynamicConfig],
     namespace:     UUID,
+    expander:      SmartGcalExpander[F, Flamingos2StaticConfig, Flamingos2DynamicConfig],
     config:        Config,
-    scienceItc:    Either[OdbError, Flamingos2Imaging]
+    scienceItc:    Either[OdbError, Flamingos2Imaging],
+    calRole:       Option[CalibrationRole]
   ): F[Either[OdbError, StreamingExecutionConfig[Pure, Flamingos2StaticConfig, Flamingos2DynamicConfig]]] =
     val static = config.staticConfig
     instantiate(
       static,
-      Science.flamingos2(observationId, estimator, static, namespace, config, scienceItc)
+      Science.flamingos2(observationId, estimator, static, namespace, expander, config, scienceItc, calRole)
     )
