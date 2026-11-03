@@ -331,8 +331,9 @@ class configurationRequests_UniquenessKey
   test("Flamingos-2 imaging - the same filters in another order reuse the request"):
     assertImagingCollapses(flamingos2Imaging("Y", "J"), flamingos2Imaging("J", "Y"))
 
-  // The imaging modes are told apart by the observing mode type alone, so that had better
-  // actually distinguish them.
+  // Requests for different modes are told apart by the observing mode type, which is part of
+  // the key alongside each mode's own parameters (for imaging, the filters and the GNIRS camera).
+  // These check that the mode type really does distinguish them.
   test("GNIRS imaging is distinct from GNIRS long slit"):
     setup.flatMap: (pid, tid) =>
       for

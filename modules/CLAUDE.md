@@ -324,11 +324,12 @@ When writing a `Fragment` / `encoder` for an INSERT that maps to a table with `c
 
 ## Configuration Requests & `ConfigurationService`
 
-`Configuration.ObservingMode` (from `lucuma-core`) has a variant per mode. `ConfigurationService.scala` matches on `(ObservingModeType, ..., Some(discriminantValue), ...)` tuples from SQL to construct these. When adding a new mode:
+`Configuration.ObservingMode` (from `lucuma-core`) has a variant per mode. Request rows are decoded once, by `request_row` in `ConfigurationService.Statements`, over the shared `RequestColumns` list that both `SelectRequest` and `InsertRequest`'s `RETURNING` use. It matches on the observing mode type and then reads that mode's columns by name. Observations and requests read through GraphQL are decoded from the shared `ConfigurationSelection`. When adding a new mode or mode parameter:
 
-- Add the match case in both occurrences of `selectMany` (there are two — one for a single obs, one for multiple).
+- Add the column to `RequestColumns`, a slot to `request_row`'s codec and pattern, and a case to its mode match.
+- Add the mode's sub-object to `ConfigurationSelection`.
 - The JSON codec in `configurationrequest.scala` must encode and decode the new variant; the discriminant field is the mode-specific key (e.g., `"gnirsLongSlit"`).
-- Add the new discriminant columns to `SelectRequest`'s `WHERE`, to its `contramap`, and to `InsertRequest`.
+- Add the new discriminant columns to `SelectRequest`'s `WHERE`, to its `contramap`, and to `InsertRequest`'s `VALUES` and `contramap`.
 - **Rebuild the `t_configuration_request_unique` index to include them** (see below).
 
 Since V1385 the key is a unique *index*, not a constraint. A key with one column per parameter would exceed Postgres's limit of 32 index columns. So the mode-specific parameters are packed into one value of the composite type `configuration_request_mode_key`, and btree compares its fields with NULLs equal, as `NULLS NOT DISTINCT` does. To add a mode parameter, drop the index first, because the index's column depends on the type. Then add the attribute with `ALTER TYPE configuration_request_mode_key ADD ATTRIBUTE ...`, and recreate the index with the new column at the same position in its `ROW(...)` expression.
