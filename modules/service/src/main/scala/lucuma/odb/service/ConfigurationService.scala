@@ -670,6 +670,225 @@ object ConfigurationService {
     private def gnirsImagingFilters(cfg: Configuration): Option[Arr[GnirsFilter]] =
       cfg.observingMode.gnirsImaging.map(m => canonicalFilters(m.filters))
 
+    // The columns of a request row, in the order `request_row` decodes them.  Shared by
+    // `SelectRequest` and `InsertRequest`'s RETURNING, so a new column is added once.
+    private val RequestColumns: String =
+      """
+        c_configuration_request_id,
+        c_status,
+        c_cloud_extinction,
+        c_image_quality,
+        c_sky_background,
+        c_water_vapor,
+        c_reference_ra,
+        c_reference_dec,
+        c_region_ra_arc_type,
+        c_region_ra_arc_start,
+        c_region_ra_arc_end,
+        c_region_dec_arc_type,
+        c_region_dec_arc_start,
+        c_region_dec_arc_end,
+        c_observing_mode_type,
+        c_flamingos_2_longslit_disperser,
+        c_gmos_north_imaging_filters,
+        c_gmos_south_imaging_filters,
+        c_gmos_north_longslit_grating,
+        c_gmos_south_longslit_grating,
+        c_gnirs_longslit_grating,
+        c_gnirs_longslit_camera,
+        c_gnirs_longslit_prism,
+        c_visitor_radius,
+        c_gnirs_ifu_grating,
+        c_gnirs_ifu_fpu,
+        c_gmos_north_ifu_grating,
+        c_gmos_north_ifu_fpu,
+        c_gmos_south_ifu_grating,
+        c_gmos_south_ifu_fpu,
+        c_flamingos_2_imaging_filters,
+        c_gnirs_imaging_filters,
+        c_ghost_ifu_resolution_mode,
+        c_gnirs_imaging_camera,
+        c_altair_mode,
+        c_scheduling_mode
+      """
+
+    private val request_row: skunk.Decoder[Request] =
+      (
+        configuration_request_id     *:
+        configuration_request_status *:
+        cloud_extinction_preset      *:
+        image_quality_preset         *:
+        sky_background               *:
+        water_vapor                  *:
+        right_ascension.opt          *:
+        declination.opt              *:
+        arc_type.opt                 *:
+        right_ascension.opt          *:
+        right_ascension.opt          *:
+        arc_type.opt                 *:
+        declination.opt              *:
+        declination.opt              *:
+        observing_mode_type          *:
+        flamingos_2_disperser.opt    *:
+        _gmos_north_filter.opt       *:
+        _gmos_south_filter.opt       *:
+        gmos_north_grating.opt       *:
+        gmos_south_grating.opt       *:
+        gnirs_grating.opt            *:
+        gnirs_camera.opt             *:
+        gnirs_prism.opt              *:
+        angle_µas.opt                *:
+        gnirs_grating.opt            *:
+        gnirs_fpu_ifu.opt            *:
+        gmos_north_grating.opt       *:
+        gmos_north_ifu_fpu.opt       *:
+        gmos_south_grating.opt       *:
+        gmos_south_ifu_fpu.opt       *:
+        _flamingos_2_filter.opt      *:
+        _gnirs_filter.opt            *:
+        ghost_resolution_mode.opt    *:
+        gnirs_camera.opt             *:
+        altair_mode.opt              *:
+        scheduling_mode
+      ).emap:
+        { case
+          id                       *:
+          status                   *:
+          cloudExtinction          *:
+          imageQuality             *:
+          skyBackground            *:
+          waterVapor               *:
+          rightAscension           *:
+          declination              *:
+          raArcType                *:
+          raArcStart               *:
+          raArcEnd                 *:
+          decArcType               *:
+          decArcStart              *:
+          decArcEnd                *:
+          observingModeType        *:
+          flamingos2Disperser      *:
+          gmosNorthImagingFilters  *:
+          gmosSouthImagingFilters  *:
+          gmosNorthLongSlitGrating *:
+          gmosSouthLongSlitGrating *:
+          gnirsLongSlitGrating     *:
+          gnirsLongSlitCamera      *:
+          gnirsLongSlitPrism       *:
+          visitorRadius            *:
+          gnirsIfuGrating          *:
+          gnirsIfuFpu              *:
+          gmosNorthIfuGrating      *:
+          gmosNorthIfuFpu          *:
+          gmosSouthIfuGrating      *:
+          gmosSouthIfuFpu          *:
+          flamingos2ImagingFilters *:
+          gnirsImagingFilters      *:
+          ghostResolutionMode      *:
+          gnirsImagingCamera       *:
+          altairMode               *:
+          schedulingMode           *:
+          EmptyTuple =>
+
+            // The mode type decides which columns are read, each by name, so two columns of
+            // the same type (the long slit and imaging GNIRS cameras, say) cannot be swapped.
+            val mode: Either[String, Configuration.ObservingMode] =
+              def need[A](a: Option[A]): Either[String, A] =
+                a.toRight(s"Malformed observing mode for configuration request $id")
+
+              observingModeType match
+                case ObservingModeType.Flamingos2LongSlit =>
+                  need(flamingos2Disperser.map(Configuration.ObservingMode.Flamingos2LongSlit.apply))
+                // MOS reuses the long slit disperser column; the mode type is what
+                // discriminates the two (see V1262).
+                case ObservingModeType.Flamingos2Mos =>
+                  need(flamingos2Disperser.map(Configuration.ObservingMode.Flamingos2Mos.apply))
+                case ObservingModeType.Flamingos2Imaging =>
+                  need(flamingos2ImagingFilters.map(fs => Configuration.ObservingMode.Flamingos2Imaging(fs.toList)))
+                case ObservingModeType.GhostIfu =>
+                  need(ghostResolutionMode.map(Configuration.ObservingMode.GhostIfu.apply))
+                case ObservingModeType.GmosNorthImaging =>
+                  need(gmosNorthImagingFilters.map(fs => Configuration.ObservingMode.GmosNorthImaging(fs.toList)))
+                case ObservingModeType.GmosSouthImaging =>
+                  need(gmosSouthImagingFilters.map(fs => Configuration.ObservingMode.GmosSouthImaging(fs.toList)))
+                case ObservingModeType.GmosNorthLongSlit =>
+                  need(gmosNorthLongSlitGrating.map(Configuration.ObservingMode.GmosNorthLongSlit.apply))
+                case ObservingModeType.GmosSouthLongSlit =>
+                  need(gmosSouthLongSlitGrating.map(Configuration.ObservingMode.GmosSouthLongSlit.apply))
+                case ObservingModeType.GmosNorthMos =>
+                  need(gmosNorthLongSlitGrating.map(Configuration.ObservingMode.GmosNorthMos.apply))
+                case ObservingModeType.GmosSouthMos =>
+                  need(gmosSouthLongSlitGrating.map(Configuration.ObservingMode.GmosSouthMos.apply))
+                case ObservingModeType.GmosNorthIfu =>
+                  need((gmosNorthIfuGrating, gmosNorthIfuFpu).mapN(Configuration.ObservingMode.GmosNorthIfu.apply))
+                case ObservingModeType.GmosSouthIfu =>
+                  need((gmosSouthIfuGrating, gmosSouthIfuFpu).mapN(Configuration.ObservingMode.GmosSouthIfu.apply))
+                case ObservingModeType.GnirsLongSlit =>
+                  need((gnirsLongSlitGrating, gnirsLongSlitCamera, gnirsLongSlitPrism).mapN(Configuration.ObservingMode.GnirsLongSlit.apply))
+                case ObservingModeType.GnirsIfu =>
+                  need((gnirsIfuGrating, gnirsIfuFpu).mapN(Configuration.ObservingMode.GnirsIfu.apply))
+                case ObservingModeType.GnirsImaging =>
+                  need((gnirsImagingCamera, gnirsImagingFilters).mapN((c, fs) => Configuration.ObservingMode.GnirsImaging(c, fs.toList)))
+                case ObservingModeType.Igrins2LongSlit =>
+                  Right(Configuration.ObservingMode.Igrins2LongSlit)
+                case m: VisitorObservingModeType =>
+                  need(visitorRadius.map(Configuration.ObservingMode.Visitor(m, _)))
+                case _ =>
+                  Left(s"Malformed observing mode for configuration request $id")
+
+            val refCoords: Either[String, Option[Coordinates]] =
+              (rightAscension, declination) match
+                case (Some(ra), Some(dec)) => Right(Some(Coordinates(ra, dec)))
+                case (None, None) => Right(None)
+                case _ => Left("Malformed reference coordinates.")
+
+            def arc[A: Angular](tpe: Option[ArcType], start: Option[A], end: Option[A]): Either[String, Option[Arc[A]]] =
+              (tpe, start, end) match
+                case (Some(ArcType.Empty), None, None) => Right(Some(Arc.Empty()))
+                case (Some(ArcType.Full), None, None) => Right(Some(Arc.Full()))
+                case (Some(ArcType.Partial), Some(a), Some(b)) => Right(Some(Arc.Partial(a, b)))
+                case (None, None, None) => Right(None)
+                case _ => Left(s"Malformed arc.")
+
+            val raArc: Either[String, Option[Arc[RightAscension]]] =
+              arc(raArcType, raArcStart, raArcEnd)
+
+            val decArc: Either[String, Option[Arc[Declination]]] =
+              arc(decArcType, decArcStart, decArcEnd)
+
+            val region: Either[String, Option[Region]] =
+              (raArc, decArc).flatMapN:
+                case (Some(ra), Some(dec)) => Right(Some(Region(ra, dec)))
+                case (None, None) => Right(None)
+                case _ => Left("Malformed region.")
+
+            val target: Either[String, Either[Coordinates, Region]] =
+              (refCoords, region).flatMapN:
+                case (Some(rc), None) => Right(Left(rc))
+                case (None, Some(r))  => Right(Right(r))
+                case _ => Left("Malformed configuration target.")
+
+            mode.flatMap: m =>
+              target.map: t =>
+                Request(
+                  id,
+                  status,
+                  Configuration(
+                    Conditions(
+                      cloudExtinction,
+                      imageQuality,
+                      skyBackground,
+                      waterVapor
+                    ),
+                    t,
+                    m,
+                    altairMode,
+                    schedulingMode
+                  )
+                )
+
+        }
+
     // Select the row a conflicting insert collided with. The matched columns are exactly the
     // columns of the t_configuration_request_unique index (the mode parameters among them packed
     // into its configuration_request_mode_key value, V1385) -- a discriminant belongs in both or
@@ -677,43 +896,7 @@ object ConfigurationService {
     // row.
     val SelectRequest: Query[(Observation.Id, Configuration), Request] =
       sql"""
-        SELECT
-          c_configuration_request_id,
-          c_status,
-          c_cloud_extinction,
-          c_image_quality,
-          c_sky_background,
-          c_water_vapor,
-          c_reference_ra,
-          c_reference_dec,
-          c_region_ra_arc_type,
-          c_region_ra_arc_start,
-          c_region_ra_arc_end,
-          c_region_dec_arc_type,
-          c_region_dec_arc_start,
-          c_region_dec_arc_end,
-          c_observing_mode_type,
-          c_flamingos_2_longslit_disperser,
-          c_gmos_north_imaging_filters,
-          c_gmos_south_imaging_filters,
-          c_gmos_north_longslit_grating,
-          c_gmos_south_longslit_grating,
-          c_gnirs_longslit_grating,
-          c_gnirs_longslit_camera,
-          c_gnirs_longslit_prism,
-          c_visitor_radius,
-          c_gnirs_ifu_grating,
-          c_gnirs_ifu_fpu,
-          c_gmos_north_ifu_grating,
-          c_gmos_north_ifu_fpu,
-          c_gmos_south_ifu_grating,
-          c_gmos_south_ifu_fpu,
-          c_flamingos_2_imaging_filters,
-          c_gnirs_imaging_filters,
-          c_ghost_ifu_resolution_mode,
-          c_gnirs_imaging_camera,
-          c_altair_mode,
-          c_scheduling_mode
+        SELECT #$RequestColumns
         FROM v_configuration_request
         WHERE (
           c_program_id = (select c_program_id from t_observation where c_observation_id = $observation_id) AND
@@ -752,193 +935,7 @@ object ConfigurationService {
           c_altair_mode IS NOT DISTINCT FROM ${altair_mode.opt} AND
           c_scheduling_mode = $scheduling_mode
         )
-      """.query(
-        (
-          configuration_request_id     *:
-          configuration_request_status *:
-          cloud_extinction_preset      *:
-          image_quality_preset         *:
-          sky_background               *:
-          water_vapor                  *:
-          right_ascension.opt          *:
-          declination.opt              *:
-          arc_type.opt                 *:
-          right_ascension.opt          *:
-          right_ascension.opt          *:
-          arc_type.opt                 *:
-          declination.opt              *:
-          declination.opt              *:
-          observing_mode_type          *:
-          flamingos_2_disperser.opt    *:
-          _gmos_north_filter.opt       *:
-          _gmos_south_filter.opt       *:
-          gmos_north_grating.opt       *:
-          gmos_south_grating.opt       *:
-          gnirs_grating.opt            *:
-          gnirs_camera.opt             *:
-          gnirs_prism.opt              *:
-          angle_µas.opt                *:
-          gnirs_grating.opt            *:
-          gnirs_fpu_ifu.opt            *:
-          gmos_north_grating.opt       *:
-          gmos_north_ifu_fpu.opt       *:
-          gmos_south_grating.opt       *:
-          gmos_south_ifu_fpu.opt       *:
-          _flamingos_2_filter.opt      *:
-          _gnirs_filter.opt            *:
-          ghost_resolution_mode.opt    *:
-          gnirs_camera.opt             *:
-          altair_mode.opt              *:
-          scheduling_mode
-        ).emap:
-          { case
-            id                       *:
-            status                   *:
-            cloudExtinction          *:
-            imageQuality             *:
-            skyBackground            *:
-            waterVapor               *:
-            rightAscension           *:
-            declination              *:
-            raArcType                *:
-            raArcStart               *:
-            raArcEnd                 *:
-            decArcType               *:
-            decArcStart              *:
-            decArcEnd                *:
-            observingModeType        *:
-            flamingos2Disperser      *:
-            gmosNorthImagingFilters  *:
-            gmosSouthImagingFilters  *:
-            gmosNorthLongSlitGrating *:
-            gmosSouthLongSlitGrating *:
-            gnirsLongSlitGrating     *:
-            gnirsLongSlitCamera      *:
-            gnirsLongSlitPrism       *:
-            visitorRadius            *:
-            gnirsIfuGrating          *:
-            gnirsIfuFpu              *:
-            gmosNorthIfuGrating      *:
-            gmosNorthIfuFpu          *:
-            gmosSouthIfuGrating      *:
-            gmosSouthIfuFpu          *:
-            flamingos2ImagingFilters *:
-            gnirsImagingFilters      *:
-            ghostResolutionMode      *:
-            gnirsImagingCamera       *:
-            altairMode               *:
-            schedulingMode           *:
-            EmptyTuple =>
-
-              val mode: Either[String, Configuration.ObservingMode] =
-                (observingModeType, flamingos2Disperser, gmosNorthImagingFilters, gmosSouthImagingFilters, gmosNorthLongSlitGrating, gmosSouthLongSlitGrating, gnirsLongSlitGrating, gnirsLongSlitCamera, gnirsLongSlitPrism, visitorRadius, gnirsIfuGrating, gnirsIfuFpu, gmosNorthIfuGrating, gmosNorthIfuFpu, gmosSouthIfuGrating, gmosSouthIfuFpu, flamingos2ImagingFilters, gnirsImagingFilters, ghostResolutionMode, gnirsImagingCamera) match
-
-                  case (ObservingModeType.Flamingos2LongSlit, Some(d), _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) =>
-                    Right(Configuration.ObservingMode.Flamingos2LongSlit(d))
-
-                  case (ObservingModeType.Flamingos2Mos, Some(d), _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) =>
-                    Right(Configuration.ObservingMode.Flamingos2Mos(d))
-
-                  case (ObservingModeType.GmosNorthImaging, _, Some(fs), _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) =>
-                    Right(Configuration.ObservingMode.GmosNorthImaging(fs.toList))
-
-                  case (ObservingModeType.GmosSouthImaging, _, _, Some(fs), _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) =>
-                    Right(Configuration.ObservingMode.GmosSouthImaging(fs.toList))
-
-                  case (ObservingModeType.GmosNorthLongSlit, _, _, _, Some(g), _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) =>
-                    Right(Configuration.ObservingMode.GmosNorthLongSlit(g))
-
-                  case (ObservingModeType.GmosSouthLongSlit, _, _, _, _, Some(g), _, _, _, _, _, _, _, _, _, _, _, _, _, _) =>
-                    Right(Configuration.ObservingMode.GmosSouthLongSlit(g))
-
-                  case (ObservingModeType.GmosNorthMos, _, _, _, Some(g), _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) =>
-                    Right(Configuration.ObservingMode.GmosNorthMos(g))
-
-                  case (ObservingModeType.GmosSouthMos, _, _, _, _, Some(g), _, _, _, _, _, _, _, _, _, _, _, _, _, _) =>
-                    Right(Configuration.ObservingMode.GmosSouthMos(g))
-
-                  case (ObservingModeType.Igrins2LongSlit, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) =>
-                    Right(Configuration.ObservingMode.Igrins2LongSlit)
-
-                  case (ObservingModeType.GhostIfu, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, Some(r), _) =>
-                    Right(Configuration.ObservingMode.GhostIfu(r))
-
-                  case (ObservingModeType.Flamingos2Imaging, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, Some(fs), _, _, _) =>
-                    Right(Configuration.ObservingMode.Flamingos2Imaging(fs.toList))
-
-                  case (ObservingModeType.GnirsImaging, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, Some(fs), _, Some(camera)) =>
-                    Right(Configuration.ObservingMode.GnirsImaging(camera, fs.toList))
-
-                  case (ObservingModeType.GnirsLongSlit, _, _, _, _, _, Some(grating), Some(cam), Some(prism), _, _, _, _, _, _, _, _, _, _, _) =>
-                    Right(Configuration.ObservingMode.GnirsLongSlit(grating, cam, prism))
-
-                  case (ObservingModeType.GnirsIfu, _, _, _, _, _, _, _, _, _, Some(grating), Some(fpu), _, _, _, _, _, _, _, _) =>
-                    Right(Configuration.ObservingMode.GnirsIfu(grating, fpu))
-
-                  case (ObservingModeType.GmosNorthIfu, _, _, _, _, _, _, _, _, _, _, _, Some(grating), Some(fpu), _, _, _, _, _, _) =>
-                    Right(Configuration.ObservingMode.GmosNorthIfu(grating, fpu))
-
-                  case (ObservingModeType.GmosSouthIfu, _, _, _, _, _, _, _, _, _, _, _, _, _, Some(grating), Some(fpu), _, _, _, _) =>
-                    Right(Configuration.ObservingMode.GmosSouthIfu(grating, fpu))
-
-                  case (m: VisitorObservingModeType, _, _, _, _, _, _, _, _, Some(radius), _, _, _, _, _, _, _, _, _, _) =>
-                    Right(Configuration.ObservingMode.Visitor(m, radius))
-
-                  case _ => Left(s"Malformed observing mode for configuration request $id")
-
-              val refCoords: Either[String, Option[Coordinates]] =
-                (rightAscension, declination) match
-                  case (Some(ra), Some(dec)) => Right(Some(Coordinates(ra, dec)))
-                  case (None, None) => Right(None)
-                  case _ => Left("Malformed reference coordinates.")
-
-              def arc[A: Angular](tpe: Option[ArcType], start: Option[A], end: Option[A]): Either[String, Option[Arc[A]]] =
-                (tpe, start, end) match
-                  case (Some(ArcType.Empty), None, None) => Right(Some(Arc.Empty()))
-                  case (Some(ArcType.Full), None, None) => Right(Some(Arc.Full()))
-                  case (Some(ArcType.Partial), Some(a), Some(b)) => Right(Some(Arc.Partial(a, b)))
-                  case (None, None, None) => Right(None)
-                  case _ => Left(s"Malformed arc.")
-
-              val raArc: Either[String, Option[Arc[RightAscension]]] =
-                arc(raArcType, raArcStart, raArcEnd)
-
-              val decArc: Either[String, Option[Arc[Declination]]] =
-                arc(decArcType, decArcStart, decArcEnd)
-
-              val region: Either[String, Option[Region]] =
-                (raArc, decArc).flatMapN:
-                  case (Some(ra), Some(dec)) => Right(Some(Region(ra, dec)))
-                  case (None, None) => Right(None)
-                  case _ => Left("Malformed region.")
-
-              val target: Either[String, Either[Coordinates, Region]] =
-                (refCoords, region).flatMapN:
-                  case (Some(rc), None) => Right(Left(rc))
-                  case (None, Some(r))  => Right(Right(r))
-                  case _ => Left("Malformed configuration target.")
-
-              mode.flatMap: m =>
-                target.map: t =>
-                  Request(
-                    id,
-                    status,
-                    Configuration(
-                      Conditions(
-                        cloudExtinction,
-                        imageQuality,
-                        skyBackground,
-                        waterVapor
-                      ),
-                      t,
-                      m,
-                      altairMode,
-                      schedulingMode
-                    )
-                  )
-
-          }
-      ).contramap[(Observation.Id, Configuration)] { (oid, cfg) =>
+      """.query(request_row).contramap[(Observation.Id, Configuration)] { (oid, cfg) =>
         oid                                                                     *:
         cfg.conditions.cloudExtinction                                          *:
         cfg.conditions.imageQuality                                             *:
@@ -1059,232 +1056,8 @@ object ConfigurationService {
           $scheduling_mode
         )
         ON CONFLICT DO NOTHING
-        RETURNING
-          c_configuration_request_id,
-          c_status,
-          c_cloud_extinction,
-          c_image_quality,
-          c_sky_background,
-          c_water_vapor,
-          c_reference_ra,
-          c_reference_dec,
-          c_region_ra_arc_type,
-          c_region_ra_arc_start,
-          c_region_ra_arc_end,
-          c_region_dec_arc_type,
-          c_region_dec_arc_start,
-          c_region_dec_arc_end,
-          c_observing_mode_type,
-          c_flamingos_2_longslit_disperser,
-          c_gmos_north_imaging_filters,
-          c_gmos_south_imaging_filters,
-          c_gmos_north_longslit_grating,
-          c_gmos_south_longslit_grating,
-          c_gnirs_longslit_grating,
-          c_gnirs_longslit_camera,
-          c_gnirs_longslit_prism,
-          c_visitor_radius,
-          c_gnirs_ifu_grating,
-          c_gnirs_ifu_fpu,
-          c_gmos_north_ifu_grating,
-          c_gmos_north_ifu_fpu,
-          c_gmos_south_ifu_grating,
-          c_gmos_south_ifu_fpu,
-          c_flamingos_2_imaging_filters,
-          c_gnirs_imaging_filters,
-          c_ghost_ifu_resolution_mode,
-          c_gnirs_imaging_camera,
-          c_altair_mode,
-          c_scheduling_mode
-      """.query(
-        (
-          configuration_request_id     *:
-          configuration_request_status *:
-          cloud_extinction_preset      *:
-          image_quality_preset         *:
-          sky_background               *:
-          water_vapor                  *:
-          right_ascension.opt          *:
-          declination.opt              *:
-          arc_type.opt                 *:
-          right_ascension.opt          *:
-          right_ascension.opt          *:
-          arc_type.opt                 *:
-          declination.opt              *:
-          declination.opt              *:
-          observing_mode_type          *:
-          flamingos_2_disperser.opt    *:
-          _gmos_north_filter.opt       *:
-          _gmos_south_filter.opt       *:
-          gmos_north_grating.opt       *:
-          gmos_south_grating.opt       *:
-          gnirs_grating.opt            *:
-          gnirs_camera.opt             *:
-          gnirs_prism.opt              *:
-          angle_µas.opt                *:
-          gnirs_grating.opt            *:
-          gnirs_fpu_ifu.opt            *:
-          gmos_north_grating.opt       *:
-          gmos_north_ifu_fpu.opt       *:
-          gmos_south_grating.opt       *:
-          gmos_south_ifu_fpu.opt       *:
-          _flamingos_2_filter.opt      *:
-          _gnirs_filter.opt            *:
-          ghost_resolution_mode.opt    *:
-          gnirs_camera.opt             *:
-          altair_mode.opt              *:
-          scheduling_mode
-        ).emap:
-          { case
-            id                       *:
-            status                   *:
-            cloudExtinction          *:
-            imageQuality             *:
-            skyBackground            *:
-            waterVapor               *:
-            rightAscension           *:
-            declination              *:
-            raArcType                *:
-            raArcStart               *:
-            raArcEnd                 *:
-            decArcType               *:
-            decArcStart              *:
-            decArcEnd                *:
-            observingModeType        *:
-            flamingos2LongSlitDisperser *:
-            gmosNorthFilters         *:
-            gmosSouthFilters         *:
-            gmosNorthLongSlitGrating *:
-            gmosSouthLongSlitGrating *:
-            gnirsLongSlitGrating     *:
-            gnirsLongSlitCamera      *:
-            gnirsLongSlitPrism       *:
-            visitorRadius            *:
-            gnirsIfuGrating          *:
-            gnirsIfuFpu              *:
-            gmosNorthIfuGrating      *:
-            gmosNorthIfuFpu          *:
-            gmosSouthIfuGrating      *:
-            gmosSouthIfuFpu          *:
-            flamingos2ImagingFilters *:
-            gnirsImagingFilters      *:
-            ghostResolutionMode      *:
-            gnirsImagingCamera       *:
-            altairMode               *:
-            schedulingMode           *:
-            EmptyTuple =>
-
-              val mode: Either[String, Configuration.ObservingMode] =
-                (observingModeType, flamingos2LongSlitDisperser, gmosNorthFilters, gmosSouthFilters, gmosNorthLongSlitGrating, gmosSouthLongSlitGrating, gnirsLongSlitGrating, gnirsLongSlitCamera, gnirsLongSlitPrism, visitorRadius, gnirsIfuGrating, gnirsIfuFpu, gmosNorthIfuGrating, gmosNorthIfuFpu, gmosSouthIfuGrating, gmosSouthIfuFpu, flamingos2ImagingFilters, gnirsImagingFilters, ghostResolutionMode, gnirsImagingCamera) match
-
-                  case (ObservingModeType.Flamingos2LongSlit, Some(d), _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) =>
-                    Right(Configuration.ObservingMode.Flamingos2LongSlit(d))
-
-                  // MOS reuses the long slit disperser column; the mode type
-                  // is what discriminates the two (see V1262).
-                  case (ObservingModeType.Flamingos2Mos, Some(d), _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) =>
-                    Right(Configuration.ObservingMode.Flamingos2Mos(d))
-
-                  case (ObservingModeType.GmosNorthImaging, _, Some(fs), _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) =>
-                    Right(Configuration.ObservingMode.GmosNorthImaging(fs.toList))
-
-                  case (ObservingModeType.GmosSouthImaging, _, _, Some(fs), _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) =>
-                    Right(Configuration.ObservingMode.GmosSouthImaging(fs.toList))
-
-                  case (ObservingModeType.GmosNorthLongSlit, _, _, _, Some(g), _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) =>
-                    Right(Configuration.ObservingMode.GmosNorthLongSlit(g))
-
-                  case (ObservingModeType.GmosSouthLongSlit, _, _, _, _, Some(g), _, _, _, _, _, _, _, _, _, _, _, _, _, _) =>
-                    Right(Configuration.ObservingMode.GmosSouthLongSlit(g))
-
-                  case (ObservingModeType.GmosNorthMos, _, _, _, Some(g), _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) =>
-                    Right(Configuration.ObservingMode.GmosNorthMos(g))
-
-                  case (ObservingModeType.GmosSouthMos, _, _, _, _, Some(g), _, _, _, _, _, _, _, _, _, _, _, _, _, _) =>
-                    Right(Configuration.ObservingMode.GmosSouthMos(g))
-
-                  case (ObservingModeType.GhostIfu, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, Some(r), _) =>
-                    Right(Configuration.ObservingMode.GhostIfu(r))
-
-                  case (ObservingModeType.Flamingos2Imaging, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, Some(fs), _, _, _) =>
-                    Right(Configuration.ObservingMode.Flamingos2Imaging(fs.toList))
-
-                  case (ObservingModeType.GnirsImaging, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, Some(fs), _, Some(camera)) =>
-                    Right(Configuration.ObservingMode.GnirsImaging(camera, fs.toList))
-
-                  case (ObservingModeType.Igrins2LongSlit, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) =>
-                    Right(Configuration.ObservingMode.Igrins2LongSlit)
-
-                  case (ObservingModeType.GnirsLongSlit, _, _, _, _, _, Some(grating), Some(cam), Some(prism), _, _, _, _, _, _, _, _, _, _, _) =>
-                    Right(Configuration.ObservingMode.GnirsLongSlit(grating, cam, prism))
-
-                  case (ObservingModeType.GnirsIfu, _, _, _, _, _, _, _, _, _, Some(grating), Some(fpu), _, _, _, _, _, _, _, _) =>
-                    Right(Configuration.ObservingMode.GnirsIfu(grating, fpu))
-
-                  case (ObservingModeType.GmosNorthIfu, _, _, _, _, _, _, _, _, _, _, _, Some(grating), Some(fpu), _, _, _, _, _, _) =>
-                    Right(Configuration.ObservingMode.GmosNorthIfu(grating, fpu))
-
-                  case (ObservingModeType.GmosSouthIfu, _, _, _, _, _, _, _, _, _, _, _, _, _, Some(grating), Some(fpu), _, _, _, _) =>
-                    Right(Configuration.ObservingMode.GmosSouthIfu(grating, fpu))
-
-                  case (m: VisitorObservingModeType, _, _, _, _, _, _, _, _, Some(radius), _, _, _, _, _, _, _, _, _, _) =>
-                    Right(Configuration.ObservingMode.Visitor(m, radius))
-
-                  case _ => Left(s"Malformed observing mode for configuration request $id")
-
-              val refCoords: Either[String, Option[Coordinates]] =
-                (rightAscension, declination) match
-                  case (Some(ra), Some(dec)) => Right(Some(Coordinates(ra, dec)))
-                  case (None, None) => Right(None)
-                  case _ => Left("Malformed reference coordinates.")
-
-              def arc[A: Angular](tpe: Option[ArcType], start: Option[A], end: Option[A]): Either[String, Option[Arc[A]]] =
-                (tpe, start, end) match
-                  case (Some(ArcType.Empty), None, None) => Right(Some(Arc.Empty()))
-                  case (Some(ArcType.Full), None, None) => Right(Some(Arc.Full()))
-                  case (Some(ArcType.Partial), Some(a), Some(b)) => Right(Some(Arc.Partial(a, b)))
-                  case (None, None, None) => Right(None)
-                  case _ => Left(s"Malformed arc.")
-
-              val raArc: Either[String, Option[Arc[RightAscension]]] =
-                arc(raArcType, raArcStart, raArcEnd)
-
-              val decArc: Either[String, Option[Arc[Declination]]] =
-                arc(decArcType, decArcStart, decArcEnd)
-
-              val region: Either[String, Option[Region]] =
-                (raArc, decArc).flatMapN:
-                  case (Some(ra), Some(dec)) => Right(Some(Region(ra, dec)))
-                  case (None, None) => Right(None)
-                  case _ => Left("Malformed region.")
-
-              val target: Either[String, Either[Coordinates, Region]] =
-                (refCoords, region).flatMapN:
-                  case (Some(rc), None) => Right(Left(rc))
-                  case (None, Some(r))  => Right(Right(r))
-                  case _ => Left("Malformed configuration target.")
-
-              mode.flatMap: m =>
-                target.map: t =>
-                  Request(
-                    id,
-                    status,
-                    Configuration(
-                      Conditions(
-                        cloudExtinction,
-                        imageQuality,
-                        skyBackground,
-                        waterVapor
-                      ),
-                      t,
-                      m,
-                      altairMode,
-                      schedulingMode
-                    )
-                  )
-
-          }
-      ).contramap[(CreateConfigurationRequestInput, Configuration)] { (input, cfg) =>
+        RETURNING #$RequestColumns
+      """.query(request_row).contramap[(CreateConfigurationRequestInput, Configuration)] { (input, cfg) =>
         input.oid                                                               *:
         input.SET.justification                                                 *:
         cfg.conditions.cloudExtinction                                          *:
