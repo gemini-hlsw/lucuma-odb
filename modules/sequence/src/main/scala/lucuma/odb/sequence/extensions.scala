@@ -7,31 +7,31 @@ import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.StepGuideState
 
+// Calibration roles taken as day calibrations: unguided, uncharged, DayCal class.
+val DayCalibrationRoles: Set[CalibrationRole] =
+  Set(
+    CalibrationRole.DaytimeArc,
+    CalibrationRole.DaytimeCalibration,
+    CalibrationRole.DaytimeFlat,
+    CalibrationRole.DaytimePinhole,
+    CalibrationRole.Twilight
+  )
+
 extension(role: Option[CalibrationRole])
-  // what is the observe claass for the science on a particular calibration role
+  def isDayCalibration: Boolean =
+    role.exists(DayCalibrationRoles.contains)
+
+  // observe class for the science steps of a particular calibration role
   def sciClass: ObserveClass =
-    role match
-      case Some(CalibrationRole.Twilight)            => ObserveClass.DayCal
-      case Some(CalibrationRole.DaytimePinhole)      => ObserveClass.DayCal
-      case Some(CalibrationRole.DaytimeCalibration)  => ObserveClass.DayCal
-      case Some(CalibrationRole.Telluric)            => ObserveClass.NightCal
-      case Some(CalibrationRole.SpectroPhotometric)  => ObserveClass.NightCal
-      case _                                         => ObserveClass.Science
+    if isDayCalibration then ObserveClass.DayCal
+    else role match
+      case Some(CalibrationRole.SpectroPhotometric) |
+           Some(CalibrationRole.Telluric)           => ObserveClass.NightCal
+      case _                                        => ObserveClass.Science
 
-  // what is the observa claass for gcal steps for a particular calibration role
+  // observe class for the gcal steps of a particular calibration role
   def gcalClass: ObserveClass =
-    role match
-      case Some(CalibrationRole.Twilight)            => ObserveClass.DayCal
-      case Some(CalibrationRole.DaytimePinhole)      => ObserveClass.DayCal
-      case Some(CalibrationRole.DaytimeCalibration)  => ObserveClass.DayCal
-      case _                                         => ObserveClass.NightCal
+    if isDayCalibration then ObserveClass.DayCal else ObserveClass.NightCal
 
-  // whether science steps are guided for a particular calibration role.  this
-  // mirrors GuideService.GuideEnvironment.CalRolesWithoutGuiding, which skips
-  // guide star selection altogether for these roles
   def sciGuiding: StepGuideState =
-    role match
-      case Some(CalibrationRole.Twilight)            => StepGuideState.Disabled
-      case Some(CalibrationRole.DaytimePinhole)      => StepGuideState.Disabled
-      case Some(CalibrationRole.DaytimeCalibration)  => StepGuideState.Disabled
-      case _                                         => StepGuideState.Enabled
+    if isDayCalibration then StepGuideState.Disabled else StepGuideState.Enabled

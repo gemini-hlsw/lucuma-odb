@@ -22115,6 +22115,16 @@ enum CalibrationRole {
   DAYTIME_PINHOLE
 
   """
+  CalibrationRole DaytimeFlat
+  """
+  DAYTIME_FLAT
+
+  """
+  CalibrationRole DaytimeArc
+  """
+  DAYTIME_ARC
+
+  """
   CalibrationRole DaytimeCalibration
   """
   DAYTIME_CALIBRATION

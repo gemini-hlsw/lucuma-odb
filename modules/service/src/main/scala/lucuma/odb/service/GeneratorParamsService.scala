@@ -118,6 +118,15 @@ trait GeneratorParamsService[F[_]] {
 
 object GeneratorParamsService {
 
+  private val TargetlessRoles: Set[CalibrationRole] =
+    Set(
+      CalibrationRole.DaytimeArc,
+      CalibrationRole.DaytimeCalibration,
+      CalibrationRole.DaytimeFlat,
+      CalibrationRole.DaytimePinhole,
+      CalibrationRole.Telluric
+    )
+
   sealed trait Error extends Product with Serializable:
     def format: String
 
@@ -285,7 +294,7 @@ object GeneratorParamsService {
         // let it through so the generator can charge a placeholder time.  A
         // user-defined one is the user's to complete, so it is checked as science.
         val targetCheck =
-          if !isUserDefinedTelluric.value && calibrationRole.exists(r => r === CalibrationRole.DaytimePinhole || r === CalibrationRole.Telluric || r === CalibrationRole.DaytimeCalibration) then
+          if !isUserDefinedTelluric.value && calibrationRole.exists(TargetlessRoles.contains) then
             ().asRight[NonEmptyList[MissingParam]]
           else
             params

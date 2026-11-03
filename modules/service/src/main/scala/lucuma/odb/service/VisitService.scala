@@ -24,6 +24,7 @@ import lucuma.odb.graphql.input.RecordVisitInput
 import lucuma.odb.logic.GeneratorContext
 import lucuma.odb.sequence.data.VisitOrigin
 import lucuma.odb.sequence.data.VisitRecord
+import lucuma.odb.sequence.isDayCalibration
 import lucuma.odb.syntax.instrument.*
 import lucuma.odb.util.Codecs.{site as _, *}
 import skunk.*
@@ -92,14 +93,7 @@ object VisitService:
     // general way that wouldn't need to be updated as code changes, but this is
     // far cheaper and is correct at least for now.
     def isChargeable: Boolean =
-      calibrationRole match
-        case None                                     |
-             Some(CalibrationRole.Photometric)        |
-             Some(CalibrationRole.SpectroPhotometric) |
-             Some(CalibrationRole.Telluric)            => true
-        case Some(CalibrationRole.Twilight)          |
-             Some(CalibrationRole.DaytimePinhole)      |
-             Some(CalibrationRole.DaytimeCalibration)  => false
+      !calibrationRole.isDayCalibration
 
   def instantiate[F[_]: Concurrent](using Services[F]): VisitService[F] =
     new VisitService[F]:

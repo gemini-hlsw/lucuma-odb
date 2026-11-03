@@ -30,7 +30,6 @@ import lucuma.ags.syntax.*
 import lucuma.catalog.clients.GaiaClient
 import lucuma.catalog.votable.*
 import lucuma.core.enums.AltairMode
-import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.Flamingos2LyotWheel
 import lucuma.core.enums.GuideProbe
 import lucuma.core.enums.GuideSpeed
@@ -87,6 +86,7 @@ import lucuma.odb.sequence.gmos
 import lucuma.odb.sequence.gnirs
 import lucuma.odb.sequence.igrins2
 import lucuma.odb.sequence.imaging.Variant
+import lucuma.odb.sequence.isDayCalibration
 import lucuma.odb.sequence.syntax.hash.*
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.sequence.util.HashBytes
@@ -198,11 +198,6 @@ object GuideService {
 
   object GuideEnvironment {
     given Encoder[GuideEnvironment] = deriveEncoder
-
-    // Calibration roles that don't use guide stars; an empty guide environment is
-    // returned for these without invoking AGS.
-    val CalRolesWithoutGuiding: Set[CalibrationRole] =
-      Set(CalibrationRole.Twilight, CalibrationRole.DaytimePinhole, CalibrationRole.DaytimeCalibration)
 
     val posAngle: Lens[GuideEnvironment, Angle] =
       Focus[GuideEnvironment](_.posAngle)
@@ -1294,9 +1289,9 @@ object GuideService {
             genInfo         <- ResultT(getGeneratorInfo(oid))
             scienceDuration <- ResultT.fromResult(genInfo.getScienceDuration(obsDuration, oid))
             scienceStart     = genInfo.getScienceStartTime(obsTime)
-            // Twilight and daytime pinhole calibrations have no guide stars, so skip AGS
+            // Day calibrations have no guide stars, so skip AGS
             // entirely and return an empty guide environment.
-            result          <- if (genInfo.params.calibrationRole.exists(GuideEnvironment.CalRolesWithoutGuiding.contains))
+            result          <- if (genInfo.params.calibrationRole.isDayCalibration)
                                   ResultT.pure(GuideEnvironment(obsInfo.availabilityAngles.head, Nil))
                                 else
                                   ResultT(lookupGuideStar(oid, obsInfo.guideStarName, obsInfo, genInfo, targets, obsTime, obsDuration, scienceStart, scienceDuration))
@@ -1333,7 +1328,7 @@ object GuideService {
             scienceStart     = generatorInfo.getScienceStartTime(obsTime)
             targets         <- ResultT.liftF(getSearchTargets(oid))
             // A calibration that does not guide never has a star; that is not an error.
-            resolution      <- if (generatorInfo.params.calibrationRole.exists(GuideEnvironment.CalRolesWithoutGuiding.contains))
+            resolution      <- if (generatorInfo.params.calibrationRole.isDayCalibration)
                                  ResultT.pure(GuideStarResolution.NotGuided)
                                else
                                  ResultT(lookupGuideStar(oid, obsInfo.guideStarName, obsInfo, generatorInfo, targets, obsTime, obsDuration, scienceStart, scienceDuration))
