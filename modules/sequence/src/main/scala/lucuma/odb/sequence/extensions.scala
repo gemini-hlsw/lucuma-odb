@@ -11,19 +11,23 @@ extension(role: Option[CalibrationRole])
   // what is the observe claass for the science on a particular calibration role
   def sciClass: ObserveClass =
     role match
-      case Some(CalibrationRole.Twilight)            => ObserveClass.DayCal
-      case Some(CalibrationRole.DaytimePinhole)      => ObserveClass.DayCal
+      case Some(CalibrationRole.DaytimeArc)          => ObserveClass.DayCal
       case Some(CalibrationRole.DaytimeCalibration)  => ObserveClass.DayCal
-      case Some(CalibrationRole.Telluric)            => ObserveClass.NightCal
+      case Some(CalibrationRole.DaytimeFlat)         => ObserveClass.DayCal
+      case Some(CalibrationRole.DaytimePinhole)      => ObserveClass.DayCal
       case Some(CalibrationRole.SpectroPhotometric)  => ObserveClass.NightCal
+      case Some(CalibrationRole.Telluric)            => ObserveClass.NightCal
+      case Some(CalibrationRole.Twilight)            => ObserveClass.DayCal
       case _                                         => ObserveClass.Science
 
   // what is the observa claass for gcal steps for a particular calibration role
   def gcalClass: ObserveClass =
     role match
       case Some(CalibrationRole.Twilight)            => ObserveClass.DayCal
-      case Some(CalibrationRole.DaytimePinhole)      => ObserveClass.DayCal
+      case Some(CalibrationRole.DaytimeArc)          => ObserveClass.DayCal
       case Some(CalibrationRole.DaytimeCalibration)  => ObserveClass.DayCal
+      case Some(CalibrationRole.DaytimeFlat)         => ObserveClass.DayCal
+      case Some(CalibrationRole.DaytimePinhole)      => ObserveClass.DayCal
       case _                                         => ObserveClass.NightCal
 
   // whether science steps are guided for a particular calibration role.  this
@@ -32,6 +36,8 @@ extension(role: Option[CalibrationRole])
   def sciGuiding: StepGuideState =
     role match
       case Some(CalibrationRole.Twilight)            => StepGuideState.Disabled
-      case Some(CalibrationRole.DaytimePinhole)      => StepGuideState.Disabled
+      case Some(CalibrationRole.DaytimeArc)          => StepGuideState.Disabled
       case Some(CalibrationRole.DaytimeCalibration)  => StepGuideState.Disabled
+      case Some(CalibrationRole.DaytimeFlat)         => StepGuideState.Disabled
+      case Some(CalibrationRole.DaytimePinhole)      => StepGuideState.Disabled
       case _                                         => StepGuideState.Enabled

@@ -77,7 +77,12 @@ object GroupProgressEvaluator:
 
   /** Calibrations taken in the daytime, which group progress ignores. */
   val DaytimeCalibrationRoles: Set[CalibrationRole] =
-    Set(CalibrationRole.DaytimePinhole, CalibrationRole.DaytimeCalibration)
+    Set(
+      CalibrationRole.DaytimeArc,
+      CalibrationRole.DaytimeCalibration,
+      CalibrationRole.DaytimeFlat,
+      CalibrationRole.DaytimePinhole
+    )
 
   /**
    * What the evaluator needs to know about an observation.  `calibrationRole`

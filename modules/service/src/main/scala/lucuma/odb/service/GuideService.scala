@@ -202,7 +202,13 @@ object GuideService {
     // Calibration roles that don't use guide stars; an empty guide environment is
     // returned for these without invoking AGS.
     val CalRolesWithoutGuiding: Set[CalibrationRole] =
-      Set(CalibrationRole.Twilight, CalibrationRole.DaytimePinhole, CalibrationRole.DaytimeCalibration)
+      Set(
+        CalibrationRole.Twilight,
+        CalibrationRole.DaytimeArc,
+        CalibrationRole.DaytimeCalibration,
+        CalibrationRole.DaytimeFlat,
+        CalibrationRole.DaytimePinhole
+      )
 
     val posAngle: Lens[GuideEnvironment, Angle] =
       Focus[GuideEnvironment](_.posAngle)
