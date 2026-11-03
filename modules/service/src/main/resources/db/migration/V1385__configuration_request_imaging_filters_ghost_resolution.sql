@@ -18,7 +18,21 @@ ALTER TABLE t_configuration_request
 
 -- A filter array is part of the key, so it must have one spelling per set: sorted
 -- by tag in byte order (matching the service, which sorts on the tag string) with
--- no repeats.
+-- no repeats.  `tags_are_canonical` tests that, and the CHECKs added after the
+-- backfill enforce it for every writer: otherwise `{K,J}` stored beside `{J,K}`
+-- would be a duplicate the unique index cannot see, and `SelectRequest` would find
+-- two rows.  The CHECK rejects rather than rewrites, because the service has to
+-- normalize anyway, to match on the arrays it is given.
+CREATE FUNCTION tags_are_canonical(tags _d_tag) RETURNS boolean AS $$
+  SELECT array_position(tags, NULL) IS NULL
+     AND NOT EXISTS (
+           SELECT 1
+             FROM generate_subscripts(tags, 1) AS i
+            WHERE i > array_lower(tags, 1)
+              AND (tags[i - 1]::text COLLATE "C" < tags[i]::text COLLATE "C") IS NOT TRUE
+         );
+$$ LANGUAGE sql IMMUTABLE STRICT;
+
 CREATE FUNCTION pg_temp.canonical_tags(tags _d_tag) RETURNS _d_tag AS $$
   SELECT COALESCE(array_agg(t ORDER BY t COLLATE "C"), '{}'::_d_tag)
     FROM (SELECT DISTINCT unnest(tags) AS t) u;
@@ -181,7 +195,15 @@ ALTER TABLE t_configuration_request
   ADD CONSTRAINT t_configuration_request_gnirs_imaging_filters_check
     CHECK (c_gnirs_imaging_filters IS NOT NULL = (c_observing_mode_type = 'gnirs_imaging'::e_observing_mode_type)),
   ADD CONSTRAINT t_configuration_request_ghost_ifu_resolution_mode_check
-    CHECK (c_ghost_ifu_resolution_mode IS NOT NULL = (c_observing_mode_type = 'ghost_ifu'::e_observing_mode_type));
+    CHECK (c_ghost_ifu_resolution_mode IS NOT NULL = (c_observing_mode_type = 'ghost_ifu'::e_observing_mode_type)),
+  ADD CONSTRAINT t_configuration_request_gmos_north_imaging_filters_canonical
+    CHECK (tags_are_canonical(c_gmos_north_imaging_filters)),
+  ADD CONSTRAINT t_configuration_request_gmos_south_imaging_filters_canonical
+    CHECK (tags_are_canonical(c_gmos_south_imaging_filters)),
+  ADD CONSTRAINT t_configuration_request_flamingos_2_imaging_filters_canonical
+    CHECK (tags_are_canonical(c_flamingos_2_imaging_filters)),
+  ADD CONSTRAINT t_configuration_request_gnirs_imaging_filters_canonical
+    CHECK (tags_are_canonical(c_gnirs_imaging_filters));
 
 -- Array elements cannot be checked by a foreign key.  Body copied from V1031, plus
 -- the two new arrays.
