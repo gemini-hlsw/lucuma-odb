@@ -129,12 +129,12 @@ Two rules apply to **every** calibration role, whatever its kind:
   accepted proposal included. There is no separate calibration program to
   exempt it.
 
-Beyond that the five roles split into two groups:
+Beyond that the six roles split into two groups:
 
 | Role | Group | Lifecycle |
 |---|---|---|
 | `Photometric`, `SpectroPhotometric`, `Twilight` | program-level | the generic lifecycle above, entered at `Undefined` until a band is inherited |
-| `Telluric`, `DaytimePinhole` | per-observation | inherits its science observation's user state; see below |
+| `Telluric`, `DaytimePinhole`, `DaytimeFlat` | per-observation | inherits its science observation's user state; see below |
 
 ### Program-level calibrations
 
@@ -152,7 +152,7 @@ on `Ready <-> Ongoing`.
 
 ### Per-observation calibrations
 
-Tellurics and daytime pinholes are auto-created alongside their science
+Tellurics, daytime pinholes and daytime flats are auto-created alongside their science
 observation and normally have **no** transitions of their own — they inherit the
 science observation's user state. SC-8458 carves out one exception, for tellurics
 only (see `../../../docs/adr/0008-telluric-decline-override.md`).
