@@ -44,6 +44,25 @@ class schedulerRoutes extends SchedulerRoutesSuite with ExecutionTestSupportForG
     atomsRequest(serviceUser, "foo", "o-123", "bar").flatMap: request =>
       withRoutes(serviceUser, request).assertResponse(Status.BadRequest, "Unable to parse observation ids: foo, bar".some)
 
+  test("not service user, invalid observation ids"):
+    // Authorization is checked before the body is parsed.
+    atomsRequest(pi, "foo", "bar").flatMap: request =>
+      withRoutes(serviceUser, request).assertResponse(Status.Forbidden, none)
+
+  test("invalid observation ids, bounded error message"):
+    val long = "x" * 100
+    val bad  = List("b1", "b2", "b3", "b4", long, "b6", "b7")
+    atomsRequest(serviceUser, ("o-123" :: bad)*).flatMap: request =>
+      withRoutes(serviceUser, request).assertResponse(
+        Status.BadRequest,
+        s"Unable to parse observation ids: b1, b2, b3, b4, ${"x" * 32}... (and 2 more)".some
+      )
+
+  test("request body too large"):
+    val huge = "o" * (SchedulerRoutes.MaxAtomsRequestBytes.toInt + 1)
+    atomsRequest(serviceUser, huge).flatMap: request =>
+      withRoutes(serviceUser, request).map(r => assertEquals(r.status, Status.PayloadTooLarge))
+
   test("unknown observation ids"):
     atomsRequest(serviceUser, "o-123", "o-124", "o-125").flatMap: request =>
       withRoutes(serviceUser, request).assertResponse(Status.Ok, "".some)

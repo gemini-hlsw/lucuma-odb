@@ -4,7 +4,6 @@
 package lucuma.odb.graphql
 
 import cats.Parallel
-import cats.data.NonEmptyList
 import cats.effect.*
 import cats.effect.std.SecureRandom
 import cats.effect.std.UUIDGen
@@ -38,6 +37,7 @@ import lucuma.sso.client.SsoClient
 import org.http4s.*
 import org.http4s.client.Client
 import org.http4s.dsl.Http4sDsl
+import org.http4s.server.middleware.EntityLimiter
 import org.http4s.server.middleware.GZip
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.LoggerFactory
@@ -109,6 +109,48 @@ object SchedulerRoutes:
       case VisibilityChange.ForTarget(id, invalidatedAt) =>
         s"${Gid[Target.Id].show(id)}\t${invalidatedAt.toInstant}"
 
+  /**
+   * Maximum accepted size of a request body.  An observation id line is ~20
+   * bytes, so this leaves room for tens of thousands of ids.
+   */
+  val MaxAtomsRequestBytes: Long = 1024L * 1024L
+
+  /** Maximum number of unparseable lines reported back in a BadRequest. */
+  val MaxReportedErrors: Int = 5
+
+  /** Maximum length of each reported unparseable line. */
+  val MaxReportedErrorLength: Int = 32
+
+  private def truncate(s: String): String =
+    if s.length <= MaxReportedErrorLength then s
+    else s"${s.take(MaxReportedErrorLength)}..."
+
+  /**
+   * Parses newline-separated observation ids, keeping only a bounded sample of
+   * the invalid lines for the error message.
+   */
+  private def parseObservationIds[F[_]: Sync](
+    body: fs2.Stream[F, Byte]
+  ): F[Either[String, List[Observation.Id]]] =
+    body
+      .through(fs2.text.utf8.decode)
+      .through(fs2.text.lines)
+      .filter(_.nonEmpty)
+      .compile
+      .fold((List.empty[Observation.Id], Vector.empty[String], 0)):
+        case ((ids, errs, errCount), line) =>
+          Observation.Id.parse(line) match
+            case Some(oid) => (oid :: ids, errs, errCount)
+            case None      =>
+              val errsʹ = if errs.sizeIs < MaxReportedErrors then errs :+ truncate(line) else errs
+              (ids, errsʹ, errCount + 1)
+      .map: (ids, errs, errCount) =>
+        if errCount === 0 then ids.reverse.asRight
+        else
+          val more = errCount - errs.size
+          val suffix = if more > 0 then s" (and $more more)" else ""
+          s"Unable to parse observation ids: ${errs.mkString(", ")}$suffix".asLeft
+
   def apply[F[_]: Async](
     services:  [A] => User => (Services[F] => F[A]) => F[A],
     ssoClient: SsoClient[F, User]
@@ -129,40 +171,28 @@ object SchedulerRoutes:
 
     val routes = HttpRoutes.of[F]:
       case req @ POST -> Root / "scheduler" / "atoms" =>
-        val input: F[Either[NonEmptyList[String], List[Observation.Id]]] =
-          req
-            .body
-            .through(fs2.text.utf8.decode)
-            .through(fs2.text.lines)
-            .filter(_.nonEmpty)
-            .map(s => Observation.Id.parse(s).toRight(s).toValidatedNel)
-            .compile
-            .toList
-            .map(_.sequence.toEither)
-
-        for
-          oids     <- input
-          response <- oids.fold(
-            errs     =>
-              BadRequest(s"Unable to parse observation ids: ${errs.intercalate(", ")}"),
-            validIds =>
-              ssoClient.require(req) { user =>
-                user.verifyAccess(Access.Service) *>
-                services(user): s =>
-                  Services.asSuperUser:
-                    s.transactionally:
-                      Ok(
-                        sequenceService
-                          .selectAtomDigests(validIds)
-                          .map(tsv)
-                          .intersperse("\n")
-                          .through(fs2.text.utf8.encode)
-                      )
-              }.handleErrorWith:
-                 case _: AccessControlException => Forbidden()
-                 case other                     => other.raiseError[F, Response[F]]
-          )
-        yield response
+        // Authenticate before touching the request body so that unauthenticated
+        // clients cannot make us read (or echo back) arbitrary input.
+        ssoClient.require(req) { user =>
+          user.verifyAccess(Access.Service) *>
+          parseObservationIds(req.body).flatMap:
+            case Left(msg)      =>
+              BadRequest(msg)
+            case Right(validIds) =>
+              services(user): s =>
+                Services.asSuperUser:
+                  s.transactionally:
+                    Ok(
+                      sequenceService
+                        .selectAtomDigests(validIds)
+                        .map(tsv)
+                        .intersperse("\n")
+                        .through(fs2.text.utf8.encode)
+                    )
+        }.handleErrorWith:
+           case _: AccessControlException       => Forbidden()
+           case EntityLimiter.EntityTooLarge(_) => PayloadTooLarge(s"Request body exceeds $MaxAtomsRequestBytes bytes")
+           case other                           => other.raiseError[F, Response[F]]
 
       case req @ GET -> Root / "scheduler" / "visibility-changes" :? SinceMatcher(since) =>
         ssoClient.require(req) { user =>
@@ -181,4 +211,4 @@ object SchedulerRoutes:
            case _: AccessControlException => Forbidden()
            case other                     => other.raiseError[F, Response[F]]
 
-    GZip(routes, level = DeflateParams.Level.NINE)
+    GZip(EntityLimiter(routes, MaxAtomsRequestBytes), level = DeflateParams.Level.NINE)
