@@ -1732,7 +1732,7 @@ class updateObservations_GmosImaging extends OdbSuite with UpdateObservationsOps
 
     val update: String = """
       constraintSet: {
-        imageQuality: POINT_ONE
+        imageQuality: POINT_THREE
       }
     """
 

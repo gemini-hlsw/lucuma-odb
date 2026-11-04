@@ -131,7 +131,7 @@ class createObservation_GmosImaging extends OdbSuite:
 
     createProgramAs(pi).flatMap: pid =>
       createTargetAs(pi, pid, sourceProfile = gaussian).flatMap: tid =>
-        createGmosNorthImagingObservationAs(pi, pid, iq = ImageQuality.Preset.PointOne, tid).flatMap: oid =>
+        createGmosNorthImagingObservationAs(pi, pid, iq = ImageQuality.Preset.PointThree, tid).flatMap: oid =>
           expect(pi, s"""
             query {
               observation(observationId: "$oid") {

@@ -88,7 +88,7 @@ trait UpdateObservationsOps { this: OdbSuite =>
     )
 
   def setBestConditionsAs(user: User, oid: Observation.Id): IO[Unit] =
-    updateObservationConditions(user, oid, CloudExtinction.Preset.PointOne, ImageQuality.Preset.PointOne, SkyBackground.Dark)
+    updateObservationConditions(user, oid, CloudExtinction.Preset.PointOne, ImageQuality.Preset.PointThree, SkyBackground.Dark)
 
   def updateObservationsTimesMutation(
     oid:    Observation.Id,

@@ -312,7 +312,7 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
                SET: {
                  constraintSet: {
                    cloudExtinction: POINT_ONE,
-                   imageQuality: POINT_ONE,
+                   imageQuality: POINT_THREE,
                    skyBackground: DARKEST
                  },
                  targetEnvironment: {
@@ -384,7 +384,7 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
                SET: {
                  constraintSet: {
                    cloudExtinction: POINT_ONE,
-                   imageQuality: POINT_ONE,
+                   imageQuality: POINT_THREE,
                    skyBackground: DARKEST
                  },
                  scienceRequirements: {
