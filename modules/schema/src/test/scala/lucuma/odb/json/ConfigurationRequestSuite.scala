@@ -6,7 +6,12 @@ package lucuma.odb.json
 import io.circe.Decoder
 import io.circe.Json
 import io.circe.literal.*
+import io.circe.syntax.*
+import lucuma.core.enums.Flamingos2Filter
+import lucuma.core.enums.GhostResolutionMode
 import lucuma.core.enums.GmosNorthGrating
+import lucuma.core.enums.GnirsCamera
+import lucuma.core.enums.GnirsFilter
 import lucuma.core.model.Configuration.ObservingMode
 import munit.FunSuite
 
@@ -15,8 +20,8 @@ import configurationrequest.query.given
 /**
  * The `ObservingMode` decoder reads what the `configuration { observingMode { ... } }` GraphQL
  * selection returns: the mode type, plus a sub-object for each mode that has parameters.  It
- * dispatches on the mode, so a mode with no parameters needs no sub-object, and a mode with one
- * reports that sub-object's own error rather than masking it.
+ * dispatches on the mode, so a mode with no parameters (only IGRINS-2 long slit now) needs no
+ * sub-object, and a mode with one reports that sub-object's own error rather than masking it.
  */
 class ConfigurationRequestSuite extends FunSuite:
 
@@ -25,14 +30,21 @@ class ConfigurationRequestSuite extends FunSuite:
       (("instrument" -> Json.Null) :: ("mode" -> Json.fromString(mode)) :: subObject.toList)*
     ).as[ObservingMode]
 
-  test("GNIRS imaging decodes by name"):
-    assertEquals(decode("GNIRS_IMAGING"), Right(ObservingMode.GnirsImaging))
+  // The encoder writes exactly what the GraphQL selection returns, so it round trips.
+  private def roundTrip(m: ObservingMode): Unit =
+    assertEquals(m.asJson.as[ObservingMode], Right(m))
 
-  test("Flamingos-2 imaging decodes by name"):
-    assertEquals(decode("FLAMINGOS_2_IMAGING"), Right(ObservingMode.Flamingos2Imaging))
+  test("GNIRS imaging round trips its camera and filters"):
+    roundTrip(ObservingMode.GnirsImaging(GnirsCamera.LongRed, List(GnirsFilter.Order6, GnirsFilter.H2)))
 
-  test("GHOST IFU decodes by name"):
-    assertEquals(decode("GHOST_IFU"), Right(ObservingMode.GhostIfu))
+  test("Flamingos-2 imaging round trips its filters"):
+    roundTrip(ObservingMode.Flamingos2Imaging(List(Flamingos2Filter.Y, Flamingos2Filter.J)))
+
+  test("GHOST IFU round trips its resolution mode"):
+    GhostResolutionMode.values.foreach(r => roundTrip(ObservingMode.GhostIfu(r)))
+
+  test("GHOST IFU without its sub-object is not decoded by name"):
+    assert(decode("GHOST_IFU").isLeft)
 
   test("IGRINS-2 long slit decodes by name"):
     assertEquals(decode("IGRINS_2_LONG_SLIT"), Right(ObservingMode.Igrins2LongSlit))

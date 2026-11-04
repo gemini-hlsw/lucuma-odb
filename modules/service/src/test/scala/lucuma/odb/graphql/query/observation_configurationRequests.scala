@@ -25,6 +25,7 @@ import lucuma.core.model.CloudExtinction
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.syntax.string.*
 import lucuma.core.util.Enumerated
@@ -196,12 +197,12 @@ class observation_configurationRequests
       case ObservingModeType.Flamingos2Imaging  => None
       case ObservingModeType.Flamingos2LongSlit => Some(Mutation.forFlamingos2LongSlit(user, oid, Flamingos2Disperser.R1200JH))
       case ObservingModeType.Flamingos2Mos      => None
-      case ObservingModeType.GhostIfu           => None
+      case ObservingModeType.GhostIfu           => Some(Mutation.forGhostIfu(user, oid, GhostResolutionMode.High))
       case ObservingModeType.GmosNorthLongSlit  => Some(Mutation.forGmosNorthLongSlit(user, oid, GmosNorthGrating.B1200_G5301))
-      case ObservingModeType.GmosNorthImaging   => None // Mutation.forGmosNorthImaging(user, oid, List(GmosNorthFilter.GG455, GmosNorthFilter.GPrime_GG455))
+      case ObservingModeType.GmosNorthImaging   => Some(Mutation.forGmosNorthImaging(user, oid, List(GmosNorthFilter.GG455, GmosNorthFilter.GPrime_GG455))) // adds filters
       case ObservingModeType.GmosNorthMos       => None
       case ObservingModeType.GmosSouthLongSlit  => Some(Mutation.forGmosSouthLongSlit(user, oid, GmosSouthGrating.R600_G5324))
-      case ObservingModeType.GmosSouthImaging   => None // Mutation.forGmosSouthImaging(user, oid, List(GmosSouthFilter.GG455, GmosSouthFilter.GPrime_GG455))
+      case ObservingModeType.GmosSouthImaging   => Some(Mutation.forGmosSouthImaging(user, oid, List(GmosSouthFilter.GG455, GmosSouthFilter.GPrime_GG455))) // adds filters
       case ObservingModeType.GmosSouthMos       => None
       case ObservingModeType.GmosNorthIfu       =>
         Some(Mutation.forGmosNorthIfu(user, oid, GmosNorthGrating.R831_G5302))
@@ -388,6 +389,57 @@ class observation_configurationRequests
 
     }
   }
+
+  // Flamingos-2 and GNIRS imaging sit outside the generic loop above (see `UnImplementedModes`),
+  // so their approval rule is pinned here: an approved request covers any subset of its filters,
+  // adding a filter needs a new request, and the GNIRS camera must match (sc-9766).
+  private def imagingObservation(create: (Program.Id, Target.Id) => IO[Observation.Id]): IO[Observation.Id] =
+    for
+      cfpid <- createGeminiCallForProposalsAs(admin)
+      pid   <- createProgramAs(pi, "Foo")
+      _     <- addProposal(pi, pid, Some(cfpid), None)
+      tid   <- createTargetWithProfileAs(pi, pid)
+      oid   <- create(pid, tid)
+    yield oid
+
+  private def assertCoverageAfter(
+    create:  (Program.Id, Target.Id) => IO[Observation.Id],
+    update:  String,
+    covered: Boolean
+  ): IO[Unit] =
+    for
+      oid <- imagingObservation(create)
+      rid <- createConfigurationRequestAs(pi, oid)
+      _   <- expectRequests(pi, oid, List(rid)) // sanity check
+      _   <- updateObservationAs(pi, oid)(s"observingMode: { $update }")
+      _   <- expectRequests(pi, oid, if covered then List(rid) else Nil)
+    yield ()
+
+  private def filterList(filters: String*): String =
+    filters.map(f => s"{ filter: $f }").mkString("[", ", ", "]")
+
+  // createFlamingos2ImagingObservationAs uses filters Y and J.
+  private val flamingos2Imaging: (Program.Id, Target.Id) => IO[Observation.Id] =
+    (pid, tid) => createFlamingos2ImagingObservationAs(pi, pid, tid)
+
+  test("[Flamingos2Imaging] request should apply after dropping a filter"):
+    assertCoverageAfter(flamingos2Imaging, s"flamingos2Imaging: { filters: ${filterList("Y")} }", covered = true)
+
+  test("[Flamingos2Imaging] request should not apply after adding a filter"):
+    assertCoverageAfter(flamingos2Imaging, s"flamingos2Imaging: { filters: ${filterList("Y", "J", "H")} }", covered = false)
+
+  // createGnirsImagingObservationAs uses the SHORT_BLUE camera with filters J and ORDER4.
+  private val gnirsImaging: (Program.Id, Target.Id) => IO[Observation.Id] =
+    (pid, tid) => createGnirsImagingObservationAs(pi, pid, tid)
+
+  test("[GnirsImaging] request should apply after dropping a filter"):
+    assertCoverageAfter(gnirsImaging, s"gnirsImaging: { filters: ${filterList("J")} }", covered = true)
+
+  test("[GnirsImaging] request should not apply after adding a filter"):
+    assertCoverageAfter(gnirsImaging, s"gnirsImaging: { filters: ${filterList("J", "ORDER4", "K")} }", covered = false)
+
+  test("[GnirsImaging] request should not apply after changing the camera"):
+    assertCoverageAfter(gnirsImaging, "gnirsImaging: { camera: LONG_BLUE }", covered = false)
 
   // `Observation.configurationRequests` used to serve its requests from a `CirceCursor` built by
   // `Encoder[ConfigurationRequest]`, so anything the schema declares but the encoder omitted failed

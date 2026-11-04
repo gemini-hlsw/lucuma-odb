@@ -13,6 +13,8 @@ import lucuma.core.enums.AltairMode
 import lucuma.core.enums.DaytimeCalibrationObservingModeType
 import lucuma.core.enums.ExchangeObservingModeType
 import lucuma.core.enums.Flamingos2Disperser
+import lucuma.core.enums.Flamingos2Filter
+import lucuma.core.enums.GhostResolutionMode
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosNorthIfuFpu
@@ -20,6 +22,7 @@ import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosSouthIfuFpu
 import lucuma.core.enums.GnirsCamera
+import lucuma.core.enums.GnirsFilter
 import lucuma.core.enums.GnirsFpuIfu
 import lucuma.core.enums.GnirsGrating
 import lucuma.core.enums.GnirsPrism
@@ -65,11 +68,17 @@ object configurationrequest:
         "waterVapor" -> c.waterVapor.asJson,
       )
 
+    val DecodeFlamingos2Imaging: Decoder[Flamingos2Imaging] = hc =>
+      hc.downField("filters").as[List[Flamingos2Filter]].map(Flamingos2Imaging(_))
+
     val DecodeFlamingos2LongSlit: Decoder[Flamingos2LongSlit] = hc =>
       hc.downField("disperser").as[Flamingos2Disperser].map(Flamingos2LongSlit(_))
 
     val DecodeFlamingos2Mos: Decoder[Flamingos2Mos] = hc =>
       hc.downField("disperser").as[Flamingos2Disperser].map(Flamingos2Mos(_))
+
+    val DecodeGhostIfu: Decoder[GhostIfu] = hc =>
+      hc.downField("resolutionMode").as[GhostResolutionMode].map(GhostIfu(_))
 
     val DecodeGmosNorthImaging: Decoder[GmosNorthImaging] = hc =>
       hc.downField("filters").as[List[GmosNorthFilter]].map(GmosNorthImaging(_))
@@ -114,6 +123,12 @@ object configurationrequest:
         fpu     <- hc.downField("fpu").as[GnirsFpuIfu]
       yield GnirsIfu(grating, fpu)
 
+    val DecodeGnirsImaging: Decoder[GnirsImaging] = hc =>
+      for
+        camera  <- hc.downField("camera").as[GnirsCamera]
+        filters <- hc.downField("filters").as[List[GnirsFilter]]
+      yield GnirsImaging(camera, filters)
+
     val DecodeVisitor: Decoder[Visitor] = hc =>
       for
         m <- hc.downField("mode").as[VisitorObservingModeType]
@@ -135,8 +150,10 @@ object configurationrequest:
         hc.downField(field).as(using d)
 
       modeField.as[ObservingModeType].flatMap:
+        case ObservingModeType.Flamingos2Imaging  => sub("flamingos2Imaging",  DecodeFlamingos2Imaging)
         case ObservingModeType.Flamingos2LongSlit => sub("flamingos2LongSlit", DecodeFlamingos2LongSlit)
         case ObservingModeType.Flamingos2Mos      => sub("flamingos2Mos",      DecodeFlamingos2Mos)
+        case ObservingModeType.GhostIfu           => sub("ghostIfu",           DecodeGhostIfu)
         case ObservingModeType.GmosNorthImaging   => sub("gmosNorthImaging",   DecodeGmosNorthImaging)
         case ObservingModeType.GmosNorthLongSlit  => sub("gmosNorthLongSlit",  DecodeGmosNorthLongSlit)
         case ObservingModeType.GmosNorthMos       => sub("gmosNorthMos",       DecodeGmosNorthMos)
@@ -147,12 +164,10 @@ object configurationrequest:
         case ObservingModeType.GmosSouthIfu       => sub("gmosSouthIfu",       DecodeGmosSouthIfu)
         case ObservingModeType.GnirsLongSlit      => sub("gnirsLongSlit",      DecodeGnirsLongSlit)
         case ObservingModeType.GnirsIfu           => sub("gnirsIfu",           DecodeGnirsIfu)
+        case ObservingModeType.GnirsImaging       => sub("gnirsImaging",       DecodeGnirsImaging)
         case _: VisitorObservingModeType          => sub("visitor",            DecodeVisitor)
 
-        // These modes have no parameters, so the mode alone identifies them.
-        case ObservingModeType.Flamingos2Imaging  => Flamingos2Imaging.asRight
-        case ObservingModeType.GhostIfu           => GhostIfu.asRight
-        case ObservingModeType.GnirsImaging       => GnirsImaging.asRight
+        // This mode has no parameters, so the mode alone identifies it.
         case ObservingModeType.Igrins2LongSlit    => Igrins2LongSlit.asRight
 
         // Exchange observations are not approved through configuration requests and have no
@@ -187,10 +202,10 @@ object configurationrequest:
         "igrins2LongSlit"    -> Json.Null, // one of these will be replaced below
         "visitor"            -> Json.Null,  // one of these will be replaced below
         m match
-          case Flamingos2Imaging                     => "flamingos2Imaging"  -> Json.obj("ignore" -> Json.Null)
+          case Flamingos2Imaging(filters)            => "flamingos2Imaging"  -> Json.obj("filters" -> filters.asJson)
           case Flamingos2LongSlit(disperser)         => "flamingos2LongSlit" -> Json.obj("disperser" -> disperser.asJson)
           case Flamingos2Mos(disperser)              => "flamingos2Mos"      -> Json.obj("disperser" -> disperser.asJson)
-          case GhostIfu                              => "ghostIfu"           -> Json.obj("ignore" -> Json.Null)
+          case GhostIfu(resolutionMode)              => "ghostIfu"           -> Json.obj("resolutionMode" -> resolutionMode.asJson)
           case GmosNorthImaging(filters)             => "gmosNorthImaging"   -> Json.obj("filters" -> filters.asJson)
           case GmosNorthLongSlit(grating)            => "gmosNorthLongSlit"  -> Json.obj("grating" -> grating.asJson)
           case GmosNorthMos(grating)                 => "gmosNorthMos"       -> Json.obj("grating" -> grating.asJson)
@@ -201,7 +216,7 @@ object configurationrequest:
           case GmosSouthIfu(grating, fpu)            => "gmosSouthIfu"       -> Json.obj("grating" -> grating.asJson, "fpu" -> fpu.asJson)
           case GnirsLongSlit(grating, camera, prism) => "gnirsLongSlit"      -> Json.obj("grating" -> grating.asJson, "camera" -> camera.asJson, "prism" -> prism.asJson)
           case GnirsIfu(grating, fpu)                => "gnirsIfu"           -> Json.obj("grating" -> grating.asJson, "fpu" -> fpu.asJson)
-          case GnirsImaging                          => "gnirsImaging"       -> Json.obj("ignore" -> Json.Null)
+          case GnirsImaging(camera, filters)         => "gnirsImaging"       -> Json.obj("camera" -> camera.asJson, "filters" -> filters.asJson)
           case Igrins2LongSlit                       => "igrins2LongSlit"    -> Json.obj("ignore" -> Json.Null)
           case Visitor(mode, radius)                 => "visitor"            -> Json.obj("mode" -> mode.asJson, "radius" -> radius.asJson)
       )

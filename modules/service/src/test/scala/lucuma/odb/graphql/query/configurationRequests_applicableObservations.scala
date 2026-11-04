@@ -111,8 +111,28 @@ class configurationRequests_applicableObservations
                 rid1 -> List(oid1, oid2),
                 rid2 -> List(oid3)
               ))
-      
+
     yield ()
 
+  test("applicable requests with region targets"):
+    for
+      cfpid <- createGeminiCallForProposalsAs(admin)
+      pid   <- createProgramAs(pi, "Foo")
+      _     <- addProposal(pi, pid, Some(cfpid), None)
+      tid1  <- createOpportunityTargetWithRegionAs(pi, pid, decRegion(10, 70))
+      tid2  <- createOpportunityTargetWithRegionAs(pi, pid, decRegion(20, 60))  // inside tid1's region
+      tid3  <- createOpportunityTargetWithRegionAs(pi, pid, decRegion(-70, -10)) // outside it
+      oid1  <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid1))
+      oid2  <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid2))
+      oid3  <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid3))
+
+      rid1  <- createConfigurationRequestAs(pi, oid1)
+      rid2  <- createConfigurationRequestAs(pi, oid3)
+
+      _     <- expectRequests(pi, List(
+                rid1 -> List(oid1, oid2),
+                rid2 -> List(oid3)
+              ))
+    yield ()
 
 }
