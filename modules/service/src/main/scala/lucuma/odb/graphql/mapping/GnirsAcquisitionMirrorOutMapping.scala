@@ -11,16 +11,18 @@ import table.GnirsDynamicView
 trait GnirsAcquisitionMirrorOutMapping[F[_]] extends GnirsDynamicView[F]:
 
   private def acquisitionMirrorOutMappingAt(
-    path: Path
+    path:  Path,
+    table: GnirsDynamicTable[?]
   ): ObjectMapping =
     ObjectMapping(path)(
-      SqlField("synthetic_id", GnirsDynamicView.AcquisitionMirrorOut.SyntheticId, key = true, hidden = true),
-      SqlField("prism",        GnirsDynamicView.AcquisitionMirrorOut.Prism),
-      SqlField("grating",      GnirsDynamicView.AcquisitionMirrorOut.Grating),
+      SqlField("synthetic_id", table.AcquisitionMirrorOut.SyntheticId, key = true, hidden = true),
+      SqlField("prism",        table.AcquisitionMirrorOut.Prism),
+      SqlField("grating",      table.AcquisitionMirrorOut.Grating),
       SqlObject("wavelength")
     )
 
   lazy val GnirsAcquisitionMirrorOutMappings: List[TypeMapping] =
     List(
-      acquisitionMirrorOutMappingAt(StepRecordType / "gnirs" / "acquisitionMirrorOut")
+      acquisitionMirrorOutMappingAt(StepRecordType / "gnirs" / "acquisitionMirrorOut", GnirsDynamicView),
+      acquisitionMirrorOutMappingAt(CalibrationSetType / "gnirs" / "acquisitionMirrorOut", GnirsCalibrationSetupTable)
     )

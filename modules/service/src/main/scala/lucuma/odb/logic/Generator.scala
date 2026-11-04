@@ -874,10 +874,10 @@ object Generator:
             case _: ExchangeObservingModeType         =>
               EitherT.pure(())
 
-            // Only GMOS, Flamingos 2 and IGRINS-2 daytime calibrations generate
-            // from Calibration Sets so far.  A stored sequence wins, and with no
-            // sets there is nothing to materialize: doing so anyway would
-            // freeze the rows behind a visit that produced nothing.
+            // Only GMOS, Flamingos 2, IGRINS-2 and GNIRS daytime calibrations
+            // generate from Calibration Sets so far.  A stored sequence wins,
+            // and with no sets there is nothing to materialize: doing so anyway
+            // would freeze the rows behind a visit that produced nothing.
             case _: DaytimeCalibrationObservingModeType =>
               val hasSets = ctx.params.observingMode.asDaytimeCalibration.exists(_.sets.nonEmpty)
               def unlessMaterialized(gen: => EitherT[F, OdbError, Unit]): EitherT[F, OdbError, Unit] =
@@ -900,6 +900,10 @@ object Generator:
                   unlessMaterialized:
                     EitherT(streaming.generateDaytimeIgrins2(ctx))
                       .flatMap(s => EitherT.liftF(sequenceService.materializeIgrins2ExecutionConfig(oid, s, sequenceTypes)))
+                case Instrument.Gnirs =>
+                  unlessMaterialized:
+                    EitherT(streaming.generateDaytimeGnirs(ctx))
+                      .flatMap(s => EitherT.liftF(sequenceService.materializeGnirsExecutionConfig(oid, s, sequenceTypes)))
                 case _                    =>
                   EitherT.pure(())
 

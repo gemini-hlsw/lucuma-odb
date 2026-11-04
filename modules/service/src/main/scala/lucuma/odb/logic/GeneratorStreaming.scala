@@ -91,6 +91,10 @@ sealed trait GeneratorStreaming[F[_]]:
     context: GeneratorContext
   )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, GnirsStatic, GnirsDynamic]]]
 
+  def generateDaytimeGnirs(
+    context: GeneratorContext
+  ): F[Either[OdbError, StreamingExecutionConfig[F, GnirsStatic, GnirsDynamic]]]
+
   def selectDaytimeIgrins2(
     context: GeneratorContext
   )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, Igrins2Static, Igrins2Dynamic]]]
@@ -418,7 +422,12 @@ object GeneratorStreaming:
       override def selectDaytimeGnirs(
         context: GeneratorContext
       )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, GnirsStatic, GnirsDynamic]]] =
-        selectOrEmpty(DaytimeStatics.Gnirs, sequenceService.selectGnirsSequence(context.oid, _, _))
+        selectDaytime(DaytimeStatics.Gnirs, sequenceService.selectGnirsSequence(context.oid, _, _), generateDaytimeGnirs(context))
+
+      override def generateDaytimeGnirs(
+        context: GeneratorContext
+      ): F[Either[OdbError, StreamingExecutionConfig[F, GnirsStatic, GnirsDynamic]]] =
+        generateDaytime(context, calculator.gnirsStep, DaytimeStatics.Gnirs, exp.gnirs, _.gnirsSets)
 
       override def selectDaytimeIgrins2(
         context: GeneratorContext

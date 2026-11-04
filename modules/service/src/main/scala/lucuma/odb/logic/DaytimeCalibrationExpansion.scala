@@ -70,5 +70,6 @@ object DaytimeCalibrationExpansion:
       case Instrument.Flamingos2 => setCounts(exp.flamingos2, DaytimeStatics.Flamingos2, oid, cfg.flamingos2Sets)
       case Instrument.GmosNorth  => setCounts(exp.gmosNorth,  DaytimeStatics.GmosNorth,  oid, cfg.gmosNorthSets)
       case Instrument.GmosSouth  => setCounts(exp.gmosSouth,  DaytimeStatics.GmosSouth,  oid, cfg.gmosSouthSets)
+      case Instrument.Gnirs      => setCounts(exp.gnirs,      DaytimeStatics.Gnirs,      oid, cfg.gnirsSets)
       case Instrument.Igrins2    => setCounts(exp.igrins2,    DaytimeStatics.Igrins2,    oid, cfg.igrins2Sets)
       case _                     => cfg.sets.map(_.explicitCount).pure[F]

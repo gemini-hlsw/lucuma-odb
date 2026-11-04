@@ -108,6 +108,24 @@ trait DaytimeCalibrationOps extends ReplaceSequenceOps:
       }
     """
 
+  // A GNIRS dark with the acquisition mirror in.
+  def gnirsDarkStep: String =
+    """
+      {
+        instrumentConfig: {
+          exposure: { seconds: 20 }
+          coadds: 1
+          filter: ORDER4
+          decker: ACQUISITION
+          fpuOther: ACQUISITION
+          camera: SHORT_BLUE
+          readMode: BRIGHT
+        }
+        stepConfig: { dark: true }
+        observeClass: DAY_CAL
+      }
+    """
+
   def workflowQuery(oid: Observation.Id): String =
     s"""
       query {

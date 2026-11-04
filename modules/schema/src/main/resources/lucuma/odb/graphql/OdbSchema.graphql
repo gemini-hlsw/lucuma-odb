@@ -6425,6 +6425,11 @@ type CalibrationSet {
   IGRINS-2 setup, when the instrument is IGRINS-2.
   """
   igrins2: Igrins2Dynamic
+
+  """
+  GNIRS setup, when the instrument is GNIRS.
+  """
+  gnirs: GnirsDynamic
 }
 
 """
@@ -6473,6 +6478,8 @@ input CalibrationSetInput {
   flamingos2: Flamingos2DynamicInput
 
   igrins2: Igrins2DynamicInput
+
+  gnirs: GnirsDynamicInput
 }
 
 """
