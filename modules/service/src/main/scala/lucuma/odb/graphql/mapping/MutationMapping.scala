@@ -126,6 +126,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] with UserEnv {
       SetProgramReference,
       SetProgramResourceLimit,
       SetProposalStatus,
+      SetTacFeedback,
       UnlinkUser,
       UpdateAsterisms,
       UpdateAttachments,
@@ -836,6 +837,22 @@ trait MutationMapping[F[_]] extends AccessControl[F] with UserEnv {
           p <- ResultT(allocationService.setAllocations(c))
           q <- ResultT.fromResult(allocationResultSubquery(p, child))
         yield q).value
+
+  private lazy val SetTacFeedback =
+    MutationField("setTacFeedback", SetTacFeedbackInput.Binding): (input, child) =>
+      services.useTransactionally:
+        selectForUpdate(input).flatMap: r =>
+          r.flatTraverse: checked =>
+            tacFeedbackService.setTacFeedback(checked).nestMap: (pid, partner) =>
+              Unique(
+                Filter(
+                  And(
+                    Predicates.tacFeedbackResult.programId.eql(pid),
+                    Predicates.tacFeedbackResult.partner.eql(partner)
+                  ),
+                  child
+                )
+              )
 
   private lazy val SetGuideTargetName =
     MutationField("setGuideTargetName", SetGuideTargetNameInput.Binding): (input, child) =>

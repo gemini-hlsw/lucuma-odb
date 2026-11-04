@@ -318,6 +318,8 @@ object OdbMapping {
           with StepRecordMapping[F]
           with StepRecordSelectResultMapping[F]
           with SubscriptionMapping[F]
+          with TacFeedbackMapping[F]
+          with TacFeedbackResultMapping[F]
           with TargetEditMapping[F]
           with TargetEnvironmentMapping[F]
           with TargetMapping[F]
@@ -609,6 +611,8 @@ object OdbMapping {
                 SubscriptionMapping,
                 SystemProgramReferenceMapping,
                 SystemVerificationMapping,
+                TacFeedbackMapping,
+                TacFeedbackResultMapping,
                 TargetEditMapping,
                 TargetEnvironmentMapping,
                 TargetGroupMapping,

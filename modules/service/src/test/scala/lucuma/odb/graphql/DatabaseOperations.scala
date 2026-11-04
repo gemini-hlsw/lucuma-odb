@@ -88,6 +88,7 @@ import lucuma.odb.data.Existence
 import lucuma.odb.data.Obscalc
 import lucuma.odb.data.OdbError
 import lucuma.odb.graphql.input.AllocationInput
+import lucuma.odb.graphql.input.TacFeedbackInput
 import lucuma.odb.graphql.input.TimeChargeCorrectionInput
 import lucuma.odb.service.EmailService
 import lucuma.odb.service.ObscalcService
@@ -2414,6 +2415,41 @@ trait DatabaseOperations { this: OdbSuite =>
               category
               scienceBand
               duration { hours }
+            }
+          }
+        }
+      """
+    )
+
+  /** GraphQL input object text for a `TacFeedbackInput`, omitting unspecified fields. */
+  def tacFeedbackInputString(f: TacFeedbackInput): String =
+    List(
+      s"partner: ${f.partner.tag.toScreamingSnakeCase}".some,
+      f.decision.map(d => s"decision: ${d.tag.toScreamingSnakeCase}"),
+      f.ranking.map(r => s"ranking: \"${r.value}\""),
+      f.recommendedTime.map(t => s"recommendedTime: { hours: \"${t.toHours}\" }"),
+      f.comments.fold("comments: null".some, none, c => s"comments: ${c.value.asJson}".some)
+    ).flatten.mkString("{\n", "\n", "\n}")
+
+  def setTacFeedbackAs(
+    user:     User,
+    pid:      Program.Id,
+    feedback: TacFeedbackInput
+  ): IO[Json] =
+    query(
+      user = user,
+      query = s"""
+        mutation {
+          setTacFeedback(input: {
+            programId:   ${pid.asJson}
+            tacFeedback: ${tacFeedbackInputString(feedback)}
+          }) {
+            tacFeedback {
+              partner
+              decision
+              ranking
+              recommendedTime { hours }
+              comments
             }
           }
         }

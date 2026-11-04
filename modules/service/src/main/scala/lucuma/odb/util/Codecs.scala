@@ -818,6 +818,9 @@ trait Codecs extends CoreCodecs {
   val target_disposition: Codec[TargetDisposition] =
     enumerated(Type("e_target_disposition"))
 
+  val tac_partner_decision: Codec[TacPartnerDecision] =
+    enumerated(Type("e_tac_partner_decision"))
+
   /** A `text[]` column read as `List[String]`, for array-valued provenance such as GOA query URLs. */
   val text_list: Codec[List[String]] =
     _text.imap(_.toList)(Arr(_*))

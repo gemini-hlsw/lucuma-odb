@@ -24,6 +24,7 @@ import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.graphql.table.ProgramView
 import lucuma.odb.graphql.table.ProposalView
 import lucuma.odb.graphql.table.StepRecordView
+import lucuma.odb.graphql.table.TacFeedbackTable
 import lucuma.odb.graphql.table.TimeChargeCorrectionTable
 import lucuma.odb.graphql.table.TimeChargeDiscountTable
 import lucuma.odb.graphql.table.TimingWindowView
@@ -47,6 +48,7 @@ trait TimeSpanMapping[F[_]] extends AllocationTable[F]
                                with ObservationView[F]
                                with GroupView[F]
                                with StepRecordView[F]
+                               with TacFeedbackTable[F]
                                with TimeChargeCorrectionTable[F]
                                with TimeChargeDiscountTable[F]
                                with TimingWindowView[F]
@@ -60,6 +62,7 @@ trait TimeSpanMapping[F[_]] extends AllocationTable[F]
     List(
       timeSpanMappingAtPath(AllocationType / "duration",   AllocationTable.Duration)(AllocationTable.ProgramId, AllocationTable.Category, AllocationTable.ScienceBand),
       timeSpanMappingAtPath(ConditionsExpectationType / "timeframe", ChronConditionsEntryView.Intuition.Expectation.Timespan)(ChronConditionsEntryView.Intuition.Expectation.SyntheticId),
+      timeSpanMappingAtPath(TacFeedbackType / "recommendedTime", TacFeedbackTable.RecommendedTime)(TacFeedbackTable.ProgramId, TacFeedbackTable.Partner),
       timeSpanMappingAtPath(ExchangeType / "totalRequestTime", ExchangeView.TotalRequestTime)(ExchangeView.TotalRequestTimeId),
       timeSpanMappingAtPath(GhostIfuType    / "slitViewingCameraExposureTime", GhostIfuView.SlitViewingCamera.ExposureTime)(GhostIfuView.SlitViewingCamera.Id),
       timeSpanMappingAtPath(GhostStaticType / "slitViewingCameraExposureTime", GhostStaticView.SlitViewingCamera.ExposureTime)(GhostStaticView.SlitViewingCamera.Id),

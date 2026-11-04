@@ -251,6 +251,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F]:
       LeafMapping[String](DmsStringType),
       LeafMapping[String](HmsStringType),
       LeafMapping[Tag](TacCategoryType),
+      LeafMapping[TacPartnerDecision](TacPartnerDecisionType),
       LeafMapping[Target.Id](TargetIdType),
       LeafMapping[TargetDisposition](TargetDispositionType),
       LeafMapping[TimeAccountingCategory](TimeAccountingCategoryType),

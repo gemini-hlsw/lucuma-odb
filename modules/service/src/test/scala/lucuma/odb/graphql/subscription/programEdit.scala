@@ -9,7 +9,9 @@ import cats.syntax.all.*
 import io.circe.literal.*
 import lucuma.core.data.EmailAddress
 import lucuma.core.enums.EmailStatus
+import lucuma.core.enums.Partner
 import lucuma.core.enums.ScienceBand
+import lucuma.core.enums.TacPartnerDecision
 import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.model.ServiceUser
 import lucuma.core.syntax.timespan.*
@@ -552,6 +554,68 @@ class programEdit extends OdbSuite with SubscriptionUtils {
           json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo", "allocations": $allocsJson } } }""",
         )
     )
+  }
+
+
+  test("edit event should show up for setting TAC feedback") {
+    import Group2.pi
+    import Group2.service
+    import eu.timepit.refined.types.numeric.PosBigDecimal
+    import eu.timepit.refined.types.string.NonEmptyString
+    import lucuma.core.util.TimeSpan
+    import lucuma.odb.data.Nullable
+    import lucuma.odb.graphql.input.TacFeedbackInput
+
+    val create = TacFeedbackInput(
+      Partner.US,
+      TacPartnerDecision.Accepted.some,
+      PosBigDecimal.unsafeFrom(BigDecimal(1)).some,
+      TimeSpan.fromHours(BigDecimal(2)).get.some,
+      Nullable.NonNull(NonEmptyString.unsafeFrom("Good."))
+    )
+    val reject = TacFeedbackInput(Partner.US, TacPartnerDecision.Rejected.some, none, none, Nullable.Absent)
+    val noop   = TacFeedbackInput(Partner.US, none, none, none, Nullable.Absent)
+
+    def event(decision: String) =
+      json"""{ "programEdit": { "editType": "UPDATED", "value": { "tacFeedback": [ { "partner": "US", "decision": $decision } ] } } }"""
+
+    // Set up the program and proposal before subscribing, so that only TAC
+    // feedback edits are observed.
+    for {
+      p <- createProgram(pi, "foo")
+      _ <- addProposal(pi, p)
+      _ <- addPartnerSplits(pi, p, partnerSplits = List((Partner.US, 100)))
+      _ <- subscriptionExpect(
+             user = pi,
+             query =
+               s"""
+                 subscription {
+                   programEdit(input: { programId: "$p" }) {
+                     editType
+                     value {
+                       tacFeedback {
+                         partner
+                         decision
+                       }
+                     }
+                   }
+                 }
+               """,
+             mutations =
+               Right(
+                 for {
+                   _ <- IO.sleep(1.second)
+                   _ <- setTacFeedbackAs(service, p, create)
+                   _ <- IO.sleep(1.second)
+                   _ <- setTacFeedbackAs(service, p, noop)
+                   _ <- IO.sleep(1.second)
+                   _ <- setTacFeedbackAs(service, p, reject)
+                   _ <- IO.sleep(1.second)
+                 } yield ()
+               ),
+             expected = List(event("ACCEPTED"), event("REJECTED"))
+           )
+    } yield ()
   }
 
 }

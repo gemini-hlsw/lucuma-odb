@@ -27,6 +27,7 @@ import lucuma.core.model.Program
 import lucuma.core.model.ProgramNote
 import lucuma.core.model.ProgramReference
 import lucuma.core.model.ProposalReference
+import lucuma.core.model.StandardRole
 import lucuma.core.model.Target
 import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
@@ -59,6 +60,8 @@ import lucuma.odb.graphql.input.SetAllocationsInput
 import lucuma.odb.graphql.input.SetGuideTargetNameInput
 import lucuma.odb.graphql.input.SetObservationWorkflowStateInput
 import lucuma.odb.graphql.input.SetProgramReferenceInput
+import lucuma.odb.graphql.input.SetTacFeedbackInput
+import lucuma.odb.graphql.input.TacFeedbackInput
 import lucuma.odb.graphql.input.TargetPropertiesInput
 import lucuma.odb.graphql.input.UpdateAsterismsInput
 import lucuma.odb.graphql.input.UpdateAttachmentsInput
@@ -697,6 +700,36 @@ trait AccessControl[F[_]] extends Predicates[F] {
           Services.asSuperUser:
             AccessControl.unchecked(input.allocations, pid, program_id)
         .value
+
+  /**
+   * Staff (or better) may set TAC feedback for any partner.  NGO users may only
+   * set feedback for their own partner, and only for programs they can read.
+   */
+  def selectForUpdate(
+    input: SetTacFeedbackInput
+  )(using Services[F], Transaction[F]): F[Result[AccessControl.CheckedWithId[TacFeedbackInput, Program.Id]]] =
+    requireNgoAccess:
+      def checked(pid: Program.Id): AccessControl.CheckedWithId[TacFeedbackInput, Program.Id] =
+        Services.asSuperUser(AccessControl.unchecked(input.tacFeedback, pid, program_id))
+
+      val notAuthorized: Result[AccessControl.CheckedWithId[TacFeedbackInput, Program.Id]] =
+        OdbError.NotAuthorized(user.id).asFailure
+
+      val resolvePid: F[Result[Program.Id]] =
+        programService.resolvePid(input.programId, input.proposalReference, input.programReference)
+
+      user.role match
+        case StandardRole.Ngo(_, partner) =>
+          if partner =!= input.tacFeedback.partner then notAuthorized.pure[F]
+          else
+            // Report reference resolution problems as NotAuthorized so that an
+            // NGO learns nothing about programs it cannot read.
+            resolvePid.flatMap: r =>
+              r.toOption.fold(notAuthorized.pure[F]): pid =>
+                programUserService.userHasReadAccess(pid).map: canRead =>
+                  if canRead then Result(checked(pid)) else notAuthorized
+        case _                            =>
+          resolvePid.map(_.map(checked))
 
   def selectForWarningDismissal(
     input: WarningDismissalInput
