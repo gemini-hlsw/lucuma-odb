@@ -41,6 +41,7 @@ import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.syntax.all.*
 import lucuma.odb.sequence.util.AtomBuilder
+import lucuma.odb.sequence.util.definitionError
 
 import java.util.UUID
 
@@ -221,9 +222,6 @@ object Science:
     // segment must feed the same `buildStream`.
     override def generate: Stream[Pure, Atom[GnirsDynamicConfig]] =
       builder.buildStream(Stream.emits(blocks.toVector.flatMap(segment)))
-
-  private def definitionError(oid: Observation.Id, msg: String): OdbError =
-    OdbError.SequenceUnavailable(oid, s"Could not generate a sequence for $oid: $msg".some)
 
   private def nm(sw: CentralWavelengthConfig): String =
     f"${sw.centralWavelength.toNanometers.value.value.toDouble}%.0f nm"

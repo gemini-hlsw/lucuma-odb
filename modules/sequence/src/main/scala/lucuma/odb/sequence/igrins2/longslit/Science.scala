@@ -28,6 +28,7 @@ import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.syntax.all.*
 import lucuma.odb.sequence.util.AtomBuilder
+import lucuma.odb.sequence.util.definitionError
 
 import java.util.UUID
 
@@ -80,9 +81,6 @@ object Science:
         List.fill(goalCycles.value)(scienceAtom)
 
       builder.buildStream(Stream.emits(atoms))
-
-  private def definitionError(oid: Observation.Id, msg: String): OdbError =
-    OdbError.SequenceUnavailable(oid, s"Could not generate a sequence for $oid: $msg".some)
 
   private def zeroExposureTime(oid: Observation.Id): OdbError =
     definitionError(oid, "IGRINS-2 Long Slit requires a positive exposure time.")

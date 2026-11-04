@@ -46,6 +46,7 @@ import lucuma.odb.sequence.imaging.ExposuresPerOffset
 import lucuma.odb.sequence.imaging.ImagingSequence
 import lucuma.odb.sequence.imaging.Variant
 import lucuma.odb.sequence.util.AtomBuilder
+import lucuma.odb.sequence.util.definitionError
 
 import java.util.UUID
 
@@ -185,7 +186,7 @@ object Science:
       val resolved: Either[OdbError, (NonEmptyMap[Flamingos2Filter, Zipper[Result]], NonEmptyMap[Flamingos2Filter, Flamingos2ReadMode])] =
         time.flatMap: nem =>
           nem.toNel
-            .traverse((filter, zipper) => itcReadMode(zipper.focus._2).bimap(spectroscopy.definitionError(observationId, _), filter -> _))
+            .traverse((filter, zipper) => itcReadMode(zipper.focus._2).bimap(definitionError(observationId, _), filter -> _))
             .map(readModes => (nem, readModes.toNem))
 
       resolved.traverse: (nem, readModes) =>
@@ -255,8 +256,6 @@ object Science:
       (for
         _ <- ProtoSequences.setup(config)
         _ <- F2.filter   := filter
-        _ <- F2.readMode := config.readMode
-        _ <- F2.reads    := config.reads
         f <- ProtoSequences.flatStep(TelescopeConfig(Offset.Zero, StepGuideState.Disabled), ObserveClass.DayCal)
       yield f).runA(ProtoSequences.initialDynamicConfig).value
 
@@ -264,6 +263,7 @@ object Science:
       if config.filters.length > 1 then NonEmptyString.unsafeFrom(s"${DaytimeFlatTitle.value} ${filter.shortName}")
       else DaytimeFlatTitle
 
+    // The science sequence takes the filters in wavelength order, so the flats do too.
     val filters: NonEmptyList[Flamingos2Filter] =
       given Order[Flamingos2Filter] = ImagingSequence.wavelengthOrder(config.variant)(_.wavelength)
       config.filters.map(_.filter).distinct.sorted
@@ -273,7 +273,7 @@ object Science:
         EitherT(expander.expandStep(static, flat(filter)))
           .map(steps => ProtoAtom(title(filter).some, steps))
       .bimap(
-        m => spectroscopy.definitionError(observationId, m),
+        m => definitionError(observationId, m),
         atoms =>
           val builder = AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Science)
           new SequenceGenerator[F2]:

@@ -3,17 +3,14 @@
 
 package lucuma.odb.sequence.flamingos2.spectroscopy
 
-import cats.syntax.option.*
 import lucuma.core.enums.Flamingos2TelluricOffsetPreset
 import lucuma.core.model.Observation
 import lucuma.core.model.SlitTelescopeConfigs
 import lucuma.core.model.sequence.flamingos2.defaultTelluricTelescopeConfigs
 import lucuma.odb.data.OdbError
+import lucuma.odb.sequence.util.definitionError
 
 // Definitions shared by the Flamingos 2 spectroscopy sequence generators.
-
-def definitionError(oid: Observation.Id, msg: String): OdbError =
-  OdbError.SequenceUnavailable(oid, s"Could not generate a sequence for $oid: $msg".some)
 
 def zeroExposureTime(oid: Observation.Id, modeName: String): OdbError =
   definitionError(oid, s"$modeName requires a positive exposure time.")
