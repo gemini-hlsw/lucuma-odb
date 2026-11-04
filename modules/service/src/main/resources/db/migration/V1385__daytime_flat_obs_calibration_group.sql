@@ -111,10 +111,19 @@ RETURNS BOOLEAN AS $$
   );
 $$ LANGUAGE sql STABLE;
 
--- Existing Flamingos-2 imaging observations need a calibration pass to get
--- their daytime flat.
-UPDATE t_obscalc c
-   SET c_obscalc_state = 'pending'
-  FROM t_observation o
- WHERE c.c_observation_id = o.c_observation_id
-   AND o.c_observing_mode_type = 'flamingos_2_imaging';
+-- Existing Flamingos-2 imaging science observations need a calibration pass
+-- to get their daytime flat.
+DO $$
+DECLARE
+  o RECORD;
+BEGIN
+  FOR o IN
+    SELECT c_observation_id, c_program_id
+    FROM   t_observation
+    WHERE  c_observing_mode_type = 'flamingos_2_imaging'
+      AND  c_calibration_role IS NULL
+      AND  c_existence = 'present'
+  LOOP
+    CALL invalidate_calibration_calc(o.c_observation_id, o.c_program_id, 'recalc');
+  END LOOP;
+END $$;

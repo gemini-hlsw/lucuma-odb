@@ -129,7 +129,9 @@ Two rules apply to **every** calibration role, whatever its kind:
   accepted proposal included. There is no separate calibration program to
   exempt it.
 
-Beyond that the six roles split into two groups:
+Beyond that the generated roles split into two groups. `DaytimeArc` is not
+generated yet and `DaytimeCalibration` observations are created by staff, so
+neither appears here:
 
 | Role | Group | Lifecycle |
 |---|---|---|

@@ -259,13 +259,13 @@ object Science:
         f <- ProtoSequences.flatStep(TelescopeConfig(Offset.Zero, StepGuideState.Disabled), ObserveClass.DayCal)
       yield f).runA(ProtoSequences.initialDynamicConfig).value
 
-    def title(filter: Flamingos2Filter): NonEmptyString =
-      if config.filters.length > 1 then NonEmptyString.unsafeFrom(s"${DaytimeFlatTitle.value} ${filter.shortName}")
-      else DaytimeFlatTitle
-
     // The science sequence takes the filters in wavelength order, so the flats do too.
     val filters: NonEmptyList[Flamingos2Filter] =
       config.filters.map(_.filter).distinct.sorted
+
+    def title(filter: Flamingos2Filter): NonEmptyString =
+      if filters.length > 1 then NonEmptyString.unsafeFrom(s"${DaytimeFlatTitle.value} ${filter.shortName}")
+      else DaytimeFlatTitle
 
     filters
       .traverse: filter =>
