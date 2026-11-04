@@ -47,13 +47,13 @@ import lucuma.odb.sequence.imaging.ImagingSequence
 import lucuma.odb.sequence.imaging.Variant
 import lucuma.odb.sequence.util.AtomBuilder
 import lucuma.odb.sequence.util.definitionError
+import lucuma.refined.*
 
 import java.util.UUID
 
 object Science:
 
-  val DaytimeFlatTitle: NonEmptyString =
-    NonEmptyString.unsafeFrom("Daytime Flat")
+  val DaytimeFlatTitle: NonEmptyString = "Daytime Flat".refined
 
   object ProtoSequences extends SequenceState[F2] with Flamingos2InitialDynamicConfig:
 
@@ -250,7 +250,7 @@ object Science:
     namespace:     UUID,
     expander:      SmartGcalExpander[F, Flamingos2StaticConfig, F2],
     config:        Config
-  ): F[Either[OdbError, SequenceGenerator[F2]]] =
+  )(using Order[Flamingos2Filter]): F[Either[OdbError, SequenceGenerator[F2]]] =
 
     def flat(filter: Flamingos2Filter): ProtoStep[F2] =
       (for
@@ -265,7 +265,6 @@ object Science:
 
     // The science sequence takes the filters in wavelength order, so the flats do too.
     val filters: NonEmptyList[Flamingos2Filter] =
-      given Order[Flamingos2Filter] = ImagingSequence.wavelengthOrder(config.variant)(_.wavelength)
       config.filters.map(_.filter).distinct.sorted
 
     filters
@@ -291,9 +290,9 @@ object Science:
     time:          Either[OdbError, Flamingos2Imaging],
     calRole:       Option[CalibrationRole]
   ): F[Either[OdbError, SequenceGenerator[F2]]] =
+    given Order[Flamingos2Filter] = ImagingSequence.wavelengthOrder(config.variant)(_.wavelength)
     calRole match
       case Some(CalibrationRole.DaytimeFlat) =>
         daytimeFlat(observationId, estimator, static, namespace, expander, config)
       case _                                 =>
-        given Order[Flamingos2Filter] = ImagingSequence.wavelengthOrder(config.variant)(_.wavelength)
         ScienceGenerator.instantiate(observationId, estimator, static, namespace, config, time.map(_.science))
