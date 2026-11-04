@@ -19,7 +19,9 @@ import lucuma.core.enums.GcalArc
 import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.odb.logic.DaytimeCalibrationExpansion
+import lucuma.odb.logic.DaytimeInstrument
 import lucuma.odb.logic.SmartGcalImplementation
+import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.service.Services
 
 import Services.Syntax.*
@@ -36,6 +38,8 @@ trait CalibrationSetMapping[F[_]: Concurrent] extends DaytimeCalibrationSetView[
                                                  with Igrins2DynamicTable[F]
                                                  with KeyValueEffectHandler[F]:
   this: SkunkMapping[F] =>
+
+  def timeEstimateCalculator: TimeEstimateCalculatorImplementation.ForInstrumentMode
 
   def services(using User): Resource[F, Services[F]]
 
@@ -66,7 +70,8 @@ trait CalibrationSetMapping[F[_]: Concurrent] extends DaytimeCalibrationSetView[
           val exp = SmartGcalImplementation.fromService(smartGcalService)
           daytimeCalibrationService.select(keys.map(_._1).distinct).flatMap: cfgs =>
             cfgs.toList.traverse: (oid, cfg) =>
-              DaytimeCalibrationExpansion.setCounts(exp, oid, cfg).map: counts =>
+              val di = DaytimeInstrument.forInstrument(cfg.instrument, timeEstimateCalculator, exp, sequenceService)
+              DaytimeCalibrationExpansion.setCounts(di, oid, cfg).map: counts =>
                 counts.zipWithIndex.map((n, i) => (oid, i) -> n.success)
             .map: all =>
               // A set removed between the two reads answers null, not an error.

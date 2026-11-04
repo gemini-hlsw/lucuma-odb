@@ -14,6 +14,7 @@ import cats.syntax.option.*
 import fs2.Pure
 import fs2.Stream
 import lucuma.core.enums.GnirsAcquisitionType
+import lucuma.core.enums.Instrument
 import lucuma.core.enums.SequenceType
 import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
@@ -37,10 +38,7 @@ import lucuma.odb.data.ItcScience
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.sequence.ObservingMode.Syntax.*
-import lucuma.odb.sequence.SmartGcalExpander
-import lucuma.odb.sequence.StepTimeEstimateCalculator
 import lucuma.odb.sequence.data.StreamingExecutionConfig
-import lucuma.odb.sequence.daytimecal.StaticConfigs as DaytimeStatics
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.sequence.util.SequenceIds
 import lucuma.odb.service.Services
@@ -59,49 +57,19 @@ import java.util.UUID
  */
 sealed trait GeneratorStreaming[F[_]]:
 
-  def selectDaytimeFlamingos2(
-    context: GeneratorContext
-  )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, Flamingos2Static, Flamingos2Dynamic]]]
+  /** The daytime calibration pieces of an instrument, or none for one without daytime calibrations. */
+  def daytimeInstrument(instrument: Instrument): Option[DaytimeInstrument[F]]
 
-  def generateDaytimeFlamingos2(
-    context: GeneratorContext
-  ): F[Either[OdbError, StreamingExecutionConfig[F, Flamingos2Static, Flamingos2Dynamic]]]
+  /** The stored science sequence of a daytime calibration, or else the sequence its sets generate. */
+  def selectDaytime(
+    instrument: DaytimeInstrument[F],
+    context:    GeneratorContext
+  )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, instrument.S, instrument.D]]]
 
-  def selectDaytimeGhost(
-    context: GeneratorContext
-  )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, GhostStatic, GhostDynamic]]]
-
-  def selectDaytimeGmosNorth(
-    context: GeneratorContext
-  )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, GmosNorthStatic, GmosNorthDynamic]]]
-
-  def generateDaytimeGmosNorth(
-    context: GeneratorContext
-  ): F[Either[OdbError, StreamingExecutionConfig[F, GmosNorthStatic, GmosNorthDynamic]]]
-
-  def selectDaytimeGmosSouth(
-    context: GeneratorContext
-  )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, GmosSouthStatic, GmosSouthDynamic]]]
-
-  def generateDaytimeGmosSouth(
-    context: GeneratorContext
-  ): F[Either[OdbError, StreamingExecutionConfig[F, GmosSouthStatic, GmosSouthDynamic]]]
-
-  def selectDaytimeGnirs(
-    context: GeneratorContext
-  )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, GnirsStatic, GnirsDynamic]]]
-
-  def generateDaytimeGnirs(
-    context: GeneratorContext
-  ): F[Either[OdbError, StreamingExecutionConfig[F, GnirsStatic, GnirsDynamic]]]
-
-  def selectDaytimeIgrins2(
-    context: GeneratorContext
-  )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, Igrins2Static, Igrins2Dynamic]]]
-
-  def generateDaytimeIgrins2(
-    context: GeneratorContext
-  ): F[Either[OdbError, StreamingExecutionConfig[F, Igrins2Static, Igrins2Dynamic]]]
+  def generateDaytime(
+    instrument: DaytimeInstrument[F],
+    context:    GeneratorContext
+  ): F[Either[OdbError, StreamingExecutionConfig[F, instrument.S, instrument.D]]]
 
   def selectOrGenerateFlamingos2LongSlit(
     context: GeneratorContext
@@ -349,95 +317,29 @@ object GeneratorStreaming:
             else gen.unsplit(context.oid)
           ).map(_.covary[F])
 
-      private def selectOrEmpty[S, D](
-        static: S,
-        lookup: (SequenceType, S) => (Transaction[F]) ?=> F[Option[Stream[F, Atom[D]]]]
-      )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, S, D]]] =
-        selectOrGenerate(
-          static,
-          lookup,
-          StreamingExecutionConfig[F, S, D](static, Stream.empty, Stream.empty).asRight[OdbError].pure[F]
-        )
-
-      override def selectDaytimeGhost(
-        context: GeneratorContext
-      )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, GhostStatic, GhostDynamic]]] =
-        selectOrEmpty(DaytimeStatics.Ghost, sequenceService.selectGhostSequence(context.oid, _, _))
+      override def daytimeInstrument(instrument: Instrument): Option[DaytimeInstrument[F]] =
+        DaytimeInstrument.forInstrument(instrument, calculator, exp, sequenceService)
 
       // Daytime calibrations have no acquisition, so a stored science sequence
       // alone decides: generating from the sets only when none is stored.  The
       // atoms are never collapsed; one atom per set is the documented shape.
-      private def selectDaytime[S, D](
-        static:  S,
-        lookup:  (SequenceType, S) => (Transaction[F]) ?=> F[Option[Stream[F, Atom[D]]]],
-        gen:     => F[Either[OdbError, StreamingExecutionConfig[F, S, D]]]
-      )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, S, D]]] =
-        lookup(SequenceType.Science, static).flatMap:
-          case Some(s) => StreamingExecutionConfig(static, Stream.empty, s).asRight[OdbError].pure[F]
-          case None    => gen
+      override def selectDaytime(
+        instrument: DaytimeInstrument[F],
+        context:    GeneratorContext
+      )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, instrument.S, instrument.D]]] =
+        instrument.select(context.oid, SequenceType.Science).flatMap:
+          case Some(s) => StreamingExecutionConfig(instrument.static, Stream.empty, s).asRight[OdbError].pure[F]
+          case None    => generateDaytime(instrument, context)
 
-      private def generateDaytime[S, D](
-        context:   GeneratorContext,
-        estimator: StepTimeEstimateCalculator[S, D],
-        static:    S,
-        expander:  SmartGcalExpander[F, S, D],
-        sets:      lucuma.odb.sequence.daytimecal.Config => List[lucuma.odb.sequence.daytimecal.CalibrationSet[D]]
-      ): F[Either[OdbError, StreamingExecutionConfig[F, S, D]]] =
+      override def generateDaytime(
+        instrument: DaytimeInstrument[F],
+        context:    GeneratorContext
+      ): F[Either[OdbError, StreamingExecutionConfig[F, instrument.S, instrument.D]]] =
         import lucuma.odb.sequence.daytimecal.DaytimeCalibration
         (for
           cfg   <- extractMode(ObservingMode.DaytimeCalibrationName, context)(_.asDaytimeCalibration)
-          atoms <- EitherT(DaytimeCalibrationExpansion.expandAtoms(expander, static, context.oid, sets(cfg)))
-        yield DaytimeCalibration.executionConfig(estimator, static, context.namespace, atoms).covary[F]).value
-
-      override def selectDaytimeFlamingos2(
-        context: GeneratorContext
-      )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, Flamingos2Static, Flamingos2Dynamic]]] =
-        selectDaytime(DaytimeStatics.Flamingos2, sequenceService.selectFlamingos2Sequence(context.oid, _, _), generateDaytimeFlamingos2(context))
-
-      override def generateDaytimeFlamingos2(
-        context: GeneratorContext
-      ): F[Either[OdbError, StreamingExecutionConfig[F, Flamingos2Static, Flamingos2Dynamic]]] =
-        generateDaytime(context, calculator.flamingos2Step, DaytimeStatics.Flamingos2, exp.flamingos2, _.flamingos2Sets)
-
-      override def selectDaytimeGmosNorth(
-        context: GeneratorContext
-      )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, GmosNorthStatic, GmosNorthDynamic]]] =
-        selectDaytime(DaytimeStatics.GmosNorth, sequenceService.selectGmosNorthSequence(context.oid, _, _), generateDaytimeGmosNorth(context))
-
-      override def generateDaytimeGmosNorth(
-        context: GeneratorContext
-      ): F[Either[OdbError, StreamingExecutionConfig[F, GmosNorthStatic, GmosNorthDynamic]]] =
-        generateDaytime(context, calculator.gmosNorthStep, DaytimeStatics.GmosNorth, exp.gmosNorth, _.gmosNorthSets)
-
-      override def selectDaytimeGmosSouth(
-        context: GeneratorContext
-      )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, GmosSouthStatic, GmosSouthDynamic]]] =
-        selectDaytime(DaytimeStatics.GmosSouth, sequenceService.selectGmosSouthSequence(context.oid, _, _), generateDaytimeGmosSouth(context))
-
-      override def generateDaytimeGmosSouth(
-        context: GeneratorContext
-      ): F[Either[OdbError, StreamingExecutionConfig[F, GmosSouthStatic, GmosSouthDynamic]]] =
-        generateDaytime(context, calculator.gmosSouthStep, DaytimeStatics.GmosSouth, exp.gmosSouth, _.gmosSouthSets)
-
-      override def selectDaytimeGnirs(
-        context: GeneratorContext
-      )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, GnirsStatic, GnirsDynamic]]] =
-        selectDaytime(DaytimeStatics.Gnirs, sequenceService.selectGnirsSequence(context.oid, _, _), generateDaytimeGnirs(context))
-
-      override def generateDaytimeGnirs(
-        context: GeneratorContext
-      ): F[Either[OdbError, StreamingExecutionConfig[F, GnirsStatic, GnirsDynamic]]] =
-        generateDaytime(context, calculator.gnirsStep, DaytimeStatics.Gnirs, exp.gnirs, _.gnirsSets)
-
-      override def selectDaytimeIgrins2(
-        context: GeneratorContext
-      )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, Igrins2Static, Igrins2Dynamic]]] =
-        selectDaytime(DaytimeStatics.Igrins2, sequenceService.selectIgrins2Sequence(context.oid, _, _), generateDaytimeIgrins2(context))
-
-      override def generateDaytimeIgrins2(
-        context: GeneratorContext
-      ): F[Either[OdbError, StreamingExecutionConfig[F, Igrins2Static, Igrins2Dynamic]]] =
-        generateDaytime(context, calculator.igrins2Step, DaytimeStatics.Igrins2, exp.igrins2, _.igrins2Sets)
+          atoms <- EitherT(DaytimeCalibrationExpansion.expandAtoms(instrument.expander, instrument.static, context.oid, instrument.sets(cfg)))
+        yield DaytimeCalibration.executionConfig(instrument.estimator, instrument.static, context.namespace, atoms).covary[F]).value
 
       override def selectOrGenerateFlamingos2LongSlit(
         context: GeneratorContext

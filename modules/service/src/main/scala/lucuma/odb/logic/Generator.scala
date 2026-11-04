@@ -268,16 +268,11 @@ object Generator:
 
       // Dispatches on the daytime calibration's instrument, reading its stored sequence.
       private def daytimeCalibration[A](ctx: GeneratorContext)(
-        f: [S, D] => StreamingExecutionConfig[F, S, D] => EitherT[F, OdbError, A]
+        f: (di: DaytimeInstrument[F]) => StreamingExecutionConfig[F, di.S, di.D] => EitherT[F, OdbError, A]
       )(using Transaction[F]): EitherT[F, OdbError, A] =
-        daytimeInstrument(ctx) match
-          case Instrument.Flamingos2 => EitherT(streaming.selectDaytimeFlamingos2(ctx)).flatMap(s => f(s))
-          case Instrument.Ghost      => EitherT(streaming.selectDaytimeGhost(ctx)).flatMap(s => f(s))
-          case Instrument.GmosNorth  => EitherT(streaming.selectDaytimeGmosNorth(ctx)).flatMap(s => f(s))
-          case Instrument.GmosSouth  => EitherT(streaming.selectDaytimeGmosSouth(ctx)).flatMap(s => f(s))
-          case Instrument.Gnirs      => EitherT(streaming.selectDaytimeGnirs(ctx)).flatMap(s => f(s))
-          case Instrument.Igrins2    => EitherT(streaming.selectDaytimeIgrins2(ctx)).flatMap(s => f(s))
-          case other                 => EitherT.leftT(unsupportedDaytimeInstrument(ctx, other))
+        streaming.daytimeInstrument(daytimeInstrument(ctx)) match
+          case Some(di) => EitherT(streaming.selectDaytime(di, ctx)).flatMap(f(di))
+          case None     => EitherT.leftT(unsupportedDaytimeInstrument(ctx, daytimeInstrument(ctx)))
 
       // No target means no sequence, so charge a fixed time instead.
       private def isUnresolvedTelluric(ctx: GeneratorContext): Boolean =
@@ -413,14 +408,7 @@ object Generator:
               EitherT(streaming.selectOrGenerateIgrins2LongSlit(ctx)).flatMap(digest(_, calculator.igrins2LongSlitSetup))
             case _: DaytimeCalibrationObservingModeType =>
               val noSetup = SetupTimeEstimateCalculator.Zero
-              val d = daytimeInstrument(ctx) match
-                case Instrument.Flamingos2 => EitherT(streaming.selectDaytimeFlamingos2(ctx)).flatMap(digest(_, noSetup))
-                case Instrument.Ghost      => EitherT(streaming.selectDaytimeGhost(ctx)).flatMap(digest(_, noSetup))
-                case Instrument.GmosNorth  => EitherT(streaming.selectDaytimeGmosNorth(ctx)).flatMap(digest(_, noSetup))
-                case Instrument.GmosSouth  => EitherT(streaming.selectDaytimeGmosSouth(ctx)).flatMap(digest(_, noSetup))
-                case Instrument.Gnirs      => EitherT(streaming.selectDaytimeGnirs(ctx)).flatMap(digest(_, noSetup))
-                case Instrument.Igrins2    => EitherT(streaming.selectDaytimeIgrins2(ctx)).flatMap(digest(_, noSetup))
-                case other                 => EitherT.leftT[F, ExecutionDigest](unsupportedDaytimeInstrument(ctx, other))
+              val d = daytimeCalibration(ctx)(di => s => digest(s, noSetup)(using di.stepCheck))
               d.map: d =>
                 if d.science.atomCount.value == 0 then d.copy(science = d.science.copy(executionState = ctx.params.executionState))
                 else d
@@ -501,7 +489,7 @@ object Generator:
           case ObservingModeType.GnirsLongSlit        => digests(EitherT(streaming.selectOrGenerateGnirsSpectroscopy(ctx)))
           case ObservingModeType.Igrins2LongSlit      => digests(EitherT(streaming.selectOrGenerateIgrins2LongSlit(ctx)))
           case _: DaytimeCalibrationObservingModeType =>
-            daytimeCalibration(ctx)([S, D] => (s: StreamingExecutionConfig[F, S, D]) => digests(EitherT.rightT[F, OdbError](s)))
+            daytimeCalibration(ctx)(_ => s => digests(EitherT.rightT[F, OdbError](s)))
           case _: VisitorObservingModeType            => noSequence
 
       override def obscalc(
@@ -574,33 +562,7 @@ object Generator:
               EitherT.rightT(InstrumentExecutionConfig.Exchange)
 
             case _: DaytimeCalibrationObservingModeType =>
-              daytimeInstrument(ctx) match
-                case Instrument.Flamingos2 =>
-                  EitherT(streaming.selectDaytimeFlamingos2(ctx))
-                    .flatMap(s => EitherT.liftF(executionConfig(s)))
-                    .map(InstrumentExecutionConfig.Flamingos2.apply)
-                case Instrument.Ghost =>
-                  EitherT(streaming.selectDaytimeGhost(ctx))
-                    .flatMap(s => EitherT.liftF(executionConfig(s)))
-                    .map(InstrumentExecutionConfig.Ghost.apply)
-                case Instrument.GmosNorth =>
-                  EitherT(streaming.selectDaytimeGmosNorth(ctx))
-                    .flatMap(s => EitherT.liftF(executionConfig(s)))
-                    .map(InstrumentExecutionConfig.GmosNorth.apply)
-                case Instrument.GmosSouth =>
-                  EitherT(streaming.selectDaytimeGmosSouth(ctx))
-                    .flatMap(s => EitherT.liftF(executionConfig(s)))
-                    .map(InstrumentExecutionConfig.GmosSouth.apply)
-                case Instrument.Gnirs =>
-                  EitherT(streaming.selectDaytimeGnirs(ctx))
-                    .flatMap(s => EitherT.liftF(executionConfig(s)))
-                    .map(InstrumentExecutionConfig.Gnirs.apply)
-                case Instrument.Igrins2 =>
-                  EitherT(streaming.selectDaytimeIgrins2(ctx))
-                    .flatMap(s => EitherT.liftF(executionConfig(s)))
-                    .map(InstrumentExecutionConfig.Igrins2.apply)
-                case other =>
-                  EitherT.leftT(unsupportedDaytimeInstrument(ctx, other))
+              daytimeCalibration(ctx)(di => s => EitherT.liftF(executionConfig(s)).map(di.instrumentExecutionConfig))
 
             case ObservingModeType.Flamingos2Imaging  =>
               EitherT(streaming.selectOrGenerateFlamingos2Imaging(ctx))
@@ -883,28 +845,12 @@ object Generator:
               def unlessMaterialized(gen: => EitherT[F, OdbError, Unit]): EitherT[F, OdbError, Unit] =
                 EitherT.liftF(sequenceService.isMaterialized(oid, SequenceType.Science)).flatMap: m =>
                   if m || !hasSets then EitherT.pure(()) else gen
-              daytimeInstrument(ctx) match
-                case Instrument.Flamingos2 =>
+              streaming.daytimeInstrument(daytimeInstrument(ctx)) match
+                case Some(di) =>
                   unlessMaterialized:
-                    EitherT(streaming.generateDaytimeFlamingos2(ctx))
-                      .flatMap(s => EitherT.liftF(sequenceService.materializeFlamingos2ExecutionConfig(oid, s, sequenceTypes)))
-                case Instrument.GmosNorth =>
-                  unlessMaterialized:
-                    EitherT(streaming.generateDaytimeGmosNorth(ctx))
-                      .flatMap(s => EitherT.liftF(sequenceService.materializeGmosNorthExecutionConfig(oid, s, sequenceTypes)))
-                case Instrument.GmosSouth =>
-                  unlessMaterialized:
-                    EitherT(streaming.generateDaytimeGmosSouth(ctx))
-                      .flatMap(s => EitherT.liftF(sequenceService.materializeGmosSouthExecutionConfig(oid, s, sequenceTypes)))
-                case Instrument.Igrins2 =>
-                  unlessMaterialized:
-                    EitherT(streaming.generateDaytimeIgrins2(ctx))
-                      .flatMap(s => EitherT.liftF(sequenceService.materializeIgrins2ExecutionConfig(oid, s, sequenceTypes)))
-                case Instrument.Gnirs =>
-                  unlessMaterialized:
-                    EitherT(streaming.generateDaytimeGnirs(ctx))
-                      .flatMap(s => EitherT.liftF(sequenceService.materializeGnirsExecutionConfig(oid, s, sequenceTypes)))
-                case _                    =>
+                    EitherT(streaming.generateDaytime(di, ctx))
+                      .flatMap(s => EitherT.liftF(di.materialize(oid, s, sequenceTypes)))
+                case None     =>
                   EitherT.pure(())
 
         transactionallyWithContext(oid, commitHash): ctx =>
