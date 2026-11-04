@@ -2456,6 +2456,26 @@ trait DatabaseOperations { this: OdbSuite =>
       """
     )
 
+  def deleteTacFeedbackAs(
+    user:    User,
+    pid:     Program.Id,
+    partner: Partner
+  ): IO[Boolean] =
+    query(
+      user = user,
+      query = s"""
+        mutation {
+          deleteTacFeedback(input: {
+            programId: ${pid.asJson}
+            partner:   ${partner.tag.toScreamingSnakeCase}
+          }) {
+            result
+          }
+        }
+      """
+    ).flatMap: js =>
+      js.hcursor.downFields("deleteTacFeedback", "result").as[Boolean].leftMap(f => new RuntimeException(f.message)).liftTo[IO]
+
   def setOneAllocationAs(
     user: User,
     pid: Program.Id,

@@ -4221,6 +4221,12 @@ type Mutation {
   setTacFeedback(input: SetTacFeedbackInput!): TacFeedbackResult!
 
   """
+  Deletes a partner's TAC feedback for a program.  NGO users may only delete
+  feedback for their own partner, and only for programs they can read.
+  """
+  deleteTacFeedback(input: DeleteTacFeedbackInput!): DeleteTacFeedbackResult!
+
+  """
   Set the name of the guide target for an observation.
   """
   setGuideTargetName(input: SetGuideTargetNameInput!): SetGuideTargetNameResult!
@@ -6558,8 +6564,8 @@ type SetAllocationsResult {
 
 """
 Sets or updates the TAC feedback of a single partner for a program, which must
-have a proposal in which the partner has a non-zero time split. One of programId, programReference or proposalReference is
-required. (If two or more are provided, they must refer to the same program.)
+have a proposal in which the partner has a non-zero time split. One of
+programId, programReference or proposalReference is required. (If two or more are provided, they must refer to the same program.)
 """
 input SetTacFeedbackInput {
   programId: ProgramId
@@ -22146,6 +22152,26 @@ input TacFeedbackInput {
   ranking: PosBigDecimal
   recommendedTime: TimeSpanInput
   comments: NonEmptyString
+}
+
+"""
+Deletes the TAC feedback of a single partner for a program. One of programId,
+programReference or proposalReference is required. (If two or more are
+provided, they must refer to the same program.)
+"""
+input DeleteTacFeedbackInput {
+  programId: ProgramId
+  proposalReference: ProposalReferenceLabel
+  programReference: ProgramReferenceLabel
+
+  "The partner whose TAC feedback should be deleted."
+  partner: Partner!
+}
+
+"The result of deleting TAC feedback."
+type DeleteTacFeedbackResult {
+  "`true` if TAC feedback was deleted, `false` otherwise."
+  result: Boolean!
 }
 
 """

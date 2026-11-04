@@ -557,7 +557,7 @@ class programEdit extends OdbSuite with SubscriptionUtils {
   }
 
 
-  test("edit event should show up for setting TAC feedback") {
+  test("edit event should show up for setting and deleting TAC feedback") {
     import Group2.pi
     import Group2.service
     import eu.timepit.refined.types.numeric.PosBigDecimal
@@ -578,6 +578,9 @@ class programEdit extends OdbSuite with SubscriptionUtils {
 
     def event(decision: String) =
       json"""{ "programEdit": { "editType": "UPDATED", "value": { "tacFeedback": [ { "partner": "US", "decision": $decision } ] } } }"""
+
+    val deleted =
+      json"""{ "programEdit": { "editType": "UPDATED", "value": { "tacFeedback": [] } } }"""
 
     // Set up the program and proposal before subscribing, so that only TAC
     // feedback edits are observed.
@@ -611,9 +614,13 @@ class programEdit extends OdbSuite with SubscriptionUtils {
                    _ <- IO.sleep(1.second)
                    _ <- setTacFeedbackAs(service, p, reject)
                    _ <- IO.sleep(1.second)
+                   _ <- deleteTacFeedbackAs(service, p, Partner.US)
+                   _ <- IO.sleep(1.second)
+                   _ <- deleteTacFeedbackAs(service, p, Partner.US)
+                   _ <- IO.sleep(1.second)
                  } yield ()
                ),
-             expected = List(event("ACCEPTED"), event("REJECTED"))
+             expected = List(event("ACCEPTED"), event("REJECTED"), deleted)
            )
     } yield ()
   }

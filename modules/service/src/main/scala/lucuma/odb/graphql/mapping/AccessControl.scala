@@ -18,6 +18,7 @@ import grackle.Type
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.enums.Partner
 import lucuma.core.enums.SequenceType
 import lucuma.core.model.Access
 import lucuma.core.model.Observation
@@ -46,6 +47,7 @@ import lucuma.odb.graphql.input.CreateProgramInput
 import lucuma.odb.graphql.input.CreateProgramNoteInput
 import lucuma.odb.graphql.input.CreateTargetInput
 import lucuma.odb.graphql.input.DeleteSequenceInput
+import lucuma.odb.graphql.input.DeleteTacFeedbackInput
 import lucuma.odb.graphql.input.EditAsterismsPatchInput
 import lucuma.odb.graphql.input.InsertSmartGcalInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
@@ -708,19 +710,36 @@ trait AccessControl[F[_]] extends Predicates[F] {
   def selectForUpdate(
     input: SetTacFeedbackInput
   )(using Services[F], Transaction[F]): F[Result[AccessControl.CheckedWithId[TacFeedbackInput, Program.Id]]] =
-    requireNgoAccess:
-      def checked(pid: Program.Id): AccessControl.CheckedWithId[TacFeedbackInput, Program.Id] =
-        Services.asSuperUser(AccessControl.unchecked(input.tacFeedback, pid, program_id))
+    selectForTacFeedback(input.programId, input.proposalReference, input.programReference, input.tacFeedback.partner, input.tacFeedback)
 
-      val notAuthorized: Result[AccessControl.CheckedWithId[TacFeedbackInput, Program.Id]] =
+  /**
+   * TAC feedback deletion has the same restrictions as setting it.
+   */
+  def selectForUpdate(
+    input: DeleteTacFeedbackInput
+  )(using Services[F], Transaction[F]): F[Result[AccessControl.CheckedWithId[Partner, Program.Id]]] =
+    selectForTacFeedback(input.programId, input.proposalReference, input.programReference, input.partner, input.partner)
+
+  private def selectForTacFeedback[A](
+    programId:         Option[Program.Id],
+    proposalReference: Option[ProposalReference],
+    programReference:  Option[ProgramReference],
+    feedbackPartner:   Partner,
+    a:                 A
+  )(using Services[F], Transaction[F]): F[Result[AccessControl.CheckedWithId[A, Program.Id]]] =
+    requireNgoAccess:
+      def checked(pid: Program.Id): AccessControl.CheckedWithId[A, Program.Id] =
+        Services.asSuperUser(AccessControl.unchecked(a, pid, program_id))
+
+      val notAuthorized: Result[AccessControl.CheckedWithId[A, Program.Id]] =
         OdbError.NotAuthorized(user.id).asFailure
 
       val resolvePid: F[Result[Program.Id]] =
-        programService.resolvePid(input.programId, input.proposalReference, input.programReference)
+        programService.resolvePid(programId, proposalReference, programReference)
 
       user.role match
         case StandardRole.Ngo(_, partner) =>
-          if partner =!= input.tacFeedback.partner then notAuthorized.pure[F]
+          if partner =!= feedbackPartner then notAuthorized.pure[F]
           else
             // Report reference resolution problems as NotAuthorized so that an
             // NGO learns nothing about programs it cannot read.

@@ -127,6 +127,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] with UserEnv {
       SetProgramResourceLimit,
       SetProposalStatus,
       SetTacFeedback,
+      DeleteTacFeedback,
       UnlinkUser,
       UpdateAsterisms,
       UpdateAttachments,
@@ -853,6 +854,14 @@ trait MutationMapping[F[_]] extends AccessControl[F] with UserEnv {
                   child
                 )
               )
+
+  private lazy val DeleteTacFeedback =
+    MutationField.json("deleteTacFeedback", DeleteTacFeedbackInput.Binding): input =>
+      services.useTransactionally:
+        selectForUpdate(input).flatMap: r =>
+          r.flatTraverse: checked =>
+            tacFeedbackService.deleteTacFeedback(checked).nestMap: b =>
+              Json.obj("result" -> b.asJson)
 
   private lazy val SetGuideTargetName =
     MutationField("setGuideTargetName", SetGuideTargetNameInput.Binding): (input, child) =>

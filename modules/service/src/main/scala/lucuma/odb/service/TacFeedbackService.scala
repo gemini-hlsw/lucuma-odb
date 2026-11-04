@@ -38,6 +38,15 @@ trait TacFeedbackService[F[_]]:
     input: AccessControl.CheckedWithId[TacFeedbackInput, Program.Id]
   )(using Transaction[F]): F[Result[(Program.Id, Partner)]]
 
+  /**
+   * Deletes a partner's TAC feedback for a program.
+   *
+   * @return `true` if feedback was deleted, `false` if there was none
+   */
+  def deleteTacFeedback(
+    input: AccessControl.CheckedWithId[Partner, Program.Id]
+  )(using Transaction[F]): F[Result[Boolean]]
+
 object TacFeedbackService:
 
   def instantiate[F[_]: MonadCancelThrow](using Services[F]): TacFeedbackService[F] =
@@ -56,6 +65,14 @@ object TacFeedbackService:
                 else OdbError.InvalidArgument(
                   s"Partner ${feedback.partner.tag.toUpperCase} has no time split in the proposal for program $pid, so it cannot provide TAC feedback.".some
                 ).asFailureF
+
+      override def deleteTacFeedback(
+        input: AccessControl.CheckedWithId[Partner, Program.Id]
+      )(using Transaction[F]): F[Result[Boolean]] =
+        input.foldWithId(OdbError.InvalidArgument().asFailureF): (partner, pid) =>
+          session
+            .option(Statements.DeleteTacFeedback)((pid, partner))
+            .map(deleted => Result(deleted.isDefined))
 
       private def upsert(pid: Program.Id, f: TacFeedbackInput): F[Result[Unit]] =
         // With nothing to change, there is no need to touch the row.
@@ -101,6 +118,14 @@ object TacFeedbackService:
              AND c_percent    > 0
         )
       """.query(bool)
+
+    val DeleteTacFeedback: Query[(Program.Id, Partner), Partner] =
+      sql"""
+        DELETE FROM t_tac_feedback
+         WHERE c_program_id = $program_id
+           AND c_partner    = $partner
+     RETURNING c_partner
+      """.query(partner)
 
     val TacFeedbackExists: Query[(Program.Id, Partner), Boolean] =
       sql"""
