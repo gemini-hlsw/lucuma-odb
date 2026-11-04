@@ -53,6 +53,7 @@ import lucuma.odb.sequence.ObservingMode.Syntax.*
 import lucuma.odb.sequence.data.CalibrationGroupTellurics
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.ItcInput
+import lucuma.odb.sequence.flamingos2.imaging.Config as Flamingos2ImagingConfig
 import lucuma.odb.sequence.flamingos2.longslit.Config as Flamingos2Config
 import lucuma.odb.sequence.flamingos2.mos.Config as Flamingos2MosConfig
 import lucuma.odb.sequence.gmos.ifu.Config.GmosNorth as GmosNorthIfu
@@ -87,7 +88,7 @@ case class ObsExtract[A](
     copy(data = f(data))
 
   def requiresTelluric: Boolean =
-    telluricType.forall(_ =!= TelluricType.NoTelluric)
+    telluricType.exists(_ =!= TelluricType.NoTelluric)
 
   /** The telluric count when the user supplies the targets. */
   def isUserDefinedTellurics: Option[TelluricCount] =
@@ -104,7 +105,7 @@ object ObsExtract:
       case _                          => none
 
   def modeRequiresTelluric(mode: ObservingMode): Boolean =
-    modeTelluricType(mode).forall(_ =!= TelluricType.NoTelluric)
+    modeTelluricType(mode).exists(_ =!= TelluricType.NoTelluric)
 
   /** Modes whose science observations are accompanied by tellurics. */
   def modeTakesTelluric(modeType: ObservingModeType): Boolean =
@@ -199,13 +200,14 @@ object ObsExtract:
   // set discriminates such a group from the per-program "Calibrations" group,
   // whose roles (twilight, spectrophotometric) are disjoint from these.  Keep
   // that disjointness invariant when adding roles.
-  val PerObservationCalibrationRoles = List(CalibrationRole.Telluric, CalibrationRole.DaytimePinhole)
+  val PerObservationCalibrationRoles = List(CalibrationRole.Telluric, CalibrationRole.DaytimePinhole, CalibrationRole.DaytimeFlat)
 
   def perObsFilter: PartialFunction[ObsExtract[ObservingMode], ObsExtract[ObservingMode]] =
     case d @ ObsExtract(data = _: Flamingos2Config)    => d
     case d @ ObsExtract(data = _: Flamingos2MosConfig) => d
     case d @ ObsExtract(data = _: Igrins2Config)       => d
     case d @ ObsExtract(data = _: GnirsSpectroscopyConfig) => d
+    case d @ ObsExtract(data = _: Flamingos2ImagingConfig) => d
 
   /** The modes that take per-program, per-configuration calibrations: a twilight and a specphot. */
   def perProgramFilter: PartialFunction[ObsExtract[ObservingMode], ObsExtract[ObservingMode]] =

@@ -138,9 +138,11 @@ object PerScienceObservationCalibrationsService:
 
       // The calibration roles a per-observation calibration group holds, derived
       // from the science config: GNIRS cross-dispersed also gets daytime pinhole
-      // flats; everything else has only tellurics.
+      // flats, Flamingos-2 imaging gets only a daytime flat, and everything else
+      // has only tellurics.
       private def obsCalibrationGroupRoles(config: CalibrationConfigSubset): List[CalibrationRole] =
         if isCrossDispersedGnirs(config) then List(CalibrationRole.Telluric, CalibrationRole.DaytimePinhole)
+        else if isFlamingos2Imaging(config) then List(CalibrationRole.DaytimeFlat)
         else List(CalibrationRole.Telluric)
 
       private def newObsCalibrationGroup(
@@ -426,29 +428,52 @@ object PerScienceObservationCalibrationsService:
           _                  <- stale.traverse_(telluricTargetsService.updateScienceDuration)
         } yield (created, deleted)
 
-      // ---- Daytime pinhole flats (GNIRS cross-dispersed) ----
+      // ---- Daytime calibrations: pinhole flats and flats ----
       // Cross-dispersed GNIRS observations need a daytime pinhole flat to trace
-      // the cross-dispersed spectral orders.  It lives in the same system group
-      // as the tellurics and is a daytime (DayCal) calibration, so it does not
-      // count against the program's time.
+      // the cross-dispersed spectral orders, and Flamingos-2 imaging observations
+      // need a daytime flat per filter.  Each lives in the science observation's
+      // system group and is a daytime (DayCal) calibration, so it does not count
+      // against the program's time.
 
       private def isCrossDispersedGnirs(config: CalibrationConfigSubset): Boolean =
         config match
           case g: CalibrationConfigSubset.GnirsSpectroscopyConfigs => g.isCrossDispersed
           case _                                                   => false
 
-      private def findDaytimePinholeObservations(gid: Group.Id): F[List[Observation.Id]] =
-        session
-          .prepareR(Statements.selectTelluricObservations)
-          .use(_.stream((gid, CalibrationRole.DaytimePinhole), 10).compile.toList)
+      private def isFlamingos2Imaging(config: CalibrationConfigSubset): Boolean =
+        config match
+          case _: CalibrationConfigSubset.Flamingos2ImagingConfigs => true
+          case _                                                   => false
 
-      private def insertDaytimePinholeObservation(
-        pid: Program.Id,
-        gid: Group.Id
+      private def requiresGeneratedDayCal(config: CalibrationConfigSubset): Boolean =
+        isCrossDispersedGnirs(config) || isFlamingos2Imaging(config)
+
+      // The generated daytime calibration roles a per-observation group may hold.
+      private val DayCalRoles: List[CalibrationRole] =
+        ObsExtract.PerObservationCalibrationRoles.filterNot(_ === CalibrationRole.Telluric)
+
+      private def findDaytimeObservations(
+        gid:             Group.Id,
+        calibrationRole: CalibrationRole
+      ): F[List[Observation.Id]] =
+        session
+          .prepareR(Statements.selectDayCalObservations)
+          .use(_.stream((gid, List(calibrationRole)), 10).compile.toList)
+
+      // Every generated daytime calibration in the group, whatever its role.
+      private def findDayCalObservations(gid: Group.Id): F[List[Observation.Id]] =
+        session
+          .prepareR(Statements.selectDayCalObservations)
+          .use(_.stream((gid, DayCalRoles), 10).compile.toList)
+
+      private def insertDaytimeObservation(
+        pid:             Program.Id,
+        gid:             Group.Id,
+        calibrationRole: CalibrationRole
       )(using Transaction[F], SuperUserAccess): F[Observation.Id] =
-        // A daytime pinhole flat is an internal GCAL calibration: no target, a
-        // fixed position angle, and no science requirements (the exposure comes
-        // from SmartGcal).
+        // A daytime flat is an internal GCAL calibration: no target, a fixed
+        // position angle, and no science requirements (the exposure comes from
+        // SmartGcal).
         val obsInput = ObservationPropertiesInput.Create(
           subtitle            = none,
           scienceBand         = none,
@@ -472,30 +497,46 @@ object PerScienceObservationCalibrationsService:
         observationService
           .createObservation(
             AccessControl.unchecked(obsInput, pid, program_id),
-            calibrationRole = CalibrationRole.DaytimePinhole.some
+            calibrationRole = calibrationRole.some
           ).orError
 
-      private def syncDaytimePinhole(
-        pid: Program.Id,
-        obs: ObsExtract[CalibrationConfigSubset],
-        gid: Group.Id
+      // Creates the calibration when the science needs one and there is none,
+      // resyncs it when there is, and deletes it when the science no longer
+      // needs it, unless it or its science has executed.
+      private def syncDaytimeCalibration(
+        pid:             Program.Id,
+        obs:             ObsExtract[CalibrationConfigSubset],
+        gid:             Group.Id,
+        calibrationRole: CalibrationRole,
+        needed:          Boolean
       )(using Transaction[F], SuperUserAccess): F[(List[Observation.Id], List[Observation.Id])] =
-        T.span("sync-daytime-pinhole", Attribute.from(ProgramIdKey, pid), Attribute.from(GroupIdKey, gid)).surround:
-          findDaytimePinholeObservations(gid).flatMap: existing =>
-            (isCrossDispersedGnirs(obs.data), existing) match
+        T.span(s"sync-${calibrationRole.tag}", Attribute.from(ProgramIdKey, pid), Attribute.from(GroupIdKey, gid)).surround:
+          findDaytimeObservations(gid, calibrationRole).flatMap: existing =>
+            (needed, existing) match
               case (true, Nil) =>
                 for
-                  oid <- insertDaytimePinholeObservation(pid, gid)
-                  _   <- syncConfiguration(pid, obs.id, oid, CalibrationRole.DaytimePinhole)
+                  oid <- insertDaytimeObservation(pid, gid, calibrationRole)
+                  _   <- syncConfiguration(pid, obs.id, oid, calibrationRole)
                 yield (List(oid), List.empty[Observation.Id])
               case (true, es)  =>
-                es.traverse_(oid => syncConfiguration(pid, obs.id, oid, CalibrationRole.DaytimePinhole))
+                es.traverse_(oid => syncConfiguration(pid, obs.id, oid, calibrationRole))
                   .as((List.empty[Observation.Id], List.empty[Observation.Id]))
               case (false, es) =>
                 excludeObsCalibrationsFromDeletion(es, identity).flatMap: deletable =>
                   NonEmptyList.fromList(deletable) match
                     case Some(nel) => observationService.deleteCalibrationObservations(nel).as((List.empty[Observation.Id], deletable))
                     case None      => (List.empty[Observation.Id], List.empty[Observation.Id]).pure[F]
+
+      // Syncs every generated daytime calibration the science observation may need.
+      private def syncDaytimeCalibrations(
+        pid: Program.Id,
+        obs: ObsExtract[CalibrationConfigSubset],
+        gid: Group.Id
+      )(using Transaction[F], SuperUserAccess): F[(List[Observation.Id], List[Observation.Id])] =
+        for
+          pResult <- syncDaytimeCalibration(pid, obs, gid, CalibrationRole.DaytimePinhole, isCrossDispersedGnirs(obs.data))
+          fResult <- syncDaytimeCalibration(pid, obs, gid, CalibrationRole.DaytimeFlat, isFlamingos2Imaging(obs.data))
+        yield (pResult._1 ++ fResult._1, pResult._2 ++ fResult._2)
 
       private def generateObsCalibrationsForScience(
         pid:  Program.Id,
@@ -504,10 +545,10 @@ object PerScienceObservationCalibrationsService:
       )(using Transaction[F], SuperUserAccess): F[(List[Observation.Id], List[Observation.Id])] =
         T.span("generate-obs-calibrations-for-science", Attribute.from(ProgramIdKey, pid)).surround:
           val requiresTelluric = obs.requiresTelluric
-          if !requiresTelluric && !isCrossDispersedGnirs(obs.data) then
+          if !requiresTelluric && !requiresGeneratedDayCal(obs.data) then
             findObsCalibrationGroupForObservation(obs.id).flatMap:
               case Some(gid) =>
-                info"Observation ${obs.id} does not require tellurics, cleaning up obs calibration group $gid" *>
+                info"Observation ${obs.id} requires no calibrations, cleaning up obs calibration group $gid" *>
                   cleanupOrphanedObsCalibrationGroup(pid, gid, obs.id, keepUserDefined = false)
               case None      =>
                 (List.empty[Observation.Id], List.empty[Observation.Id]).pure[F]
@@ -515,8 +556,8 @@ object PerScienceObservationCalibrationsService:
             def sync(gid: Group.Id): F[(List[Observation.Id], List[Observation.Id])] =
               for
                 tResult <- syncTelluricObservation(pid, obs, gid, requiresTelluric, syncExisting = true)
-                pResult <- syncDaytimePinhole(pid, obs, gid)
-              yield (tResult._1 ++ pResult._1, tResult._2 ++ pResult._2)
+                dResult <- syncDaytimeCalibrations(pid, obs, gid)
+              yield (tResult._1 ++ dResult._1, tResult._2 ++ dResult._2)
 
             // A new group is only created once something will go in it. An empty group
             // would be removed on the next pass, and each move of the science observation
@@ -528,7 +569,7 @@ object PerScienceObservationCalibrationsService:
                 for
                   duration <- if requiresTelluric then telluricDuration(obs.id)
                               else Option.empty[TimeSpan].pure[F]
-                  needed    = duration.isDefined || isCrossDispersedGnirs(obs.data) || obs.isUserDefinedTellurics.isDefined
+                  needed    = duration.isDefined || requiresGeneratedDayCal(obs.data) || obs.isUserDefinedTellurics.isDefined
                   result   <- if needed then readObsCalibrationGroup(pid, tree, obs).flatMap(sync)
                               else
                                 info"Observation ${obs.id} needs no calibrations yet, no obs calibration group" *>
@@ -538,8 +579,8 @@ object PerScienceObservationCalibrationsService:
       // A telluric's S/N floor, also used when no science S/N can be derived.
       private val MinTelluricSN = TelluricETMHelpers.DerivedSignalToNoise
 
-      // A pinhole flat's exposure comes from SmartGcal, so its S/N doesn't really matter.
-      private val DaytimePinholeSN = SignalToNoise.fromInt(100).get
+      // A pinhole or daytime flat exposure comes from SmartGcal; the S/N is a placeholder.
+      private val SmartGcalPlaceholderSN = SignalToNoise.fromInt(100).get
 
       // The largest value that still fits once doubled.
       private val MaxUndoubledSN = SignalToNoise.Max.toBigDecimal / 2
@@ -630,7 +671,7 @@ object PerScienceObservationCalibrationsService:
             .prepareR(Statements.selectScienceExposureTimeModesByIndex)
             .use(_.stream(oid, 8).compile.toList)
 
-        // A pinhole pairs with the science configuration at the same index, at a fixed S/N.
+        // A daytime flat pairs with the science configuration at the same index, at a fixed S/N.
         // A telluric, collapsed to one row per wavelength, with the science configurations
         // sharing it.  Also returns the deepest candidate, for a row that pairs with nothing.
         def telluricEtmFor(
@@ -654,7 +695,7 @@ object PerScienceObservationCalibrationsService:
               ((_, w) => byLambda.get(w).map(telluricFloor), deepest.map(telluricFloor))
             case _                        =>
               val fixed = science.map: (etm, _, _) =>
-                            ExposureTimeMode.SignalToNoiseMode(DaytimePinholeSN, etm.at)
+                            ExposureTimeMode.SignalToNoiseMode(SmartGcalPlaceholderSN, etm.at)
               ((i, _) => fixed.lift(i), fixed.headOption)
 
         for {
@@ -725,10 +766,10 @@ object PerScienceObservationCalibrationsService:
         def syncObservationProperties: F[Unit] =
           S.session.executeCommand(Statements.syncObservationConfiguration(sourceOid, targetOid)).void
 
-        // A daytime pinhole flat is taken with the dome closed, so it never
+        // A daytime calibration is taken with the dome closed, so it never
         // observes behind Altair; a telluric standard does, on its own star.
         def syncAltair: F[Unit] =
-          if calibrationRole === CalibrationRole.DaytimePinhole then F.unit
+          if calibrationRole =!= CalibrationRole.Telluric then F.unit
           else
             selectAltair(sourceOid).flatMap: science =>
               S.session
@@ -884,12 +925,12 @@ object PerScienceObservationCalibrationsService:
       )(using Transaction[F], SuperUserAccess): F[(List[Observation.Id], List[Observation.Id])] =
         for
           // Query the calibration observations in the group (tellurics and any
-          // daytime pinhole flat), not all observations.
+          // daytime calibrations), not all observations.
           telluricsInGroup    <- findGroupTellurics(gid)
-          pinholeOidsInGroup  <- findDaytimePinholeObservations(gid)
-          allOidsInGroup       = telluricsInGroup.map(_.oid) ++ pinholeOidsInGroup
+          dayCalOidsInGroup   <- findDayCalObservations(gid)
+          allOidsInGroup       = telluricsInGroup.map(_.oid) ++ dayCalOidsInGroup
           keptUserDefined      = if keepUserDefined then telluricsInGroup.filter(_.userDefined.value).map(_.oid) else Nil
-          // Tellurics and daytime pinhole flats alike are kept if they (or the
+          // Tellurics and daytime calibrations alike are kept if they (or the
           // parent science obs) have started/finished executing or have visits.
           deletable           <- excludeObsCalibrationsFromDeletion(allOidsInGroup.filterNot(keptUserDefined.contains), identity)
           deleted             <- NonEmptyList.fromList(deletable) match
@@ -935,11 +976,17 @@ object PerScienceObservationCalibrationsService:
                                                      List(ObservationWorkflowState.Ongoing),
                                                      false
                                                    )
-                                      result  <- (gidOpt, ongoing.find(_.requiresTelluric)) match
-                                                  // Between visits only the telluric count follows obsDuration.
+                                      result  <- (gidOpt, ongoing.find(o => o.requiresTelluric || requiresGeneratedDayCal(o.data))) match
+                                                  // Between visits the telluric count follows obsDuration and the
+                                                  // daytime calibrations follow the configuration; existing
+                                                  // tellurics are left alone.
                                                   case (Some(gid), Some(obs)) =>
-                                                    info"Observation $oid is ongoing, syncing its telluric count" *>
-                                                      syncTelluricObservation(pid, obs, gid, true, syncExisting = false)
+                                                    info"Observation $oid is ongoing, syncing its calibrations" *>
+                                                      (for
+                                                        tResult <- if obs.requiresTelluric then syncTelluricObservation(pid, obs, gid, true, syncExisting = false)
+                                                                   else (List.empty[Observation.Id], List.empty[Observation.Id]).pure[F]
+                                                        dResult <- syncDaytimeCalibrations(pid, obs, gid)
+                                                      yield (tResult._1 ++ dResult._1, tResult._2 ++ dResult._2))
                                                   case (Some(gid), None) =>
                                                     info"Observation $oid no longer active or ongoing, cleaning up obs calibration group $gid" *>
                                                       scienceTakesTellurics(oid).flatMap: keepUserDefined =>
@@ -1021,12 +1068,12 @@ object PerScienceObservationCalibrationsService:
               AND  e.c_role = 'science'::e_exposure_time_mode_role
           """.query(exposure_time_mode_id *: exposure_time_mode *: skunk.codec.numeric.int4 *: wavelength_pm.opt)
 
-        val selectTelluricObservations: Query[(Group.Id, CalibrationRole), Observation.Id] =
+        val selectDayCalObservations: Query[(Group.Id, List[CalibrationRole]), Observation.Id] =
           sql"""
             SELECT c_observation_id
             FROM   t_observation
             WHERE  c_group_id         = $group_id
-              AND  c_calibration_role = $calibration_role
+              AND  c_calibration_role = ANY($_calibration_role)
             ORDER BY c_group_index
           """.query(observation_id)
 

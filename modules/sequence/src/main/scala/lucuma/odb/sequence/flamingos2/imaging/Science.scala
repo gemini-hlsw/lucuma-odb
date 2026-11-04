@@ -5,8 +5,10 @@ package lucuma.odb.sequence
 package flamingos2
 package imaging
 
+import cats.Monad
 import cats.Order
 import cats.Order.catsKernelOrderingForOrder
+import cats.data.EitherT
 import cats.data.NonEmptyList
 import cats.data.NonEmptyMap
 import cats.data.State
@@ -14,15 +16,20 @@ import cats.effect.Sync
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.PosInt
+import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Chunk
 import fs2.Pure
 import fs2.Stream
 import lucuma.core.data.Zipper
+import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.ObserveClass
+import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepGuideState
+import lucuma.core.math.Offset
 import lucuma.core.model.Observation
+import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig as F2
@@ -38,10 +45,15 @@ import lucuma.odb.sequence.data.TelescopeConfigGenerator
 import lucuma.odb.sequence.imaging.ExposuresPerOffset
 import lucuma.odb.sequence.imaging.ImagingSequence
 import lucuma.odb.sequence.imaging.Variant
+import lucuma.odb.sequence.util.AtomBuilder
+import lucuma.odb.sequence.util.definitionError
+import lucuma.refined.*
 
 import java.util.UUID
 
 object Science:
+
+  val DaytimeFlatTitle: NonEmptyString = "Daytime Flat".refined
 
   object ProtoSequences extends SequenceState[F2] with Flamingos2InitialDynamicConfig:
 
@@ -174,7 +186,7 @@ object Science:
       val resolved: Either[OdbError, (NonEmptyMap[Flamingos2Filter, Zipper[Result]], NonEmptyMap[Flamingos2Filter, Flamingos2ReadMode])] =
         time.flatMap: nem =>
           nem.toNel
-            .traverse((filter, zipper) => itcReadMode(zipper.focus._2).bimap(spectroscopy.definitionError(observationId, _), filter -> _))
+            .traverse((filter, zipper) => itcReadMode(zipper.focus._2).bimap(definitionError(observationId, _), filter -> _))
             .map(readModes => (nem, readModes.toNem))
 
       resolved.traverse: (nem, readModes) =>
@@ -225,13 +237,62 @@ object Science:
         protoAtoms.map: v =>
           ImagingSequence.makeGenerator(estimator, static, namespace, v)
 
+  /**
+   * The sequence of a daytime flat calibration: one smart GCAL flat per distinct
+   * science filter, in the order the science sequence takes the filters.  The exposure and
+   * lamps come from SmartGcal and the steps are DayCal, so they cost no program
+   * time.  A filter without a SmartGcal row fails the whole sequence.
+   */
+  private def daytimeFlat[F[_]: Monad](
+    observationId: Observation.Id,
+    estimator:     StepTimeEstimateCalculator[Flamingos2StaticConfig, F2],
+    static:        Flamingos2StaticConfig,
+    namespace:     UUID,
+    expander:      SmartGcalExpander[F, Flamingos2StaticConfig, F2],
+    config:        Config
+  )(using Order[Flamingos2Filter]): F[Either[OdbError, SequenceGenerator[F2]]] =
+
+    def flat(filter: Flamingos2Filter): ProtoStep[F2] =
+      (for
+        _ <- ProtoSequences.setup(config)
+        _ <- F2.filter   := filter
+        f <- ProtoSequences.flatStep(TelescopeConfig(Offset.Zero, StepGuideState.Disabled), ObserveClass.DayCal)
+      yield f).runA(ProtoSequences.initialDynamicConfig).value
+
+    // The science sequence takes the filters in wavelength order, so the flats do too.
+    val filters: NonEmptyList[Flamingos2Filter] =
+      config.filters.map(_.filter).distinct.sorted
+
+    def title(filter: Flamingos2Filter): NonEmptyString =
+      if filters.length > 1 then NonEmptyString.unsafeFrom(s"${DaytimeFlatTitle.value} ${filter.shortName}")
+      else DaytimeFlatTitle
+
+    filters
+      .traverse: filter =>
+        EitherT(expander.expandStep(static, flat(filter)))
+          .map(steps => ProtoAtom(title(filter).some, steps))
+      .bimap(
+        m => definitionError(observationId, m),
+        atoms =>
+          val builder = AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Science)
+          new SequenceGenerator[F2]:
+            def generate: Stream[Pure, Atom[F2]] =
+              builder.buildStream(Stream.emits(atoms.toList))
+      ).value
+
   def flamingos2[F[_]: Sync](
     observationId: Observation.Id,
     estimator:     StepTimeEstimateCalculator[Flamingos2StaticConfig, F2],
     static:        Flamingos2StaticConfig,
     namespace:     UUID,
+    expander:      SmartGcalExpander[F, Flamingos2StaticConfig, F2],
     config:        Config,
-    time:          Either[OdbError, Flamingos2Imaging]
+    time:          Either[OdbError, Flamingos2Imaging],
+    calRole:       Option[CalibrationRole]
   ): F[Either[OdbError, SequenceGenerator[F2]]] =
     given Order[Flamingos2Filter] = ImagingSequence.wavelengthOrder(config.variant)(_.wavelength)
-    ScienceGenerator.instantiate(observationId, estimator, static, namespace, config, time.map(_.science))
+    calRole match
+      case Some(CalibrationRole.DaytimeFlat) =>
+        daytimeFlat(observationId, estimator, static, namespace, expander, config)
+      case _                                 =>
+        ScienceGenerator.instantiate(observationId, estimator, static, namespace, config, time.map(_.science))

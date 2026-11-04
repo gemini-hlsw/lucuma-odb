@@ -36,6 +36,7 @@ import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.syntax.all.*
 import lucuma.odb.sequence.util.AtomBuilder
+import lucuma.odb.sequence.util.definitionError
 
 import java.util.UUID
 

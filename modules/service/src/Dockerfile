@@ -32,4 +32,4 @@ RUN docker-ensure-initdb.sh -c fsync=off -c synchronous_commit=off -c full_page_
 VOLUME /var/lib/postgresql/odb-data
 
 # Also disable durability at test time, to speed up database writes in tests
-CMD ["postgres", "-c", "fsync=off", "-c", "synchronous_commit=off", "-c", "full_page_writes=off"]
+CMD ["postgres", "-c", "fsync=off", "-c", "synchronous_commit=off", "-c", "full_page_writes=off", "-c", "jit=off"]

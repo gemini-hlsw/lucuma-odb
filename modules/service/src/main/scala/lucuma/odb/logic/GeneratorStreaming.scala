@@ -491,8 +491,10 @@ object GeneratorStreaming:
         import lucuma.odb.sequence.flamingos2.imaging.Imaging
         (for
           cfg <- extractMode(ObservingMode.Flamingos2ImagingName, context)(_.asFlamingos2Imaging)
+          // A daytime flat has no target, so no ITC result; its generator ignores this.
           itc  = requireImagingItc(ObservingMode.Flamingos2ImagingName, context.oid, context.itcRes, ItcScience.flamingos2Imaging.getOption)
-          gen <- EitherT(Imaging.flamingos2(context.oid, calculator.flamingos2Step, context.namespace, cfg, itc))
+          rol  = context.params.calibrationRole
+          gen <- EitherT(Imaging.flamingos2(context.oid, calculator.flamingos2Step, context.namespace, exp.flamingos2, cfg, itc, rol))
           res <- collapseIfNecessary(context, gen)
         yield res).value
 
