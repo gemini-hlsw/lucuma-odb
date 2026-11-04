@@ -130,7 +130,7 @@ class calibrations_gnirs_altair
       s"""
         mutation {
           updateObservations(input: {
-            SET: { constraintSet: { imageQuality: POINT_ONE, cloudExtinction: ZERO } }
+            SET: { constraintSet: { imageQuality: POINT_THREE, cloudExtinction: ZERO } }
             WHERE: { id: { EQ: "$oid" } }
           }) {
             observations { id }

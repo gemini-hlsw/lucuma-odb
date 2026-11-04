@@ -675,7 +675,7 @@ object WiringSuite:
     SpectroscopyInput(
       SpectroscopyParameters(
         ItcConstraintsInput(
-          ImageQualityInput.preset(ImageQuality.Preset.PointOne),
+          ImageQualityInput.preset(ImageQuality.Preset.PointThree),
           CloudExtinctionInput.preset(CloudExtinction.Preset.PointOne),
           skyBackground = SkyBackground.Darkest,
           waterVapor = WaterVapor.VeryDry,
@@ -723,7 +723,7 @@ object WiringSuite:
     SpectroscopyInput(
       SpectroscopyParameters(
         ItcConstraintsInput(
-          ImageQualityInput.preset(ImageQuality.Preset.PointOne),
+          ImageQualityInput.preset(ImageQuality.Preset.PointThree),
           CloudExtinctionInput.preset(CloudExtinction.Preset.PointOne),
           skyBackground = SkyBackground.Darkest,
           waterVapor = WaterVapor.VeryDry,
@@ -769,7 +769,7 @@ object WiringSuite:
     SpectroscopyInput(
       SpectroscopyParameters(
         ItcConstraintsInput(
-          ImageQualityInput.preset(ImageQuality.Preset.PointOne),
+          ImageQualityInput.preset(ImageQuality.Preset.PointThree),
           CloudExtinctionInput.preset(CloudExtinction.Preset.PointOne),
           skyBackground = SkyBackground.Darkest,
           waterVapor = WaterVapor.VeryDry,
@@ -817,7 +817,7 @@ object WiringSuite:
     SpectroscopyInput(
       SpectroscopyParameters(
         ItcConstraintsInput(
-          ImageQualityInput.preset(ImageQuality.Preset.PointOne),
+          ImageQualityInput.preset(ImageQuality.Preset.PointThree),
           CloudExtinctionInput.preset(CloudExtinction.Preset.PointOne),
           skyBackground = SkyBackground.Darkest,
           waterVapor = WaterVapor.VeryDry,
@@ -855,7 +855,7 @@ object WiringSuite:
     SpectroscopyInput(
       SpectroscopyParameters(
         ItcConstraintsInput(
-          ImageQualityInput.preset(ImageQuality.Preset.PointOne),
+          ImageQualityInput.preset(ImageQuality.Preset.PointThree),
           CloudExtinctionInput.preset(CloudExtinction.Preset.PointOne),
           skyBackground = SkyBackground.Darkest,
           waterVapor = WaterVapor.VeryDry,
@@ -895,7 +895,7 @@ object WiringSuite:
     SpectroscopyInput(
       SpectroscopyParameters(
         ItcConstraintsInput(
-          ImageQualityInput.preset(ImageQuality.Preset.PointOne),
+          ImageQualityInput.preset(ImageQuality.Preset.PointThree),
           CloudExtinctionInput.preset(CloudExtinction.Preset.PointOne),
           skyBackground = SkyBackground.Darkest,
           waterVapor = WaterVapor.VeryDry,
@@ -926,7 +926,7 @@ object WiringSuite:
     SpectroscopyInput(
       SpectroscopyParameters(
         ItcConstraintsInput(
-          ImageQualityInput.preset(ImageQuality.Preset.PointOne),
+          ImageQualityInput.preset(ImageQuality.Preset.PointThree),
           CloudExtinctionInput.preset(CloudExtinction.Preset.PointOne),
           skyBackground = SkyBackground.Darkest,
           waterVapor = WaterVapor.VeryDry,
@@ -973,7 +973,7 @@ object WiringSuite:
     ImagingInput(
       ImagingParameters(
         ItcConstraintsInput(
-          ImageQualityInput.preset(ImageQuality.Preset.PointOne),
+          ImageQualityInput.preset(ImageQuality.Preset.PointThree),
           CloudExtinctionInput.preset(CloudExtinction.Preset.PointOne),
           skyBackground = SkyBackground.Darkest,
           waterVapor = WaterVapor.VeryDry,
@@ -1011,7 +1011,7 @@ object WiringSuite:
     ImagingInput(
       ImagingParameters(
         ItcConstraintsInput(
-          ImageQualityInput.preset(ImageQuality.Preset.PointOne),
+          ImageQualityInput.preset(ImageQuality.Preset.PointThree),
           CloudExtinctionInput.preset(CloudExtinction.Preset.PointOne),
           skyBackground = SkyBackground.Darkest,
           waterVapor = WaterVapor.VeryDry,
@@ -1050,7 +1050,7 @@ object WiringSuite:
     ImagingInput(
       ImagingParameters(
         ItcConstraintsInput(
-          ImageQualityInput.preset(ImageQuality.Preset.PointOne),
+          ImageQualityInput.preset(ImageQuality.Preset.PointThree),
           CloudExtinctionInput.preset(CloudExtinction.Preset.PointOne),
           skyBackground = SkyBackground.Darkest,
           waterVapor = WaterVapor.VeryDry,
@@ -1086,7 +1086,7 @@ object WiringSuite:
     SpectroscopyIntegrationTimeAndGraphsInput(
       SpectroscopyIntegrationTimeAndGraphsParameters(
         ItcConstraintsInput(
-          ImageQualityInput.preset(ImageQuality.Preset.PointOne),
+          ImageQualityInput.preset(ImageQuality.Preset.PointThree),
           CloudExtinctionInput.preset(CloudExtinction.Preset.PointOne),
           skyBackground = SkyBackground.Darkest,
           waterVapor = WaterVapor.VeryDry,
@@ -1133,7 +1133,7 @@ object WiringSuite:
     SpectroscopyInput(
       SpectroscopyParameters(
         ItcConstraintsInput(
-          ImageQualityInput.preset(ImageQuality.Preset.PointOne),
+          ImageQualityInput.preset(ImageQuality.Preset.PointThree),
           CloudExtinctionInput.preset(CloudExtinction.Preset.PointOne),
           skyBackground = SkyBackground.Darkest,
           waterVapor = WaterVapor.VeryDry,

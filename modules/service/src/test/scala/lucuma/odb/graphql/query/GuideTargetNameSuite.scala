@@ -282,7 +282,7 @@ trait GuideTargetNameSuite extends ExecutionTestSupport {
         expect(pi, guideTargetNameQuery(oid), expected = guideTargetNameResult(targetName1.some))
 
   test("changing the constraints keeps name"):
-    nameAfterObservationEdit("constraintSet: { imageQuality: POINT_ONE, cloudExtinction: ZERO }")
+    nameAfterObservationEdit("constraintSet: { imageQuality: POINT_THREE, cloudExtinction: ZERO }")
       .flatMap: oid =>
         expect(pi, guideTargetNameQuery(oid), expected = guideTargetNameResult(targetName1.some))
 

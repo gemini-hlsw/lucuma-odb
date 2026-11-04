@@ -123,8 +123,8 @@ class observingModeGroup extends OdbSuite:
           ).replicateA(2)
 
         (create2(ImageQuality.Preset.OnePointFive, GmosNorthGrating.B1200_G5301),
-         create2(ImageQuality.Preset.PointOne, GmosNorthGrating.R400_G5310),
-         create2(ImageQuality.Preset.PointOne, GmosNorthGrating.R831_G5302)
+         create2(ImageQuality.Preset.PointThree, GmosNorthGrating.R400_G5310),
+         create2(ImageQuality.Preset.PointThree, GmosNorthGrating.R831_G5302)
         ).parFlatMapN: (g1, g2, g3) =>
           expect(
             user = pi,
@@ -218,7 +218,7 @@ class observingModeGroup extends OdbSuite:
               grating  = GmosNorthGrating.B1200_G5301.tag.toScreamingSnakeCase,
               fpu      = GmosNorthFpu.LongSlit_5_00.tag.toScreamingSnakeCase,
               xbin     = bin,
-              iq       = ImageQuality.Preset.PointOne,
+              iq       = ImageQuality.Preset.PointThree,
               asterism = List(tid)
           )
 
@@ -280,7 +280,7 @@ class observingModeGroup extends OdbSuite:
             Site.GN,
             grating  = GmosNorthGrating.B1200_G5301.tag.toScreamingSnakeCase,
             qs       = qs,
-            iq       = ImageQuality.Preset.PointOne,
+            iq       = ImageQuality.Preset.PointThree,
             asterism = List(tid)
           )
 
@@ -346,7 +346,7 @@ class observingModeGroup extends OdbSuite:
               Site.GN,
               grating  = grating.tag.toScreamingSnakeCase,
               fpu      = GmosNorthFpu.LongSlit_5_00.tag.toScreamingSnakeCase,
-              iq       = ImageQuality.Preset.PointOne,
+              iq       = ImageQuality.Preset.PointThree,
               asterism = List(tid)
           )
 

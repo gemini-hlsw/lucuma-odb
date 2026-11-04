@@ -29,7 +29,7 @@ class observation extends OdbSuite {
                 SET: {
                   constraintSet: {
                     cloudExtinction: POINT_ONE
-                    imageQuality: POINT_ONE
+                    imageQuality: POINT_THREE
                     skyBackground: DARKEST
                   }
                   targetEnvironment: { asterism: ["$tid1", "$tid2"] }

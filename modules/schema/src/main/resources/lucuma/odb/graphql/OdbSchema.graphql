@@ -16443,16 +16443,6 @@ Image quality
 """
 enum ImageQualityPreset {
   """
-  ImageQualityPreset PointOne
-  """
-  POINT_ONE
-
-  """
-  ImageQualityPreset PointTwo
-  """
-  POINT_TWO
-
-  """
   ImageQualityPreset PointThree
   """
   POINT_THREE

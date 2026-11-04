@@ -1178,7 +1178,7 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat with que
           }
         """.stripMargin
       ).flatMap { tid =>
-        query(pi, createObsWithGmosObservingMode(pid, Site.GN, "B1200_G5301", fpu = "LONG_SLIT_5_00", iq = ImageQuality.Preset.PointOne, reqSn = 20.some, asterism = List(tid))).flatMap { js =>
+        query(pi, createObsWithGmosObservingMode(pid, Site.GN, "B1200_G5301", fpu = "LONG_SLIT_5_00", iq = ImageQuality.Preset.PointThree, reqSn = 20.some, asterism = List(tid))).flatMap { js =>
           val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", "gmosNorthLongSlit")
 
           assertIO(

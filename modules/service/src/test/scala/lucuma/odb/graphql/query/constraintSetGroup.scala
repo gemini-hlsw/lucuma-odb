@@ -56,8 +56,8 @@ class constraintSetGroup extends OdbSuite with query.ObservingModeSetupOperation
         def create2(iq: ImageQuality.Preset, sb: SkyBackground) = createObservation(user, pid, iq, sb).replicateA(2)
         (
           create2(ImageQuality.Preset.OnePointFive, SkyBackground.Bright),
-          create2(ImageQuality.Preset.PointOne, SkyBackground.Bright),
-          create2(ImageQuality.Preset.PointOne, SkyBackground.Dark)
+          create2(ImageQuality.Preset.PointThree, SkyBackground.Bright),
+          create2(ImageQuality.Preset.PointThree, SkyBackground.Dark)
         ).parFlatMapN { (g1, g2, g3) =>
           expect(
             user = user,
@@ -96,7 +96,7 @@ class constraintSetGroup extends OdbSuite with query.ObservingModeSetupOperation
                       },
                       {
                         "constraintSet" : {
-                          "imageQuality" : "POINT_ONE",
+                          "imageQuality" : "POINT_THREE",
                           "skyBackground" : "BRIGHT"
                         },
                         "observations" : {
@@ -105,7 +105,7 @@ class constraintSetGroup extends OdbSuite with query.ObservingModeSetupOperation
                       },
                       {
                         "constraintSet" : {
-                          "imageQuality" : "POINT_ONE",
+                          "imageQuality" : "POINT_THREE",
                           "skyBackground" : "DARK"
                         },
                         "observations" : {
@@ -132,8 +132,8 @@ class constraintSetGroup extends OdbSuite with query.ObservingModeSetupOperation
             .replicateA(2)
         (
           create2(ImageQuality.Preset.OnePointFive, SkyBackground.Bright),
-          create2(ImageQuality.Preset.PointOne, SkyBackground.Bright),
-          create2(ImageQuality.Preset.PointOne, SkyBackground.Dark)
+          create2(ImageQuality.Preset.PointThree, SkyBackground.Bright),
+          create2(ImageQuality.Preset.PointThree, SkyBackground.Dark)
         ).parFlatMapN { (g1, g2, g3) =>
           createGeminiCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A")).flatMap { cid =>
            addDemoScienceProposal(user, pid, cid)
@@ -188,7 +188,7 @@ class constraintSetGroup extends OdbSuite with query.ObservingModeSetupOperation
                         },
                         {
                           "constraintSet" : {
-                            "imageQuality" : "POINT_ONE",
+                            "imageQuality" : "POINT_THREE",
                             "skyBackground" : "BRIGHT"
                           },
                           "observations" : {
@@ -197,7 +197,7 @@ class constraintSetGroup extends OdbSuite with query.ObservingModeSetupOperation
                         },
                         {
                           "constraintSet" : {
-                            "imageQuality" : "POINT_ONE",
+                            "imageQuality" : "POINT_THREE",
                             "skyBackground" : "DARK"
                           },
                           "observations" : {
