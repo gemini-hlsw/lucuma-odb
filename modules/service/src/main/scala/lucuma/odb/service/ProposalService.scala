@@ -920,7 +920,14 @@ object ProposalService {
           .flatMap {
             case Delete(0) => false.success.pure[F]
             case Delete(1) =>
-              session.execute(Statements.ResetProgramTypeToScience)(input.programId).as(true.success)
+              // Partner splits and TAC feedback belong to the proposal, though
+              // they cascade only from the program.
+              val deleteDependents: F[Unit] =
+                Services.asSuperUser:
+                  partnerSplitsService.deleteSplits(input.programId) *>
+                    tacFeedbackService.deleteAllTacFeedback(input.programId)
+              deleteDependents *>
+                session.execute(Statements.ResetProgramTypeToScience)(input.programId).as(true.success)
             case c         => OdbError.InvalidArgument(s"Could not delete proposal in ${input.programId}: $c".some).asFailure.pure[F]
           }
 

@@ -117,6 +117,11 @@ class deleteTacFeedback extends OdbSuite with query.ObservingModeSetupOperations
         """.asRight
       )
 
+  test("deleting the proposal deletes its TAC feedback"):
+    createProgramWithFeedback.flatMap: pid =>
+      deleteProposal(staff, pid).map(assert(_)) *>
+      partners(pid).map(ps => assertEquals(ps, Nil))
+
   test("deleting missing TAC feedback returns false"):
     createProgramWithFeedback.flatMap: pid =>
       deleteTacFeedbackAs(staff, pid, Partner.US).map(assert(_)) *>

@@ -172,6 +172,26 @@ class setTacFeedback extends OdbSuite with query.ObservingModeSetupOperations:
                  assert(m.startsWith("Partner CA has no time split"), m)
     yield ()
 
+  test("TAC feedback requires a time split in a recreated proposal"):
+    // The deleted proposal's splits must not carry over to its replacement,
+    // here a Demo Science proposal, which has none.
+    for
+      pid <- createProgramWithProposal(List((Partner.US, 100)))
+      _   <- deleteProposal(staff, pid).map(assert(_))
+      _   <- addProposal(pi, pid, callProps = "demoScience: { minPercentTime: 0 }".some)
+      _   <- interceptOdbError(setTacFeedbackAs(staff, pid, feedback(Partner.US))):
+               case OdbError.InvalidArgument(Some(m)) =>
+                 assert(m.startsWith("Partner US has no time split"), m)
+    yield ()
+
+  test("TAC feedback can be set in a proposal recreated with the same split"):
+    for
+      pid <- createProgramWithProposal(List((Partner.US, 100)))
+      _   <- deleteProposal(staff, pid).map(assert(_))
+      _   <- addProposal(pi, pid, callProps = "queue: { considerForBand3: DO_NOT_CONSIDER, partnerSplits: [{ partner: US, percent: 100 }] }".some)
+      _   <- setTacFeedbackAs(staff, pid, feedback(Partner.US))
+    yield ()
+
   test("TAC feedback requires a proposal"):
     createProgramAs(pi).flatMap: pid =>
       interceptOdbError(setTacFeedbackAs(staff, pid, feedback(Partner.US))):

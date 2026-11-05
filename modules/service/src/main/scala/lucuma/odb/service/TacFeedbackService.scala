@@ -50,6 +50,12 @@ trait TacFeedbackService[F[_]]:
     input: AccessControl.CheckedWithId[Partner, Program.Id]
   )(using Transaction[F]): F[Result[Boolean]]
 
+  /**
+   * Deletes every partner's TAC feedback for a program.  Intended for use by
+   * `ProposalService` when the proposal is deleted.
+   */
+  def deleteAllTacFeedback(pid: Program.Id)(using Transaction[F], Services.SuperUserAccess): F[Unit]
+
 object TacFeedbackService:
 
   def instantiate[F[_]: MonadCancelThrow](using Services[F]): TacFeedbackService[F] =
@@ -77,6 +83,9 @@ object TacFeedbackService:
             .option(Statements.DeleteTacFeedback)((pid, partner))
             .map(deleted => Result(deleted.isDefined))
 
+      override def deleteAllTacFeedback(pid: Program.Id)(using Transaction[F], Services.SuperUserAccess): F[Unit] =
+        session.execute(Statements.DeleteAllTacFeedback)(pid).void
+
       private def upsert(pid: Program.Id, f: TacFeedbackInput): F[Result[Unit]] =
         upsertFeedback(pid, f).flatMap: r =>
           r.flatTraverse: _ =>
@@ -86,12 +95,14 @@ object TacFeedbackService:
 
       private def upsertFeedback(pid: Program.Id, f: TacFeedbackInput): F[Result[Unit]] =
         // When nothing in the feedback row itself changes, there is no need to
-        // touch it, but it must already exist.
+        // update it, but it must already exist.  Locking it serializes the
+        // replacement of its recommended times with other edits and deletion,
+        // just as the UPDATE below does.
         val noFeedbackChanges = f.decision.isEmpty && f.ranking.isEmpty && f.comments.isAbsent
         if noFeedbackChanges then
           session
-            .unique(Statements.TacFeedbackExists)((pid, f.partner))
-            .map(exists => if exists then Result.unit else missingFields(f))
+            .option(Statements.LockTacFeedback)((pid, f.partner))
+            .map(_.fold(missingFields(f))(_ => Result.unit))
         else
           session
             .option(Statements.UpdateTacFeedback)((f.decision, f.ranking, f.comments.isDefined, f.comments.toOption, pid, f.partner))
@@ -104,7 +115,7 @@ object TacFeedbackService:
           .tupled
           .fold(missingFields(f).pure[F]): (decision, ranking) =>
             session
-              .execute(Statements.InsertTacFeedback)((pid, f.partner, decision, ranking, f.comments.toOption))
+              .execute(Statements.InsertTacFeedback)((pid, f.partner, decision, ranking, f.comments.toOption, f.comments.isDefined))
               .as(Result.unit)
 
       // Replaces the recommended times, touching only the rows that change so
@@ -149,15 +160,20 @@ object TacFeedbackService:
      RETURNING c_partner
       """.query(partner)
 
-    val TacFeedbackExists: Query[(Program.Id, Partner), Boolean] =
+    val DeleteAllTacFeedback: Command[Program.Id] =
       sql"""
-        SELECT EXISTS (
-          SELECT 1
-            FROM t_tac_feedback
-           WHERE c_program_id = $program_id
-             AND c_partner    = $partner
-        )
-      """.query(bool)
+        DELETE FROM t_tac_feedback
+         WHERE c_program_id = $program_id
+      """.command
+
+    val LockTacFeedback: Query[(Program.Id, Partner), Partner] =
+      sql"""
+        SELECT c_partner
+          FROM t_tac_feedback
+         WHERE c_program_id = $program_id
+           AND c_partner    = $partner
+           FOR UPDATE
+      """.query(partner)
 
     // Comments are set (possibly to NULL) only when the Boolean flag is true.
     val UpdateTacFeedback: Query[(Option[TacPartnerDecision], Option[PosBigDecimal], Boolean, Option[NonEmptyString], Program.Id, Partner), Partner] =
@@ -172,9 +188,11 @@ object TacFeedbackService:
       """.query(partner)
 
     // ON CONFLICT covers a concurrent insert of the same program and partner.
-    val InsertTacFeedback: Command[(Program.Id, Partner, TacPartnerDecision, PosBigDecimal, Option[NonEmptyString])] =
+    // As in an update, the comments are replaced only when the Boolean flag is
+    // true, so omitted comments keep the value the other insert gave them.
+    val InsertTacFeedback: Command[(Program.Id, Partner, TacPartnerDecision, PosBigDecimal, Option[NonEmptyString], Boolean)] =
       sql"""
-        INSERT INTO t_tac_feedback (
+        INSERT INTO t_tac_feedback AS t (
           c_program_id,
           c_partner,
           c_decision,
@@ -190,7 +208,7 @@ object TacFeedbackService:
         ON CONFLICT (c_program_id, c_partner) DO UPDATE SET
           c_decision = EXCLUDED.c_decision,
           c_ranking  = EXCLUDED.c_ranking,
-          c_comments = EXCLUDED.c_comments
+          c_comments = CASE WHEN $bool THEN EXCLUDED.c_comments ELSE t.c_comments END
       """.command
 
     // Removes the recommended times for every band not in the list.
