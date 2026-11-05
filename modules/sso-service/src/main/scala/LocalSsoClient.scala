@@ -23,13 +23,20 @@ import org.typelevel.ci.CIString
  */
 object LocalSsoClient {
 
+  private val Bearer = CIString("Bearer")
+
+  /** Whether the credential is a raw API key rather than a JWT. The two formats never overlap. */
+  def isApiKey(authorization: Authorization): Boolean =
+    authorization.credentials match {
+      case Token(Bearer, ba) => ApiKey.fromString.getOption(ba).isDefined
+      case _                 => false
+    }
+
   def apply[F[_]: Sync](
     jwtReader: SsoJwtReader[F],
     dbPool:    Resource[F, Database[F]]
   ): SsoClient[F, User] =
     new AbstractSsoClient[F, User] {
-
-      val Bearer = CIString("Bearer")
 
       def fetchApiUser(apiKey: ApiKey): F[Option[StandardUser]] =
         dbPool.use(_.findStandardUserFromApiKey(apiKey))

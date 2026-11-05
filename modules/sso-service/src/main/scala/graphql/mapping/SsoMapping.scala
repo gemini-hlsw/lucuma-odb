@@ -44,6 +44,9 @@ import org.typelevel.otel4s.trace.Tracer
 
 object SsoMapping {
 
+  /** Env key under which the routes record whether the request was authenticated with an API key. */
+  val ApiKeyAuthKey: String = "apiKeyAuth"
+
   case class Channels[F[_]](
     apiKeyDeletions: Channel[F, String, String]
   )
@@ -66,12 +69,15 @@ object SsoMapping {
     monitor:  SkunkMonitor[F],
     loadedSchema: Schema
   ): Mapping[F] = {
-      // Directly-computed result for `createApiKey` mutation.
+      // A leaked API key must not mint keys for the user's other roles, nor keys that outlive its
+      // own revocation, so only session (JWT) callers may create API keys.
       def createApiKey(env: Env): F[Result[String]] =
-        (env.getR[StandardUser](UserContext.EnvKey), env.getR[StandardRole.Id]("roleId"))
+        (env.getR[StandardUser](UserContext.EnvKey), env.getR[StandardRole.Id]("roleId"), env.getR[Boolean](ApiKeyAuthKey))
           .parTupled
-          .flatTraverse: (user, roleId) =>
-            if (user.role :: user.otherRoles).exists(_.id === roleId) then
+          .flatTraverse: (user, roleId, apiKeyAuth) =>
+            if apiKeyAuth then
+              Result.failure("API keys cannot create API keys. Authenticate with a session token.").pure[F]
+            else if (user.role :: user.otherRoles).exists(_.id === roleId) then
               pool.map(Database.fromSession(_)).use: db =>
                 db.createApiKey(roleId)
                   .map(apiKey => Result(lucuma.sso.client.ApiKey.fromString.reverseGet(apiKey)))
@@ -124,9 +130,9 @@ object SsoMapping {
 
         val schema: Schema = loadedSchema
 
-        override def parserConfig: GraphQLParser.Config = 
+        override def parserConfig: GraphQLParser.Config =
           GraphQLParser.defaultConfig.copy(
-            maxInputValueDepth = 10, // arbitrary; default is 5, which is too low 
+            maxInputValueDepth = 10, // arbitrary; default is 5, which is too low
             maxListTypeDepth = 10,
           )
 
@@ -273,8 +279,8 @@ object SsoMapping {
             Elab.liftR(rRoleId).flatMap { roleId => Elab.env("roleId" -> roleId)}
 
           case (MutationType, "addRole", List(
-            Binding("userId", Value.StringValue(id)), 
-            Binding("roleType", Value.EnumValue(roleType)), 
+            Binding("userId", Value.StringValue(id)),
+            Binding("roleType", Value.EnumValue(roleType)),
             Binding("partner", pValue))
           ) =>
             import lucuma.sso.service.database.{ RoleType => RT }
@@ -289,7 +295,7 @@ object SsoMapping {
                     pValue match
                       case EnumValue(name) => Result.fromOption(Partner.values.find(_.tag.equalsIgnoreCase(name)), s"Not a valid partner: $name").map(_.some)
                       case AbsentValue | NullValue => Result.success(None)
-                      case _ => Result.internalError("Unpossible; validation should disallow these cases.")                
+                      case _ => Result.internalError("Unpossible; validation should disallow these cases.")
                   )
                     .parFlatMapN:
                       case (uid, RT.Pi, None)                        => Result.success((uid, RoleRequest.Pi))

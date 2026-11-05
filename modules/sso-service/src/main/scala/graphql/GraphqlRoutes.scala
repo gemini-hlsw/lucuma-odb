@@ -4,10 +4,16 @@
 package lucuma.sso.service
 package graphql
 
+import cats.data.EitherT
 import cats.effect.*
+import cats.syntax.all.*
 import grackle.skunk.SkunkMonitor
+import lucuma.common.middleware.UserAttributes.given
 import lucuma.common.middleware.UserContext
 import lucuma.core.model.StandardUser
+import lucuma.core.model.User
+import lucuma.graphql.routes.Auth
+import lucuma.graphql.routes.Authenticator
 import lucuma.graphql.routes.GraphQLService
 import lucuma.graphql.routes.Routes as LucumaGraphQLRoutes
 import lucuma.sso.client.SsoClient
@@ -15,6 +21,7 @@ import lucuma.sso.service.graphql.mapping.SsoMapping
 import org.http4s.*
 import org.http4s.server.websocket.WebSocketBuilder2
 import org.typelevel.log4cats.Logger
+import org.typelevel.otel4s.Attributes
 import org.typelevel.otel4s.trace.Tracer
 import skunk.Session
 
@@ -33,6 +40,22 @@ object GraphQLRoutes {
     service: GraphQLService[F],
     wsb:     WebSocketBuilder2[F],
   ): HttpRoutes[F] =
-    LucumaGraphQLRoutes.forService[F](service, UserContext.authenticator(client), wsb)
+    LucumaGraphQLRoutes.forService[F](service, authenticator(client), wsb)
+
+  /**
+   * Like `UserContext.authenticator`, but also records whether the request was authenticated with
+   * a raw API key, so the mapping can keep API keys from minting further API keys.
+   */
+  def authenticator[F[_]: Async](client: SsoClient[F, StandardUser]): Authenticator[F] =
+    Authenticator:
+      case None    => Auth.Anonymous.pure[F]
+      case Some(a) =>
+        EitherT(client.get(a)).fold(
+          Auth.Denied(_),
+          u => Auth(
+            UserContext.env(u).add(SsoMapping.ApiKeyAuthKey -> LocalSsoClient.isApiKey(a)),
+            Attributes.from(u: User)
+          )
+        )
 
 }

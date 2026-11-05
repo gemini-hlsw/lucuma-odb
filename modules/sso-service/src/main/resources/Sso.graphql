@@ -42,7 +42,10 @@ type UserSelectResult {
 
 type Mutation {
 
-  "Create and return an API key for the specified role, if owned by the current user."
+  """
+  Create and return an API key for the specified role, if owned by the current user. The request
+  must be authenticated with a session token; an API key cannot create further API keys.
+  """
   createApiKey(role: RoleId!): String!
 
   "Delete the specified API key, if owned by the current user. Returns the constant value `true`."
