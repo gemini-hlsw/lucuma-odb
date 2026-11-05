@@ -136,14 +136,12 @@ object PerScienceObservationCalibrationsService:
       ): Option[Group.Id] =
         tree.collectGroups(oid, b => !b.system)
 
-      // The calibration roles a per-observation calibration group holds, derived
-      // from the science config: GNIRS cross-dispersed also gets daytime pinhole
-      // flats, Flamingos-2 imaging gets only a daytime flat, and everything else
-      // has only tellurics.
+      // The calibration roles a per-observation calibration group holds: a
+      // telluric unless the mode is imaging, plus whichever generated daytime
+      // calibrations the science config wants.
       private def obsCalibrationGroupRoles(config: CalibrationConfigSubset): List[CalibrationRole] =
-        if isCrossDispersedGnirs(config) then List(CalibrationRole.Telluric, CalibrationRole.DaytimePinhole)
-        else if isFlamingos2Imaging(config) then List(CalibrationRole.DaytimeFlat)
-        else List(CalibrationRole.Telluric)
+        Option.unless(isFlamingos2Imaging(config))(CalibrationRole.Telluric).toList ++
+          GeneratedDayCals.filter(_.wantedBy(config)).map(_.calibrationRole)
 
       private def newObsCalibrationGroup(
         pid:           Program.Id,
@@ -445,12 +443,22 @@ object PerScienceObservationCalibrationsService:
           case _: CalibrationConfigSubset.Flamingos2ImagingConfigs => true
           case _                                                   => false
 
-      private def requiresGeneratedDayCal(config: CalibrationConfigSubset): Boolean =
-        isCrossDispersedGnirs(config) || isFlamingos2Imaging(config)
+      // A daytime calibration the ODB generates into the per-observation group,
+      // and the science configs that want it.  Adding a role here is enough for
+      // group roles, sync and cleanup; the sequence branch is separate.
+      private case class GeneratedDayCal(calibrationRole: CalibrationRole, wantedBy: CalibrationConfigSubset => Boolean)
 
-      // The generated daytime calibration roles a per-observation group may hold.
+      private val GeneratedDayCals: List[GeneratedDayCal] =
+        List(
+          GeneratedDayCal(CalibrationRole.DaytimePinhole, isCrossDispersedGnirs),
+          GeneratedDayCal(CalibrationRole.DaytimeFlat,    isFlamingos2Imaging)
+        )
+
+      private def requiresGeneratedDayCal(config: CalibrationConfigSubset): Boolean =
+        GeneratedDayCals.exists(_.wantedBy(config))
+
       private val DayCalRoles: List[CalibrationRole] =
-        ObsExtract.PerObservationCalibrationRoles.filterNot(_ === CalibrationRole.Telluric)
+        GeneratedDayCals.map(_.calibrationRole)
 
       private def findDaytimeObservations(
         gid:             Group.Id,
@@ -533,10 +541,9 @@ object PerScienceObservationCalibrationsService:
         obs: ObsExtract[CalibrationConfigSubset],
         gid: Group.Id
       )(using Transaction[F], SuperUserAccess): F[(List[Observation.Id], List[Observation.Id])] =
-        for
-          pResult <- syncDaytimeCalibration(pid, obs, gid, CalibrationRole.DaytimePinhole, isCrossDispersedGnirs(obs.data))
-          fResult <- syncDaytimeCalibration(pid, obs, gid, CalibrationRole.DaytimeFlat, isFlamingos2Imaging(obs.data))
-        yield (pResult._1 ++ fResult._1, pResult._2 ++ fResult._2)
+        GeneratedDayCals
+          .traverse(g => syncDaytimeCalibration(pid, obs, gid, g.calibrationRole, g.wantedBy(obs.data)))
+          .map(_.combineAll)
 
       private def generateObsCalibrationsForScience(
         pid:  Program.Id,
