@@ -23,11 +23,14 @@ import org.typelevel.ci.CIString
  */
 object LocalSsoClient {
 
+  /** A standard user and whether a raw API key, rather than a JWT, authenticated the request. */
+  case class Authenticated(user: StandardUser, viaApiKey: Boolean)
+
   def apply[F[_]: Sync](
     jwtReader: SsoJwtReader[F],
     dbPool:    Resource[F, Database[F]]
-  ): SsoClient[F, User] =
-    new AbstractSsoClient[F, User] {
+  ): SsoClient[F, Authenticated] =
+    new AbstractSsoClient[F, Authenticated] {
 
       val Bearer = CIString("Bearer")
 
@@ -43,15 +46,19 @@ object LocalSsoClient {
       def getJwtInfo(bearerAuthorization: String): F[Either[String, User]] =
         jwtReader.decodeUser(bearerAuthorization).attempt.map(_.leftMap(SsoClient.denialMessage))
 
-      def getUserInfo(bearerAuthorization: String): F[Either[String, User]] =
-        OptionT(getApiUser(bearerAuthorization).widen[Option[User]])
-          .map(_.asRight[String])
-          .getOrElseF(getJwtInfo(bearerAuthorization))
+      def getUserInfo(bearerAuthorization: String): F[Either[String, Authenticated]] =
+        OptionT(getApiUser(bearerAuthorization))
+          .map(u => Authenticated(u, viaApiKey = true).asRight[String])
+          .getOrElseF:
+            getJwtInfo(bearerAuthorization).map:
+              _.flatMap:
+                case su: StandardUser => Authenticated(su, viaApiKey = false).asRight
+                case _                => SsoClient.AccessDenied.asLeft
 
-      def get(authorization: Authorization): F[Either[String, User]] =
+      def get(authorization: Authorization): F[Either[String, Authenticated]] =
         authorization.credentials match {
           case Token(Bearer, ba) => getUserInfo(ba)
-          case _                 => SsoClient.AccessDenied.asLeft[User].pure[F]
+          case _                 => SsoClient.AccessDenied.asLeft[Authenticated].pure[F]
         }
 
     }

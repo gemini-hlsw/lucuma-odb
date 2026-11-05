@@ -16,7 +16,6 @@ import com.monovore.decline.effect.CommandIOApp
 import fs2.io.net.Network
 import lucuma.common.middleware.LoggingMiddleware
 import lucuma.core.model.StandardRole
-import lucuma.core.model.StandardUser
 import lucuma.core.util.Gid
 import lucuma.otel.OtelServices
 import lucuma.otel.OtelSetup
@@ -204,7 +203,7 @@ object FMain extends AnsiColor {
                        healthChecks(singleSession(config.database), httpClient, config.orcid)
                      ))
     } yield wsb => health <+> middleware {
-      val localClient = LocalSsoClient(config.ssoJwtReader, dbPool).collect { case su: StandardUser => su }
+      val localClient = LocalSsoClient(config.ssoJwtReader, dbPool)
       val odb = OdbClient[F](httpClient, config.ssoJwtWriter, config.odbRootUri, serviceUser)
       Routes[F](
         dbPool    = dbPool,

@@ -15,7 +15,6 @@ import fs2.io.net.Network
 import lucuma.core.model.GuestUser
 import lucuma.core.model.ServiceUser
 import lucuma.core.model.StandardUser
-import lucuma.core.model.User
 import lucuma.sso.client.SsoJwtReader
 import lucuma.sso.service.config.Config
 import lucuma.sso.service.config.DatabaseConfig
@@ -111,7 +110,7 @@ trait SsoSimulator extends TestContainerForAll { self: Suite =>
 
   object SsoSimulator {
 
-    val config = 
+    val config =
       Config.local(null, None)
         .copy(scheme = Uri.Scheme.https) // no ORCID config since we're faking ORCID
         .copy(database = DatabaseConfig(
@@ -150,7 +149,7 @@ trait SsoSimulator extends TestContainerForAll { self: Suite =>
           cookies   = CookieService[F]("gemini.edu", true),
           cookieDomain = "gemini.edu",
         ) <+> GraphQLRoutes(
-          LocalSsoClient(config.ssoJwtReader, dbPool).collect { case su: StandardUser => su },
+          LocalSsoClient(config.ssoJwtReader, dbPool),
           service,
           null // !!!
         ), config.ssoJwtReader, config.ssoJwtWriter)
@@ -170,7 +169,7 @@ trait SsoSimulator extends TestContainerForAll { self: Suite =>
           (pool, sim, client, reader, writer)
         }
       }
-    } 
+    }
 
   }
 }

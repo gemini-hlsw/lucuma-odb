@@ -130,7 +130,7 @@ object Routes {
           case Some(u) =>
             traceUser(u) *> {
               if (u.role.id === rid || u.otherRoles.exists(_.id === rid))
-                dbPool.use(_.createApiKey(u.role.id)).flatMap(Created(_))
+                dbPool.use(_.createApiKey(rid)).flatMap(Created(_))
               else
                 Forbidden("Role is not owned by user.")
             }
@@ -146,7 +146,8 @@ object Routes {
               case Some(u) =>
                 traceUser(u, "lucuma.apikey") *>
                 Logger[F].info(s"API key ${apiKey.id} for ${u.displayName} (${u.id}) exchanged by ${su.displayName}.") *>
-                jwtWriter.newJwt(u, Some(3.hours)).flatMap(Ok(_))
+                // An API key stands for one role, so its JWT must not carry the user's other roles.
+                jwtWriter.newJwt(u.copy(otherRoles = Nil), Some(3.hours)).flatMap(Ok(_))
             }
         }
 
@@ -178,7 +179,7 @@ object Routes {
                 case None =>
                   db.canonicalizeUser(access, person, RoleRequest.Pi)
                 case Some(guestUser) =>
-                  // We used to be a guest but we are now a standard user, so either promote the guest user or 
+                  // We used to be a guest but we are now a standard user, so either promote the guest user or
                   // chown the guest's programs, depending on whether the standard user is new or not.
                   db.promoteGuestUser(access, person, guestUser.id, RoleRequest.Pi).flatMap {
                     case (None, tok) => tok.pure[F]

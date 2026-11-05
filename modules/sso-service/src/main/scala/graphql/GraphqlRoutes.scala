@@ -6,19 +6,23 @@ package graphql
 
 import cats.effect.*
 import grackle.skunk.SkunkMonitor
+import lucuma.common.middleware.UserAttributes.given
 import lucuma.common.middleware.UserContext
-import lucuma.core.model.StandardUser
+import lucuma.core.model.User
+import lucuma.graphql.routes.Authenticator
 import lucuma.graphql.routes.GraphQLService
+import lucuma.graphql.routes.RequestContext
 import lucuma.graphql.routes.Routes as LucumaGraphQLRoutes
 import lucuma.sso.client.SsoClient
 import lucuma.sso.service.graphql.mapping.SsoMapping
 import org.http4s.*
 import org.http4s.server.websocket.WebSocketBuilder2
 import org.typelevel.log4cats.Logger
+import org.typelevel.otel4s.Attributes
 import org.typelevel.otel4s.trace.Tracer
 import skunk.Session
 
-object GraphQLRoutes {
+object GraphQLRoutes:
 
   /** The GraphQL service of SSO, which serves every request. */
   def service[F[_]: Async: Tracer: Logger](pool: Resource[F, Session[F]]): Resource[F, GraphQLService[F]] =
@@ -29,10 +33,19 @@ object GraphQLRoutes {
     } yield service
 
   def apply[F[_]: Async: Tracer: Logger](
-    client:  SsoClient[F, StandardUser],
+    client:  SsoClient[F, LocalSsoClient.Authenticated],
     service: GraphQLService[F],
     wsb:     WebSocketBuilder2[F],
   ): HttpRoutes[F] =
-    LucumaGraphQLRoutes.forService[F](service, UserContext.authenticator(client), wsb)
+    LucumaGraphQLRoutes.forService[F](service, authenticator(client), wsb)
 
-}
+  /** The shared authenticator, with the env also recording whether an API key authenticated the request. */
+  def authenticator[F[_]: Async](client: SsoClient[F, LocalSsoClient.Authenticated]): Authenticator[F] =
+    UserContext.authenticator(
+      client,
+      _ => Async[F].unit,
+      a => RequestContext(
+        UserContext.env(a.user).add(SsoMapping.ApiKeyAuthKey -> a.viaApiKey),
+        Attributes.from(a.user: User)
+      )
+    )
