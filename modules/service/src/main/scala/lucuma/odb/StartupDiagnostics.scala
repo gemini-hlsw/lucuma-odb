@@ -120,6 +120,7 @@ object StartupDiagnostics:
           checkPostgresEnum(subaru_proposal_type),
           checkPostgresEnum(summary_generation_state),
           checkPostgresEnum(summary_style),
+          checkPostgresEnum(tac_partner_decision),
           checkPostgresEnum(target_disposition),
           checkPostgresEnum(telluric_slot),
           checkPostgresEnum(tg_op),

@@ -17,6 +17,7 @@ import grackle.QueryCompiler.Elab
 import grackle.Result
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
+import lucuma.core.enums.Partner
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.model.Attachment
@@ -61,6 +62,7 @@ trait ProgramMapping[F[_]]
      with UserInvitationTable[F]
      with KeyValueEffectHandler[F]
      with AllocationTable[F]
+     with TacFeedbackTable[F]
      with EmailTable[F] {
 
   def itcClient: ItcClient[F]
@@ -102,6 +104,7 @@ trait ProgramMapping[F[_]]
       EffectField("timeCharge", timeChargeHandler, List("id")),
       SqlObject("userInvitations", Join(ProgramView.Id, UserInvitationTable.ProgramId)),
       SqlObject("allocations", Join(ProgramView.Id, AllocationTable.ProgramId)),
+      SqlObject("tacFeedback", Join(ProgramView.Id, TacFeedbackTable.ProgramId)),
       SqlField("calibrationRole", ProgramView.CalibrationRole),
       SqlObject("goa"),
       SqlObject("proposalSummaryGeneration", Join(ProgramView.Id, SummaryGenerationView.ProgramId)),
@@ -252,6 +255,10 @@ trait ProgramMapping[F[_]]
           OrderSelection[TimeAccountingCategory](AllocationType / "category")
         )), child)
       }
+
+    case (ProgramType, "tacFeedback", Nil) =>
+      Elab.transformChild: child =>
+        OrderBy(OrderSelections(List(OrderSelection[Partner](TacFeedbackType / "partner"))), child)
 
   }
 

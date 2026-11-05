@@ -246,6 +246,9 @@ trait Services[F[_]]:
   /** The `Sequence`. */
   def sequenceService: SequenceService[F]
 
+  /** The `TacFeedbackService`. */
+  def tacFeedbackService: TacFeedbackService[F]
+
   /** The `TargetService`. */
   def targetService: TargetService[F]
 
@@ -416,6 +419,7 @@ object Services:
       lazy val tooTriggerService = TooTriggerService.instantiate
       lazy val programUserService = ProgramUserService.instantiate
       lazy val smartGcalService = SmartGcalService.instantiate
+      lazy val tacFeedbackService = TacFeedbackService.instantiate
       lazy val targetService = TargetService.instantiate
       lazy val timeAccountingService = TimeAccountingService.instantiate
       lazy val timeService = TimeService.instantiate
@@ -508,6 +512,7 @@ object Services:
     def pdfSummaryJobService[F[_]](using Services[F]): PdfSummaryJobService[F] = summon[Services[F]].pdfSummaryJobService
     def smartGcalService[F[_]](using Services[F]): SmartGcalService[F] = summon[Services[F]].smartGcalService
     def sequenceService[F[_]](using Services[F]): SequenceService[F] = summon[Services[F]].sequenceService
+    def tacFeedbackService[F[_]](using Services[F]): TacFeedbackService[F] = summon[Services[F]].tacFeedbackService
     def targetService[F[_]](using Services[F]): TargetService[F] = summon[Services[F]].targetService
     def trackingService[F[_]](using Services[F]): TrackingService[F] = summon[Services[F]].trackingService
     def timeAccountingService[F[_]](using Services[F]): TimeAccountingService[F] = summon[Services[F]].timeAccountingService

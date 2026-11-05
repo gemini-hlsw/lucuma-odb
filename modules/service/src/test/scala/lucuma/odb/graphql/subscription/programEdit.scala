@@ -9,7 +9,9 @@ import cats.syntax.all.*
 import io.circe.literal.*
 import lucuma.core.data.EmailAddress
 import lucuma.core.enums.EmailStatus
+import lucuma.core.enums.Partner
 import lucuma.core.enums.ScienceBand
+import lucuma.core.enums.TacPartnerDecision
 import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.model.ServiceUser
 import lucuma.core.syntax.timespan.*
@@ -552,6 +554,91 @@ class programEdit extends OdbSuite with SubscriptionUtils {
           json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo", "allocations": $allocsJson } } }""",
         )
     )
+  }
+
+
+  test("edit event should show up for setting and deleting TAC feedback") {
+    import Group2.pi
+    import Group2.service
+    import eu.timepit.refined.types.numeric.PosBigDecimal
+    import eu.timepit.refined.types.string.NonEmptyString
+    import lucuma.core.util.TimeSpan
+    import lucuma.odb.data.Nullable
+    import lucuma.odb.graphql.input.TacFeedbackInput
+    import lucuma.odb.graphql.input.TacRecommendedTimeInput
+
+    def band1(hours: Int): Option[List[TacRecommendedTimeInput]] =
+      List(TacRecommendedTimeInput(ScienceBand.Band1, TimeSpan.fromHours(hours).get)).some
+
+    val create    = TacFeedbackInput(
+      Partner.US,
+      TacPartnerDecision.Accepted.some,
+      PosBigDecimal.unsafeFrom(BigDecimal(1)).some,
+      band1(2),
+      Nullable.NonNull(NonEmptyString.unsafeFrom("Good."))
+    )
+    val reject    = TacFeedbackInput(Partner.US, TacPartnerDecision.Rejected.some, none, none, Nullable.Absent)
+    val noop      = TacFeedbackInput(Partner.US, none, none, none, Nullable.Absent)
+    val sameTimes = TacFeedbackInput(Partner.US, none, none, band1(2), Nullable.Absent)
+    val newTimes  = TacFeedbackInput(Partner.US, none, none, band1(3), Nullable.Absent)
+
+    def event(decision: String, hours: String) =
+      json"""{ "programEdit": { "editType": "UPDATED", "value": { "tacFeedback": [ { "partner": "US", "decision": $decision, "recommendedTimes": [ { "band": "BAND1", "time": { "hours": ${BigDecimal(hours)} } } ] } ] } } }"""
+
+    val deleted =
+      json"""{ "programEdit": { "editType": "UPDATED", "value": { "tacFeedback": [] } } }"""
+
+    // Set up the program and proposal before subscribing, so that only TAC
+    // feedback edits are observed.
+    for {
+      p <- createProgram(pi, "foo")
+      _ <- addProposal(pi, p)
+      _ <- addPartnerSplits(pi, p, partnerSplits = List((Partner.US, 100)))
+      _ <- subscriptionExpect(
+             user = pi,
+             query =
+               s"""
+                 subscription {
+                   programEdit(input: { programId: "$p" }) {
+                     editType
+                     value {
+                       tacFeedback {
+                         partner
+                         decision
+                         recommendedTimes { band time { hours } }
+                       }
+                     }
+                   }
+                 }
+               """,
+             mutations =
+               Right(
+                 for {
+                   _ <- IO.sleep(1.second)
+                   _ <- setTacFeedbackAs(service, p, create)
+                   _ <- IO.sleep(1.second)
+                   _ <- setTacFeedbackAs(service, p, noop)
+                   _ <- IO.sleep(1.second)
+                   _ <- setTacFeedbackAs(service, p, reject)
+                   _ <- IO.sleep(1.second)
+                   _ <- setTacFeedbackAs(service, p, sameTimes)
+                   _ <- IO.sleep(1.second)
+                   _ <- setTacFeedbackAs(service, p, newTimes)
+                   _ <- IO.sleep(1.second)
+                   _ <- deleteTacFeedbackAs(service, p, Partner.US)
+                   _ <- IO.sleep(1.second)
+                   _ <- deleteTacFeedbackAs(service, p, Partner.US)
+                   _ <- IO.sleep(1.second)
+                 } yield ()
+               ),
+             expected = List(
+               event("ACCEPTED", "2.000000"),
+               event("REJECTED", "2.000000"),
+               event("REJECTED", "3.000000"),
+               deleted
+             )
+           )
+    } yield ()
   }
 
 }

@@ -18,6 +18,7 @@ import grackle.Type
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.enums.Partner
 import lucuma.core.enums.SequenceType
 import lucuma.core.model.Access
 import lucuma.core.model.Observation
@@ -27,6 +28,7 @@ import lucuma.core.model.Program
 import lucuma.core.model.ProgramNote
 import lucuma.core.model.ProgramReference
 import lucuma.core.model.ProposalReference
+import lucuma.core.model.StandardRole
 import lucuma.core.model.Target
 import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
@@ -45,6 +47,7 @@ import lucuma.odb.graphql.input.CreateProgramInput
 import lucuma.odb.graphql.input.CreateProgramNoteInput
 import lucuma.odb.graphql.input.CreateTargetInput
 import lucuma.odb.graphql.input.DeleteSequenceInput
+import lucuma.odb.graphql.input.DeleteTacFeedbackInput
 import lucuma.odb.graphql.input.EditAsterismsPatchInput
 import lucuma.odb.graphql.input.InsertSmartGcalInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
@@ -59,6 +62,8 @@ import lucuma.odb.graphql.input.SetAllocationsInput
 import lucuma.odb.graphql.input.SetGuideTargetNameInput
 import lucuma.odb.graphql.input.SetObservationWorkflowStateInput
 import lucuma.odb.graphql.input.SetProgramReferenceInput
+import lucuma.odb.graphql.input.SetTacFeedbackInput
+import lucuma.odb.graphql.input.TacFeedbackInput
 import lucuma.odb.graphql.input.TargetPropertiesInput
 import lucuma.odb.graphql.input.UpdateAsterismsInput
 import lucuma.odb.graphql.input.UpdateAttachmentsInput
@@ -697,6 +702,53 @@ trait AccessControl[F[_]] extends Predicates[F] {
           Services.asSuperUser:
             AccessControl.unchecked(input.allocations, pid, program_id)
         .value
+
+  /**
+   * Staff (or better) may set TAC feedback for any partner.  NGO users may only
+   * set feedback for their own partner, and only for programs they can read.
+   */
+  def selectForUpdate(
+    input: SetTacFeedbackInput
+  )(using Services[F], Transaction[F]): F[Result[AccessControl.CheckedWithId[TacFeedbackInput, Program.Id]]] =
+    selectForTacFeedback(input.programId, input.proposalReference, input.programReference, input.tacFeedback.partner, input.tacFeedback)
+
+  /**
+   * TAC feedback deletion has the same restrictions as setting it.
+   */
+  def selectForUpdate(
+    input: DeleteTacFeedbackInput
+  )(using Services[F], Transaction[F]): F[Result[AccessControl.CheckedWithId[Partner, Program.Id]]] =
+    selectForTacFeedback(input.programId, input.proposalReference, input.programReference, input.partner, input.partner)
+
+  private def selectForTacFeedback[A](
+    programId:         Option[Program.Id],
+    proposalReference: Option[ProposalReference],
+    programReference:  Option[ProgramReference],
+    feedbackPartner:   Partner,
+    a:                 A
+  )(using Services[F], Transaction[F]): F[Result[AccessControl.CheckedWithId[A, Program.Id]]] =
+    requireNgoAccess:
+      def checked(pid: Program.Id): AccessControl.CheckedWithId[A, Program.Id] =
+        Services.asSuperUser(AccessControl.unchecked(a, pid, program_id))
+
+      val notAuthorized: Result[AccessControl.CheckedWithId[A, Program.Id]] =
+        OdbError.NotAuthorized(user.id).asFailure
+
+      val resolvePid: F[Result[Program.Id]] =
+        programService.resolvePid(programId, proposalReference, programReference)
+
+      user.role match
+        case StandardRole.Ngo(_, partner) =>
+          if partner =!= feedbackPartner then notAuthorized.pure[F]
+          else
+            // Report reference resolution problems as NotAuthorized so that an
+            // NGO learns nothing about programs it cannot read.
+            resolvePid.flatMap: r =>
+              r.toOption.fold(notAuthorized.pure[F]): pid =>
+                programUserService.userHasReadAccess(pid).map: canRead =>
+                  if canRead then Result(checked(pid)) else notAuthorized
+        case _                            =>
+          resolvePid.map(_.map(checked))
 
   def selectForWarningDismissal(
     input: WarningDismissalInput

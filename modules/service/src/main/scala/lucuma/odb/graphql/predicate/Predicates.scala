@@ -69,6 +69,7 @@ trait Predicates[F[_]] extends BaseMapping[F]:
     val slewEvent                       = ExecutionEventPredicates(Path.from(SlewEventType))
     val stepEvent                       = ExecutionEventPredicates(Path.from(StepEventType))
     val stepRecord                      = StepRecordPredicates(Path.from(StepRecordType))
+    val tacFeedbackResult               = TacFeedbackPredicates(Path.from(TacFeedbackResultType))
     val target                          = TargetPredicates(Path.from(TargetType))
     val targetEdit                      = TargetEditPredicates(Path.from(TargetEditType))
     val targetGroup                     = TargetGroupPredicates(Path.from(TargetGroupType))

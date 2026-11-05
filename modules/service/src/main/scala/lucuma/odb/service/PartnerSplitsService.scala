@@ -22,6 +22,8 @@ private[service] trait PartnerSplitsService[F[_]] {
 
     def updateSplits(splits: Map[Partner, IntPercent], pid: Program.Id)(using Transaction[F], SuperUserAccess): F[Unit]
 
+    def deleteSplits(pid: Program.Id)(using Transaction[F], SuperUserAccess): F[Unit]
+
 }
 
 object PartnerSplitsService {
@@ -44,8 +46,7 @@ object PartnerSplitsService {
           _ <- insertSplits(splits, pid)
         } yield ()
 
-      @annotation.nowarn("msg=unused implicit parameter")
-      private def deleteSplits(pid: Program.Id)(using Transaction[F]): F[Unit] =
+      def deleteSplits(pid: Program.Id)(using Transaction[F], SuperUserAccess): F[Unit] =
         session.prepareR(Statements.DeleteSplits).use(_.execute(pid)).void
 
     }

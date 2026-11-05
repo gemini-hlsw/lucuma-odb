@@ -4213,6 +4213,20 @@ type Mutation {
   setAllocations(input: SetAllocationsInput!): SetAllocationsResult!
 
   """
+  Sets, or updates, a partner's TAC feedback for a program.  Feedback may only
+  be provided by partners with a non-zero time split in the proposal.  NGO users
+  may only set feedback for their own partner, and only for programs they can
+  read.
+  """
+  setTacFeedback(input: SetTacFeedbackInput!): TacFeedbackResult!
+
+  """
+  Deletes a partner's TAC feedback for a program.  NGO users may only delete
+  feedback for their own partner, and only for programs they can read.
+  """
+  deleteTacFeedback(input: DeleteTacFeedbackInput!): DeleteTacFeedbackResult!
+
+  """
   Set the name of the guide target for an observation.
   """
   setGuideTargetName(input: SetGuideTargetNameInput!): SetGuideTargetNameResult!
@@ -6546,6 +6560,18 @@ input SetAllocationsInput {
 
 type SetAllocationsResult {
   allocations: [Allocation!]!
+}
+
+"""
+Sets or updates the TAC feedback of a single partner for a program, which must
+have a proposal in which the partner has a non-zero time split. One of
+programId, programReference or proposalReference is required. (If two or more are provided, they must refer to the same program.)
+"""
+input SetTacFeedbackInput {
+  programId: ProgramId
+  proposalReference: ProposalReferenceLabel
+  programReference: ProgramReferenceLabel
+  tacFeedback: TacFeedbackInput!
 }
 
 type SetupTime {
@@ -19019,6 +19045,11 @@ type Program {
   allocations: [Allocation!]!
 
   """
+  TAC feedback from each partner that has provided it, ordered by partner.
+  """
+  tacFeedback: [TacFeedback!]!
+
+  """
   Calibration role of the program
   """
   calibrationRole: CalibrationRole
@@ -22086,6 +22117,117 @@ enum TacCategory {
   TacCategory ExtragalacticOther
   """
   EXTRAGALACTIC_OTHER
+}
+
+"""
+A partner's TAC (Time Allocation Committee) feedback for a program.
+"""
+type TacFeedback {
+  "The partner whose TAC provided the feedback."
+  partner: Partner!
+
+  "The partner TAC's decision."
+  decision: TacPartnerDecision!
+
+  "The partner TAC's ranking of the proposal."
+  ranking: PosBigDecimal!
+
+  """
+  The time recommended by the partner TAC, at most one entry per science band,
+  sorted by band.  Empty if the partner TAC recommends no time.
+  """
+  recommendedTimes: [TacRecommendedTime!]!
+
+  "The partner TAC's comments, if any."
+  comments: NonEmptyString
+}
+
+"""
+A partner's TAC feedback input.  When the partner has no feedback yet for the
+program, the decision and ranking are required.  Otherwise, omitted fields keep
+their existing values.  The decision, ranking and recommended times may not be
+set to null.  Comments are optional, and setting them to null removes any
+existing comments.
+"""
+input TacFeedbackInput {
+  partner: Partner!
+  decision: TacPartnerDecision
+  ranking: PosBigDecimal
+
+  """
+  The time recommended for each science band.  Each band may appear at most
+  once.  When supplied, the list (even an empty one) replaces all existing
+  recommended times.  When omitted, existing recommended times are kept, or
+  none are recorded for new feedback.
+  """
+  recommendedTimes: [TacRecommendedTimeInput!]
+
+  comments: NonEmptyString
+}
+
+"""
+Deletes the TAC feedback of a single partner for a program. One of programId,
+programReference or proposalReference is required. (If two or more are
+provided, they must refer to the same program.)
+"""
+input DeleteTacFeedbackInput {
+  programId: ProgramId
+  proposalReference: ProposalReferenceLabel
+  programReference: ProgramReferenceLabel
+
+  "The partner whose TAC feedback should be deleted."
+  partner: Partner!
+}
+
+"The result of deleting TAC feedback."
+type DeleteTacFeedbackResult {
+  "`true` if TAC feedback was deleted, `false` otherwise."
+  result: Boolean!
+}
+
+"""
+The result of setting TAC feedback.
+"""
+type TacFeedbackResult {
+  "The TAC feedback, as updated."
+  tacFeedback: TacFeedback!
+}
+
+"""
+A partner TAC's decision on a proposal.
+"""
+enum TacPartnerDecision {
+  """
+  The proposal was accepted.
+  """
+  ACCEPTED
+
+  """
+  The proposal was rejected.
+  """
+  REJECTED
+}
+
+"""
+The time recommended by a partner TAC for a science band.
+"""
+type TacRecommendedTime {
+  "The science band for which the time is recommended."
+  band: ScienceBand!
+
+  "The time recommended for this band."
+  time: TimeSpan!
+}
+
+"""
+The time recommended by a partner TAC for a science band.
+"""
+input TacRecommendedTimeInput {
+  "The science band for which the time is recommended."
+  band: ScienceBand!
+
+  "The time recommended for this band."
+  time: TimeSpanInput!
 }
 
 """

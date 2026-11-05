@@ -88,6 +88,7 @@ import lucuma.odb.data.Existence
 import lucuma.odb.data.Obscalc
 import lucuma.odb.data.OdbError
 import lucuma.odb.graphql.input.AllocationInput
+import lucuma.odb.graphql.input.TacFeedbackInput
 import lucuma.odb.graphql.input.TimeChargeCorrectionInput
 import lucuma.odb.service.EmailService
 import lucuma.odb.service.ObscalcService
@@ -2419,6 +2420,63 @@ trait DatabaseOperations { this: OdbSuite =>
         }
       """
     )
+
+  /** GraphQL input object text for a `TacFeedbackInput`, omitting unspecified fields. */
+  def tacFeedbackInputString(f: TacFeedbackInput): String =
+    List(
+      s"partner: ${f.partner.tag.toScreamingSnakeCase}".some,
+      f.decision.map(d => s"decision: ${d.tag.toScreamingSnakeCase}"),
+      f.ranking.map(r => s"ranking: \"${r.value}\""),
+      f.recommendedTimes.map: ts =>
+        ts.map(t => s"{ band: ${t.band.tag.toScreamingSnakeCase}, time: { hours: \"${t.time.toHours}\" } }")
+          .mkString("recommendedTimes: [", ", ", "]"),
+      f.comments.fold("comments: null".some, none, c => s"comments: ${c.value.asJson}".some)
+    ).flatten.mkString("{\n", "\n", "\n}")
+
+  def setTacFeedbackAs(
+    user:     User,
+    pid:      Program.Id,
+    feedback: TacFeedbackInput
+  ): IO[Json] =
+    query(
+      user = user,
+      query = s"""
+        mutation {
+          setTacFeedback(input: {
+            programId:   ${pid.asJson}
+            tacFeedback: ${tacFeedbackInputString(feedback)}
+          }) {
+            tacFeedback {
+              partner
+              decision
+              ranking
+              recommendedTimes { band time { hours } }
+              comments
+            }
+          }
+        }
+      """
+    )
+
+  def deleteTacFeedbackAs(
+    user:    User,
+    pid:     Program.Id,
+    partner: Partner
+  ): IO[Boolean] =
+    query(
+      user = user,
+      query = s"""
+        mutation {
+          deleteTacFeedback(input: {
+            programId: ${pid.asJson}
+            partner:   ${partner.tag.toScreamingSnakeCase}
+          }) {
+            result
+          }
+        }
+      """
+    ).flatMap: js =>
+      js.hcursor.downFields("deleteTacFeedback", "result").as[Boolean].leftMap(f => new RuntimeException(f.message)).liftTo[IO]
 
   def setOneAllocationAs(
     user: User,

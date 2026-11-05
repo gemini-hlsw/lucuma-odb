@@ -901,6 +901,7 @@ class reference extends OdbSuite with query.ExecutionTestSupportForGmos {
       _   <- setProgramReference(staff, pid, """calibration: { semester: "2025B", instrument: GMOS_SOUTH }""")
       _   <- setProgramReference(staff, pid, """science: { semester: "2025B", scienceSubtype: QUEUE }""")
       _   <- addProposal(pi, pid, cid.some, "queue: { considerForBand3: DO_NOT_CONSIDER }".some)
+      _   <- addPartnerSplits(pi, pid)  // deleting the proposal deleted its splits
       _   <- addDefinedObservationAs(pi, pid)
       _   <- acceptProposal(staff, pid)
       ref <- fetchProgramReference(pi, pid)
