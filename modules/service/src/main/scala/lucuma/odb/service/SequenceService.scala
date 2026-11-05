@@ -17,6 +17,7 @@ import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
+import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Pipe
 import fs2.Pure
@@ -107,12 +108,17 @@ trait SequenceService[F[_]]:
   )(using Transaction[F], Services.ServiceAccess): F[Unit]
 
   /**
-   * Selects the atom digests of the given observations, ordered by observation
-   * and atom index.  The result is fully materialized so that it cannot outlive
-   * the transaction; callers with many observations should query in batches.
+   * Selects up to `limit` atom digests of the given observations, ordered by
+   * observation and atom index, starting after the (observation, atom index)
+   * `after` (or from the beginning if `None`).  The result is fully
+   * materialized so that it cannot outlive the transaction; callers read a
+   * large result one page per transaction, and pass many observations in
+   * batches to stay within the bind-parameter limit.
    */
   def selectAtomDigests(
-    which: List[Observation.Id]
+    which: List[Observation.Id],
+    after: Option[(Observation.Id, Short)],
+    limit: PosInt
   )(using Transaction[F], Services.ServiceAccess): F[List[(Observation.Id, Short, AtomDigest)]]
 
   def isMaterialized(
@@ -434,10 +440,16 @@ object SequenceService:
         yield ()
 
       override def selectAtomDigests(
-        which: List[Observation.Id]
+        which: List[Observation.Id],
+        after: Option[(Observation.Id, Short)],
+        limit: PosInt
       )(using Transaction[F], Services.ServiceAccess): F[List[(Observation.Id, Short, AtomDigest)]] =
         if which.isEmpty then List.empty.pure[F]
-        else session.execute(Statements.selectAtomDigests(which))(which)
+        else
+          val afterObservation = after.map(_._1)
+          session.execute(Statements.selectAtomDigests(which))(
+            (which, afterObservation, afterObservation, after.map(_._2), limit.value)
+          )
 
       /**
        * Marks ongoing steps as abandoned and deletes any steps that are
@@ -1831,7 +1843,9 @@ object SequenceService:
         ) VALUES $enc
       """.command
 
-    def selectAtomDigests(which: List[Observation.Id]): Query[which.type, (Observation.Id, Short, AtomDigest)] =
+    def selectAtomDigests(
+      which: List[Observation.Id]
+    ): Query[(which.type, Option[Observation.Id], Option[Observation.Id], Option[Short], Int), (Observation.Id, Short, AtomDigest)] =
       sql"""
         SELECT
           #$AtomDigestRowColumns
@@ -1839,7 +1853,9 @@ object SequenceService:
           t_atom_digest
         WHERE
           c_observation_id IN ${observation_id.list(which).values}
+          AND (${observation_id.opt} IS NULL OR (c_observation_id, c_atom_index) > (${observation_id.opt}, ${int2.opt}))
         ORDER BY c_observation_id, c_atom_index
+        LIMIT $int4
       """.query(atom_digest_row)
 
     final case class DynamicTable[D](

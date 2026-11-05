@@ -5,7 +5,6 @@ package lucuma.odb.graphql
 
 import cats.Monad
 import cats.Parallel
-import cats.data.NonEmptyList
 import cats.effect.*
 import cats.effect.std.SecureRandom
 import cats.effect.std.UUIDGen
@@ -199,17 +198,30 @@ object SchedulerRoutes:
           s"Unable to parse observation ids: a line exceeds $MaxAtomsRequestLineLength characters".asLeft
 
   /**
-   * How much is read per transaction: `atomBatchSize` observations' atom
-   * digests, or `visibilityPageSize` visibility changes.
+   * How much is read per transaction.  Every page holds at most `rowLimit`
+   * rows (atom digests or visibility changes).  Atom digests are also read
+   * for at most `observationBatchSize` requested observations at a time,
+   * which bounds the number of bind parameters in each query.
    */
   case class PageSizes(
-    atomBatchSize:      PosInt,
-    visibilityPageSize: PosInt
+    observationBatchSize: PosInt,
+    rowLimit:             PosInt
   )
 
   object PageSizes:
     val Default: PageSizes =
       PageSizes(PosInt.unsafeFrom(1000), PosInt.unsafeFrom(10000))
+
+  /**
+   * Where the next page of atom digests starts: in the observations of `batch`
+   * after the (observation, atom index) `after`, with the `rest` of the
+   * batches still to come.
+   */
+  private case class AtomCursor(
+    batch: List[Observation.Id],
+    rest:  List[List[Observation.Id]],
+    after: Option[(Observation.Id, Short)]
+  )
 
   /** Where the next page of visibility changes starts. */
   private enum VisibilityCursor:
@@ -231,6 +243,10 @@ object SchedulerRoutes:
         fs2.Stream
           .unfoldEval(next)(_.traverse(fetch))
           .flatMap(fs2.Stream.emits)
+
+  /** The last row of a full page, from which the next page starts. */
+  private def lastOfFull[A](page: List[A], limit: PosInt): Option[A] =
+    page.lastOption.filter(_ => page.sizeIs >= limit.value)
 
   def apply[F[_]: Async](
     services:  [A] => User => (Services[F] => F[A]) => F[A],
@@ -269,16 +285,24 @@ object SchedulerRoutes:
             case Left(msg)      =>
               BadRequest(msg)
             case Right(validIds) =>
-              // Each batch is read in its own short transaction so that memory
-              // and bind parameters stay bounded however many ids are sent.
-              def fetch(batches: NonEmptyList[List[Observation.Id]]): F[(List[AtomRow], Option[NonEmptyList[List[Observation.Id]]])] =
-                superUserTransaction(user)(sequenceService.selectAtomDigests(batches.head))
-                  .map(rows => (rows, batches.tail.toNel))
+              // The ids are read in batches, and each batch in pages of rows,
+              // each page in its own short transaction, so that memory and bind
+              // parameters stay bounded however many ids or atoms there are.
+              def fetch(cursor: AtomCursor): F[(List[AtomRow], Option[AtomCursor])] =
+                val limit = pageSizes.rowLimit
+                superUserTransaction(user)(sequenceService.selectAtomDigests(cursor.batch, cursor.after, limit))
+                  .map: page =>
+                    val next =
+                      lastOfFull(page, limit).fold(
+                        cursor.rest match
+                          case b :: bs => AtomCursor(b, bs, None).some
+                          case Nil     => none
+                      )((oid, idx, _) => cursor.copy(after = (oid, idx).some).some)
+                    (page, next)
 
-              NonEmptyList
-                .fromList(validIds.distinct.grouped(pageSizes.atomBatchSize.value).toList)
-                .fold(Ok()): batches =>
-                  pagedBody(batches)(fetch).flatMap(rows => Ok(encode(rows.map(tsv))))
+              validIds.distinct.grouped(pageSizes.observationBatchSize.value).toList match
+                case Nil     => Ok()
+                case b :: bs => pagedBody(AtomCursor(b, bs, None))(fetch).flatMap(rows => Ok(encode(rows.map(tsv))))
         }.handleErrorWith:
            case _: AccessControlException       => Forbidden()
            case EntityLimiter.EntityTooLarge(_) => PayloadTooLarge(s"Request body exceeds $MaxAtomsRequestBytes bytes")
@@ -290,22 +314,18 @@ object SchedulerRoutes:
         // stamped while paging is returned and the newest time in the response
         // can't pass a change to a row that was already paged.
         def fetch(user: User, until: Timestamp)(cursor: VisibilityCursor): F[(List[VisibilityChange], Option[VisibilityCursor])] =
-          val limit = pageSizes.visibilityPageSize
-
-          // The last row of a full page, from which the next page starts.
-          def lastOfFull[A](page: List[A]): Option[A] =
-            page.lastOption.filter(_ => page.sizeIs >= limit.value)
+          val limit = pageSizes.rowLimit
 
           cursor match
             case VisibilityCursor.Observations(after) =>
               superUserTransaction(user)(visibilityService.selectObservationChanges(since, until, after, limit))
                 .map: page =>
-                  val next = lastOfFull(page).fold(VisibilityCursor.Targets(None))(c => VisibilityCursor.Observations(c.id.some))
+                  val next = lastOfFull(page, limit).fold(VisibilityCursor.Targets(None))(c => VisibilityCursor.Observations(c.id.some))
                   (page, next.some)
             case VisibilityCursor.Targets(after)      =>
               superUserTransaction(user)(visibilityService.selectTargetChanges(since, until, after, limit))
                 .map: page =>
-                  (page, lastOfFull(page).map(c => VisibilityCursor.Targets(c.id.some)))
+                  (page, lastOfFull(page, limit).map(c => VisibilityCursor.Targets(c.id.some)))
 
         ssoClient.require(req) { user =>
           for

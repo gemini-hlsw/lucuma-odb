@@ -217,6 +217,25 @@ class schedulerRoutes extends SchedulerRoutesSuite with ExecutionTestSupportForG
         withRoutes(serviceUser, request, SinglePages)
           .assertUncompressedAtoms(Status.Ok, List(oid0 -> List(a0, a1, a2, a3), oid1 -> List(a0, a1, a2, a3)))
 
+  test("atoms read in pages that split observations"):
+    val setup: IO[(Observation.Id, Observation.Id)] =
+      for
+        p  <- createProgram
+        t  <- createTargetWithProfileAs(pi, p)
+        o0 <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        _  <- runObscalcUpdate(p, o0)
+        o1 <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        _  <- runObscalcUpdate(p, o1)
+      yield (o0, o1)
+
+    // One batch of eight atoms in pages of three: the second page ends one
+    // observation and starts the next, and the last page is short.
+    val pageSizes = SchedulerRoutes.PageSizes(PosInt.unsafeFrom(1000), PosInt.unsafeFrom(3))
+    setup.flatMap: (oid0, oid1) =>
+      atomsRequest(serviceUser, oid0.toString, oid1.toString).flatMap: request =>
+        withRoutes(serviceUser, request, pageSizes)
+          .assertUncompressedAtoms(Status.Ok, List(oid0 -> List(a0, a1, a2, a3), oid1 -> List(a0, a1, a2, a3)))
+
   test("gzip"):
     val setup: IO[Observation.Id] =
       for
