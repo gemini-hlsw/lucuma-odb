@@ -3,11 +3,14 @@
 
 package lucuma.odb.graphql
 
+import cats.Monad
 import cats.Parallel
+import cats.data.NonEmptyList
 import cats.effect.*
 import cats.effect.std.SecureRandom
 import cats.effect.std.UUIDGen
 import cats.implicits.*
+import eu.timepit.refined.types.numeric.PosInt
 import fs2.compression.Compression
 import fs2.compression.DeflateParams
 import lucuma.catalog.clients.GaiaClient
@@ -43,6 +46,7 @@ import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.LoggerFactory
 import org.typelevel.otel4s.trace.Tracer
 import skunk.Session
+import skunk.Transaction
 
 import java.time.Instant
 
@@ -76,20 +80,25 @@ object SchedulerRoutes:
           TelluricTargetsClient.noop[F],
           GoaClient.noop[F]
         )).use(fa),
-      ssoClient
+      ssoClient,
+      PageSizes.Default
     )
 
   // used by tests
   def apply[F[_]: Async](
     services:  Services[F],
-    ssoClient: SsoClient[F, User]
+    ssoClient: SsoClient[F, User],
+    pageSizes: PageSizes = PageSizes.Default
   ): HttpRoutes[F] =
     apply(
       [A] => (_: User) => (fa: Services[F] => F[A]) => fa(services),
-      ssoClient
+      ssoClient,
+      pageSizes
     )
 
-  private def tsv(row: (Observation.Id, Short, AtomDigest)): String =
+  private type AtomRow = (Observation.Id, Short, AtomDigest)
+
+  private def tsv(row: AtomRow): String =
     List(
       Gid[Observation.Id].show(row._1),
       row._2.toString,
@@ -151,9 +160,44 @@ object SchedulerRoutes:
           val suffix = if more > 0 then s" (and $more more)" else ""
           s"Unable to parse observation ids: ${errs.mkString(", ")}$suffix".asLeft
 
+  /**
+   * How much is read per transaction: `atomBatchSize` observations' atom
+   * digests, or `visibilityPageSize` visibility changes.
+   */
+  case class PageSizes(
+    atomBatchSize:      PosInt,
+    visibilityPageSize: PosInt
+  )
+
+  object PageSizes:
+    val Default: PageSizes =
+      PageSizes(PosInt.unsafeFrom(1000), PosInt.unsafeFrom(10000))
+
+  /** Where the next page of visibility changes starts. */
+  private enum VisibilityCursor:
+    case Observations(after: Option[Observation.Id])
+    case Targets(after: Option[Target.Id])
+
+  /**
+   * A response body read one page at a time, each page fetched (and fully
+   * materialized) by `fetch`, which also returns the state for the next page
+   * if there is one.  The first page is fetched before the body is returned,
+   * so a failure there becomes an error response rather than a truncated 200.
+   * A failure on a later page still truncates the body.
+   */
+  private def pagedBody[F[_]: Monad, S, A](
+    init:  S
+  )(fetch: S => F[(List[A], Option[S])]): F[fs2.Stream[F, A]] =
+    fetch(init).map: (first, next) =>
+      fs2.Stream.emits(first) ++
+        fs2.Stream
+          .unfoldEval(next)(_.traverse(fetch))
+          .flatMap(fs2.Stream.emits)
+
   def apply[F[_]: Async](
     services:  [A] => User => (Services[F] => F[A]) => F[A],
-    ssoClient: SsoClient[F, User]
+    ssoClient: SsoClient[F, User],
+    pageSizes: PageSizes
   ): HttpRoutes[F] =
     val dsl = Http4sDsl[F]
     import dsl._
@@ -169,6 +213,14 @@ object SchedulerRoutes:
 
     object SinceMatcher extends QueryParamDecoderMatcher[Timestamp]("since")
 
+    def superUserTransaction[A](user: User)(fa: (Transaction[F], Services[F], Services.ServiceAccess) ?=> F[A]): F[A] =
+      services(user): s =>
+        Services.asSuperUser:
+          s.transactionally(fa)
+
+    def encode(lines: fs2.Stream[F, String]): fs2.Stream[F, Byte] =
+      lines.intersperse("\n").through(fs2.text.utf8.encode)
+
     val routes = HttpRoutes.of[F]:
       case req @ POST -> Root / "scheduler" / "atoms" =>
         // Authenticate before touching the request body so that unauthenticated
@@ -179,34 +231,45 @@ object SchedulerRoutes:
             case Left(msg)      =>
               BadRequest(msg)
             case Right(validIds) =>
-              services(user): s =>
-                Services.asSuperUser:
-                  s.transactionally:
-                    Ok(
-                      sequenceService
-                        .selectAtomDigests(validIds)
-                        .map(tsv)
-                        .intersperse("\n")
-                        .through(fs2.text.utf8.encode)
-                    )
+              // Each batch is read in its own short transaction so that memory
+              // and bind parameters stay bounded however many ids are sent.
+              def fetch(batches: NonEmptyList[List[Observation.Id]]): F[(List[AtomRow], Option[NonEmptyList[List[Observation.Id]]])] =
+                superUserTransaction(user)(sequenceService.selectAtomDigests(batches.head))
+                  .map(rows => (rows, batches.tail.toNel))
+
+              NonEmptyList
+                .fromList(validIds.distinct.grouped(pageSizes.atomBatchSize.value).toList)
+                .fold(Ok()): batches =>
+                  pagedBody(batches)(fetch).flatMap(rows => Ok(encode(rows.map(tsv))))
         }.handleErrorWith:
            case _: AccessControlException       => Forbidden()
            case EntityLimiter.EntityTooLarge(_) => PayloadTooLarge(s"Request body exceeds $MaxAtomsRequestBytes bytes")
            case other                           => other.raiseError[F, Response[F]]
 
       case req @ GET -> Root / "scheduler" / "visibility-changes" :? SinceMatcher(since) =>
+        // All observations first, then all targets, each paged by id.
+        def fetch(user: User)(cursor: VisibilityCursor): F[(List[VisibilityChange], Option[VisibilityCursor])] =
+          val limit = pageSizes.visibilityPageSize
+
+          // The last row of a full page, from which the next page starts.
+          def lastOfFull[A](page: List[A]): Option[A] =
+            page.lastOption.filter(_ => page.sizeIs >= limit.value)
+
+          cursor match
+            case VisibilityCursor.Observations(after) =>
+              superUserTransaction(user)(visibilityService.selectObservationChanges(since, after, limit))
+                .map: page =>
+                  val next = lastOfFull(page).fold(VisibilityCursor.Targets(None))(c => VisibilityCursor.Observations(c.id.some))
+                  (page, next.some)
+            case VisibilityCursor.Targets(after)      =>
+              superUserTransaction(user)(visibilityService.selectTargetChanges(since, after, limit))
+                .map: page =>
+                  (page, lastOfFull(page).map(c => VisibilityCursor.Targets(c.id.some)))
+
         ssoClient.require(req) { user =>
           user.verifyAccess(Access.Service) *>
-          services(user): s =>
-            Services.asSuperUser:
-              s.transactionally:
-                Ok(
-                  visibilityService
-                    .selectVisibilityChanges(since)
-                    .map(visibilityTsv)
-                    .intersperse("\n")
-                    .through(fs2.text.utf8.encode)
-                )
+          pagedBody(VisibilityCursor.Observations(None))(fetch(user))
+            .flatMap(changes => Ok(encode(changes.map(visibilityTsv))))
         }.handleErrorWith:
            case _: AccessControlException => Forbidden()
            case other                     => other.raiseError[F, Response[F]]

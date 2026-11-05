@@ -34,9 +34,13 @@ class visibilityChanges extends SchedulerRoutesSuite with ExecutionTestSupportFo
         headers = hs
       )
 
-  private def fetchVisibilityChanges(user: User, since: Instant): IO[(Status, String)] =
+  private def fetchVisibilityChanges(
+    user:      User,
+    since:     Instant,
+    pageSizes: SchedulerRoutes.PageSizes = SchedulerRoutes.PageSizes.Default
+  ): IO[(Status, String)] =
     visibilityRequest(user, since).flatMap: request =>
-      withRoutes(user, request).flatMap: response =>
+      withRoutes(user, request, pageSizes).flatMap: response =>
         response.as[String].map(response.status -> _)
 
   private def fetchGzip(user: User, since: Instant): IO[(Status, String)] =
@@ -272,6 +276,22 @@ class visibilityChanges extends SchedulerRoutesSuite with ExecutionTestSupportFo
     yield
       assertEquals(st, Status.Ok)
       assert(hasObs(b, o))
+
+  test("reading one row per page returns the same changes in the same order"):
+    for
+      p         <- createProgram
+      t0        <- createTargetWithProfileAs(pi, p)
+      t1        <- createTargetWithProfileAs(pi, p)
+      _         <- createGmosNorthLongSlitObservationAs(pi, p, List(t0))
+      _         <- createGmosNorthLongSlitObservationAs(pi, p, List(t1))
+      _         <- createGmosNorthLongSlitObservationAs(pi, p, List(t0, t1))
+      (s0, all) <- fetchVisibilityChanges(serviceUser, Epoch)
+      (s1, one) <- fetchVisibilityChanges(serviceUser, Epoch, SinglePages)
+    yield
+      assertEquals(s0, Status.Ok)
+      assertEquals(s1, Status.Ok)
+      assert(all.linesIterator.size >= 5)
+      assertEquals(one, all)
 
   test("a gzip-encoded response can be decompressed"):
     for

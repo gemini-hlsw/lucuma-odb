@@ -141,6 +141,24 @@ class schedulerRoutes extends SchedulerRoutesSuite with ExecutionTestSupportForG
       atomsRequest(serviceUser, oid0.toString, oid1.toString).flatMap: request =>
         withRoutes(serviceUser, request).assertUncompressedAtoms(Status.Ok, List(oid0 -> List(a0, a1, a2, a3), oid1 -> List(a0, a1, a2, a3)))
 
+  test("observations read in separate batches"):
+    val setup: IO[(Observation.Id, Observation.Id)] =
+      for
+        p  <- createProgram
+        t  <- createTargetWithProfileAs(pi, p)
+        o0 <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        _  <- runObscalcUpdate(p, o0)
+        o1 <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        _  <- runObscalcUpdate(p, o1)
+      yield (o0, o1)
+
+    // One observation per batch, with an unknown id (an empty batch) between
+    // them and a duplicate that must not be repeated.
+    setup.flatMap: (oid0, oid1) =>
+      atomsRequest(serviceUser, oid0.toString, "o-fffffff", oid1.toString, oid0.toString).flatMap: request =>
+        withRoutes(serviceUser, request, SinglePages)
+          .assertUncompressedAtoms(Status.Ok, List(oid0 -> List(a0, a1, a2, a3), oid1 -> List(a0, a1, a2, a3)))
+
   test("gzip"):
     val setup: IO[Observation.Id] =
       for

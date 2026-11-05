@@ -106,9 +106,14 @@ trait SequenceService[F[_]]:
     digests:       Stream[F, AtomDigest]
   )(using Transaction[F], Services.ServiceAccess): F[Unit]
 
+  /**
+   * Selects the atom digests of the given observations, ordered by observation
+   * and atom index.  The result is fully materialized so that it cannot outlive
+   * the transaction; callers with many observations should query in batches.
+   */
   def selectAtomDigests(
     which: List[Observation.Id]
-  )(using Transaction[F], Services.ServiceAccess): Stream[F, (Observation.Id, Short, AtomDigest)]
+  )(using Transaction[F], Services.ServiceAccess): F[List[(Observation.Id, Short, AtomDigest)]]
 
   def isMaterialized(
     observationId: Observation.Id,
@@ -430,9 +435,9 @@ object SequenceService:
 
       override def selectAtomDigests(
         which: List[Observation.Id]
-      )(using Transaction[F], Services.ServiceAccess): Stream[F, (Observation.Id, Short, AtomDigest)] =
-        if which.isEmpty then Stream.empty
-        else session.stream(Statements.selectAtomDigests(which))(which, 1024)
+      )(using Transaction[F], Services.ServiceAccess): F[List[(Observation.Id, Short, AtomDigest)]] =
+        if which.isEmpty then List.empty.pure[F]
+        else session.execute(Statements.selectAtomDigests(which))(which)
 
       /**
        * Marks ongoing steps as abandoned and deletes any steps that are

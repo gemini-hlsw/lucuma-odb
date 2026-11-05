@@ -6,6 +6,7 @@ package scheduler
 
 import cats.Order.catsKernelOrderingForOrder
 import cats.effect.IO
+import eu.timepit.refined.types.numeric.PosInt
 import cats.syntax.all.*
 import fs2.Stream
 import fs2.compression.Compression
@@ -25,6 +26,10 @@ import scala.jdk.CollectionConverters.*
 
 abstract class SchedulerRoutesSuite extends OdbSuite:
 
+  /** Page sizes of one, so that every row is read in its own transaction. */
+  protected val SinglePages: SchedulerRoutes.PageSizes =
+    SchedulerRoutes.PageSizes(PosInt.unsafeFrom(1), PosInt.unsafeFrom(1))
+
   protected  def responseStream(s: String): Stream[IO, Byte] =
     Stream[IO, String](s).through(text.utf8.encode)
 
@@ -33,10 +38,14 @@ abstract class SchedulerRoutesSuite extends OdbSuite:
     if gzip then headers.map(_.put(`Accept-Encoding`(ContentCoding.gzip)))
     else headers
 
-  protected def withRoutes(user: User, request: Request[IO]): IO[Response[IO]] =
+  protected def withRoutes(
+    user:      User,
+    request:   Request[IO],
+    pageSizes: SchedulerRoutes.PageSizes = SchedulerRoutes.PageSizes.Default
+  ): IO[Response[IO]] =
     withSession: s =>
       servicesFor(user).use: srv =>
-        SchedulerRoutes(srv(s), ssoClient).orNotFound.run(request)
+        SchedulerRoutes(srv(s), ssoClient, pageSizes).orNotFound.run(request)
 
   protected def decompress(resp: Response[IO]): IO[String] =
     resp.body
