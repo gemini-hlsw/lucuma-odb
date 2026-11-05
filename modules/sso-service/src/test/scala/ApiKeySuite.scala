@@ -13,6 +13,7 @@ import lucuma.core.refined.auto.*
 import lucuma.core.util.Gid
 import lucuma.sso.client.ApiKey
 import lucuma.sso.client.SsoJwtClaim
+import lucuma.sso.service.database.RoleRequest
 import org.http4s.Credentials
 import org.http4s.Headers
 import org.http4s.Method
@@ -34,12 +35,12 @@ class ApiKeySuite extends SsoSuite with Fixture {
     SsoSimulator[IO].use { case (db, sim, sso, reader, _) =>
       val stage1  = (SsoRoot / "auth" / "v1" / "stage1").withQueryParam("state", ExploreRoot)
       for {
-    
+
         // Log in as Bob
         redir  <- sso.get(stage1)(_.headers.get[Location].map(_.uri).get.pure[IO])
         stage2 <- sim.authenticate(redir, Bob, None)
         _      <- sso.get(stage2)(CookieReader[IO].getSessionToken) // ensure we have our cookie
-    
+
         // Exchange cookie for JWT
         jwt    <- sso.expect[String](
           Request[IO](
@@ -47,10 +48,10 @@ class ApiKeySuite extends SsoSuite with Fixture {
             uri = SsoRoot / "api" / "v1" / "refresh-token",
           )
         )
-    
+
         // Get the user out of the JWT
         user   <- reader.decodeStandardUser(jwt)
-    
+
         // Create an API Key
         apiKey <- sso.expect[ApiKey](
           Request[IO](
@@ -59,10 +60,10 @@ class ApiKeySuite extends SsoSuite with Fixture {
             headers = Headers(Authorization(Credentials.Token(CIString("Bearer"), jwt))),
           )
         )
-    
+
         // Redeem it (TODO: use API but we need a service user to do it)
         user  <- db.use(_.findStandardUserFromApiKey(apiKey))
-    
+
       } yield assert(user.exists(_.displayName == "Bob Dobbs"))
     } .onError(e => IO(println(e)))
   }
@@ -71,36 +72,38 @@ class ApiKeySuite extends SsoSuite with Fixture {
     SsoSimulator[IO].use { case (db, sim, sso, _, _) =>
       val stage1  = (SsoRoot / "auth" / "v1" / "stage1").withQueryParam("state", ExploreRoot)
       for {
-    
+
         // Log in as Bob
         redir  <- sso.get(stage1)(_.headers.get[Location].map(_.uri).get.pure[IO])
         stage2 <- sim.authenticate(redir, Bob, None)
         tok    <- sso.get(stage2)(CookieReader[IO].getSessionToken)
         user   <- db.use(_.getStandardUserFromToken(tok))
-    
+
         // Create an API Key
         apiKey <- db.use(_.createApiKey(user.role.id))
-    
+
         // Delete it
         _      <- db.use(_.deleteApiKey(apiKey.id, Some(user.id)))
-    
+
         // Try to redeem it, should fail
         user2  <- db.use(_.findStandardUserFromApiKey(apiKey))
-    
+
       } yield assert(user2.isEmpty)
     } .onError(e => IO(println(e)))
   }
 
-  test("Can't create an API key for someone else!") {
-    SsoSimulator[IO].use { case (_, sim, sso, _, _) =>
+  test("Create an API key for another owned role.") {
+    SsoSimulator[IO].use { case (db, sim, sso, _, _) =>
       val stage1  = (SsoRoot / "auth" / "v1" / "stage1").withQueryParam("state", ExploreRoot)
       for {
-    
+
         // Log in as Bob
         redir  <- sso.get(stage1)(_.headers.get[Location].map(_.uri).get.pure[IO])
         stage2 <- sim.authenticate(redir, Bob, None)
-        _      <- sso.get(stage2)(CookieReader[IO].getSessionToken) // ensure we have our cookie
-    
+        tok    <- sso.get(stage2)(CookieReader[IO].getSessionToken)
+        user   <- db.use(_.getStandardUserFromToken(tok))
+        staff  <- db.use(_.canonicalizeRole(user, RoleRequest.Staff))
+
         // Exchange cookie for JWT
         jwt    <- sso.expect[String](
           Request[IO](
@@ -108,7 +111,41 @@ class ApiKeySuite extends SsoSuite with Fixture {
             uri = SsoRoot / "api" / "v1" / "refresh-token",
           )
         )
-    
+
+        // Create an API Key for the staff role, which is not the active one
+        apiKey <- sso.expect[ApiKey](
+          Request[IO](
+            method  = Method.POST,
+            uri     = (SsoRoot / "api" / "v1" / "create-api-key").withQueryParam("role", staff),
+            headers = Headers(Authorization(Credentials.Token(CIString("Bearer"), jwt))),
+          )
+        )
+
+        // Redeem it
+        user2  <- db.use(_.findStandardUserFromApiKey(apiKey))
+
+      } yield assertEq(Some(staff), user2.map(_.role.id))
+    } .onError(e => IO(println(e)))
+  }
+
+  test("Can't create an API key for someone else!") {
+    SsoSimulator[IO].use { case (_, sim, sso, _, _) =>
+      val stage1  = (SsoRoot / "auth" / "v1" / "stage1").withQueryParam("state", ExploreRoot)
+      for {
+
+        // Log in as Bob
+        redir  <- sso.get(stage1)(_.headers.get[Location].map(_.uri).get.pure[IO])
+        stage2 <- sim.authenticate(redir, Bob, None)
+        _      <- sso.get(stage2)(CookieReader[IO].getSessionToken) // ensure we have our cookie
+
+        // Exchange cookie for JWT
+        jwt    <- sso.expect[String](
+          Request[IO](
+            method = Method.POST,
+            uri = SsoRoot / "api" / "v1" / "refresh-token",
+          )
+        )
+
         // Create an API Key
         status <- sso.status(
           Request[IO](
@@ -117,7 +154,7 @@ class ApiKeySuite extends SsoSuite with Fixture {
             headers = Headers(Authorization(Credentials.Token(CIString("Bearer"), jwt))),
           )
         )
-    
+
       } yield assertEq(Status.Forbidden, status)
     } .onError(e => IO(println(e)))
   }
@@ -129,27 +166,27 @@ class ApiKeySuite extends SsoSuite with Fixture {
       val Bearer = CIString("Bearer")
       import reader.entityDecoder
       for {
-    
+
         // Log in as Bob
         redir  <- sso.get(stage1)(_.headers.get[Location].map(_.uri).get.pure[IO])
         stage2 <- sim.authenticate(redir, Bob, None)
         tok    <- sso.get(stage2)(CookieReader[IO].getSessionToken)
         user   <- db.use(_.getStandardUserFromToken(tok))
-    
+
         // Create an API Key
         apiKey <- db.use(_.createApiKey(user.role.id))
-    
+
         // Promote it to a JWT
-    
+
         serviceJwt <- writer.newJwt(ServiceUser(User.Id(1L.refined), "bogus")) // need to call as a service user
-    
+
         jwt <- sso.expect[SsoJwtClaim](
                 Request[IO](
                   uri     = (SsoRoot / "api" / "v1" / "exchange-api-key").withQueryParam("key", apiKey),
                   headers = Headers(Authorization(Credentials.Token(Bearer, serviceJwt)))
                 )
               )
-    
+
       } yield assertEquals(Right(user), jwt.getUser)
     } .onError(e => IO(println(e)))
   }
@@ -158,24 +195,24 @@ class ApiKeySuite extends SsoSuite with Fixture {
     SsoSimulator[IO].use { case (db, sim, sso, _, _) =>
       val stage1  = (SsoRoot / "auth" / "v1" / "stage1").withQueryParam("state", ExploreRoot)
       for {
-    
+
         // Log in as Bob
         redir  <- sso.get(stage1)(_.headers.get[Location].map(_.uri).get.pure[IO])
         stage2 <- sim.authenticate(redir, Bob, None)
         tok    <- sso.get(stage2)(CookieReader[IO].getSessionToken)
         user   <- db.use(_.getStandardUserFromToken(tok))
-    
+
         // Create an API Key
         apiKey <- db.use(_.createApiKey(user.role.id))
-    
+
         // Promote it to a JWT
         status <- sso.status(
                     Request[IO](
                       uri = (SsoRoot / "api" / "v1" / "exchange-api-key").withQueryParam("key", apiKey),
                     )
                   )
-    
-    
+
+
       } yield assertEq(Status.Forbidden, status)
     } .onError(e => IO(println(e)))
   }

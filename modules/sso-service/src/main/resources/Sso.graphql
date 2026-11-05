@@ -48,7 +48,10 @@ type Mutation {
   """
   createApiKey(role: RoleId!): String!
 
-  "Delete the specified API key, if owned by the current user. Returns the constant value `true`."
+  """
+  Delete the specified API key, if owned by the current user. Returns `true` if a key was deleted.
+  The request must be authenticated with a session token, not an API key.
+  """
   deleteApiKey(id: ApiKeyId!): Boolean!
 
   "Add a user role, or look up the role if it already exists. Available only to admin and service users."

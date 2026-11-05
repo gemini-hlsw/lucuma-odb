@@ -113,11 +113,14 @@ object SsoMapping {
                     db.deleteRole(roleId).as(Result.success(true))
 
       def deleteApiKey(env: Env): F[Result[Boolean]] =
-        (env.getR[StandardUser](UserContext.EnvKey), env.getR[PosLong]("id"))
+        (env.getR[StandardUser](UserContext.EnvKey), env.getR[PosLong]("id"), env.getR[Boolean](ApiKeyAuthKey))
           .parTupled
-          .flatTraverse: (user, id) =>
-            pool.map(Database.fromSession(_)).use: db =>
-              db.deleteApiKey(id, Some(user.id)).map(Result.success)
+          .flatTraverse: (user, id, apiKeyAuth) =>
+            if apiKeyAuth then
+              Result.failure("API keys cannot delete API keys. Authenticate with a session token.").pure[F]
+            else
+              pool.map(Database.fromSession(_)).use: db =>
+                db.deleteApiKey(id, Some(user.id)).map(Result.success)
 
       val apiKeyRevocation: Stream[F, Result[String]] =
         channels
@@ -293,9 +296,11 @@ object SsoMapping {
                     Result.fromOption(lucuma.core.model.User.Id.parse(id), s"Not a valid user id: $id"),
                     Result.fromOption(RT.parse(roleType), s"Not a valid role type: $roleType"),
                     pValue match
-                      case EnumValue(name) => Result.fromOption(Partner.values.find(_.tag.equalsIgnoreCase(name)), s"Not a valid partner: $name").map(_.some)
-                      case AbsentValue | NullValue => Result.success(None)
-                      case _ => Result.internalError("Unpossible; validation should disallow these cases.")
+                      case EnumValue(name)                           =>
+                        Result.fromOption(Partner.values.find(_.tag.equalsIgnoreCase(name)), s"Not a valid partner: $name").map(_.some)
+                      case AbsentValue | NullValue                   => Result.success(None)
+                      case _                                         =>
+                        Result.internalError("Unpossible; validation should disallow these cases.")
                   )
                     .parFlatMapN:
                       case (uid, RT.Pi, None)                        => Result.success((uid, RoleRequest.Pi))
