@@ -293,6 +293,30 @@ class visibilityChanges extends SchedulerRoutesSuite with ExecutionTestSupportFo
       assert(all.linesIterator.size >= 5)
       assertEquals(one, all)
 
+  test("a change made while paging is not passed over by the newest time in the response"):
+    for
+      p     <- createProgram
+      t     <- createTargetWithProfileAs(pi, p)
+      o1    <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      o2    <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      o3    <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      since <- obsInvalidation(o1)
+      req   <- visibilityRequest(serviceUser, since)
+      resp  <- withRoutes(serviceUser, req, SinglePages)  // reads only o1's page
+      _     <- observationInvalidation(o1)                 // already paged
+      _     <- observationInvalidation(o3)                 // not yet paged, stamped later
+      body  <- resp.as[String]
+      newest = body.linesIterator.map(line => Instant.parse(line.split("\t")(1))).max
+      (_, next) <- fetchVisibilityChanges(serviceUser, newest)
+      o1Time    <- obsInvalidation(o1)
+    yield
+      assertEquals(resp.status, Status.Ok)
+      assert(hasObs(body, o1))
+      assert(hasObs(body, o2))
+      assert(!hasObs(body, o3), "o3 was stamped after the request started")
+      assertEquals(obsTimestamp(next, o1), Some(o1Time))
+      assert(hasObs(next, o3))
+
   test("a gzip-encoded response can be decompressed"):
     for
       p       <- createProgram

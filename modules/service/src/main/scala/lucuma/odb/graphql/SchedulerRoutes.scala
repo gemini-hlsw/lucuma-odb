@@ -285,8 +285,11 @@ object SchedulerRoutes:
            case other                           => other.raiseError[F, Response[F]]
 
       case req @ GET -> Root / "scheduler" / "visibility-changes" :? SinceMatcher(since) =>
-        // All observations first, then all targets, each paged by id.
-        def fetch(user: User)(cursor: VisibilityCursor): F[(List[VisibilityChange], Option[VisibilityCursor])] =
+        // All observations first, then all targets, each paged by id.  Every
+        // page shares an upper bound fixed when the request starts, so nothing
+        // stamped while paging is returned and the newest time in the response
+        // can't pass a change to a row that was already paged.
+        def fetch(user: User, until: Timestamp)(cursor: VisibilityCursor): F[(List[VisibilityChange], Option[VisibilityCursor])] =
           val limit = pageSizes.visibilityPageSize
 
           // The last row of a full page, from which the next page starts.
@@ -295,19 +298,22 @@ object SchedulerRoutes:
 
           cursor match
             case VisibilityCursor.Observations(after) =>
-              superUserTransaction(user)(visibilityService.selectObservationChanges(since, after, limit))
+              superUserTransaction(user)(visibilityService.selectObservationChanges(since, until, after, limit))
                 .map: page =>
                   val next = lastOfFull(page).fold(VisibilityCursor.Targets(None))(c => VisibilityCursor.Observations(c.id.some))
                   (page, next.some)
             case VisibilityCursor.Targets(after)      =>
-              superUserTransaction(user)(visibilityService.selectTargetChanges(since, after, limit))
+              superUserTransaction(user)(visibilityService.selectTargetChanges(since, until, after, limit))
                 .map: page =>
                   (page, lastOfFull(page).map(c => VisibilityCursor.Targets(c.id.some)))
 
         ssoClient.require(req) { user =>
-          user.verifyAccess(Access.Service) *>
-          pagedBody(VisibilityCursor.Observations(None))(fetch(user))
-            .flatMap(changes => Ok(encode(changes.map(visibilityTsv))))
+          for
+            _       <- user.verifyAccess(Access.Service)
+            until   <- superUserTransaction(user)(timeService.transactionTime)
+            changes <- pagedBody(VisibilityCursor.Observations(None))(fetch(user, until))
+            resp    <- Ok(encode(changes.map(visibilityTsv)))
+          yield resp
         }.handleErrorWith:
            case _: AccessControlException => Forbidden()
            case other                     => other.raiseError[F, Response[F]]
