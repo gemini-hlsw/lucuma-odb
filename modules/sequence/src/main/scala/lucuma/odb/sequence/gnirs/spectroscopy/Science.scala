@@ -41,6 +41,7 @@ import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.syntax.all.*
 import lucuma.odb.sequence.util.AtomBuilder
+import lucuma.odb.sequence.util.DaytimeSmartGcal
 import lucuma.odb.sequence.util.definitionError
 
 import java.util.UUID
@@ -318,20 +319,12 @@ object Science:
     val distinctWavelengths: NonEmptyList[CentralWavelengthConfig] =
       NonEmptyList.fromListUnsafe(config.wavelengths.toList.distinctBy(_.centralWavelength))
 
-    distinctWavelengths
-      .zip(titleSuffixes(distinctWavelengths, config.wavelengths.length > 1))
-      .traverse: (sw, suffix) =>
-        EitherT(expander.expandStep(static, flat(sw)))
-          .map: steps =>
-            ProtoAtom(atomTitle(DaytimePinholeTitle, suffix).some, steps)
-      .bimap(
-        m => definitionError(observationId, m),
-        atoms =>
-          val builder = AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Science)
-          new SequenceGenerator[GnirsDynamicConfig]:
-            def generate: Stream[Pure, Atom[GnirsDynamicConfig]] =
-              builder.buildStream(Stream.emits(atoms.toList))
-      ).value
+    val atoms: NonEmptyList[(NonEmptyString, ProtoStep[GnirsDynamicConfig])] =
+      distinctWavelengths
+        .zip(titleSuffixes(distinctWavelengths, config.wavelengths.length > 1))
+        .map((sw, suffix) => (atomTitle(DaytimePinholeTitle, suffix), flat(sw)))
+
+    DaytimeSmartGcal.sequence(observationId, estimator, static, namespace, expander, atoms)
 
   def instantiate[F[_]: Monad](
     observationId: Observation.Id,
