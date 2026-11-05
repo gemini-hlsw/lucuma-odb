@@ -367,9 +367,18 @@ object ObservationValidationInfo {
     /**
      * Joins `s`, holding `c_workflow_user_state`: for an observation `o` that
      * is a per-observation calibration (a telluric or daytime pinhole flat),
-     * the science observation in its group; otherwise no row.  At most one row
-     * per observation, chosen deterministically should a group hold more than
-     * one science observation.  The roles are `PerObservationCalibrationRoles`,
+     * the science observation in its group; otherwise no row.
+     *
+     * A per-observation calibration group holds a single science observation:
+     * the calibrations service builds the group around it, and observations
+     * can't be moved in or out (`ObservationService`).  Should a group ever
+     * hold more, "the" science observation is the first in group order, the
+     * one `GroupProgressEvaluator` also takes, so the workflow and group
+     * progress agree.  But a calibration shared by several science
+     * observations would need its own rule (it is needed while any of them
+     * needs it, say), and this is the place to define it.
+     *
+     * The roles are `PerObservationCalibrationRoles`,
      * the same ones `effectiveUserState` treats as inheriting.  They are
      * written into the SQL as literals (enum tags, so constants), which keeps
      * the fragment free of parameters for the queries that embed it.
@@ -385,7 +394,7 @@ object ObservationValidationInfo {
             AND  sci.c_calibration_role IS NULL
             AND  sci.c_group_id  = o.c_group_id
             AND  sci.c_existence = 'present'
-          ORDER BY sci.c_observation_id
+          ORDER BY sci.c_group_index
           LIMIT 1
         ) s ON TRUE
       """

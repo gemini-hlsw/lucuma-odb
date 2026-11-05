@@ -302,8 +302,9 @@ object GroupProgressEvaluator:
       facts.getOrElse(oid, ObservationFacts.NotStarted)
 
     // The science observation of a per-observation calibration group is its
-    // one observation that isn't a calibration (as in
-    // `ObservationValidationInfo.Statements.AssociatedScienceObservation`).
+    // one observation that isn't a calibration; should there be more, the
+    // first in group order, matching
+    // `ObservationValidationInfo.Statements.AssociatedScienceObservation`.
     val science: Option[Element] =
       branch.children.collectFirst:
         case GroupTree.Leaf(oid) if leafFacts(oid).calibrationRole.isEmpty =>
