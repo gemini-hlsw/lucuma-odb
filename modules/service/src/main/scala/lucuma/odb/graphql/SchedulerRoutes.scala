@@ -124,6 +124,13 @@ object SchedulerRoutes:
    */
   val MaxAtomsRequestBytes: Long = 1024L * 1024L
 
+  /**
+   * Maximum accepted length of a line in an atoms request.  A valid observation
+   * id is at most 18 characters, so anything longer is rejected without being
+   * accumulated further.
+   */
+  val MaxAtomsRequestLineLength: Int = 64
+
   /** Maximum number of unparseable lines reported back in a BadRequest. */
   val MaxReportedErrors: Int = 5
 
@@ -163,14 +170,15 @@ object SchedulerRoutes:
 
   /**
    * Parses newline-separated observation ids, keeping only a bounded sample of
-   * the invalid lines for the error message.
+   * the invalid lines for the error message.  Fails fast on any line longer
+   * than `MaxAtomsRequestLineLength`.
    */
   private def parseObservationIds[F[_]: Sync](
     body: fs2.Stream[F, Byte]
   ): F[Either[String, List[Observation.Id]]] =
     body
       .through(fs2.text.utf8.decode)
-      .through(fs2.text.lines)
+      .through(fs2.text.linesLimited(MaxAtomsRequestLineLength))
       .filter(_.nonEmpty)
       .compile
       .fold((List.empty[Observation.Id], Vector.empty[String], 0)):
@@ -186,6 +194,9 @@ object SchedulerRoutes:
           val more = errCount - errs.size
           val suffix = if more > 0 then s" (and $more more)" else ""
           s"Unable to parse observation ids: ${errs.mkString(", ")}$suffix".asLeft
+      .recover:
+        case _: fs2.text.LineTooLongException =>
+          s"Unable to parse observation ids: a line exceeds $MaxAtomsRequestLineLength characters".asLeft
 
   /**
    * How much is read per transaction: `atomBatchSize` observations' atom

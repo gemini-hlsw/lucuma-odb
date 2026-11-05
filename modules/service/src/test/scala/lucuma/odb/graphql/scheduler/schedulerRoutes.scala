@@ -7,6 +7,7 @@ package scheduler
 import cats.effect.IO
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegInt
+import fs2.Stream
 import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.GcalLampType
@@ -50,7 +51,7 @@ class schedulerRoutes extends SchedulerRoutesSuite with ExecutionTestSupportForG
       withRoutes(serviceUser, request).assertResponse(Status.Forbidden, none)
 
   test("invalid observation ids, bounded error message"):
-    val long = "x" * 100
+    val long = "x" * 50  // longer than the reported length, within the line limit
     val bad  = List("b1", "b2", "b3", "b4", long, "b6", "b7")
     atomsRequest(serviceUser, ("o-123" :: bad)*).flatMap: request =>
       withRoutes(serviceUser, request).assertResponse(
@@ -68,9 +69,28 @@ class schedulerRoutes extends SchedulerRoutesSuite with ExecutionTestSupportForG
         s"Unable to parse observation ids: a\\u0000b\\u001b[2Jc, x\\u202ey\\\\z, ${"w" * 31}\uD83D\uDE00...".some
       )
 
+  test("line too long"):
+    val tooLong = "o-" + ("f" * (SchedulerRoutes.MaxAtomsRequestLineLength - 1))
+    atomsRequest(serviceUser, "o-123", tooLong).flatMap: request =>
+      withRoutes(serviceUser, request).assertResponse(
+        Status.BadRequest,
+        s"Unable to parse observation ids: a line exceeds ${SchedulerRoutes.MaxAtomsRequestLineLength} characters".some
+      )
+
+  test("line too long across chunks"):
+    // No single chunk is too long, but together they make one long line.
+    val half = "x" * (SchedulerRoutes.MaxAtomsRequestLineLength / 2 + 1)
+    atomsRequest(serviceUser).flatMap: request =>
+      val req = request.withBodyStream(Stream(half, half).through(fs2.text.utf8.encode).chunkLimit(half.length).unchunks)
+      withRoutes(serviceUser, req).assertResponse(
+        Status.BadRequest,
+        s"Unable to parse observation ids: a line exceeds ${SchedulerRoutes.MaxAtomsRequestLineLength} characters".some
+      )
+
   test("request body too large"):
-    val huge = "o" * (SchedulerRoutes.MaxAtomsRequestBytes.toInt + 1)
-    atomsRequest(serviceUser, huge).flatMap: request =>
+    // Many short lines ("o-1\n" is 4 bytes) adding up to more than the limit.
+    val lines = List.fill(SchedulerRoutes.MaxAtomsRequestBytes.toInt / 4 + 1)("o-1")
+    atomsRequest(serviceUser, lines*).flatMap: request =>
       withRoutes(serviceUser, request).map(r => assertEquals(r.status, Status.PayloadTooLarge))
 
   test("unknown observation ids"):
