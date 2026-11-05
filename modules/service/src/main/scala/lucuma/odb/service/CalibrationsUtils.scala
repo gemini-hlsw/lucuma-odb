@@ -193,14 +193,16 @@ object ObsExtract:
   def telluricsForVisit(visitTime: TimeSpan): NonNegInt =
     if visitTime > TelluricTargetsService.MultiTelluricThreshold then 2.refined else 1.refined
 
-  val PerProgramPerConfigCalibrationTypes = List(CalibrationRole.SpectroPhotometric, CalibrationRole.Twilight)
+  /** Roles generated into the per-program "Calibrations" group, one per configuration, in creation order. */
+  val PerProgramPerConfigCalibrationTypes: List[CalibrationRole] =
+    List(CalibrationRole.SpectroPhotometric, CalibrationRole.Twilight)
 
-  // Calibration roles whose observations live in a per-observation calibration
-  // group (the system group attached to a single science observation).  This
-  // set discriminates such a group from the per-program "Calibrations" group,
-  // whose roles (twilight, spectrophotometric) are disjoint from these.  Keep
-  // that disjointness invariant when adding roles.
-  val PerObservationCalibrationRoles = List(CalibrationRole.Telluric, CalibrationRole.DaytimePinhole, CalibrationRole.DaytimeFlat)
+  // Roles generated into the system group attached to a single science
+  // observation.  Disjoint from the per-program roles (CalibrationRolesSuite);
+  // the DB function is_obs_calibration_group hardcodes the same three, and
+  // groupObservationsPerNight checks they agree.
+  val PerObservationCalibrationRoles: List[CalibrationRole] =
+    List(CalibrationRole.Telluric, CalibrationRole.DaytimePinhole, CalibrationRole.DaytimeFlat)
 
   def perObsFilter: PartialFunction[ObsExtract[ObservingMode], ObsExtract[ObservingMode]] =
     case d @ ObsExtract(data = _: Flamingos2Config)    => d

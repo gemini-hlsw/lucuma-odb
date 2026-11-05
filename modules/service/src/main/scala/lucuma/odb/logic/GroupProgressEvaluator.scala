@@ -24,6 +24,7 @@ import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.odb.data.GroupTree
+import lucuma.odb.sequence.isDayCalibration
 import lucuma.odb.service.ObsExtract
 
 /**
@@ -91,15 +92,6 @@ import lucuma.odb.service.ObsExtract
  *     elements remain to make it up.
  */
 object GroupProgressEvaluator:
-
-  /** Calibrations taken in the daytime, which group progress ignores. */
-  val DaytimeCalibrationRoles: Set[CalibrationRole] =
-    Set(
-      CalibrationRole.DaytimeArc,
-      CalibrationRole.DaytimeCalibration,
-      CalibrationRole.DaytimeFlat,
-      CalibrationRole.DaytimePinhole
-    )
 
   /**
    * What the evaluator needs to know about an observation.  `calibrationRole`
@@ -190,7 +182,7 @@ object GroupProgressEvaluator:
     // per-observation calibration is left out or rejected with its science
     // observation, whatever its own QA state.
     val perObs   = leaf.calibrationRole.exists(ObsExtract.PerObservationCalibrationRoles.contains)
-    val daytime  = leaf.calibrationRole.exists(DaytimeCalibrationRoles.contains)
+    val daytime  = leaf.calibrationRole.isDayCalibration
     val excluded = daytime || (if complete then time.isEmpty else leaf.inactive) || (perObs && science.exists(_.excluded))
     val rejected = !excluded && (if perObs then science.exists(_.rejected) else leaf.isRejected)
 
