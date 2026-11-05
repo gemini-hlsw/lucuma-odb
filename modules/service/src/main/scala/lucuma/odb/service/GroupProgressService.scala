@@ -100,7 +100,15 @@ object GroupProgressService:
           s.c_observation_id,
           o.c_workflow_user_state,
           s.c_workflow_user_state,
-          q.c_state,
+          -- The evaluator reads QA only for an observation completed at a
+          -- known time, so the dataset aggregate runs only for those.
+          CASE WHEN t.c_completion_time IS NOT NULL THEN
+            (
+              SELECT q.c_state
+              FROM   v_observation_qa q
+              WHERE  q.c_observation_id = o.c_observation_id
+            )
+          END,
           COALESCE(
             t.c_start_time,
             (
@@ -128,7 +136,6 @@ object GroupProgressService:
           o.c_instrument
         FROM t_observation o
         JOIN v_execution_timestamps t ON t.c_observation_id = o.c_observation_id
-        JOIN v_observation_qa q       ON q.c_observation_id = o.c_observation_id
         ${ObservationValidationInfo.Statements.AssociatedScienceObservation}
         WHERE o.c_observation_id = ANY(${_gid[Observation.Id]})
           AND o.c_existence  = 'present'

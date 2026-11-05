@@ -107,8 +107,10 @@ object GroupProgressEvaluator:
    * calibration, the science observation it goes with, as
    * `ObservationValidationInfo.Statements.AssociatedScienceObservation`
    * associates them.  `inactive` is true when a user has set it inactive (or
-   * declined it, for a telluric).  `qaState` is its QA
-   * state, if assessed (or overridden by staff).  `startTime` is when it
+   * declined it, for a telluric).  `qaState` is its QA state, if assessed (or
+   * overridden by staff); it matters only once the observation is complete
+   * at a known time, and `GroupProgressService` reads it only then.
+   * `startTime` is when it
    * started executing, once it has started.  `completionTime` is when it
    * finished, once it is complete, and is unknown only for an observation
    * declared complete without ever having been observed.  (For a visitor
