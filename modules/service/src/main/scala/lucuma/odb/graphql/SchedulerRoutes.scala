@@ -127,12 +127,39 @@ object SchedulerRoutes:
   /** Maximum number of unparseable lines reported back in a BadRequest. */
   val MaxReportedErrors: Int = 5
 
-  /** Maximum length of each reported unparseable line. */
+  /** Maximum length, in code points, of each reported unparseable line. */
   val MaxReportedErrorLength: Int = 32
 
-  private def truncate(s: String): String =
-    if s.length <= MaxReportedErrorLength then s
-    else s"${s.take(MaxReportedErrorLength)}..."
+  // Character types that are escaped rather than echoed: controls, invisible
+  // formatting (e.g., bidi overrides), lone surrogates, and code points with
+  // no assigned or public meaning.
+  private val UnprintableTypes: Set[Int] =
+    Set(
+      Character.CONTROL,
+      Character.FORMAT,
+      Character.SURROGATE,
+      Character.UNASSIGNED,
+      Character.PRIVATE_USE,
+      Character.LINE_SEPARATOR,
+      Character.PARAGRAPH_SEPARATOR
+    ).map(_.toInt)
+
+  /**
+   * Makes an unparseable input line safe to echo in an error message: keeps at
+   * most `MaxReportedErrorLength` code points (never splitting a surrogate
+   * pair), writes unprintable code points as `\uXXXX` (or `\u{XXXXX}` beyond
+   * the BMP), and doubles backslashes so that the escapes are unambiguous.
+   */
+  private def sanitize(line: String): String =
+    val cps = line.codePoints.limit(MaxReportedErrorLength + 1L).toArray
+    val sb  = new StringBuilder
+    cps.iterator.take(MaxReportedErrorLength).foreach: cp =>
+      if cp === '\\'.toInt then sb.append("\\\\")
+      else if UnprintableTypes.contains(Character.getType(cp)) then
+        sb.append(if cp <= 0xFFFF then f"\\u$cp%04x" else f"\\u{$cp%x}")
+      else sb.appendAll(Character.toChars(cp))
+    if cps.length > MaxReportedErrorLength then sb.append("...")
+    sb.result()
 
   /**
    * Parses newline-separated observation ids, keeping only a bounded sample of
@@ -151,7 +178,7 @@ object SchedulerRoutes:
           Observation.Id.parse(line) match
             case Some(oid) => (oid :: ids, errs, errCount)
             case None      =>
-              val errsʹ = if errs.sizeIs < MaxReportedErrors then errs :+ truncate(line) else errs
+              val errsʹ = if errs.sizeIs < MaxReportedErrors then errs :+ sanitize(line) else errs
               (ids, errsʹ, errCount + 1)
       .map: (ids, errs, errCount) =>
         if errCount === 0 then ids.reverse.asRight
