@@ -127,6 +127,25 @@ object ObservationWorkflowService {
   extension (ws: ObservationWorkflowState) def isUserState: Boolean =
     ws.asUserState.isDefined
 
+  /**
+   * Transitions that only staff may take, from whatever observation offers them:
+   * a visitor observation's Ready <-> Ongoing, and Ongoing <-> Inactive.
+   */
+  val StaffOnlyTransitions: Set[(ObservationWorkflowState, ObservationWorkflowState)] =
+    Set(Ready -> Ongoing, Ongoing -> Ready, Ongoing -> Inactive, Inactive -> Ongoing)
+
+  /**
+   * The transitions of a stored workflow that `user` may take.  Obscalc computes
+   * the stored workflow as the service user, so it includes the staff-only ones.
+   */
+  def visibleTransitions(
+    user:        User,
+    state:       ObservationWorkflowState,
+    transitions: List[ObservationWorkflowState]
+  ): List[ObservationWorkflowState] =
+    if user.role.access >= Access.Staff then transitions
+    else transitions.filterNot(t => StaffOnlyTransitions.contains(state -> t))
+
   extension (es: CoreExecutionState) def workflowExecutionState: Option[ExecutionState] =
     es match
       case CoreExecutionState.Completed        => Completed.some
@@ -221,14 +240,24 @@ object ObservationWorkflowService {
                 case Defined    => Option.unless(hasWarnings)(Ready)
 
         // Our final state is the execution state (if any), else the user state (if any), else the validation state,
+        // except that staff may set an ongoing observation inactive.  A completed one stays completed.
         val state: ObservationWorkflowState =
           (executionState, userStatus(validationStatus)) match
-            case (None, None)     => validationStatus
-            case (None, Some(us)) => us
-            case (Some(es), _)    => es
+            case (None, None)                    => validationStatus
+            case (None, Some(us))                => us
+            case (Some(Ongoing), Some(Inactive)) => Inactive
+            case (Some(es), _)                   => es
+
+        val isStaff: Boolean =
+          user.role.access >= Access.Staff
 
         val canUpdateExecutionState: Boolean =
-          info.isVisitor && user.role.access >= Access.Staff
+          info.isVisitor && isStaff
+
+        // Staff may set an ongoing observation inactive, and set it back.  Not a
+        // per-observation calibration though: those follow their science observation.
+        val canSuspendExecution: Boolean =
+          isStaff && !info.calibrationRole.exists(ObsExtract.PerObservationCalibrationRoles.contains)
 
         val allowedTransitions: List[ObservationWorkflowState] =
           if info.calibrationRole.contains(CalibrationRole.Telluric) && state <= Ready then
@@ -236,13 +265,16 @@ object ObservationWorkflowService {
             state match
               case Inactive =>
                 if info.userState.contains(Inactive)
-                then List(info.associatedUserState.getOrElse(validationStatus))
+                then List(executionState.getOrElse(info.associatedUserState.getOrElse(validationStatus)))
                 else Nil
               case _ =>
                 List(Inactive)
           else if (info.calibrationRole.exists(ObsExtract.PerObservationCalibrationRoles.contains) && state <= Ready) then Nil
           else state match
-            case Inactive   => List(executionState.getOrElse(validationStatus))
+            case Inactive   =>
+              executionState match
+                case None     => List(validationStatus)
+                case Some(es) => Option.when(canSuspendExecution)(es).toList
             case Undefined  => List(Inactive)
             case Unapproved => List(Inactive)
             case Defined    =>
@@ -264,7 +296,7 @@ object ObservationWorkflowService {
                 )(Ready)
 
             case Ready      => List(Inactive, validationStatus) ++ Option.when(canUpdateExecutionState)(Ongoing)
-            case Ongoing    => List(Completed) ++ Option.when(canUpdateExecutionState)(Ready)
+            case Ongoing    => Option.when(canSuspendExecution)(Inactive).toList ++ List(Completed) ++ Option.when(canUpdateExecutionState)(Ready)
             case Completed  => if info.isDeclaredComplete then List(Ongoing) else Nil
 
         (state, allowedTransitions)
@@ -286,14 +318,24 @@ object ObservationWorkflowService {
       override def getWorkflows(
         oids: List[Observation.Id]
       )(using NoTransaction[F], SuperUserAccess): F[Result[Map[Observation.Id, ObservationWorkflow]]] =
-        ResultT(getWorkflowsModesAndRoles(oids))
+        ResultT(getWorkflowsInfosAndExecutionStates(oids))
           .map: m =>
-            m.view.mapValues(p => p._1).toMap
+            m.view.mapValues(_._1).toMap
           .value
 
       override def getWorkflowsModesAndRoles(
         oids: List[Observation.Id]
       )(using NoTransaction[F], SuperUserAccess): F[Result[Map[Observation.Id, (ObservationWorkflow, Option[ObservingModeType], Option[CalibrationRole])]]] =
+        ResultT(getWorkflowsInfosAndExecutionStates(oids))
+          .map: m =>
+            m.view.mapValues((wf, info, _) => (wf, info.flatMap(_.observingMode), info.flatMap(_.calibrationRole))).toMap
+          .value
+
+      // The workflow of each observation, with the information it was computed
+      // from and its execution state, if any.
+      private def getWorkflowsInfosAndExecutionStates(
+        oids: List[Observation.Id]
+      )(using NoTransaction[F], SuperUserAccess): F[Result[Map[Observation.Id, (ObservationWorkflow, Option[ObservationValidationInfo], Option[ExecutionState])]]] =
 
         // The execution digests of science observations (the only ones whose
         // exposure time violations are checked), as obscalc last stored them.
@@ -380,11 +422,7 @@ object ObservationWorkflowService {
           errorFree              = infos.view.filterKeys(oid => errs.get(oid).forall(_.isEmpty)).toMap
           execs                  = executionStates(errorFree)
           workflows              = computeWorkflows(infos, errs, execs)
-          withModes =
-            workflows.map:
-              case (oid, wf) =>
-                oid -> (wf, infos.get(oid).flatMap(_.observingMode), infos.get(oid).flatMap(_.calibrationRole))
-        yield withModes).value
+        yield workflows.map((oid, wf) => oid -> (wf, infos.get(oid), execs.get(oid)))).value
 
       override def getWorkflow(
         oid: Observation.Id
@@ -499,23 +537,28 @@ object ObservationWorkflowService {
 
             ).value
 
-      extension (wf: ObservationWorkflow) def isCompatibleWith(states: Set[ObservationWorkflowState]): Boolean =
-        // An allowed transition from ongoing to completed [via declared completion] shouldn't prevent editing,
-        // even though editing will be disabled if the transition is taken.
-        (wf.state :: wf.validTransitions.filterNot(_ === ObservationWorkflowState.Completed)).forall(states.contains)
+      // An allowed transition from ongoing to completed [via declared completion] shouldn't prevent editing,
+      // even though editing will be disabled if the transition is taken.  The execution state counts too:
+      // an observation that staff set inactive while ongoing is still executing.
+      private def isCompatibleWith(
+        wf:             ObservationWorkflow,
+        executionState: Option[ExecutionState],
+        states:         Set[ObservationWorkflowState]
+      ): Boolean =
+        (wf.state :: executionState.toList ++ wf.validTransitions.filterNot(_ === ObservationWorkflowState.Completed)).forall(states.contains)
 
       override def filterState(
         oids: List[Observation.Id],
         states: Set[ObservationWorkflowState]
       )(using NoTransaction[F], SuperUserAccess): F[Result[List[Observation.Id]]] =
-        getWorkflows(oids)
+        getWorkflowsInfosAndExecutionStates(oids)
           .map: res =>
             res.flatMap: wfs =>
               oids.foldLeft(Result(Nil)): (r, oid) =>
                 wfs.get(oid) match
                   case None => r.withProblems(OdbError.InvalidObservation(oid).asProblemNec)
-                  case Some(wf) =>
-                    if wf.isCompatibleWith(states) then r.map(oid :: _)
+                  case Some((wf, _, exec)) =>
+                    if isCompatibleWith(wf, exec, states) then r.map(oid :: _)
                     else r.withProblems:
                       val prefix = s"Observation $oid is ineligible for this operation due to its workflow state (${wf.state}"
                       val suffix = if wf.validTransitions.isEmpty then ")." else s" with allowed transition to ${wf.validTransitions.mkString("/")})."
@@ -546,7 +589,7 @@ object ObservationWorkflowService {
       )(using NoTransaction[F], SuperUserAccess): F[Result[List[Target.Id]]] =
         getObservationsForTargets(which)
           .flatMap: map =>
-            getWorkflows(map.values.toList.flatten)
+            getWorkflowsInfosAndExecutionStates(map.values.toList.flatten)
               .map: res =>
                 res.flatMap: wfs =>
                   map.toList.foldLeft(Result(Nil)):
@@ -554,7 +597,7 @@ object ObservationWorkflowService {
                       oids.traverse(wfs.get) match
                         case None => Result.internalError("Unpossible: query returned one or more bogus oids")
                         case Some(wfs) =>
-                          if wfs.forall(_.isCompatibleWith(states)) then accum.map(tid :: _)
+                          if wfs.forall((wf, _, exec) => isCompatibleWith(wf, exec, states)) then accum.map(tid :: _)
                           else accum.withProblems:
                             val msg = s"Target $tid is not eligible for this operation due to the workflow state of one or more associated observations."
                             OdbError.InvalidTarget(tid, msg.some)

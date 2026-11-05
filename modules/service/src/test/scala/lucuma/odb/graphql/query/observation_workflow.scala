@@ -1178,6 +1178,23 @@ class observation_workflow
         ).asRight
       )
 
+  test("ongoing (staff)"):
+    createOngoingGmosNorthObservation.flatMap: oid =>
+      expect(
+        staff,
+        workflowQuery(oid),
+        expected = workflowQueryResult(
+          CalculatedValue(
+            CalculationState.Ready,
+            ObservationWorkflow(
+              ObservationWorkflowState.Ongoing,
+              List(ObservationWorkflowState.Inactive, ObservationWorkflowState.Completed),
+              Nil
+            )
+          )
+        ).asRight
+      )
+
   val MissingTargetInvalidInstrumentSetup: IO[Observation.Id] =
     for
       p <- createProgramAs(pi)

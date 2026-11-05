@@ -57,6 +57,23 @@ class setObservationWorkflowState
     ).map: json =>
       json.hcursor.downFields("observation", "workflow", "value", "state").require[ObservationWorkflowState]
 
+  def queryObservationWorkflowTransitionsAs(user: User, oid: Observation.Id): IO[List[ObservationWorkflowState]] =
+    query(
+      user,
+      s"""
+        query {
+          observation(observationId: "$oid") {
+            workflow {
+              value {
+                validTransitions
+              }
+            }
+          }
+        }
+        """
+    ).map: json =>
+      json.hcursor.downFields("observation", "workflow", "value", "validTransitions").require[List[ObservationWorkflowState]]
+
   def testTransition(pid: Program.Id, oid: Observation.Id, state: ObservationWorkflowState): IO[String] =
     testTransitionAs(pi, pid, oid, state)
 
@@ -176,6 +193,51 @@ class setObservationWorkflowState
       _  <- runObscalcUpdate(p, o)
       _  <- assertIO(queryObservationWorkflowState(o), Ongoing)
       _  <- testTransitions(p, o, Ongoing, Completed)
+    yield ()
+
+  def createOngoingObservation: IO[(Program.Id, Observation.Id)] =
+    for
+      p  <- createProgram
+      t  <- createTargetWithProfileAs(pi, p)
+      o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      v  <- recordVisitAs(serviceUser, o)
+      s  <- firstScienceAtomStepIds(serviceUser, o)
+      _  <- s.traverse(sid => addEndStepEvent(sid, v))
+      _  <- runObscalcUpdate(p, o)
+      _  <- assertIO(queryObservationWorkflowState(o), Ongoing)
+    yield (p, o)
+
+  test("[Sidereal]    Ongoing    <-> Inactive, Completed (staff)"):
+    createOngoingObservation.flatMap: (p, o) =>
+      testTransitionsAs(staff, p, o, Ongoing, Inactive, Completed)
+
+  test("[Sidereal]    Inactive   <-> Ongoing, once ongoing (staff only)"):
+    for
+      (p, o) <- createOngoingObservation
+      _      <- setObservationWorkflowState(staff, o, Inactive)
+      _      <- runObscalcUpdate(p, o)
+      _      <- assertIO(queryObservationWorkflowState(o), Inactive)
+      _      <- testTransitionsAs(pi, p, o, Inactive)
+      _      <- testTransitionsAs(staff, p, o, Inactive, Ongoing)
+    yield ()
+
+  test("[Sidereal]    Inactive   ->  Completed when execution finishes"):
+    for
+      p <- createProgram
+      t <- createTargetWithProfileAs(pi, p)
+      o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      v <- recordVisitAs(serviceUser, o)
+      s <- scienceStepIds(serviceUser, o)
+      _ <- addEndStepEvent(s.head, v)
+      _ <- runObscalcUpdate(p, o)
+      _ <- assertIO(queryObservationWorkflowState(o), Ongoing)
+      _ <- setObservationWorkflowState(staff, o, Inactive)
+      _ <- runObscalcUpdate(p, o)
+      _ <- assertIO(queryObservationWorkflowState(o), Inactive)
+      _ <- s.tail.traverse(sid => addEndStepEvent(sid, v))
+      _ <- runObscalcUpdate(p, o)
+      _ <- assertIO(queryObservationWorkflowState(o), Completed)
+      _ <- testTransitionsAs(staff, p, o, Completed)
     yield ()
 
 // (see executionState.scala)
@@ -333,6 +395,27 @@ class setObservationWorkflowState
       _   <- setObservationWorkflowState(staff, oid, Ongoing)
       _   <- runObscalcUpdateAs(serviceUser, pid, oid)
       _   <- assertIO(queryObservationWorkflowState(oid), Ongoing)
+    yield ()
+
+  test("[Visitor]     stored transitions show staff-only ones to staff only"):
+    for
+      cfp <- createGeminiCallForProposalsAs(staff)
+      pid <- createProgramWithNonPartnerPi(pi)
+      _   <- addProposal(pi, pid, Some(cfp), None)
+      _   <- addPartnerSplits(pi, pid)
+      _   <- addCoisAs(pi, pid)
+      tid <- createTargetWithProfileAs(pi, pid)
+      oid <- createObservationWithModeAs(pi, pid, List(tid), visitorMode)
+      _   <- createConfigurationRequestAs(pi, oid).flatMap(setConfigurationRequestStatusAs(staff, _, ConfigurationRequestStatus.Approved))
+      _   <- setProposalStatus(staff, pid, "ACCEPTED")
+      _   <- setObservationWorkflowState(pi, oid, Ready)
+      _   <- runObscalcUpdateAs(serviceUser, pid, oid)
+      _   <- assertIO(queryObservationWorkflowTransitionsAs(pi, oid), List(Inactive, Defined))
+      _   <- assertIO(queryObservationWorkflowTransitionsAs(staff, oid), List(Inactive, Defined, Ongoing))
+      _   <- setObservationWorkflowState(staff, oid, Ongoing)
+      _   <- runObscalcUpdateAs(serviceUser, pid, oid)
+      _   <- assertIO(queryObservationWorkflowTransitionsAs(pi, oid), List(Completed))
+      _   <- assertIO(queryObservationWorkflowTransitionsAs(staff, oid), List(Inactive, Completed, Ready))
     yield ()
 
   test("[Visitor]     Ongoing -> Ready (allowed for staff)"):
