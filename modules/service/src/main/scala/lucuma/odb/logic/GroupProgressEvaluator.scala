@@ -103,8 +103,11 @@ object GroupProgressEvaluator:
 
   /**
    * What the evaluator needs to know about an observation.  `calibrationRole`
-   * is its role, if it is a calibration.  `inactive` is true when a user has
-   * set it inactive (or declined it, for a telluric).  `qaState` is its QA
+   * is its role, if it is a calibration.  `science` is, for a per-observation
+   * calibration, the science observation it goes with, as
+   * `ObservationValidationInfo.Statements.AssociatedScienceObservation`
+   * associates them.  `inactive` is true when a user has set it inactive (or
+   * declined it, for a telluric).  `qaState` is its QA
    * state, if assessed (or overridden by staff).  `startTime` is when it
    * started executing, once it has started.  `completionTime` is when it
    * finished, once it is complete, and is unknown only for an observation
@@ -116,6 +119,7 @@ object GroupProgressEvaluator:
   final case class ObservationFacts(
     executionState:  ExecutionState,
     calibrationRole: Option[CalibrationRole],
+    science:         Option[Observation.Id],
     inactive:        Boolean,
     qaState:         Option[ObservationQaState],
     startTime:       Option[Timestamp],
@@ -138,7 +142,7 @@ object GroupProgressEvaluator:
 
   object ObservationFacts:
     val NotStarted: ObservationFacts =
-      ObservationFacts(ExecutionState.NotStarted, None, false, None, None, None, None)
+      ObservationFacts(ExecutionState.NotStarted, None, None, false, None, None, None, None)
 
   /**
    * Evaluates every group in each of the trees, which should hold no deleted
@@ -173,8 +177,8 @@ object GroupProgressEvaluator:
     def isRemaining: Boolean =
       !complete && !unschedulable
 
-  // `science` is the science observation of the leaf's group, as the group
-  // sees it, which a per-observation calibration goes with.
+  // `science` is the element of the leaf's science observation, which a
+  // per-observation calibration goes with.
   private def leafElement(leaf: ObservationFacts, science: Option[Element]): Element =
     val complete = leaf.isComplete
     val started  = leaf.isStarted
@@ -301,18 +305,13 @@ object GroupProgressEvaluator:
     def leafFacts(oid: Observation.Id): ObservationFacts =
       facts.getOrElse(oid, ObservationFacts.NotStarted)
 
-    // The science observation of a per-observation calibration group is its
-    // one observation that isn't a calibration; should there be more, the
-    // first in group order, matching
-    // `ObservationValidationInfo.Statements.AssociatedScienceObservation`.
-    val science: Option[Element] =
-      branch.children.collectFirst:
-        case GroupTree.Leaf(oid) if leafFacts(oid).calibrationRole.isEmpty =>
-          leafElement(leafFacts(oid), None)
+    def leaf(oid: Observation.Id): Element =
+      val f = leafFacts(oid)
+      leafElement(f, f.science.map(sci => leafElement(leafFacts(sci), None)))
 
     val evaluated: List[(Element, Map[Group.Id, GroupProgress])] =
       branch.children.map:
-        case GroupTree.Leaf(oid) => (leafElement(leafFacts(oid), science), Map.empty)
+        case GroupTree.Leaf(oid) => (leaf(oid), Map.empty)
         case b: GroupTree.Branch => evaluateBranch(b, facts, now)
 
     val nested: Map[Group.Id, GroupProgress] =

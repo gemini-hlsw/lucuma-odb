@@ -58,9 +58,10 @@ class GroupProgressEvaluatorSuite extends FunSuite:
     inactive: Boolean                 = false,
     start:    Option[Timestamp]       = None,
     role:     Option[CalibrationRole] = None,
-    qa:       Option[ObservationQaState] = None
+    qa:       Option[ObservationQaState] = None,
+    science:  Option[Long]            = None
   ): Node =
-    obs(n, ObservationFacts(state, role, inactive, qa, start, time, Some(site)))
+    obs(n, ObservationFacts(state, role, science.map(oid), inactive, qa, start, time, Some(site)))
 
   // A completed observation, by default started and completed at `t`.
   def done(n: Long, t: Timestamp, site: Site = Site.GN, start: Option[Timestamp] = None): Node =
@@ -193,8 +194,8 @@ class GroupProgressEvaluatorSuite extends FunSuite:
   // QA
 
   // A completed observation, started and completed at `t`, with QA state `qa`.
-  def assessed(n: Long, t: Timestamp, qa: ObservationQaState, role: Option[CalibrationRole] = None): Node =
-    leaf(n, ExecutionState.Completed, Some(t), start = Some(t), role = role, qa = Some(qa))
+  def assessed(n: Long, t: Timestamp, qa: ObservationQaState, role: Option[CalibrationRole] = None, science: Option[Long] = None): Node =
+    leaf(n, ExecutionState.Completed, Some(t), start = Some(t), role = role, qa = Some(qa), science = science)
 
   test("a usable completion doesn't count, but the group has started"):
     assertEquals(
@@ -270,27 +271,27 @@ class GroupProgressEvaluatorSuite extends FunSuite:
     assertEquals(eval(g(done(3, t0 +| hours(2))), t0 +| hours(3)), complete(2, 2))
 
   test("a calibration group goes with its rejected science observation"):
-    val telluric = leaf(3, ExecutionState.Completed, Some(t0 +| hours(1)), start = Some(t0 +| hours(1)), role = Some(CalibrationRole.Telluric))
+    val telluric = leaf(3, ExecutionState.Completed, Some(t0 +| hours(1)), start = Some(t0 +| hours(1)), role = Some(CalibrationRole.Telluric), science = Some(2))
     val sub      = branch(2, List(assessed(2, t0, ObservationQaState.Usable), telluric))
     val all      = evalAll(branch(1, List(done(1, t0), sub)), t0 +| hours(2))
     assertEquals(all(gid(2)), unschedulable(0, 2, InsufficientElements))
     assertEquals(all(gid(1)), unschedulable(1, 2, InsufficientElements))
 
   test("a rejected calibration group is left out of a parent with a minimum"):
-    val telluric = leaf(3, ExecutionState.Completed, Some(t0 +| hours(1)), start = Some(t0 +| hours(1)), role = Some(CalibrationRole.Telluric))
+    val telluric = leaf(3, ExecutionState.Completed, Some(t0 +| hours(1)), start = Some(t0 +| hours(1)), role = Some(CalibrationRole.Telluric), science = Some(2))
     val sub      = branch(2, List(assessed(2, t0, ObservationQaState.Usable), telluric))
     val all      = evalAll(branch(1, List(sub, done(1, t0)), min = Some(1), ordered = true), t0 +| hours(2))
     assertEquals(all(gid(1)), complete(1, 1))
 
   test("a calibration group's telluric still to do goes with its rejected science observation"):
-    val telluric = leaf(3, role = Some(CalibrationRole.Telluric))
+    val telluric = leaf(3, role = Some(CalibrationRole.Telluric), science = Some(2))
     val sub      = branch(2, List(assessed(2, t0, ObservationQaState.Fail), telluric))
     val all      = evalAll(branch(1, List(sub, leaf(4)), min = Some(1)), t0 +| hours(1))
     assertEquals(all(gid(2)), unschedulable(0, 2, InsufficientElements))
     assertEquals(all(gid(1)), ongoing(0, 1))
 
   test("a calibration group goes with its science observation declared complete without being observed"):
-    val telluric = leaf(3, role = Some(CalibrationRole.Telluric))
+    val telluric = leaf(3, role = Some(CalibrationRole.Telluric), science = Some(2))
     val sub      = (qa: Option[ObservationQaState]) => branch(2, List(leaf(2, ExecutionState.DeclaredComplete, qa = qa), telluric))
     List(None, Some(ObservationQaState.Fail)).foreach: qa =>
       val all = evalAll(branch(1, List(done(1, t0), sub(qa))), t0 +| hours(1))
@@ -298,15 +299,23 @@ class GroupProgressEvaluatorSuite extends FunSuite:
       assertEquals(all(gid(1)), complete(1, 1), clue(qa))
 
   test("a completed telluric goes with its inactive science observation"):
-    val telluric = leaf(3, ExecutionState.Completed, Some(t0), start = Some(t0), role = Some(CalibrationRole.Telluric))
+    val telluric = leaf(3, ExecutionState.Completed, Some(t0), start = Some(t0), role = Some(CalibrationRole.Telluric), science = Some(2))
     val all      = evalAll(branch(1, List(done(1, t0), branch(2, List(leaf(2, inactive = true), telluric)))), t0 +| hours(1))
     assertEquals(all(gid(2)), GroupProgress.Empty)
     assertEquals(all(gid(1)), complete(1, 1))
 
   test("a telluric's own QA doesn't affect its calibration group"):
-    val telluric = assessed(3, t0 +| hours(1), ObservationQaState.Fail, role = Some(CalibrationRole.Telluric))
+    val telluric = assessed(3, t0 +| hours(1), ObservationQaState.Fail, role = Some(CalibrationRole.Telluric), science = Some(2))
     val sub      = branch(2, List(done(2, t0), telluric))
     assertEquals(eval(sub, t0 +| hours(2)), complete(2, 2))
+
+  test("a calibration goes with its associated science observation, not the first in its group"):
+    // Not something the API allows, but the association, not the group's
+    // order, decides.
+    val telluric = leaf(4, ExecutionState.Completed, Some(t0 +| hours(1)), start = Some(t0 +| hours(1)), role = Some(CalibrationRole.Telluric), science = Some(3))
+    val sub      = branch(2, List(done(2, t0), assessed(3, t0, ObservationQaState.Fail), telluric))
+    assertEquals(eval(branch(1, List(sub), min = Some(1)), t0 +| hours(2)), unschedulable(0, 1, SubgroupUnschedulable))
+    assertEquals(evalAll(sub, t0 +| hours(2))(gid(2)), unschedulable(1, 3, InsufficientElements))
 
   test("an observation declared complete is rejected for its QA like a completed one"):
     val declared = leaf(1, ExecutionState.DeclaredComplete, Some(t0), start = Some(t0), qa = Some(ObservationQaState.Usable))
@@ -735,13 +744,14 @@ class GroupProgressEvaluatorSuite extends FunSuite:
     branch(
       g,
       List(done(n, t)) ++
-      telluric.toList.map(tt => leaf(n + 1, ExecutionState.Completed, Some(tt), start = Some(tt), role = Some(CalibrationRole.Telluric))) :+
+      telluric.toList.map(tt => leaf(n + 1, ExecutionState.Completed, Some(tt), start = Some(tt), role = Some(CalibrationRole.Telluric), science = Some(n))) :+
       leaf(
         n + 2,
         pinhole.fold(ExecutionState.NotStarted)(_ => ExecutionState.Completed),
         pinhole,
-        start = pinhole,
-        role  = Some(CalibrationRole.DaytimePinhole)
+        start   = pinhole,
+        role    = Some(CalibrationRole.DaytimePinhole),
+        science = Some(n)
       )
     )
 
