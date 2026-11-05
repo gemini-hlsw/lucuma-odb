@@ -71,17 +71,19 @@ object GroupProgressService:
       (observation_id                       *:
        execution_state                      *:
        calibration_role.opt                 *:
+       observation_id.opt                   *:
        user_state.opt                       *:
        user_state.opt                       *:
+       observation_qa_state.opt             *:
        core_timestamp.opt                   *:
        core_timestamp.opt                   *:
        lucuma.odb.util.Codecs.site.opt      *:
        instrument.opt
-      ).map: (oid, state, role, own, science, start, completion, visitSite, inst) =>
+      ).map: (oid, state, role, sci, own, science, qa, start, completion, visitSite, inst) =>
         // Inactive as the workflow decides it.
         val inactive = ObservationValidationInfo.effectiveUserState(role, own, science).contains(ObservationWorkflowState.Inactive)
         // Where it was observed, if it has been; otherwise its instrument's site.
-        oid -> ObservationFacts(state, role, inactive, start, completion, visitSite.orElse(inst.map(_.site)))
+        oid -> ObservationFacts(state, role, sci, inactive, qa, start, completion, visitSite.orElse(inst.map(_.site)))
 
     // A visitor instrument visit has only slews, and time accounting charges
     // it until the next visit at the site starts or the night ends (see
@@ -95,8 +97,18 @@ object GroupProgressService:
           o.c_observation_id,
           t.c_execution_state,
           o.c_calibration_role,
+          s.c_observation_id,
           o.c_workflow_user_state,
           s.c_workflow_user_state,
+          -- The evaluator reads QA only for an observation completed at a
+          -- known time, so the dataset aggregate runs only for those.
+          CASE WHEN t.c_completion_time IS NOT NULL THEN
+            (
+              SELECT q.c_state
+              FROM   v_observation_qa q
+              WHERE  q.c_observation_id = o.c_observation_id
+            )
+          END,
           COALESCE(
             t.c_start_time,
             (

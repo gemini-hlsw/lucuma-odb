@@ -14,6 +14,7 @@ import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ExecutionState
 import lucuma.core.enums.GroupConstraintViolation
 import lucuma.core.enums.GroupStatus
+import lucuma.core.enums.ObservationQaState
 import lucuma.core.enums.Site
 import lucuma.core.model.Group
 import lucuma.core.model.LocalObservingNight
@@ -23,6 +24,7 @@ import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.odb.data.GroupTree
+import lucuma.odb.service.ObsExtract
 
 /**
  * Evaluates the progress of groups toward satisfying their constraints.
@@ -36,9 +38,24 @@ import lucuma.odb.data.GroupTree
  *     Daytime calibrations may be taken the following day, on another
  *     observing night, so a per-observation calibration group is just its
  *     science observation and any tellurics, all taken at night.
+ *   - A complete observation whose QA state is usable or fail is rejected:
+ *     its data isn't good enough, and it can't be observed again, so it never
+ *     counts as complete and isn't checked against its group's constraints.
+ *     One not yet assessed counts.  The calibrations in a per-observation
+ *     calibration group go with their science observation, whatever their own
+ *     QA states: they are left out when it is, and rejected when it is.  A
+ *     subgroup with only rejected elements is itself rejected.
  *   - A group requires `minRequired` elements, or all of them when unset.
  *     An ordered group requires the first ones, in order.  A subgroup counts
  *     as one element, complete when its own status is complete.
+ *   - "All of them" includes the rejected ones, so a group with no minimum
+ *     and a rejected element can't complete: it is unschedulable until a
+ *     minimum is set, which lets a replacement (a new observation) take the
+ *     rejected one's place.  With a minimum, rejected elements are just left
+ *     out.  A rejection can still break the group's time constraints, or the
+ *     order of an ordered group whose later elements are already complete,
+ *     since the completions left are checked without it, and a replacement
+ *     observed later can't undo that.
  *   - Only the elements that count toward the group are checked.  An ordered
  *     group's elements after the first `minRequired` never count.  An
  *     unordered group counts all of its elements until enough are complete,
@@ -86,8 +103,14 @@ object GroupProgressEvaluator:
 
   /**
    * What the evaluator needs to know about an observation.  `calibrationRole`
-   * is its role, if it is a calibration.  `inactive` is true when a user has
-   * set it inactive (or declined it, for a telluric).  `startTime` is when it
+   * is its role, if it is a calibration.  `science` is, for a per-observation
+   * calibration, the science observation it goes with, as
+   * `ObservationValidationInfo.Statements.AssociatedScienceObservation`
+   * associates them.  `inactive` is true when a user has set it inactive (or
+   * declined it, for a telluric).  `qaState` is its QA state, if assessed (or
+   * overridden by staff); it matters only once the observation is complete
+   * at a known time, and `GroupProgressService` reads it only then.
+   * `startTime` is when it
    * started executing, once it has started.  `completionTime` is when it
    * finished, once it is complete, and is unknown only for an observation
    * declared complete without ever having been observed.  (For a visitor
@@ -98,15 +121,30 @@ object GroupProgressEvaluator:
   final case class ObservationFacts(
     executionState:  ExecutionState,
     calibrationRole: Option[CalibrationRole],
+    science:         Option[Observation.Id],
     inactive:        Boolean,
+    qaState:         Option[ObservationQaState],
     startTime:       Option[Timestamp],
     completionTime:  Option[Timestamp],
     site:            Option[Site]
-  )
+  ):
+    def isStarted: Boolean =
+      executionState match
+        case ExecutionState.NotDefined | ExecutionState.NotStarted => false
+        case _                                                     => true
+
+    def isComplete: Boolean =
+      executionState match
+        case ExecutionState.Completed | ExecutionState.DeclaredComplete => true
+        case _                                                          => false
+
+    // Complete, but with data that isn't good enough.
+    def isRejected: Boolean =
+      isComplete && qaState.exists(_ =!= ObservationQaState.Pass)
 
   object ObservationFacts:
     val NotStarted: ObservationFacts =
-      ObservationFacts(ExecutionState.NotStarted, None, false, None, None, None)
+      ObservationFacts(ExecutionState.NotStarted, None, None, false, None, None, None, None)
 
   /**
    * Evaluates every group in each of the trees, which should hold no deleted
@@ -121,11 +159,13 @@ object GroupProgressEvaluator:
 
   // A group element as its parent sees it: an observation, or a subgroup
   // summarized.  `excluded` elements are left out of the group entirely.
-  // `completion` is when it completed, once it has.  `nights` are the nights
+  // `rejected` ones never count, but a group with no minimum still requires
+  // them.  `completion` is when it completed, once it has.  `nights` are the nights
   // of the completions it counts, and `sites` the sites of the observations
   // it holds.
   private final case class Element(
     excluded:      Boolean,
+    rejected:      Boolean,
     completion:    Option[Timestamp],
     unschedulable: Boolean,
     started:       Boolean,
@@ -139,22 +179,24 @@ object GroupProgressEvaluator:
     def isRemaining: Boolean =
       !complete && !unschedulable
 
-  private def leafElement(leaf: ObservationFacts): Element =
-    import ExecutionState.*
-    val complete = leaf.executionState match
-      case Completed | DeclaredComplete => true
-      case _                            => false
-    val started  = leaf.executionState match
-      case NotDefined | NotStarted => false
-      case _                       => true
+  // `science` is the element of the leaf's science observation, which a
+  // per-observation calibration goes with.
+  private def leafElement(leaf: ObservationFacts, science: Option[Element]): Element =
+    val complete = leaf.isComplete
+    val started  = leaf.isStarted
     val time     = Option.when(complete)(leaf.completionTime).flatten
     // Left out when a daytime calibration, inactive and incomplete, or
-    // complete with no known time.
+    // complete with no known time.  Otherwise rejected, if it is.  A
+    // per-observation calibration is left out or rejected with its science
+    // observation, whatever its own QA state.
+    val perObs   = leaf.calibrationRole.exists(ObsExtract.PerObservationCalibrationRoles.contains)
     val daytime  = leaf.calibrationRole.exists(DaytimeCalibrationRoles.contains)
-    val excluded = daytime || (if complete then time.isEmpty else leaf.inactive)
+    val excluded = daytime || (if complete then time.isEmpty else leaf.inactive) || (perObs && science.exists(_.excluded))
+    val rejected = !excluded && (if perObs then science.exists(_.rejected) else leaf.isRejected)
 
     Element(
       excluded      = excluded,
+      rejected      = rejected,
       completion    = time,
       unschedulable = false,
       started       = started,
@@ -262,9 +304,16 @@ object GroupProgressEvaluator:
     now:    Timestamp
   ): (Element, Map[Group.Id, GroupProgress]) =
 
+    def leafFacts(oid: Observation.Id): ObservationFacts =
+      facts.getOrElse(oid, ObservationFacts.NotStarted)
+
+    def leaf(oid: Observation.Id): Element =
+      val f = leafFacts(oid)
+      leafElement(f, f.science.map(sci => leafElement(leafFacts(sci), None)))
+
     val evaluated: List[(Element, Map[Group.Id, GroupProgress])] =
       branch.children.map:
-        case GroupTree.Leaf(oid) => (leafElement(facts.getOrElse(oid, ObservationFacts.NotStarted)), Map.empty)
+        case GroupTree.Leaf(oid) => (leaf(oid), Map.empty)
         case b: GroupTree.Branch => evaluateBranch(b, facts, now)
 
     val nested: Map[Group.Id, GroupProgress] =
@@ -282,6 +331,7 @@ object GroupProgressEvaluator:
   private val EmptyElement: Element =
     Element(
       excluded      = true,
+      rejected      = false,
       completion    = None,
       unschedulable = false,
       started       = false,
@@ -290,18 +340,25 @@ object GroupProgressEvaluator:
       sites         = Set.empty
     )
 
+  // `all` are the elements that aren't left out, rejected ones included.
   private def evaluateElements(
     branch: GroupTree.Branch,
-    viable: NonEmptyList[Element],
+    all:    NonEmptyList[Element],
     now:    Timestamp
   ): (GroupProgress, Element) =
+
+    // The elements that may yet count.
+    val viable: List[Element] =
+      all.filterNot(_.rejected)
 
     val minInterval = branch.minInterval.filterNot(_.isZero)
     val maxInterval = branch.maxInterval.filterNot(_.isZero)
     // The minimum, or all of the elements when it is unset (or zero, which the
-    // database forbids and would mean unset).  Either way, at least one.
+    // database forbids and would mean unset), rejected ones included, so that
+    // a group with no minimum can't complete without them.  Either way, at
+    // least one.
     val required: PosInt =
-      branch.minRequired.flatMap(n => PosInt.from(n.value.toInt).toOption).getOrElse(PosInt.unsafeFrom(viable.length))
+      branch.minRequired.flatMap(n => PosInt.from(n.value.toInt).toOption).getOrElse(PosInt.unsafeFrom(all.length))
 
     // The elements that count toward the group, which everything below
     // considers.  An ordered group requires its first `required` elements, so
@@ -309,10 +366,10 @@ object GroupProgressEvaluator:
     // enough are complete, and then only the earliest completions that met
     // the minimum.
     val elements: List[Element] =
-      if branch.ordered then viable.toList.take(required.value)
+      if branch.ordered then viable.take(required.value)
       else
         val done = viable.filter(_.complete)
-        if done.size < required.value then viable.toList
+        if done.size < required.value then viable
         else done.sortBy(_.completion).take(required.value)
 
     // The completions, in order.
@@ -369,8 +426,11 @@ object GroupProgressEvaluator:
     val nextStart: Option[Timestamp] =
       timed.lastOption.map(t => minInterval.fold(t)(t +| _))
 
+    // Anything in the group that has started executing, whether or not it
+    // counts: a rejected element, or one past an ordered group's first
+    // `required`.  (A rejected element is complete, so it has started.)
     val started: Boolean =
-      elements.exists(_.started)
+      all.exists(_.started)
 
     // Observations per night, for a group with either limit.
     val perNight: Option[ObservationsPerNight] =
@@ -378,7 +438,7 @@ object GroupProgressEvaluator:
         ObservationsPerNight(
           min         = branch.minObsPerNight.fold(1)(_.value.toInt),
           max         = branch.maxObsPerNight.map(_.value.toInt),
-          viable      = viable.toList,
+          viable      = viable,
           completions = completions,
           sites       = sites,
           countMet    = countMet,
@@ -453,9 +513,11 @@ object GroupProgressEvaluator:
 
     // Its start, nights and sites, for its parent, are those of the elements
     // that counted, and it completed with the last of the completions that
-    // counted.  (Complete, it has at least one.)
+    // counted.  (Complete, it has at least one.)  With only rejected elements,
+    // it is rejected itself.
     val element = Element(
       excluded      = false,
+      rejected      = viable.isEmpty,
       completion    = Option.when(status === GroupStatus.Complete)(timed.lastOption).flatten,
       unschedulable = status === GroupStatus.Unschedulable,
       started       = started,

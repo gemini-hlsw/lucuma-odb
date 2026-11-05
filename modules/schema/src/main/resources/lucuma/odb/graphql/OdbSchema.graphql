@@ -15989,7 +15989,8 @@ enum GroupStatus {
   """
   The group has nothing to observe: no elements, or only inactive observations,
   observations declared complete without ever having been observed, daytime
-  calibrations, and empty subgroups.  Its parent group leaves it out.  (Group
+  calibrations, the calibrations of a science observation left out, and empty
+  subgroups.  Its parent group leaves it out.  (Group
   progress ignores daytime calibrations, which may be taken the following day.)
   """
   EMPTY
@@ -16056,7 +16057,12 @@ enum GroupConstraintViolation {
   """
   OBSERVATIONS_PER_NIGHT_MULTIPLE_SITES
 
-  "Too few viable (non-inactive) elements remain to reach the minimum."
+  """
+  Too few elements remain to complete the group: fewer than its minimum are
+  viable (not inactive, nor rejected for their QA state), or, in a group with no
+  minimum, which requires all of its elements, one has been rejected.  Setting a
+  minimum lets a replacement observation take a rejected one's place.
+  """
   INSUFFICIENT_ELEMENTS
 
   "A subgroup that the group needs can no longer be completed."
@@ -16099,6 +16105,23 @@ completes where its charge ends, as in its visits'
 `timeChargeInvoice.interval`.  The charge end is recorded some time after the
 fact (the charge runs until the next chargeable visit at the site starts or the
 night ends), and until then the observation completes at its slew.
+
+A complete observation whose QA state (see `ObservationQa.state`) is `USABLE`
+or `FAIL` is rejected: it never counts as complete, and it isn't checked
+against the group's constraints.  One not yet assessed counts, including one
+with some datasets still unassessed: until a person settles its QA state, an
+observation is assumed to be good, so that group progress never sends the
+scheduler back into a group without a QA decision.  The calibrations in a
+per-observation calibration group go with their science observation: they are
+left out when it is, and rejected when it is.  A subgroup with only rejected
+elements is itself rejected.  A group with no `minimumRequired` requires all of
+its elements, rejected ones included, so it is `UNSCHEDULABLE` until a minimum
+is set.  With a minimum, rejected elements are left out, and a replacement (a
+new observation) may take a rejected one's place.  A rejection can still break
+the group's time constraints (its intervals, same night, or observations per
+night), or the order of an ordered group whose later elements are already
+complete, since the completions left are checked without it, and a replacement
+observed later can't undo that.
 """
 type GroupProgress {
   status: GroupStatus!
@@ -16114,8 +16137,9 @@ type GroupProgress {
   completed: NonNegInt!
 
   """
-  The number of elements the group requires: its `minimumRequired`, or every
-  viable (non-inactive) element when that is unset.  Zero only when empty.
+  The number of elements the group requires: its `minimumRequired`, or, when
+  that is unset, every element that isn't left out (see `GroupStatus.EMPTY`),
+  rejected ones included.  Zero only when empty.
   """
   required: NonNegInt!
 

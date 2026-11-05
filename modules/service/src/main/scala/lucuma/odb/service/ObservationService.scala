@@ -309,6 +309,15 @@ object ObservationService {
               s"Target of Opportunity activation ${a.tag.toScreamingSnakeCase} fixes the scheduling mode at UNINTERRUPTIBLE; it cannot be ${mode.tag.toScreamingSnakeCase}.".some
             ).asFailure
 
+      // A per-observation calibration group holds exactly one science
+      // observation, which its calibrations follow (see
+      // `ObservationValidationInfo.Statements.AssociatedScienceObservation`).
+      // Only the calibrations service adds to it, so callers can't.
+      private def forbidObsCalibrationGroupDestination(gid: Group.Id): F[Result[Unit]] =
+        session.option(Statements.SelectIsObsCalibrationGroup)((gid, ObsExtract.PerObservationCalibrationRoles)).map:
+          case Some(true) => OdbError.InvalidArgument(s"Observations cannot be added to calibration group $gid.".some).asFailure
+          case _          => Result.unit
+
       /** Create the observation itself, with no asterism. */
       private def createObservationImpl(
         programId: Program.Id,
@@ -436,6 +445,9 @@ object ObservationService {
 
           ResultT(guidingCheck.pure[F])
             .flatMap(_ => SET.group.traverse_(gid => ResultT(groupService.checkGroupInProgram(pid, gid))))
+            // The calibrations service creates the calibrations in a
+            // per-observation calibration group, and nothing else goes in.
+            .flatMap(_ => SET.group.filter(_ => calibrationRole.isEmpty).traverse_(gid => ResultT(forbidObsCalibrationGroupDestination(gid))))
             .flatMap(_ => ResultT(Services.asSuperUser(createObservationImpl(pid, SET, calibrationRole))))
             .flatMap: oid =>
               SET
@@ -669,6 +681,12 @@ object ObservationService {
                           s"Observations ${ids.map(_.show).mkString(", ")} cannot be moved out of their system group; move the group instead.".some
                         ).asFailure
 
+            // Nor into a per-observation calibration group.
+            val forbidObsCalibrationGroupEntry: ResultT[F, Unit] =
+              SET.group.toOption
+                .filter(_ => user.role.access =!= Access.Service)
+                .traverse_(gid => ResultT(forbidObsCalibrationGroupDestination(gid)))
+
             // On a group change, the destination group must be in the same program.
             val checkSameProgram: ResultT[F, Unit] =
               SET.group.toOption.fold(ResultT.unit): dest =>
@@ -763,6 +781,7 @@ object ObservationService {
             (for {
               _ <- validateAltairConfiguration
               _ <- forbidSystemGroupMove
+              _ <- forbidObsCalibrationGroupEntry
               _ <- checkSameProgram
 
               // Ahead of the update, unlike the ceiling check below it.  A CHECK
@@ -1639,6 +1658,14 @@ object ObservationService {
         JOIN   t_group       g ON o.c_group_id = g.c_group_id
         WHERE  g.c_system = true
           AND  o.c_observation_id IN (""" |+| which |+| void")"
+
+    // Whether the group is a per-observation calibration group.
+    val SelectIsObsCalibrationGroup: Query[(Group.Id, List[CalibrationRole]), Boolean] =
+      sql"""
+        SELECT c_system AND c_calibration_roles && $_calibration_role
+        FROM   t_group
+        WHERE  c_group_id = $group_id
+      """.query(bool).contramap(_.swap)
 
     // Brute force statements to delete a calibration observations
     def linkedTargets(oids: NonEmptyList[Observation.Id]): Query[List[Observation.Id], Target.Id] =

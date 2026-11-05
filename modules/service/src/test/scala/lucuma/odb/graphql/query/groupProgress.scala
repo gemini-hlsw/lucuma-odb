@@ -12,12 +12,14 @@ import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.ObservationQaState
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.SlewStage
 import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.syntax.string.*
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
@@ -26,7 +28,7 @@ import lucuma.odb.graphql.ACursorOps
 import lucuma.odb.util.Codecs.observation_id
 import skunk.syntax.all.*
 
-// The rules are tested in lucuma-core (GroupProgressEvaluatorSuite).  These
+// The rules are tested in lucuma.odb.logic.GroupProgressEvaluatorSuite.  These
 // tests check that the facts reach the evaluator and the result reaches the API.
 class groupProgress extends ExecutionTestSupportForGmos:
 
@@ -174,6 +176,77 @@ class groupProgress extends ExecutionTestSupportForGmos:
       js <- progress(g)
     yield
       assertEquals(js.hcursor.downField("status").require[String], "COMPLETE")
+
+  def setQaOverride(oid: Observation.Id, qa: ObservationQaState): IO[Unit] =
+    query(
+      staff,
+      s"""
+        mutation {
+          updateObservations(input: {
+            SET: { qaStateOverride: ${qa.tag.toScreamingSnakeCase} }
+            WHERE: { id: { EQ: "$oid" } }
+          }) {
+            observations { id }
+          }
+        }
+      """
+    ).void
+
+  test("a completion whose QA is usable doesn't count"):
+    for
+      p  <- createProgram
+      o1 <- newObservation(p)
+      o2 <- newObservation(p)
+      g  <- group(p, List(o1, o2), min = Some(1))
+      _  <- completeObservation(o1)
+      _  <- setQaOverride(o1, ObservationQaState.Usable)
+      js <- progress(g)
+    yield assertEquals(
+      js,
+      json"""
+        {
+          "status": "ONGOING",
+          "completed": 0,
+          "required": 1,
+          "nextWindow": null,
+          "violations": []
+        }
+      """
+    )
+
+  test("a completion whose QA passes counts"):
+    for
+      p  <- createProgram
+      o1 <- newObservation(p)
+      o2 <- newObservation(p)
+      g  <- group(p, List(o1, o2), min = Some(1))
+      _  <- completeObservation(o1)
+      _  <- setQaOverride(o1, ObservationQaState.Pass)
+      js <- progress(g)
+    yield assertEquals(js.hcursor.downField("status").require[String], "COMPLETE")
+
+  test("unschedulable: a failed completion in a group with no minimum is still required"):
+    for
+      p  <- createProgram
+      o1 <- newObservation(p)
+      o2 <- newObservation(p)
+      g  <- group(p, List(o1, o2))
+      _  <- completeObservation(o1)
+      _  <- completeObservation(o2)
+      _  <- setQaOverride(o2, ObservationQaState.Fail)
+      js <- progress(g)
+    yield assertEquals(
+      js,
+      json"""
+        {
+          "status": "UNSCHEDULABLE",
+          "completed": 1,
+          "required": 2,
+          "nextWindow": null,
+          "violations": ["INSUFFICIENT_ELEMENTS"]
+        }
+      """
+    )
 
   test("unschedulable: an inactive observation leaves too few to reach the minimum"):
     for
