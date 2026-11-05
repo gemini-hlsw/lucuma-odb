@@ -8,6 +8,7 @@ import cats.implicits.*
 import eu.timepit.refined.numeric.Positive
 import lucuma.core.model.ServiceUser
 import lucuma.core.model.StandardRole
+import lucuma.core.model.StandardUser
 import lucuma.core.model.User
 import lucuma.core.refined.auto.*
 import lucuma.core.util.Gid
@@ -188,6 +189,42 @@ class ApiKeySuite extends SsoSuite with Fixture {
               )
 
       } yield assertEquals(Right(user), jwt.getUser)
+    } .onError(e => IO(println(e)))
+  }
+
+  test("A promoted API key carries only its own role.") {
+    SsoSimulator[IO].use { case (db, sim, sso, reader, writer) =>
+      val stage1  = (SsoRoot / "auth" / "v1" / "stage1").withQueryParam("state", ExploreRoot)
+      val Bearer = CIString("Bearer")
+      import reader.entityDecoder
+      for {
+
+        // Log in as Bob, who also holds a staff role
+        redir  <- sso.get(stage1)(_.headers.get[Location].map(_.uri).get.pure[IO])
+        stage2 <- sim.authenticate(redir, Bob, None)
+        tok    <- sso.get(stage2)(CookieReader[IO].getSessionToken)
+        user   <- db.use(_.getStandardUserFromToken(tok))
+        _      <- db.use(_.canonicalizeRole(user, RoleRequest.Staff))
+
+        // Create an API Key for the active (PI) role
+        apiKey <- db.use(_.createApiKey(user.role.id))
+
+        // Promote it to a JWT
+        serviceJwt <- writer.newJwt(ServiceUser(User.Id(1L.refined), "bogus"))
+        jwt <- sso.expect[SsoJwtClaim](
+                Request[IO](
+                  uri     = (SsoRoot / "api" / "v1" / "exchange-api-key").withQueryParam("key", apiKey),
+                  headers = Headers(Authorization(Credentials.Token(Bearer, serviceJwt)))
+                )
+              )
+
+      } yield jwt.getUser match {
+        case Right(promoted: StandardUser) =>
+          assertEq(user.role.id, promoted.role.id)
+          assert(promoted.otherRoles.isEmpty, promoted.otherRoles)
+        case other =>
+          fail(s"Expected a standard user, got $other")
+      }
     } .onError(e => IO(println(e)))
   }
 

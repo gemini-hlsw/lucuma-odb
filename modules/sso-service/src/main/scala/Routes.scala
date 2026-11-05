@@ -146,7 +146,8 @@ object Routes {
               case Some(u) =>
                 traceUser(u, "lucuma.apikey") *>
                 Logger[F].info(s"API key ${apiKey.id} for ${u.displayName} (${u.id}) exchanged by ${su.displayName}.") *>
-                jwtWriter.newJwt(u, Some(3.hours)).flatMap(Ok(_))
+                // An API key stands for one role, so its JWT must not carry the user's other roles.
+                jwtWriter.newJwt(u.copy(otherRoles = Nil), Some(3.hours)).flatMap(Ok(_))
             }
         }
 

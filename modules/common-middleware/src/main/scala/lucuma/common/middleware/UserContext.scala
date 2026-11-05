@@ -11,6 +11,7 @@ import lucuma.common.middleware.UserAttributes.given
 import lucuma.core.model.User
 import lucuma.graphql.routes.Auth
 import lucuma.graphql.routes.Authenticator
+import lucuma.graphql.routes.RequestContext
 import lucuma.sso.client.SsoClient
 import org.typelevel.otel4s.Attributes
 
@@ -30,9 +31,20 @@ object UserContext:
 
   /** Authenticates each request with `client`, and runs `onUser` for each user it resolves. */
   def authenticator[F[_]: Monad, U <: User](client: SsoClient[F, U], onUser: U => F[Unit]): Authenticator[F] =
+    authenticator(client, onUser, u => RequestContext(env(u), Attributes.from(u: User)))
+
+  /**
+   * Authenticates each request with `client`, which may resolve more than a user, runs `onUser`
+   * for each value it resolves, and builds the request context from that value with `context`.
+   */
+  def authenticator[F[_]: Monad, A](
+    client:  SsoClient[F, A],
+    onUser:  A => F[Unit],
+    context: A => RequestContext
+  ): Authenticator[F] =
     Authenticator:
       case None    => Auth.Anonymous.pure[F]
       case Some(a) =>
         EitherT(client.get(a))
           .semiflatTap(onUser)
-          .fold(Auth.Denied(_), u => Auth(env(u), Attributes.from(u: User)))
+          .fold(Auth.Denied(_), a => Auth.Authenticated(context(a)))
