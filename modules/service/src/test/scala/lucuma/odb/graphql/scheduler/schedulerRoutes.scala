@@ -22,6 +22,7 @@ import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
 import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
 import org.http4s.*
+import org.http4s.implicits.*
 
 class schedulerRoutes extends SchedulerRoutesSuite with ExecutionTestSupportForGmos:
 
@@ -49,6 +50,18 @@ class schedulerRoutes extends SchedulerRoutesSuite with ExecutionTestSupportForG
     // Authorization is checked before the body is parsed.
     atomsRequest(pi, "foo", "bar").flatMap: request =>
       withRoutes(serviceUser, request).assertResponse(Status.Forbidden, none)
+
+  // A body that fails the test if anything reads it.
+  private val unreadableBody: Stream[IO, Byte] =
+    Stream.raiseError[IO](new RuntimeException("request body was read"))
+
+  test("no authorization header, body not read"):
+    val request = Request[IO](method = Method.POST, uri = uri"scheduler/atoms").withBodyStream(unreadableBody)
+    withRoutes(serviceUser, request).assertResponse(Status.Forbidden, "Access denied".some)
+
+  test("not service user, body not read"):
+    atomsRequest(pi).flatMap: request =>
+      withRoutes(serviceUser, request.withBodyStream(unreadableBody)).assertResponse(Status.Forbidden, none)
 
   test("invalid observation ids, bounded error message"):
     val long = "x" * 50  // longer than the reported length, within the line limit
