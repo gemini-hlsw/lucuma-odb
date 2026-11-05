@@ -100,11 +100,26 @@ class schedulerRoutes extends SchedulerRoutesSuite with ExecutionTestSupportForG
         s"Unable to parse observation ids: a line exceeds ${SchedulerRoutes.MaxAtomsRequestLineLength} characters".some
       )
 
-  test("request body too large"):
-    // Many short lines ("o-1\n" is 4 bytes) adding up to more than the limit.
-    val lines = List.fill(SchedulerRoutes.MaxAtomsRequestBytes.toInt / 4 + 1)("o-1")
-    atomsRequest(serviceUser, lines*).flatMap: request =>
-      withRoutes(serviceUser, request).map(r => assertEquals(r.status, Status.PayloadTooLarge))
+  // Exactly MaxAtomsRequestBytes of valid lines ("o-1\n" is 4 bytes), followed
+  // by `extra`, delivered in 4 KiB chunks so the limit is applied across many
+  // chunk boundaries.
+  private def limitBody(extra: String): Stream[IO, Byte] =
+    val lineCount = SchedulerRoutes.MaxAtomsRequestBytes.toInt / 4
+    (Stream.emit("o-1\n").repeatN(lineCount.toLong) ++ Stream.emit(extra))
+      .through(fs2.text.utf8.encode)
+      .chunkLimit(4096)
+      .unchunks
+
+  test("request body at the limit is accepted"):
+    atomsRequest(serviceUser).flatMap: request =>
+      withRoutes(serviceUser, request.withBodyStream(limitBody(""))).assertResponse(Status.Ok, "".some)
+
+  test("request body one byte over the limit is rejected"):
+    atomsRequest(serviceUser).flatMap: request =>
+      withRoutes(serviceUser, request.withBodyStream(limitBody("o"))).assertResponse(
+        Status.PayloadTooLarge,
+        s"Request body exceeds ${SchedulerRoutes.MaxAtomsRequestBytes} bytes".some
+      )
 
   test("unknown observation ids"):
     atomsRequest(serviceUser, "o-123", "o-124", "o-125").flatMap: request =>
