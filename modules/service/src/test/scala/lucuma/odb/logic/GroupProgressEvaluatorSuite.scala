@@ -203,6 +203,12 @@ class GroupProgressEvaluatorSuite extends FunSuite:
       ongoing(0, 1)
     )
 
+  test("an ordered group has started with a completion past its first required, whatever its QA"):
+    val g = (second: Node) => branch(1, List(leaf(1), second), min = Some(1), ordered = true)
+    assertEquals(eval(g(done(2, t0)), t0 +| hours(1)), ongoing(0, 1))
+    assertEquals(eval(g(assessed(2, t0, ObservationQaState.Fail)), t0 +| hours(1)), ongoing(0, 1))
+    assertEquals(eval(g(leaf(2)), t0 +| hours(1)), pending(1))
+
   test("a failed completion doesn't count"):
     assertEquals(
       eval(branch(1, List(assessed(1, t0, ObservationQaState.Fail), leaf(2, ExecutionState.Ongoing)), min = Some(1))),

@@ -366,8 +366,8 @@ object ObservationValidationInfo {
 
     /**
      * Joins `s`, holding `c_observation_id` and `c_workflow_user_state`: for
-     * an observation `o` that is a per-observation calibration (a telluric or
-     * daytime pinhole flat), the science observation in its group; otherwise
+     * an observation `o` that is a per-observation calibration (a telluric, or
+     * a daytime pinhole or imaging flat), the science observation in its group; otherwise
      * no row.  This is the one association rule: the workflow inherits the
      * science observation's user state through it, and group progress
      * evaluates a calibration with the science observation it names.

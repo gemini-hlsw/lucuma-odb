@@ -426,10 +426,11 @@ object GroupProgressEvaluator:
     val nextStart: Option[Timestamp] =
       timed.lastOption.map(t => minInterval.fold(t)(t +| _))
 
-    // A rejected element was observed, so the group has started even though
-    // it doesn't count.
+    // Anything in the group that has started executing, whether or not it
+    // counts: a rejected element, or one past an ordered group's first
+    // `required`.  (A rejected element is complete, so it has started.)
     val started: Boolean =
-      elements.exists(_.started) || all.exists(_.rejected)
+      all.exists(_.started)
 
     // Observations per night, for a group with either limit.
     val perNight: Option[ObservationsPerNight] =
