@@ -58,6 +58,16 @@ class schedulerRoutes extends SchedulerRoutesSuite with ExecutionTestSupportForG
         s"Unable to parse observation ids: b1, b2, b3, b4, ${"x" * 32}... (and 2 more)".some
       )
 
+  test("invalid observation ids, unprintable characters escaped"):
+    val control = "a\u0000b\u001b[2Jc"              // NUL and an ANSI escape
+    val bidi    = "x\u202Ey\\z"                     // bidi override and a backslash
+    val emoji   = ("w" * 31) + "\uD83D\uDE00" + "v"  // 33 code points, emoji 32nd
+    atomsRequest(serviceUser, control, bidi, emoji).flatMap: request =>
+      withRoutes(serviceUser, request).assertResponse(
+        Status.BadRequest,
+        s"Unable to parse observation ids: a\\u0000b\\u001b[2Jc, x\\u202ey\\\\z, ${"w" * 31}\uD83D\uDE00...".some
+      )
+
   test("request body too large"):
     val huge = "o" * (SchedulerRoutes.MaxAtomsRequestBytes.toInt + 1)
     atomsRequest(serviceUser, huge).flatMap: request =>
