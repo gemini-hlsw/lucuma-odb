@@ -1975,6 +1975,83 @@ class perScienceObservationCalibrations
       assertEquals(removed2.size, 0)
     }
 
+  // Staff may suspend an executing science (Ongoing -> Inactive).  Its group must
+  // survive even when empty, or resuming it would find no group to sync into and
+  // its tellurics would never be generated again.
+  test("Empty obs calibration group survives suspending an executing science"):
+    for {
+      pid                <- createProgramAs(pi)
+      tid                <- createTargetWithProfileAs(pi, pid)
+      oid                <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _                  <- runObscalcUpdate(pid, oid)
+      (added1, _)        <- recalculateCalibrations(pid, when, oid)
+      _                  <- sleep >> resolveTelluricTargets
+      groupId            <- queryObservation(oid).map(_.groupId.get)
+      telluricOid        <- queryObservationsInGroup(groupId).map(_.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id)
+      vid                <- recordVisitAs(serviceUser, oid)
+      _                  <- addSequenceEventAs(serviceUser, vid, SequenceCommand.Start)
+      // Empty the group: the unobserved telluric goes.
+      _                  <- withServices(serviceUser): services =>
+                              services.transactionally:
+                                services.observationService.deleteCalibrationObservations(NonEmptyList.one(telluricOid))
+      _                  <- runObscalcUpdate(pid, oid)
+      _                  <- setObservationWorkflowState(staff, oid, ObservationWorkflowState.Inactive)
+      _                  <- runObscalcUpdate(pid, oid)
+      (_, removed2)      <- recalculateCalibrations(pid, when, oid)
+      groupExists2       <- queryGroupExists(groupId)
+      groupOfSci2        <- queryObservation(oid).map(_.groupId)
+      _                  <- setObservationWorkflowState(staff, oid, ObservationWorkflowState.Ongoing)
+      _                  <- runObscalcUpdate(pid, oid)
+      (added3, _)        <- recalculateCalibrations(pid, when, oid)
+      obsInGroup3        <- queryObservationsInGroup(groupId)
+    } yield {
+      assertEquals(added1.size, 1)
+      assertEquals(removed2, Nil)
+      assert(groupExists2)
+      assertEquals(groupOfSci2, groupId.some)
+      // Resumed, it is synced again: a new telluric is generated.
+      assertEquals(added3.size, 1)
+      assertEquals(obsInGroup3.count(_.calibrationRole.contains(CalibrationRole.Telluric)), 1)
+    }
+
+  // Once executing, a per-observation calibration still has no Ongoing <-> Inactive
+  // edges of its own, even for staff.  It follows its science observation instead,
+  // into a staff suspension and back out of it.
+  test("An executing telluric is never offered Inactive, but follows a suspended science"):
+    def workflow(oid: Observation.Id): IO[(ObservationWorkflowState, List[ObservationWorkflowState])] =
+      query(staff, s"""query { observation(observationId: "$oid") { workflow { value { state validTransitions } } } }""")
+        .map: json =>
+          val c = json.hcursor.downFields("observation", "workflow", "value")
+          (c.downField("state").require[ObservationWorkflowState], c.downField("validTransitions").require[List[ObservationWorkflowState]])
+    for {
+      pid         <- createProgramAs(pi)
+      tid         <- createTargetWithProfileAs(pi, pid)
+      oid         <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _           <- runObscalcUpdate(pid, oid)
+      _           <- recalculateCalibrations(pid, when, oid)
+      _           <- sleep >> resolveTelluricTargets
+      groupId     <- queryObservation(oid).map(_.groupId.get)
+      telluricOid <- queryObservationsInGroup(groupId).map(_.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id)
+      v           <- recordVisitAs(serviceUser, oid)
+      _           <- addSequenceEventAs(serviceUser, v, SequenceCommand.Start)
+      w           <- recordVisitAs(serviceUser, telluricOid)
+      _           <- addSequenceEventAs(serviceUser, w, SequenceCommand.Start)
+      _           <- runObscalcUpdate(pid, telluricOid)
+      wf1         <- workflow(telluricOid)
+      _           <- interceptOdbError(setObservationWorkflowState(staff, telluricOid, ObservationWorkflowState.Inactive)):
+                       case OdbError.InvalidWorkflowTransition(_, ObservationWorkflowState.Inactive, _) => ()
+      _           <- setObservationWorkflowState(staff, oid, ObservationWorkflowState.Inactive)
+      _           <- runObscalcUpdate(pid, telluricOid)
+      wf2         <- workflow(telluricOid)
+      _           <- setObservationWorkflowState(staff, oid, ObservationWorkflowState.Ongoing)
+      _           <- runObscalcUpdate(pid, telluricOid)
+      wf3         <- workflow(telluricOid)
+    } yield {
+      assertEquals(wf1, (ObservationWorkflowState.Ongoing,  List(ObservationWorkflowState.Completed)))
+      assertEquals(wf2, (ObservationWorkflowState.Inactive, Nil))
+      assertEquals(wf3, (ObservationWorkflowState.Ongoing,  List(ObservationWorkflowState.Completed)))
+    }
+
   test("Telluric with visit is preserved when science changes to GMOS"):
     for {
       pid                <- createProgramAs(pi)

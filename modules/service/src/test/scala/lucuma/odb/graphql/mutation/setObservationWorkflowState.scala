@@ -5,6 +5,7 @@ package lucuma.odb.graphql
 
 package mutation
 
+import cats.data.Ior
 import cats.effect.IO
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.PosInt
@@ -13,6 +14,9 @@ import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.enums.ExchangeObservingModeType
 import lucuma.core.enums.KeckInstrument
 import lucuma.core.enums.ObservationWorkflowState
+import lucuma.core.enums.ScienceBand
+import lucuma.core.enums.SlewStage
+import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.math.*
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -21,8 +25,11 @@ import lucuma.core.syntax.timespan.*
 import lucuma.itc.IntegrationTime
 import lucuma.itc.SignalToNoiseAt
 import lucuma.odb.data.OdbError
+import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
 import lucuma.odb.graphql.query.ObservingModeSetupOperations 
+import lucuma.odb.util.Codecs.observation_id
+import skunk.implicits.*
 
 class setObservationWorkflowState
   extends ExecutionTestSupportForGmos
@@ -56,6 +63,23 @@ class setObservationWorkflowState
         """
     ).map: json =>
       json.hcursor.downFields("observation", "workflow", "value", "state").require[ObservationWorkflowState]
+
+  def queryObservationWorkflowTransitionsAs(user: User, oid: Observation.Id): IO[List[ObservationWorkflowState]] =
+    query(
+      user,
+      s"""
+        query {
+          observation(observationId: "$oid") {
+            workflow {
+              value {
+                validTransitions
+              }
+            }
+          }
+        }
+        """
+    ).map: json =>
+      json.hcursor.downFields("observation", "workflow", "value", "validTransitions").require[List[ObservationWorkflowState]]
 
   def testTransition(pid: Program.Id, oid: Observation.Id, state: ObservationWorkflowState): IO[String] =
     testTransitionAs(pi, pid, oid, state)
@@ -176,6 +200,172 @@ class setObservationWorkflowState
       _  <- runObscalcUpdate(p, o)
       _  <- assertIO(queryObservationWorkflowState(o), Ongoing)
       _  <- testTransitions(p, o, Ongoing, Completed)
+    yield ()
+
+  def createOngoingObservation: IO[(Program.Id, Observation.Id)] =
+    for
+      p  <- createProgram
+      t  <- createTargetWithProfileAs(pi, p)
+      o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      v  <- recordVisitAs(serviceUser, o)
+      s  <- firstScienceAtomStepIds(serviceUser, o)
+      _  <- s.traverse(sid => addEndStepEvent(sid, v))
+      _  <- runObscalcUpdate(p, o)
+      _  <- assertIO(queryObservationWorkflowState(o), Ongoing)
+    yield (p, o)
+
+  // An error that appears mid-execution (here staff drop the allocation for the
+  // observation's band) must not make it look unstarted.  It stays Ongoing, can
+  // still be declared complete (the live workflow used to report Undefined and
+  // refuse), and its band stays locked: the band attributes charged time.
+  test("[Sidereal]    Ongoing with a band error stays Ongoing and locked"):
+    for
+      p <- createProgram
+      _ <- setAllocationsAs(staff, p, List(
+             AllocationInput(TimeAccountingCategory.US, ScienceBand.Band1, 10.hourTimeSpan),
+             AllocationInput(TimeAccountingCategory.US, ScienceBand.Band2, 10.hourTimeSpan)
+           ))
+      t <- createTargetWithProfileAs(pi, p)
+      o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      _ <- setScienceBandAs(pi, o, ScienceBand.Band1.some)
+      v <- recordVisitAs(serviceUser, o)
+      s <- firstScienceAtomStepIds(serviceUser, o)
+      _ <- s.traverse(sid => addEndStepEvent(sid, v))
+      // Dropping Band 1 is allowed but warns about the observation left in it.
+      _ <- expectIor(
+             user     = staff,
+             query    = s"""
+               mutation {
+                 setAllocations(input: {
+                   programId:   "$p"
+                   allocations: [{ category: US, scienceBand: BAND2, duration: { hours: 10 } }]
+                 }) {
+                   allocations { scienceBand }
+                 }
+               }
+             """,
+             expected = Ior.both(
+               List(s"The following observations now have a science band for which no time is allocated: $o"),
+               json"""{ "setAllocations": { "allocations": [ { "scienceBand": "BAND2" } ] } }"""
+             )
+           )
+      _ <- runObscalcUpdate(p, o)
+      _ <- assertIO(queryObservationWorkflowState(o), Ongoing)
+      _ <- testTransitionsAs(pi, p, o, Ongoing, Completed)
+      _ <- expectIor(
+             user     = pi,
+             query    = updateObservationsMutation(o, "scienceBand: BAND2", "observations { id }"),
+             expected = Ior.both(
+               List(s"Observation $o is ineligible for this operation due to its workflow state (Ongoing with allowed transition to Completed)."),
+               json"""{ "updateObservations": { "observations": [] } }"""
+             )
+           )
+    yield ()
+
+  test("[Sidereal]    Ongoing    <-> Inactive, Completed (staff)"):
+    createOngoingObservation.flatMap: (p, o) =>
+      testTransitionsAs(staff, p, o, Ongoing, Inactive, Completed)
+
+  // The mutation answers with the workflow of the state it entered, not the
+  // transitions of the state it left.
+  test("[Sidereal]    the mutation returns the new state's transitions"):
+    def set(user: User, o: Observation.Id, state: ObservationWorkflowState, transitions: List[ObservationWorkflowState]): IO[Unit] =
+      expect(
+        user     = user,
+        query    = s"""
+          mutation {
+            setObservationWorkflowState(input: {
+              observationId: "$o"
+              state: ${state.tag.toUpperCase}
+            }) {
+              state
+              validTransitions
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "setObservationWorkflowState": {
+              "state": ${state.tag.toUpperCase},
+              "validTransitions": ${transitions.map(_.tag.toUpperCase)}
+            }
+          }
+        """.asRight
+      )
+    for
+      (p, o) <- createOngoingObservation
+      _      <- set(staff, o, Inactive,  List(Ongoing))
+      _      <- set(staff, o, Ongoing,   List(Inactive, Completed))
+      _      <- set(pi,    o, Completed, List(Ongoing))
+      _      <- set(pi,    o, Ongoing,   List(Completed))
+    yield ()
+
+  test("[Sidereal]    Inactive   <-> Ongoing, once ongoing (staff only)"):
+    for
+      (p, o) <- createOngoingObservation
+      _      <- setObservationWorkflowState(staff, o, Inactive)
+      _      <- runObscalcUpdate(p, o)
+      _      <- assertIO(queryObservationWorkflowState(o), Inactive)
+      _      <- testTransitionsAs(pi, p, o, Inactive)
+      _      <- testTransitionsAs(staff, p, o, Inactive, Ongoing)
+    yield ()
+
+  /** The stored user state, which no query exposes. */
+  def storedUserState(oid: Observation.Id): IO[Option[String]] =
+    withSession: session =>
+      session.unique(
+        sql"SELECT c_workflow_user_state::text FROM t_observation WHERE c_observation_id = $observation_id"
+          .query(skunk.codec.text.text.opt)
+      )(oid)
+
+  // An Inactive stored before execution (V1394) does not survive its start, so it
+  // cannot override Ongoing the way a staff suspension does.
+  test("[Sidereal]    Inactive   ->  Ongoing when execution begins anyway"):
+    for
+      p <- createProgram
+      t <- createTargetWithProfileAs(pi, p)
+      o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      _ <- setObservationWorkflowState(pi, o, Inactive)
+      _ <- runObscalcUpdate(p, o)
+      _ <- assertIO(queryObservationWorkflowState(o), Inactive)
+      v <- recordVisitAs(serviceUser, o)
+      _ <- addSlewEventAs(serviceUser, o, SlewStage.StartSlew)
+      _ <- assertIO(storedUserState(o), "inactive".some) // a slew starts nothing
+      s <- firstScienceAtomStepIds(serviceUser, o)
+      _ <- s.traverse(sid => addEndStepEvent(sid, v))
+      _ <- assertIO(storedUserState(o), none)
+      _ <- runObscalcUpdate(p, o)
+      _ <- assertIO(queryObservationWorkflowState(o), Ongoing)
+      _ <- testTransitions(p, o, Ongoing, Completed)
+    yield ()
+
+  // A suspension survives later events (here the rest of the sequence, which an
+  // observer may finish anyway), and is cleared once the observation completes.
+  test("[Sidereal]    Inactive   ->  Completed when execution finishes"):
+    for
+      p <- createProgram
+      t <- createTargetWithProfileAs(pi, p)
+      o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      v <- recordVisitAs(serviceUser, o)
+      s <- scienceStepIds(serviceUser, o)
+      _  = assert(s.size > 2, s"expected more than two science steps, got ${s.size}")
+      _ <- addEndStepEvent(s.head, v)
+      _ <- runObscalcUpdate(p, o)
+      _ <- assertIO(queryObservationWorkflowState(o), Ongoing)
+      _ <- setObservationWorkflowState(staff, o, Inactive)
+      _ <- runObscalcUpdate(p, o)
+      _ <- assertIO(queryObservationWorkflowState(o), Inactive)
+      _ <- s.tail.init.traverse(sid => addEndStepEvent(sid, v))
+      _ <- runObscalcUpdate(p, o)
+      _ <- assertIO(queryObservationWorkflowState(o), Inactive)
+      _ <- assertIO(storedUserState(o), "inactive".some)
+      _ <- addEndStepEvent(s.last, v)
+      _ <- runObscalcUpdate(p, o)
+      _ <- assertIO(queryObservationWorkflowState(o), Completed)
+      _ <- assertIO(storedUserState(o), none)
+      _ <- runObscalcUpdate(p, o) // the cleared user state invalidated it once more
+      _ <- assertIO(queryObservationWorkflowState(o), Completed)
+      _ <- testTransitionsAs(staff, p, o, Completed)
     yield ()
 
 // (see executionState.scala)
@@ -333,6 +523,27 @@ class setObservationWorkflowState
       _   <- setObservationWorkflowState(staff, oid, Ongoing)
       _   <- runObscalcUpdateAs(serviceUser, pid, oid)
       _   <- assertIO(queryObservationWorkflowState(oid), Ongoing)
+    yield ()
+
+  test("[Visitor]     stored transitions show staff-only ones to staff only"):
+    for
+      cfp <- createGeminiCallForProposalsAs(staff)
+      pid <- createProgramWithNonPartnerPi(pi)
+      _   <- addProposal(pi, pid, Some(cfp), None)
+      _   <- addPartnerSplits(pi, pid)
+      _   <- addCoisAs(pi, pid)
+      tid <- createTargetWithProfileAs(pi, pid)
+      oid <- createObservationWithModeAs(pi, pid, List(tid), visitorMode)
+      _   <- createConfigurationRequestAs(pi, oid).flatMap(setConfigurationRequestStatusAs(staff, _, ConfigurationRequestStatus.Approved))
+      _   <- setProposalStatus(staff, pid, "ACCEPTED")
+      _   <- setObservationWorkflowState(pi, oid, Ready)
+      _   <- runObscalcUpdateAs(serviceUser, pid, oid)
+      _   <- assertIO(queryObservationWorkflowTransitionsAs(pi, oid), List(Inactive, Defined))
+      _   <- assertIO(queryObservationWorkflowTransitionsAs(staff, oid), List(Inactive, Defined, Ongoing))
+      _   <- setObservationWorkflowState(staff, oid, Ongoing)
+      _   <- runObscalcUpdateAs(serviceUser, pid, oid)
+      _   <- assertIO(queryObservationWorkflowTransitionsAs(pi, oid), List(Completed))
+      _   <- assertIO(queryObservationWorkflowTransitionsAs(staff, oid), List(Inactive, Completed, Ready))
     yield ()
 
   test("[Visitor]     Ongoing -> Ready (allowed for staff)"):
@@ -526,6 +737,29 @@ class setObservationWorkflowState
           }
         """
     ).void
+
+  // A warning must not hide the execution state: before, the live workflow ignored
+  // it for any observation with a validation code, so a PI saw Defined and could
+  // set an executing observation Inactive, or edit it.
+  test("[Warnings]    Ongoing   <-> Completed (pi), Inactive too (staff), still locked"):
+    for
+      (pid, oid) <- createPhaseTwoObservationWithWarnings
+      v          <- recordVisitAs(serviceUser, oid)
+      s          <- firstScienceAtomStepIds(serviceUser, oid)
+      _          <- s.traverse(sid => addEndStepEvent(sid, v))
+      _          <- runObscalcUpdateAs(serviceUser, pid, oid)
+      _          <- assertIO(queryObservationWorkflowState(oid), Ongoing)
+      _          <- testTransitionsAs(pi, pid, oid, Ongoing, Completed)
+      _          <- testTransitionsAs(staff, pid, oid, Ongoing, Inactive, Completed)
+      _          <- expectIor(
+                      user     = pi,
+                      query    = updateObservationsMutation(oid, """subtitle: "new value"""", "observations { id }"),
+                      expected = Ior.both(
+                        List(s"Observation $oid is ineligible for this operation due to its workflow state (Ongoing with allowed transition to Completed)."),
+                        json"""{ "updateObservations": { "observations": [] } }"""
+                      )
+                    )
+    yield ()
 
   test("[Warnings]    Ready     --> Defined (undismissed warning), and back once dismissed"):
     createPhaseTwoObservationWithWarnings.flatMap: (pid, oid) =>

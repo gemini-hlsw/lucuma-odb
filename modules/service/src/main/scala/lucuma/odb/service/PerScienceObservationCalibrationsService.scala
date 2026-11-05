@@ -828,6 +828,16 @@ object PerScienceObservationCalibrationsService:
           .map(_.exists((present, mode, requested) => present && mode.exists(ObsExtract.modeTakesTelluric) && requested))
 
       /**
+       * Present and executing (Ongoing, declared or not), whatever its workflow
+       * state: staff may suspend an executing observation by setting it Inactive.
+       */
+      private def scienceIsExecuting(scienceOid: Observation.Id): F[Boolean] =
+        S.session
+          .prepareR(Statements.selectScienceIsExecuting)
+          .use(_.option(scienceOid))
+          .map(_.getOrElse(false))
+
+      /**
        * Deletes the unexecuted calibrations of a science observation, and the
        * group once empty. With `keepUserDefined` the PI's tellurics survive: an
        * inactive or unapproved science is a passing state, unlike its deletion
@@ -904,9 +914,16 @@ object PerScienceObservationCalibrationsService:
                                                         dResult <- syncDaytimeCalibrations(pid, obs, gid)
                                                       yield (tResult._1 ++ dResult._1, tResult._2 ++ dResult._2))
                                                   case (Some(gid), None) =>
-                                                    info"Observation $oid no longer active or ongoing, cleaning up obs calibration group $gid" *>
-                                                      scienceTakesTellurics(oid).flatMap: keepUserDefined =>
-                                                        cleanupOrphanedObsCalibrationGroup(pid, gid, oid, keepUserDefined)
+                                                    // A suspended (Inactive) executing science keeps its group,
+                                                    // even an empty one, so that resuming it lands back in the
+                                                    // syncing case above.  Its calibrations are protected anyway.
+                                                    scienceIsExecuting(oid).ifM(
+                                                      info"Observation $oid is inactive but executing, keeping obs calibration group $gid" *>
+                                                        (List.empty[Observation.Id], List.empty[Observation.Id]).pure[F],
+                                                      info"Observation $oid no longer active or ongoing, cleaning up obs calibration group $gid" *>
+                                                        scienceTakesTellurics(oid).flatMap: keepUserDefined =>
+                                                          cleanupOrphanedObsCalibrationGroup(pid, gid, oid, keepUserDefined)
+                                                    )
                                                   case (None, _) =>
                                                     debug"Observation $oid has no obs calibration group, skipping" *>
                                                       (List.empty[Observation.Id], List.empty[Observation.Id]).pure
@@ -914,6 +931,15 @@ object PerScienceObservationCalibrationsService:
           } yield result
 
       object Statements:
+
+        val selectScienceIsExecuting: Query[Observation.Id, Boolean] =
+          sql"""
+            SELECT o.c_existence = 'present'
+               AND gp.c_execution_state IN ('ongoing', 'declared_ongoing')
+            FROM   t_observation o
+            JOIN   v_generator_params gp ON gp.c_observation_id = o.c_observation_id
+            WHERE  o.c_observation_id = $observation_id
+          """.query(bool)
 
         // The telluric type lives in the mode table of each mode that has tellurics.
         val selectScienceTakesTellurics: Query[Observation.Id, (Boolean, Option[ObservingModeType], Boolean)] =
