@@ -7,8 +7,8 @@ package scheduler
 import cats.effect.IO
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegInt
-import fs2.Stream
 import eu.timepit.refined.types.numeric.PosInt
+import fs2.Stream
 import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.GcalLampType
 import lucuma.core.enums.ObserveClass

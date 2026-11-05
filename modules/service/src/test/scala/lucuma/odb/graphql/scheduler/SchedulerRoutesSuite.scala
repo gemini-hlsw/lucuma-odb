@@ -6,8 +6,8 @@ package scheduler
 
 import cats.Order.catsKernelOrderingForOrder
 import cats.effect.IO
-import eu.timepit.refined.types.numeric.PosInt
 import cats.syntax.all.*
+import eu.timepit.refined.types.numeric.PosInt
 import fs2.Stream
 import fs2.compression.Compression
 import fs2.text
