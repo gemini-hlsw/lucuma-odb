@@ -15,7 +15,6 @@ import fs2.io.net.Network
 import lucuma.core.model.GuestUser
 import lucuma.core.model.ServiceUser
 import lucuma.core.model.StandardUser
-import lucuma.core.model.User
 import lucuma.sso.client.SsoJwtReader
 import lucuma.sso.service.config.Config
 import lucuma.sso.service.config.DatabaseConfig
