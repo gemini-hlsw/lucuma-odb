@@ -22132,8 +22132,11 @@ type TacFeedback {
   "The partner TAC's ranking of the proposal."
   ranking: PosBigDecimal!
 
-  "The time recommended by the partner TAC."
-  recommendedTime: TimeSpan!
+  """
+  The time recommended by the partner TAC, at most one entry per science band,
+  sorted by band.  Empty if the partner TAC recommends no time.
+  """
+  recommendedTimes: [TacRecommendedTime!]!
 
   "The partner TAC's comments, if any."
   comments: NonEmptyString
@@ -22141,16 +22144,24 @@ type TacFeedback {
 
 """
 A partner's TAC feedback input.  When the partner has no feedback yet for the
-program, the decision, ranking and recommended time are required.  Otherwise,
-omitted fields keep their existing values.  The decision, ranking and
-recommended time may not be set to null.  Comments are optional, and setting
-them to null removes any existing comments.
+program, the decision and ranking are required.  Otherwise, omitted fields keep
+their existing values.  The decision, ranking and recommended times may not be
+set to null.  Comments are optional, and setting them to null removes any
+existing comments.
 """
 input TacFeedbackInput {
   partner: Partner!
   decision: TacPartnerDecision
   ranking: PosBigDecimal
-  recommendedTime: TimeSpanInput
+
+  """
+  The time recommended for each science band.  Each band may appear at most
+  once.  When supplied, the list (even an empty one) replaces all existing
+  recommended times.  When omitted, existing recommended times are kept, or
+  none are recorded for new feedback.
+  """
+  recommendedTimes: [TacRecommendedTimeInput!]
+
   comments: NonEmptyString
 }
 
@@ -22195,6 +22206,28 @@ enum TacPartnerDecision {
   The proposal was rejected.
   """
   REJECTED
+}
+
+"""
+The time recommended by a partner TAC for a science band.
+"""
+type TacRecommendedTime {
+  "The science band for which the time is recommended."
+  band: ScienceBand!
+
+  "The time recommended for this band."
+  time: TimeSpan!
+}
+
+"""
+The time recommended by a partner TAC for a science band.
+"""
+input TacRecommendedTimeInput {
+  "The science band for which the time is recommended."
+  band: ScienceBand!
+
+  "The time recommended for this band."
+  time: TimeSpanInput!
 }
 
 """

@@ -12,6 +12,7 @@ import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.GeminiCallForProposalsType.RegularSemester
 import lucuma.core.enums.Partner
+import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.TacPartnerDecision
 import lucuma.core.model.Program
 import lucuma.core.model.Semester
@@ -19,6 +20,7 @@ import lucuma.core.util.TimeSpan
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.OdbError
 import lucuma.odb.graphql.input.TacFeedbackInput
+import lucuma.odb.graphql.input.TacRecommendedTimeInput
 
 class setTacFeedback extends OdbSuite with query.ObservingModeSetupOperations:
 
@@ -36,16 +38,23 @@ class setTacFeedback extends OdbSuite with query.ObservingModeSetupOperations:
     partner:  Partner,
     decision: TacPartnerDecision = TacPartnerDecision.Accepted,
     ranking:  BigDecimal         = BigDecimal("1.5"),
-    hours:    BigDecimal         = BigDecimal(2),
+    times:    List[(ScienceBand, BigDecimal)] = List(ScienceBand.Band1 -> BigDecimal(2)),
     comments: String             = "Great science."
   ): TacFeedbackInput =
     TacFeedbackInput(
       partner,
       decision.some,
       PosBigDecimal.unsafeFrom(ranking).some,
-      TimeSpan.fromHours(hours).get.some,
+      recommendedTimes(times*).some,
       Nullable.NonNull(NonEmptyString.unsafeFrom(comments))
     )
+
+  def recommendedTimes(times: (ScienceBand, BigDecimal)*): List[TacRecommendedTimeInput] =
+    times.toList.map((band, hours) => TacRecommendedTimeInput(band, TimeSpan.fromHours(hours).get))
+
+  // Expected recommended times, as (band, hours) pairs.
+  def band1(hours: String): List[(String, BigDecimal)] =
+    List("BAND1" -> BigDecimal(hours))
 
   def partial(partner: Partner): TacFeedbackInput =
     TacFeedbackInput(partner, none, none, none, Nullable.Absent)
@@ -54,24 +63,25 @@ class setTacFeedback extends OdbSuite with query.ObservingModeSetupOperations:
     partner:  String,
     decision: String,
     ranking:  BigDecimal,
-    hours:    BigDecimal,
+    times:    List[(String, BigDecimal)],
     comments: String
   ): Json =
-    feedbackJson(partner, decision, ranking, hours, comments.some)
+    feedbackJson(partner, decision, ranking, times, comments.some)
 
   def feedbackJson(
     partner:  String,
     decision: String,
     ranking:  BigDecimal,
-    hours:    BigDecimal,
+    times:    List[(String, BigDecimal)],
     comments: Option[String]
   ): Json =
+    val timesJson = times.map((band, hours) => json"""{ "band": $band, "time": { "hours": $hours } }""")
     json"""
       {
         "partner": $partner,
         "decision": $decision,
         "ranking": $ranking,
-        "recommendedTime": { "hours": $hours },
+        "recommendedTimes": $timesJson,
         "comments": $comments
       }
     """
@@ -109,7 +119,7 @@ class setTacFeedback extends OdbSuite with query.ObservingModeSetupOperations:
             partner
             decision
             ranking
-            recommendedTime { hours }
+            recommendedTimes { band time { hours } }
             comments
           }
         }
@@ -124,7 +134,7 @@ class setTacFeedback extends OdbSuite with query.ObservingModeSetupOperations:
   test("ngo can set TAC feedback for its own partner"):
     createProgramWithProposal().flatMap: pid =>
       setTacFeedbackAs(ngoCa, pid, feedback(Partner.CA)).map: js =>
-        assertEquals(js, setResult(feedbackJson("CA", "ACCEPTED", BigDecimal("1.5"), BigDecimal("2.000000"), "Great science.")))
+        assertEquals(js, setResult(feedbackJson("CA", "ACCEPTED", BigDecimal("1.5"), band1("2.000000"), "Great science.")))
 
   test("ngo can't set TAC feedback for another partner"):
     createProgramWithProposal().flatMap: pid =>
@@ -168,17 +178,17 @@ class setTacFeedback extends OdbSuite with query.ObservingModeSetupOperations:
         case OdbError.InvalidArgument(Some(m)) =>
           assertEquals(m, s"Program $pid has no proposal, so TAC feedback cannot be set.")
 
-  test("new TAC feedback requires a decision, ranking and recommended time"):
+  test("new TAC feedback requires a decision and ranking"):
     createProgramWithProposal().flatMap: pid =>
       interceptOdbError(setTacFeedbackAs(staff, pid, partial(Partner.US).copy(decision = TacPartnerDecision.Rejected.some))):
         case OdbError.InvalidArgument(Some(m)) =>
-          assertEquals(m, "ranking, recommendedTime must be specified when creating TAC feedback for partner US.")
+          assertEquals(m, "ranking must be specified when creating TAC feedback for partner US.")
 
   test("new TAC feedback with no fields at all is rejected"):
     createProgramWithProposal().flatMap: pid =>
       interceptOdbError(setTacFeedbackAs(staff, pid, partial(Partner.US))):
         case OdbError.InvalidArgument(Some(m)) =>
-          assertEquals(m, "decision, ranking, recommendedTime must be specified when creating TAC feedback for partner US.")
+          assertEquals(m, "decision, ranking must be specified when creating TAC feedback for partner US.")
 
   test("TAC feedback may be updated one field at a time"):
     createProgramWithProposal().flatMap: pid =>
@@ -186,20 +196,20 @@ class setTacFeedback extends OdbSuite with query.ObservingModeSetupOperations:
         _ <- setTacFeedbackAs(staff, pid, feedback(Partner.US))
         a <- setTacFeedbackAs(staff, pid, partial(Partner.US).copy(decision = TacPartnerDecision.Rejected.some))
         b <- setTacFeedbackAs(staff, pid, partial(Partner.US).copy(ranking = PosBigDecimal.unsafeFrom(BigDecimal(3)).some))
-        c <- setTacFeedbackAs(staff, pid, partial(Partner.US).copy(recommendedTime = TimeSpan.fromHours(BigDecimal("0.5")).get.some))
+        c <- setTacFeedbackAs(staff, pid, partial(Partner.US).copy(recommendedTimes = recommendedTimes(ScienceBand.Band1 -> BigDecimal("0.5")).some))
         d <- setTacFeedbackAs(staff, pid, partial(Partner.US).copy(comments = Nullable.NonNull(NonEmptyString.unsafeFrom("Revised."))))
         e <- setTacFeedbackAs(staff, pid, partial(Partner.US))
       yield
-        assertEquals(a, setResult(feedbackJson("US", "REJECTED", BigDecimal("1.5"), BigDecimal("2.000000"), "Great science.")))
-        assertEquals(b, setResult(feedbackJson("US", "REJECTED", BigDecimal(3),     BigDecimal("2.000000"), "Great science.")))
-        assertEquals(c, setResult(feedbackJson("US", "REJECTED", BigDecimal(3),     BigDecimal("0.500000"), "Great science.")))
-        assertEquals(d, setResult(feedbackJson("US", "REJECTED", BigDecimal(3),     BigDecimal("0.500000"), "Revised.")))
+        assertEquals(a, setResult(feedbackJson("US", "REJECTED", BigDecimal("1.5"), band1("2.000000"), "Great science.")))
+        assertEquals(b, setResult(feedbackJson("US", "REJECTED", BigDecimal(3),     band1("2.000000"), "Great science.")))
+        assertEquals(c, setResult(feedbackJson("US", "REJECTED", BigDecimal(3),     band1("0.500000"), "Great science.")))
+        assertEquals(d, setResult(feedbackJson("US", "REJECTED", BigDecimal(3),     band1("0.500000"), "Revised.")))
         assertEquals(e, d)
 
   test("comments are optional when creating TAC feedback"):
     createProgramWithProposal().flatMap: pid =>
       setTacFeedbackAs(staff, pid, feedback(Partner.US).copy(comments = Nullable.Absent)).map: js =>
-        assertEquals(js, setResult(feedbackJson("US", "ACCEPTED", BigDecimal("1.5"), BigDecimal("2.000000"), none)))
+        assertEquals(js, setResult(feedbackJson("US", "ACCEPTED", BigDecimal("1.5"), band1("2.000000"), none)))
 
   test("explicit null comments remove existing comments"):
     createProgramWithProposal().flatMap: pid =>
@@ -209,14 +219,117 @@ class setTacFeedback extends OdbSuite with query.ObservingModeSetupOperations:
         b <- setTacFeedbackAs(staff, pid, partial(Partner.US).copy(decision = TacPartnerDecision.Rejected.some))
         c <- setTacFeedbackAs(staff, pid, partial(Partner.US).copy(comments = Nullable.NonNull(NonEmptyString.unsafeFrom("Back again."))))
       yield
-        assertEquals(a, setResult(feedbackJson("US", "ACCEPTED", BigDecimal("1.5"), BigDecimal("2.000000"), none)))
-        assertEquals(b, setResult(feedbackJson("US", "REJECTED", BigDecimal("1.5"), BigDecimal("2.000000"), none)))
-        assertEquals(c, setResult(feedbackJson("US", "REJECTED", BigDecimal("1.5"), BigDecimal("2.000000"), "Back again.")))
+        assertEquals(a, setResult(feedbackJson("US", "ACCEPTED", BigDecimal("1.5"), band1("2.000000"), none)))
+        assertEquals(b, setResult(feedbackJson("US", "REJECTED", BigDecimal("1.5"), band1("2.000000"), none)))
+        assertEquals(c, setResult(feedbackJson("US", "REJECTED", BigDecimal("1.5"), band1("2.000000"), "Back again.")))
+
+  test("recommended times are optional when creating TAC feedback"):
+    createProgramWithProposal().flatMap: pid =>
+      setTacFeedbackAs(staff, pid, feedback(Partner.US).copy(recommendedTimes = none)).map: js =>
+        assertEquals(js, setResult(feedbackJson("US", "ACCEPTED", BigDecimal("1.5"), Nil, "Great science.")))
+
+  test("recommended times are sorted by band"):
+    createProgramWithProposal().flatMap: pid =>
+      val times = List(ScienceBand.Band3 -> BigDecimal(3), ScienceBand.Band1 -> BigDecimal(1), ScienceBand.Band2 -> BigDecimal(2))
+      setTacFeedbackAs(staff, pid, feedback(Partner.US, times = times)).map: js =>
+        val expected = List(
+          "BAND1" -> BigDecimal("1.000000"),
+          "BAND2" -> BigDecimal("2.000000"),
+          "BAND3" -> BigDecimal("3.000000")
+        )
+        assertEquals(js, setResult(feedbackJson("US", "ACCEPTED", BigDecimal("1.5"), expected, "Great science.")))
+
+  test("supplied recommended times replace the existing ones"):
+    createProgramWithProposal().flatMap: pid =>
+      val initial = List(ScienceBand.Band1 -> BigDecimal(2), ScienceBand.Band2 -> BigDecimal(1))
+      for
+        _ <- setTacFeedbackAs(staff, pid, feedback(Partner.US, times = initial))
+        // Remove BAND1, change BAND2 and add BAND3 in one call.
+        a <- setTacFeedbackAs(staff, pid, partial(Partner.US).copy(recommendedTimes = recommendedTimes(ScienceBand.Band3 -> BigDecimal("0.5"), ScienceBand.Band2 -> BigDecimal(3)).some))
+        // Omitting the list keeps it.
+        b <- setTacFeedbackAs(staff, pid, partial(Partner.US).copy(decision = TacPartnerDecision.Rejected.some))
+        // An empty list removes them all.
+        c <- setTacFeedbackAs(staff, pid, partial(Partner.US).copy(recommendedTimes = Nil.some))
+      yield
+        val replaced = List("BAND2" -> BigDecimal("3.000000"), "BAND3" -> BigDecimal("0.500000"))
+        assertEquals(a, setResult(feedbackJson("US", "ACCEPTED", BigDecimal("1.5"), replaced, "Great science.")))
+        assertEquals(b, setResult(feedbackJson("US", "REJECTED", BigDecimal("1.5"), replaced, "Great science.")))
+        assertEquals(c, setResult(feedbackJson("US", "REJECTED", BigDecimal("1.5"), Nil,      "Great science.")))
+
+  test("recommended times may not repeat a band"):
+    createProgramWithProposal().flatMap: pid =>
+      expectOdbError(
+        user     = staff,
+        query    = s"""
+          mutation {
+            setTacFeedback(input: {
+              programId: "$pid"
+              tacFeedback: {
+                partner: US
+                decision: ACCEPTED
+                ranking: 1
+                recommendedTimes: [
+                  { band: BAND2, time: { hours: 1 } },
+                  { band: BAND1, time: { hours: 1 } },
+                  { band: BAND2, time: { hours: 2 } }
+                ]
+              }
+            }) {
+              tacFeedback { partner }
+            }
+          }
+        """,
+        expected = {
+          case OdbError.InvalidArgument(Some(m)) if m.contains("duplicate 'recommendedTimes band' specified: BAND2") => ()
+        }
+      )
+
+  test("recommended times may not be negative"):
+    createProgramWithProposal().flatMap: pid =>
+      expectOdbError(
+        user     = staff,
+        query    = s"""
+          mutation {
+            setTacFeedback(input: {
+              programId: "$pid"
+              tacFeedback: {
+                partner: US
+                decision: ACCEPTED
+                ranking: 1
+                recommendedTimes: [ { band: BAND1, time: { hours: -1 } } ]
+              }
+            }) {
+              tacFeedback { partner }
+            }
+          }
+        """,
+        expected = {
+          case OdbError.InvalidArgument(Some(m)) if m.startsWith("Argument 'input.tacFeedback.recommendedTimes") => ()
+        }
+      )
+
+  test("explicit null recommended times are rejected"):
+    createProgramWithProposal().flatMap: pid =>
+      setTacFeedbackAs(staff, pid, feedback(Partner.US)) *>
+      expect(
+        user     = staff,
+        query    = s"""
+          mutation {
+            setTacFeedback(input: {
+              programId: "$pid"
+              tacFeedback: { partner: US, recommendedTimes: null }
+            }) {
+              tacFeedback { partner }
+            }
+          }
+        """,
+        expected = List("Argument 'input.tacFeedback.recommendedTimes' is invalid: cannot be null").asLeft
+      )
 
   test("TAC feedback can be read by anyone who can read the program, ordered by partner"):
     createProgramWithProposal().flatMap: pid =>
       setTacFeedbackAs(ngoUs, pid, feedback(Partner.US, comments = "From the US.")) *>
-      setTacFeedbackAs(ngoCa, pid, feedback(Partner.CA, TacPartnerDecision.Rejected, BigDecimal(4), BigDecimal(1), "From Canada.")) *>
+      setTacFeedbackAs(ngoCa, pid, feedback(Partner.CA, TacPartnerDecision.Rejected, BigDecimal(4), List(ScienceBand.Band1 -> BigDecimal(1)), "From Canada.")) *>
       List(pi, ngoCa, ngoUs, staff).traverse_ : user =>
         expect(
           user     = user,
@@ -225,8 +338,8 @@ class setTacFeedback extends OdbSuite with query.ObservingModeSetupOperations:
             {
               "program": {
                 "tacFeedback": [
-                  ${feedbackJson("CA", "REJECTED", BigDecimal(4), BigDecimal("1.000000"), "From Canada.")},
-                  ${feedbackJson("US", "ACCEPTED", BigDecimal("1.5"), BigDecimal("2.000000"), "From the US.")}
+                  ${feedbackJson("CA", "REJECTED", BigDecimal(4), band1("1.000000"), "From Canada.")},
+                  ${feedbackJson("US", "ACCEPTED", BigDecimal("1.5"), band1("2.000000"), "From the US.")}
                 ]
               }
             }

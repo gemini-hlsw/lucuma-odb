@@ -13,5 +13,11 @@ trait TacFeedbackResultMapping[F[_]] extends TacFeedbackTable[F]:
     ObjectMapping(TacFeedbackResultType)(
       SqlField("programId", TacFeedbackTable.ProgramId, key = true, hidden = true),
       SqlField("partner",   TacFeedbackTable.Partner,   key = true, hidden = true),
-      SqlObject("tacFeedback")
+      // A self-join rather than a plain SqlObject on the same table: without it,
+      // Grackle fails an internal assertion when compiling the composite-key join
+      // from TacFeedback to its recommendedTimes.
+      SqlObject("tacFeedback", Join(List(
+        TacFeedbackTable.ProgramId -> TacFeedbackTable.ProgramId,
+        TacFeedbackTable.Partner   -> TacFeedbackTable.Partner
+      )))
     )

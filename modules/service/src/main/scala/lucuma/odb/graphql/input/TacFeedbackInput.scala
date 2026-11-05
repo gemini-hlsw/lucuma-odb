@@ -9,24 +9,25 @@ import eu.timepit.refined.types.numeric.PosBigDecimal
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.enums.Partner
 import lucuma.core.enums.TacPartnerDecision
-import lucuma.core.util.TimeSpan
+import lucuma.core.syntax.string.*
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.*
 
 /**
- * A partner's TAC feedback.  The decision, ranking and recommended time are
- * required to create new feedback, but may be omitted when updating existing
- * feedback in order to keep their current values.  GraphQL cannot express
- * "optional but not nullable", so explicit nulls for these are rejected by the
- * binding.  Comments are optional: omitting them keeps the current value (if
- * any) and an explicit null removes them.
+ * A partner's TAC feedback.  The decision and ranking are required to create
+ * new feedback, but may be omitted when updating existing feedback in order to
+ * keep their current values.  When supplied, the recommended times (at most one
+ * per science band) replace all existing ones; when omitted they are kept.
+ * GraphQL cannot express "optional but not nullable", so explicit nulls for
+ * these are rejected by the binding.  Comments are optional: omitting them
+ * keeps the current value (if any) and an explicit null removes them.
  */
 case class TacFeedbackInput(
-  partner:         Partner,
-  decision:        Option[TacPartnerDecision],
-  ranking:         Option[PosBigDecimal],
-  recommendedTime: Option[TimeSpan],
-  comments:        Nullable[NonEmptyString]
+  partner:          Partner,
+  decision:         Option[TacPartnerDecision],
+  ranking:          Option[PosBigDecimal],
+  recommendedTimes: Option[List[TacRecommendedTimeInput]],
+  comments:         Nullable[NonEmptyString]
 )
 
 object TacFeedbackInput:
@@ -37,7 +38,9 @@ object TacFeedbackInput:
         PartnerBinding("partner", rPartner),
         TacPartnerDecisionBinding.NonNullable("decision", rDecision),
         PosBigDecimalBinding.NonNullable("ranking", rRanking),
-        TimeSpanInput.Binding.NonNullable("recommendedTime", rRecommendedTime),
+        TacRecommendedTimeInput.Binding.List.NonNullable("recommendedTimes", rRecommendedTimes),
         NonEmptyStringBinding.Nullable("comments", rComments)
       ) =>
-        (rPartner, rDecision, rRanking, rRecommendedTime, rComments).parMapN(apply)
+        val rRecommendedTimesʹ =
+          mapDedup("recommendedTimes band", rRecommendedTimes)(_.band, _.tag.toScreamingSnakeCase)
+        (rPartner, rDecision, rRanking, rRecommendedTimesʹ, rComments).parMapN(apply)

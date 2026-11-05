@@ -10,12 +10,14 @@ import eu.timepit.refined.types.numeric.PosBigDecimal
 import io.circe.literal.*
 import lucuma.core.enums.GeminiCallForProposalsType.RegularSemester
 import lucuma.core.enums.Partner
+import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.TacPartnerDecision
 import lucuma.core.model.Program
 import lucuma.core.model.Semester
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.input.TacFeedbackInput
+import lucuma.odb.graphql.input.TacRecommendedTimeInput
 
 class deleteTacFeedback extends OdbSuite with query.ObservingModeSetupOperations:
 
@@ -34,7 +36,7 @@ class deleteTacFeedback extends OdbSuite with query.ObservingModeSetupOperations
       partner,
       TacPartnerDecision.Accepted.some,
       PosBigDecimal.unsafeFrom(BigDecimal(1)).some,
-      TimeSpan.fromHours(BigDecimal(2)).get.some,
+      List(TacRecommendedTimeInput(ScienceBand.Band1, TimeSpan.fromHours(BigDecimal(2)).get)).some,
       Nullable.Absent
     )
 
@@ -95,6 +97,25 @@ class deleteTacFeedback extends OdbSuite with query.ObservingModeSetupOperations
     List((staff, Partner.US), (admin, Partner.CA), (service, Partner.US)).traverse_ : (user, partner) =>
       createProgramWithFeedback.flatMap: pid =>
         deleteTacFeedbackAs(user, pid, partner).map(assert(_))
+
+  test("deleting TAC feedback also deletes its recommended times"):
+    createProgramWithFeedback.flatMap: pid =>
+      deleteTacFeedbackAs(staff, pid, Partner.US).map(assert(_)) *>
+      setTacFeedbackAs(staff, pid, feedback(Partner.US).copy(recommendedTimes = none)) *>
+      expect(
+        user     = staff,
+        query    = s"""query { program(programId: "$pid") { tacFeedback { partner recommendedTimes { band } } } }""",
+        expected = json"""
+          {
+            "program": {
+              "tacFeedback": [
+                { "partner": "CA", "recommendedTimes": [ { "band": "BAND1" } ] },
+                { "partner": "US", "recommendedTimes": [] }
+              ]
+            }
+          }
+        """.asRight
+      )
 
   test("deleting missing TAC feedback returns false"):
     createProgramWithFeedback.flatMap: pid =>

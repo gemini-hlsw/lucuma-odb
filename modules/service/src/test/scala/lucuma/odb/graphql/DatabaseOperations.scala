@@ -2427,7 +2427,9 @@ trait DatabaseOperations { this: OdbSuite =>
       s"partner: ${f.partner.tag.toScreamingSnakeCase}".some,
       f.decision.map(d => s"decision: ${d.tag.toScreamingSnakeCase}"),
       f.ranking.map(r => s"ranking: \"${r.value}\""),
-      f.recommendedTime.map(t => s"recommendedTime: { hours: \"${t.toHours}\" }"),
+      f.recommendedTimes.map: ts =>
+        ts.map(t => s"{ band: ${t.band.tag.toScreamingSnakeCase}, time: { hours: \"${t.time.toHours}\" } }")
+          .mkString("recommendedTimes: [", ", ", "]"),
       f.comments.fold("comments: null".some, none, c => s"comments: ${c.value.asJson}".some)
     ).flatten.mkString("{\n", "\n", "\n}")
 
@@ -2448,7 +2450,7 @@ trait DatabaseOperations { this: OdbSuite =>
               partner
               decision
               ranking
-              recommendedTime { hours }
+              recommendedTimes { band time { hours } }
               comments
             }
           }

@@ -483,6 +483,7 @@ trait BaseMapping[F[_]]
   lazy val TacCategoryType                         = schema.ref("TacCategory")
   lazy val TacFeedbackResultType                   = schema.ref("TacFeedbackResult")
   lazy val TacFeedbackType                         = schema.ref("TacFeedback")
+  lazy val TacRecommendedTimeType                  = schema.ref("TacRecommendedTime")
   lazy val TacPartnerDecisionType                  = schema.ref("TacPartnerDecision")
   lazy val TargetDispositionType                   = schema.ref("TargetDisposition")
   lazy val TargetEditType                          = schema.ref("TargetEdit")

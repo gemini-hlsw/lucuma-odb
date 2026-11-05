@@ -565,19 +565,25 @@ class programEdit extends OdbSuite with SubscriptionUtils {
     import lucuma.core.util.TimeSpan
     import lucuma.odb.data.Nullable
     import lucuma.odb.graphql.input.TacFeedbackInput
+    import lucuma.odb.graphql.input.TacRecommendedTimeInput
 
-    val create = TacFeedbackInput(
+    def band1(hours: Int): Option[List[TacRecommendedTimeInput]] =
+      List(TacRecommendedTimeInput(ScienceBand.Band1, TimeSpan.fromHours(hours).get)).some
+
+    val create    = TacFeedbackInput(
       Partner.US,
       TacPartnerDecision.Accepted.some,
       PosBigDecimal.unsafeFrom(BigDecimal(1)).some,
-      TimeSpan.fromHours(BigDecimal(2)).get.some,
+      band1(2),
       Nullable.NonNull(NonEmptyString.unsafeFrom("Good."))
     )
-    val reject = TacFeedbackInput(Partner.US, TacPartnerDecision.Rejected.some, none, none, Nullable.Absent)
-    val noop   = TacFeedbackInput(Partner.US, none, none, none, Nullable.Absent)
+    val reject    = TacFeedbackInput(Partner.US, TacPartnerDecision.Rejected.some, none, none, Nullable.Absent)
+    val noop      = TacFeedbackInput(Partner.US, none, none, none, Nullable.Absent)
+    val sameTimes = TacFeedbackInput(Partner.US, none, none, band1(2), Nullable.Absent)
+    val newTimes  = TacFeedbackInput(Partner.US, none, none, band1(3), Nullable.Absent)
 
-    def event(decision: String) =
-      json"""{ "programEdit": { "editType": "UPDATED", "value": { "tacFeedback": [ { "partner": "US", "decision": $decision } ] } } }"""
+    def event(decision: String, hours: String) =
+      json"""{ "programEdit": { "editType": "UPDATED", "value": { "tacFeedback": [ { "partner": "US", "decision": $decision, "recommendedTimes": [ { "band": "BAND1", "time": { "hours": ${BigDecimal(hours)} } } ] } ] } } }"""
 
     val deleted =
       json"""{ "programEdit": { "editType": "UPDATED", "value": { "tacFeedback": [] } } }"""
@@ -599,6 +605,7 @@ class programEdit extends OdbSuite with SubscriptionUtils {
                        tacFeedback {
                          partner
                          decision
+                         recommendedTimes { band time { hours } }
                        }
                      }
                    }
@@ -614,13 +621,22 @@ class programEdit extends OdbSuite with SubscriptionUtils {
                    _ <- IO.sleep(1.second)
                    _ <- setTacFeedbackAs(service, p, reject)
                    _ <- IO.sleep(1.second)
+                   _ <- setTacFeedbackAs(service, p, sameTimes)
+                   _ <- IO.sleep(1.second)
+                   _ <- setTacFeedbackAs(service, p, newTimes)
+                   _ <- IO.sleep(1.second)
                    _ <- deleteTacFeedbackAs(service, p, Partner.US)
                    _ <- IO.sleep(1.second)
                    _ <- deleteTacFeedbackAs(service, p, Partner.US)
                    _ <- IO.sleep(1.second)
                  } yield ()
                ),
-             expected = List(event("ACCEPTED"), event("REJECTED"), deleted)
+             expected = List(
+               event("ACCEPTED", "2.000000"),
+               event("REJECTED", "2.000000"),
+               event("REJECTED", "3.000000"),
+               deleted
+             )
            )
     } yield ()
   }

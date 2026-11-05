@@ -62,7 +62,7 @@ trait TimeSpanMapping[F[_]] extends AllocationTable[F]
     List(
       timeSpanMappingAtPath(AllocationType / "duration",   AllocationTable.Duration)(AllocationTable.ProgramId, AllocationTable.Category, AllocationTable.ScienceBand),
       timeSpanMappingAtPath(ConditionsExpectationType / "timeframe", ChronConditionsEntryView.Intuition.Expectation.Timespan)(ChronConditionsEntryView.Intuition.Expectation.SyntheticId),
-      timeSpanMappingAtPath(TacFeedbackType / "recommendedTime", TacFeedbackTable.RecommendedTime)(TacFeedbackTable.ProgramId, TacFeedbackTable.Partner),
+      timeSpanMappingAtPath(TacRecommendedTimeType / "time", TacRecommendedTimeTable.RecommendedTime)(TacRecommendedTimeTable.ProgramId, TacRecommendedTimeTable.Partner, TacRecommendedTimeTable.ScienceBand),
       timeSpanMappingAtPath(ExchangeType / "totalRequestTime", ExchangeView.TotalRequestTime)(ExchangeView.TotalRequestTimeId),
       timeSpanMappingAtPath(GhostIfuType    / "slitViewingCameraExposureTime", GhostIfuView.SlitViewingCamera.ExposureTime)(GhostIfuView.SlitViewingCamera.Id),
       timeSpanMappingAtPath(GhostStaticType / "slitViewingCameraExposureTime", GhostStaticView.SlitViewingCamera.ExposureTime)(GhostStaticView.SlitViewingCamera.Id),
