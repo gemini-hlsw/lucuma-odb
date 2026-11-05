@@ -13,16 +13,6 @@ import lucuma.sso.service.database.RoleRequest
 
 class createApiKey extends GraphQLSuite with SsoSuite with Fixture:
 
-  val ApiKeyAuthError: Json =
-    json"""{
-      "errors" : [
-        {
-          "message" : "API keys cannot create API keys. Authenticate with a session token."
-        }
-      ],
-      "data" : null
-    }"""
-
   def isApiKey(json: Json): Boolean =
     json
       .hcursor
@@ -83,16 +73,14 @@ class createApiKey extends GraphQLSuite with SsoSuite with Fixture:
       """
     } .map(json => assert(isApiKey(json)))
 
-  test("An API key cannot create an API key for its own role"):
-    As(Bob).expectQueryWithUser(
-      query = user =>
-        show"""
-          mutation {
-            createApiKey(role: "${user.role.id}")
-          }
-        """,
-      expected = ApiKeyAuthError
-    )
+  test("An API key can create an API key for its own role"):
+    As(Bob).queryWithUser { user =>
+      show"""
+        mutation {
+          createApiKey(role: "${user.role.id}")
+        }
+      """
+    } .map(json => assert(isApiKey(json)))
 
   test("An API key cannot create an API key for another owned role"):
     As(Bob).withRoleRequest(RoleRequest.Staff).expectQueryWithUser(
@@ -102,5 +90,12 @@ class createApiKey extends GraphQLSuite with SsoSuite with Fixture:
             createApiKey(role: "${user.otherRoles.head.id}")
           }
         """,
-      expected = ApiKeyAuthError
+      expected = json"""{
+        "errors" : [
+          {
+            "message" : "An API key may only create API keys for its own role."
+          }
+        ],
+        "data" : null
+      }"""
     )

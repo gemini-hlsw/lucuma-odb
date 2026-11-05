@@ -69,14 +69,14 @@ object SsoMapping {
     monitor:  SkunkMonitor[F],
     loadedSchema: Schema
   ): Mapping[F] = {
-      // A leaked API key must not mint keys for the user's other roles, nor keys that outlive its
-      // own revocation, so only session (JWT) callers may create API keys.
+      // An API key authenticates as its own role, so a leaked key must not mint keys for the
+      // user's other roles. Session (JWT) callers may mint for any role they own.
       def createApiKey(env: Env): F[Result[String]] =
         (env.getR[StandardUser](UserContext.EnvKey), env.getR[StandardRole.Id]("roleId"), env.getR[Boolean](ApiKeyAuthKey))
           .parTupled
           .flatTraverse: (user, roleId, apiKeyAuth) =>
-            if apiKeyAuth then
-              Result.failure("API keys cannot create API keys. Authenticate with a session token.").pure[F]
+            if apiKeyAuth && user.role.id =!= roleId then
+              Result.failure("An API key may only create API keys for its own role.").pure[F]
             else if (user.role :: user.otherRoles).exists(_.id === roleId) then
               pool.map(Database.fromSession(_)).use: db =>
                 db.createApiKey(roleId)
