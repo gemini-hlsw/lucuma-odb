@@ -52,6 +52,7 @@ object Imaging:
     observationId:  Observation.Id,
     estimator:      StepTimeEstimateCalculator[GnirsStaticConfig, GnirsDynamicConfig],
     namespace:      UUID,
+    expander:       SmartGcalExpander[F, GnirsStaticConfig, GnirsDynamicConfig],
     config:         Config,
     acquisitionItc: Either[OdbError, IntegrationTime],
     pinnedAcqType:  Option[GnirsAcquisitionType],
@@ -66,5 +67,5 @@ object Imaging:
       config,
       acquisitionItc,
       pinnedAcqType,
-      Science.gnirs(observationId, estimator, static, namespace, config, scienceItc)
+      Science.gnirs(observationId, estimator, static, namespace, expander, config, scienceItc)
     )

@@ -8,6 +8,7 @@ import cats.data.NonEmptySet
 import cats.effect.IO
 import cats.syntax.either.*
 import cats.syntax.foldable.*
+import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.numeric.PosLong
 import io.circe.Json
@@ -53,8 +54,8 @@ class daytimeCalibrationSets_gnirs extends OdbSuite with DatabaseOperations with
   private val smartKey: Gnirs.TableKey =
     Gnirs.TableKey(
       GnirsPixelScale.PixelScale_0_15,
-      GnirsGrating.D32,
-      GnirsPrism.Mirror,
+      GnirsGrating.D32.some,
+      GnirsPrism.Mirror.some,
       BoundedInterval.unsafeOpenUpper(
         Wavelength.fromIntNanometers(900).get,
         Wavelength.fromIntNanometers(2560).get

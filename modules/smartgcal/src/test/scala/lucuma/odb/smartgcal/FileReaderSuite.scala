@@ -56,7 +56,7 @@ final class FileReaderSuite extends munit.FunSuite:
     loadInstrument(filename, entryParser.parseAll)
 
   private def loadGnirs(filename: String): Unit =
-    loadInstrument(filename, parsers.gnirs.fileEntry.parseAll)
+    loadInstrument(filename, parsers.gnirs.fileEntry.map(Availability.Current.apply).parseAll)
 
   test("Flamingos2_ARC"):
     loadF2("Flamingos2_ARC")

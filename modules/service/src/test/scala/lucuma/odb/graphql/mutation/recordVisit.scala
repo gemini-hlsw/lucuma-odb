@@ -101,8 +101,8 @@ class recordVisit extends OdbSuite with query.GenerationTestSupport with Executi
   private def gnirs_key(pixelScale: GnirsPixelScale): Gnirs.TableKey =
     Gnirs.TableKey(
       pixelScale,
-      GnirsGrating.D111,
-      GnirsPrism.Mirror,
+      GnirsGrating.D111.some,
+      GnirsPrism.Mirror.some,
       BoundedInterval.unsafeOpenUpper(Wavelength.Min, Wavelength.Max),
       GnirsFpu.Spectroscopy.Slit(GnirsFpuSlit.LongSlit_0_30),
       GnirsWellDepth.Shallow

@@ -57,11 +57,6 @@ object Science:
    */
   val AbbaCycleTitle: NonEmptyString = NonEmptyString.unsafeFrom("ABBA Cycle")
 
-  /**
-   * The name of the nighttime cal atoms.
-   */
-  val NighttimeCalTitle: NonEmptyString = NonEmptyString.unsafeFrom("Nighttime Calibrations")
-
   case class StepDefinition(
     a0:   ProtoStep[F2],
     b0:   ProtoStep[F2],
@@ -165,7 +160,7 @@ object Science:
 
     override def generate: Stream[Pure, Atom[F2]] =
 
-      val gcalAtom: ProtoAtom[ProtoStep[F2]] = ProtoAtom(NighttimeCalTitle.some, steps.cals)
+      val gcalAtom: ProtoAtom[ProtoStep[F2]] = ProtoAtom(AtomTitle.NighttimeCal.some, steps.cals)
 
       val protoAtoms: List[ProtoAtom[ProtoStep[F2]]] =
         if goalCycles.value === 0 then Nil
