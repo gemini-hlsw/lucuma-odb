@@ -18,6 +18,7 @@ import lucuma.core.model.sequence.AtomDigest
 import lucuma.core.syntax.string.*
 import lucuma.core.util.Gid
 import lucuma.core.util.Uid
+import lucuma.odb.service.Services
 import org.http4s.*
 import org.http4s.headers.`Accept-Encoding`
 import org.http4s.implicits.*
@@ -38,14 +39,27 @@ abstract class SchedulerRoutesSuite extends OdbSuite:
     if gzip then headers.map(_.put(`Accept-Encoding`(ContentCoding.gzip)))
     else headers
 
+  /**
+   * Runs `request` against the scheduler routes much as the server does: each
+   * use of the services opens its own database session and closes it when
+   * that use ends, while the shared resources stay open until the response
+   * body has been read.  A page that outlives its session then fails here
+   * (on a closed connection) rather than passing on a shared one.
+   */
   protected def withRoutes(
     user:      User,
     request:   Request[IO],
     pageSizes: SchedulerRoutes.PageSizes = SchedulerRoutes.PageSizes.Default
   ): IO[Response[IO]] =
-    withSession: s =>
-      servicesFor(user).use: srv =>
-        SchedulerRoutes(srv(s), ssoClient, pageSizes).orNotFound.run(request)
+    servicesFor(user).allocated.flatMap: (srv, release) =>
+      val services: [A] => User => (Services[IO] => IO[A]) => IO[A] =
+        [A] => (_: User) => (fa: Services[IO] => IO[A]) => session.use(s => fa(srv(s)))
+
+      SchedulerRoutes(services, ssoClient, pageSizes)
+        .orNotFound
+        .run(request)
+        .map(resp => resp.withBodyStream(resp.body.onFinalize(release)))
+        .onError(_ => release)
 
   protected def decompress(resp: Response[IO]): IO[String] =
     resp.body

@@ -83,18 +83,6 @@ object SchedulerRoutes:
       PageSizes.Default
     )
 
-  // used by tests
-  def apply[F[_]: Async](
-    services:  Services[F],
-    ssoClient: SsoClient[F, User],
-    pageSizes: PageSizes = PageSizes.Default
-  ): HttpRoutes[F] =
-    apply(
-      [A] => (_: User) => (fa: Services[F] => F[A]) => fa(services),
-      ssoClient,
-      pageSizes
-    )
-
   private type AtomRow = (Observation.Id, Short, AtomDigest)
 
   private def tsv(row: AtomRow): String =
