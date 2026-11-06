@@ -446,10 +446,8 @@ object SequenceService:
       )(using Transaction[F], Services.ServiceAccess): F[List[(Observation.Id, Short, AtomDigest)]] =
         if which.isEmpty then List.empty.pure[F]
         else
-          val afterObservation = after.map(_._1)
-          session.execute(Statements.selectAtomDigests(which))(
-            (which, afterObservation, afterObservation, after.map(_._2), limit.value)
-          )
+          val af = Statements.selectAtomDigests(which, after, limit)
+          session.execute(af.fragment.query(Statements.atom_digest_row))(af.argument)
 
       /**
        * Marks ongoing steps as abandoned and deletes any steps that are
@@ -1843,9 +1841,15 @@ object SequenceService:
         ) VALUES $enc
       """.command
 
+    // The cursor condition is added only when there is a cursor, so that first
+    // and later pages are separate statements.  A single statement with an
+    // optional cursor gets a generic plan that rereads every row of the batch
+    // before the cursor once Postgres stops planning it for each execution.
     def selectAtomDigests(
-      which: List[Observation.Id]
-    ): Query[(which.type, Option[Observation.Id], Option[Observation.Id], Option[Short], Int), (Observation.Id, Short, AtomDigest)] =
+      which: List[Observation.Id],
+      after: Option[(Observation.Id, Short)],
+      limit: PosInt
+    ): AppliedFragment =
       sql"""
         SELECT
           #$AtomDigestRowColumns
@@ -1853,10 +1857,16 @@ object SequenceService:
           t_atom_digest
         WHERE
           c_observation_id IN ${observation_id.list(which).values}
-          AND (${observation_id.opt} IS NULL OR (c_observation_id, c_atom_index) > (${observation_id.opt}, ${int2.opt}))
+      """.apply(which) |+|
+      after.foldMap: a =>
+        sql"""
+          AND (c_observation_id, c_atom_index) > ($observation_id, $int2)
+        """.apply(a)
+      |+|
+      sql"""
         ORDER BY c_observation_id, c_atom_index
         LIMIT $int4
-      """.query(atom_digest_row)
+      """.apply(limit.value)
 
     final case class DynamicTable[D](
       name:    String,

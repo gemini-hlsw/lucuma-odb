@@ -4,6 +4,7 @@
 package lucuma.odb.service
 
 import cats.Functor
+import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.model.Observation
@@ -68,8 +69,9 @@ object VisibilityService:
         after: Option[Observation.Id],
         limit: PosInt
       )(using Transaction[F], Services.ServiceAccess): F[List[VisibilityChange.ForObservation]] =
+        val af = Statements.selectObservations(since, until, after, limit)
         session
-          .execute(Statements.SelectObservations)((since, until, after, after, limit.value))
+          .execute(af.fragment.query(observation_id *: core_timestamp))(af.argument)
           .map(_.map(VisibilityChange.ForObservation.apply))
 
       override def selectTargetChanges(
@@ -78,13 +80,27 @@ object VisibilityService:
         after: Option[Target.Id],
         limit: PosInt
       )(using Transaction[F], Services.ServiceAccess): F[List[VisibilityChange.ForTarget]] =
+        val af = Statements.selectTargets(since, until, after, limit)
         session
-          .execute(Statements.SelectTargets)((since, until, after, after, limit.value))
+          .execute(af.fragment.query(target_id *: core_timestamp))(af.argument)
           .map(_.map(VisibilityChange.ForTarget.apply))
 
   object Statements:
 
-    val SelectObservations: Query[(Timestamp, Timestamp, Option[Observation.Id], Option[Observation.Id], Int), (Observation.Id, Timestamp)] =
+    // The cursor condition is added only when there is a cursor, so that first
+    // and later pages are separate statements.  A single statement with an
+    // optional cursor ("$after IS NULL OR id > $after") gets a generic plan
+    // that scans every row before the cursor once Postgres stops planning it
+    // for each execution.  The cursor is repeated on the joined table because
+    // Postgres doesn't carry an inequality across a join, and would otherwise
+    // read that table from its start to line it up.
+
+    def selectObservations(
+      since: Timestamp,
+      until: Timestamp,
+      after: Option[Observation.Id],
+      limit: PosInt
+    ): AppliedFragment =
       sql"""
         SELECT ov.c_observation_id, ov.c_last_visibility_invalidation
         FROM t_observation_visibility ov
@@ -92,12 +108,24 @@ object VisibilityService:
         WHERE o.c_existence = 'present'
           AND ov.c_last_visibility_invalidation >= $core_timestamp
           AND ov.c_last_visibility_invalidation <= $core_timestamp
-          AND (${observation_id.opt} IS NULL OR ov.c_observation_id > ${observation_id.opt})
+      """.apply((since, until)) |+|
+      after.foldMap: a =>
+        sql"""
+          AND ov.c_observation_id > $observation_id
+          AND o.c_observation_id > $observation_id
+        """.apply((a, a))
+      |+|
+      sql"""
         ORDER BY ov.c_observation_id
         LIMIT $int4
-      """.query(observation_id *: core_timestamp)
+      """.apply(limit.value)
 
-    val SelectTargets: Query[(Timestamp, Timestamp, Option[Target.Id], Option[Target.Id], Int), (Target.Id, Timestamp)] =
+    def selectTargets(
+      since: Timestamp,
+      until: Timestamp,
+      after: Option[Target.Id],
+      limit: PosInt
+    ): AppliedFragment =
       sql"""
         SELECT tv.c_target_id, tv.c_last_visibility_invalidation
         FROM t_target_visibility tv
@@ -112,7 +140,14 @@ object VisibilityService:
             WHERE a.c_target_id = tv.c_target_id
               AND o.c_existence = 'present'
           )
-          AND (${target_id.opt} IS NULL OR tv.c_target_id > ${target_id.opt})
+      """.apply((since, until)) |+|
+      after.foldMap: a =>
+        sql"""
+          AND tv.c_target_id > $target_id
+          AND t.c_target_id > $target_id
+        """.apply((a, a))
+      |+|
+      sql"""
         ORDER BY tv.c_target_id
         LIMIT $int4
-      """.query(target_id *: core_timestamp)
+      """.apply(limit.value)
