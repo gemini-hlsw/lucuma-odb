@@ -8,6 +8,7 @@ import cats.effect.IO
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.PosInt
+import fs2.Stream
 import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.GcalLampType
 import lucuma.core.enums.ObserveClass
@@ -20,7 +21,10 @@ import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
 import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
+import lucuma.odb.util.Codecs.observation_id
 import org.http4s.*
+import org.http4s.implicits.*
+import skunk.implicits.*
 
 class schedulerRoutes extends SchedulerRoutesSuite with ExecutionTestSupportForGmos:
 
@@ -43,6 +47,82 @@ class schedulerRoutes extends SchedulerRoutesSuite with ExecutionTestSupportForG
   test("invalid observation ids"):
     atomsRequest(serviceUser, "foo", "o-123", "bar").flatMap: request =>
       withRoutes(serviceUser, request).assertResponse(Status.BadRequest, "Unable to parse observation ids: foo, bar".some)
+
+  test("not service user, invalid observation ids"):
+    // Authorization is checked before the body is parsed.
+    atomsRequest(pi, "foo", "bar").flatMap: request =>
+      withRoutes(serviceUser, request).assertResponse(Status.Forbidden, none)
+
+  // A body that fails the test if anything reads it.
+  private val unreadableBody: Stream[IO, Byte] =
+    Stream.raiseError[IO](new RuntimeException("request body was read"))
+
+  test("no authorization header, body not read"):
+    val request = Request[IO](method = Method.POST, uri = uri"scheduler/atoms").withBodyStream(unreadableBody)
+    withRoutes(serviceUser, request).assertResponse(Status.Forbidden, "Access denied".some)
+
+  test("not service user, body not read"):
+    atomsRequest(pi).flatMap: request =>
+      withRoutes(serviceUser, request.withBodyStream(unreadableBody)).assertResponse(Status.Forbidden, none)
+
+  test("invalid observation ids, bounded error message"):
+    val long = "x" * 50  // longer than the reported length, within the line limit
+    val bad  = List("b1", "b2", "b3", "b4", long, "b6", "b7")
+    atomsRequest(serviceUser, ("o-123" :: bad)*).flatMap: request =>
+      withRoutes(serviceUser, request).assertResponse(
+        Status.BadRequest,
+        s"Unable to parse observation ids: b1, b2, b3, b4, ${"x" * 32}... (and 2 more)".some
+      )
+
+  test("invalid observation ids, unprintable characters escaped"):
+    val control = "a\u0000b\u001b[2Jc"              // NUL and an ANSI escape
+    val bidi    = "x\u202Ey\\z"                     // bidi override and a backslash
+    val emoji   = ("w" * 31) + "\uD83D\uDE00" + "v"  // 33 code points, emoji 32nd
+    val tag     = "a\uDB40\uDC01b"                    // U+E0001, an invisible tag beyond U+FFFF
+    atomsRequest(serviceUser, control, bidi, emoji, tag).flatMap: request =>
+      withRoutes(serviceUser, request).assertResponse(
+        Status.BadRequest,
+        s"Unable to parse observation ids: a\\u0000b\\u001b[2Jc, x\\u202ey\\\\z, ${"w" * 31}\uD83D\uDE00..., a\\u{e0001}b".some
+      )
+
+  test("line too long"):
+    val tooLong = "o-" + ("f" * (SchedulerRoutes.MaxAtomsRequestLineLength - 1))
+    atomsRequest(serviceUser, "o-123", tooLong).flatMap: request =>
+      withRoutes(serviceUser, request).assertResponse(
+        Status.BadRequest,
+        s"Unable to parse observation ids: a line exceeds ${SchedulerRoutes.MaxAtomsRequestLineLength} characters".some
+      )
+
+  test("line too long across chunks"):
+    // No single chunk is too long, but together they make one long line.
+    val half = "x" * (SchedulerRoutes.MaxAtomsRequestLineLength / 2 + 1)
+    atomsRequest(serviceUser).flatMap: request =>
+      val req = request.withBodyStream(Stream(half, half).through(fs2.text.utf8.encode).chunkLimit(half.length).unchunks)
+      withRoutes(serviceUser, req).assertResponse(
+        Status.BadRequest,
+        s"Unable to parse observation ids: a line exceeds ${SchedulerRoutes.MaxAtomsRequestLineLength} characters".some
+      )
+
+  // Exactly MaxRequestBytes of valid lines ("o-1\n" is 4 bytes), followed
+  // by `extra`, delivered in 4 KiB chunks so the limit is applied across many
+  // chunk boundaries.
+  private def limitBody(extra: String): Stream[IO, Byte] =
+    val lineCount = SchedulerRoutes.MaxRequestBytes.toInt / 4
+    (Stream.emit("o-1\n").repeatN(lineCount.toLong) ++ Stream.emit(extra))
+      .through(fs2.text.utf8.encode)
+      .chunkLimit(4096)
+      .unchunks
+
+  test("request body at the limit is accepted"):
+    atomsRequest(serviceUser).flatMap: request =>
+      withRoutes(serviceUser, request.withBodyStream(limitBody(""))).assertResponse(Status.Ok, "".some)
+
+  test("request body one byte over the limit is rejected"):
+    atomsRequest(serviceUser).flatMap: request =>
+      withRoutes(serviceUser, request.withBodyStream(limitBody("o"))).assertResponse(
+        Status.PayloadTooLarge,
+        s"Request body exceeds ${SchedulerRoutes.MaxRequestBytes} bytes".some
+      )
 
   test("unknown observation ids"):
     atomsRequest(serviceUser, "o-123", "o-124", "o-125").flatMap: request =>
@@ -121,6 +201,108 @@ class schedulerRoutes extends SchedulerRoutesSuite with ExecutionTestSupportForG
     setup.flatMap: (oid0, oid1) =>
       atomsRequest(serviceUser, oid0.toString, oid1.toString).flatMap: request =>
         withRoutes(serviceUser, request).assertUncompressedAtoms(Status.Ok, List(oid0 -> List(a0, a1, a2, a3), oid1 -> List(a0, a1, a2, a3)))
+
+  test("observations read in separate batches"):
+    val setup: IO[(Observation.Id, Observation.Id)] =
+      for
+        p  <- createProgram
+        t  <- createTargetWithProfileAs(pi, p)
+        o0 <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        _  <- runObscalcUpdate(p, o0)
+        o1 <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        _  <- runObscalcUpdate(p, o1)
+      yield (o0, o1)
+
+    // One observation per batch, with an unknown id (an empty batch) between
+    // them and a duplicate that must not be repeated.
+    setup.flatMap: (oid0, oid1) =>
+      atomsRequest(serviceUser, oid0.toString, "o-fffffff", oid1.toString, oid0.toString).flatMap: request =>
+        withRoutes(serviceUser, request, SinglePages)
+          .assertUncompressedAtoms(Status.Ok, List(oid0 -> List(a0, a1, a2, a3), oid1 -> List(a0, a1, a2, a3)))
+
+  private def rowLimit(n: Int): SchedulerRoutes.PageSizes =
+    SchedulerRoutes.PageSizes(PosInt.unsafeFrom(1000), PosInt.unsafeFrom(n))
+
+  private val twoObservations: IO[(Observation.Id, Observation.Id)] =
+    for
+      p  <- createProgram
+      t  <- createTargetWithProfileAs(pi, p)
+      o0 <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      _  <- runObscalcUpdate(p, o0)
+      o1 <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      _  <- runObscalcUpdate(p, o1)
+    yield (o0, o1)
+
+  test("an observation cut short by the row limit is read whole on the next page"):
+    // Two observations of four atoms in pages of five: the first page reaches
+    // into the second observation, which is left for the next page.
+    twoObservations.flatMap: (oid0, oid1) =>
+      atomsRequest(serviceUser, oid0.toString, oid1.toString).flatMap: request =>
+        withRoutes(serviceUser, request, rowLimit(5))
+          .assertUncompressedAtoms(Status.Ok, List(oid0 -> List(a0, a1, a2, a3), oid1 -> List(a0, a1, a2, a3)))
+
+  test("an observation with more atoms than the row limit is read whole"):
+    // Pages of three can't hold an observation of four atoms.
+    twoObservations.flatMap: (oid0, oid1) =>
+      atomsRequest(serviceUser, oid0.toString, oid1.toString).flatMap: request =>
+        withRoutes(serviceUser, request, rowLimit(3))
+          .assertUncompressedAtoms(Status.Ok, List(oid0 -> List(a0, a1, a2, a3), oid1 -> List(a0, a1, a2, a3)))
+
+  test("a sequence rewritten between pages is not mixed with its old atoms"):
+    // Gives every atom digest of the observation a new id, as a rewrite would.
+    def rewrite(oid: Observation.Id): IO[Unit] =
+      withSession: s =>
+        s.execute(
+          sql"UPDATE t_atom_digest SET c_atom_id = 'a-' || gen_random_uuid() WHERE c_observation_id = $observation_id".command
+        )(oid).void
+
+    def body(response: Response[IO]): IO[String] = response.as[String]
+
+    twoObservations.flatMap: (oid0, _) =>
+      for
+        request  <- atomsRequest(serviceUser, oid0.toString)
+        before   <- withRoutes(serviceUser, request).flatMap(body)
+        response <- withRoutes(serviceUser, request, rowLimit(2))  // reads the first page
+        _        <- rewrite(oid0)
+        paged    <- body(response)
+      yield
+        assertEquals(before.linesIterator.size, 4)
+        assertEquals(paged, before)
+
+  test("atom order doesn't depend on request order or page sizes"):
+    val setup: IO[(Observation.Id, Observation.Id)] =
+      for
+        p  <- createProgram
+        t  <- createTargetWithProfileAs(pi, p)
+        o0 <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        _  <- runObscalcUpdate(p, o0)
+        o1 <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        _  <- runObscalcUpdate(p, o1)
+      yield (o0, o1)
+
+    def body(pageSizes: SchedulerRoutes.PageSizes, oids: Observation.Id*): IO[String] =
+      atomsRequest(serviceUser, oids.map(_.toString)*).flatMap: request =>
+        withRoutes(serviceUser, request, pageSizes).flatMap(_.as[String])
+
+    setup.flatMap: (oid0, oid1) =>
+      for
+        forward  <- body(SchedulerRoutes.PageSizes.Default, oid0, oid1)
+        reversed <- body(SchedulerRoutes.PageSizes.Default, oid1, oid0)
+        single   <- body(SinglePages, oid1, oid0)
+      yield
+        assertEquals(forward.linesIterator.size, 8)
+        assertEquals(reversed, forward)
+        assertEquals(single, forward)
+
+  test("requested ids are sorted as the database orders them, not numerically"):
+    // The batches must come out in the order rows are sorted within each one,
+    // which is Postgres's text order: o-1000 < o-1a < o-a < o-fff.  Ordering
+    // Observation.Id numerically would give o-a < o-1a < o-fff < o-1000.
+    val ids = List("o-fff", "o-a", "o-1000", "o-1a", "o-a").flatMap(Observation.Id.parse)
+    withServices(serviceUser): services =>
+      services.transactionally(services.sequenceService.sortObservationIds(ids))
+    .map: sorted =>
+      assertEquals(sorted.map(_.toString), List("o-1000", "o-1a", "o-a", "o-fff"))
 
   test("gzip"):
     val setup: IO[Observation.Id] =

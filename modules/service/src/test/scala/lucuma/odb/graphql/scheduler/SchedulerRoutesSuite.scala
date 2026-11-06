@@ -7,6 +7,7 @@ package scheduler
 import cats.Order.catsKernelOrderingForOrder
 import cats.effect.IO
 import cats.syntax.all.*
+import eu.timepit.refined.types.numeric.PosInt
 import fs2.Stream
 import fs2.compression.Compression
 import fs2.text
@@ -17,6 +18,7 @@ import lucuma.core.model.sequence.AtomDigest
 import lucuma.core.syntax.string.*
 import lucuma.core.util.Gid
 import lucuma.core.util.Uid
+import lucuma.odb.service.Services
 import org.http4s.*
 import org.http4s.headers.`Accept-Encoding`
 import org.http4s.implicits.*
@@ -24,6 +26,10 @@ import org.http4s.implicits.*
 import scala.jdk.CollectionConverters.*
 
 abstract class SchedulerRoutesSuite extends OdbSuite:
+
+  /** Page sizes of one, so that every row is read in its own transaction. */
+  protected val SinglePages: SchedulerRoutes.PageSizes =
+    SchedulerRoutes.PageSizes(PosInt.unsafeFrom(1), PosInt.unsafeFrom(1))
 
   protected  def responseStream(s: String): Stream[IO, Byte] =
     Stream[IO, String](s).through(text.utf8.encode)
@@ -33,10 +39,32 @@ abstract class SchedulerRoutesSuite extends OdbSuite:
     if gzip then headers.map(_.put(`Accept-Encoding`(ContentCoding.gzip)))
     else headers
 
-  protected def withRoutes(user: User, request: Request[IO]): IO[Response[IO]] =
-    withSession: s =>
-      servicesFor(user).use: srv =>
-        SchedulerRoutes(srv(s), ssoClient).orNotFound.run(request)
+  /**
+   * Runs `request` against the scheduler routes much as the server does: each
+   * use of the services opens its own database session and closes it when
+   * that use ends, while the shared resources stay open until the response
+   * body has been read.  A page that outlives its session then fails here
+   * (on a closed connection) rather than passing on a shared one.  The
+   * services are for `user`, so the route must ask for them as that user
+   * (the one the request authenticates as); asking as anyone else fails.
+   */
+  protected def withRoutes(
+    user:      User,
+    request:   Request[IO],
+    pageSizes: SchedulerRoutes.PageSizes = SchedulerRoutes.PageSizes.Default
+  ): IO[Response[IO]] =
+    servicesFor(user).allocated.flatMap: (srv, release) =>
+      val services: [A] => User => (Services[IO] => IO[A]) => IO[A] =
+        [A] => (u: User) => (fa: Services[IO] => IO[A]) =>
+          IO.raiseError(new AssertionError(s"services requested as ${u.id}, not ${user.id}"))
+            .whenA(u.id =!= user.id) *>
+          session.use(s => fa(srv(s)))
+
+      SchedulerRoutes(services, ssoClient, pageSizes)
+        .orNotFound
+        .run(request)
+        .map(resp => resp.withBodyStream(resp.body.onFinalize(release)))
+        .onError(_ => release)
 
   protected def decompress(resp: Response[IO]): IO[String] =
     resp.body

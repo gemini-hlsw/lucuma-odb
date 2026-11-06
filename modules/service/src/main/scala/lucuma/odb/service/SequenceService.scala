@@ -17,6 +17,7 @@ import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
+import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Pipe
 import fs2.Pure
@@ -106,9 +107,31 @@ trait SequenceService[F[_]]:
     digests:       Stream[F, AtomDigest]
   )(using Transaction[F], Services.ServiceAccess): F[Unit]
 
-  def selectAtomDigests(
+  /**
+   * The distinct ids among `which`, in the order the database sorts
+   * observation ids, which is the order `selectAtomDigests` returns them in.
+   * Sorting a request before splitting it into batches makes the batches
+   * together come out in one overall order, whatever the batch size.  (The
+   * database's text order differs from the numeric order of `Observation.Id`.)
+   */
+  def sortObservationIds(
     which: List[Observation.Id]
-  )(using Transaction[F], Services.ServiceAccess): Stream[F, (Observation.Id, Short, AtomDigest)]
+  )(using Transaction[F], Services.ServiceAccess): F[List[Observation.Id]]
+
+  /**
+   * Selects up to `limit` atom digests of the given observations, ordered by
+   * observation and atom index, starting with the first observation after
+   * `after` (or from the beginning if `None`).  The result is fully
+   * materialized so that it cannot outlive the transaction; callers read a
+   * large result one page per transaction, and pass many observations in
+   * batches to stay within the bind-parameter limit.  The last observation of
+   * a full page may be cut short by the limit.
+   */
+  def selectAtomDigests(
+    which: List[Observation.Id],
+    after: Option[Observation.Id],
+    limit: PosInt
+  )(using Transaction[F], Services.ServiceAccess): F[List[(Observation.Id, Short, AtomDigest)]]
 
   def isMaterialized(
     observationId: Observation.Id,
@@ -428,11 +451,21 @@ object SequenceService:
           _ <- insert.compile.drain
         yield ()
 
-      override def selectAtomDigests(
+      override def sortObservationIds(
         which: List[Observation.Id]
-      )(using Transaction[F], Services.ServiceAccess): Stream[F, (Observation.Id, Short, AtomDigest)] =
-        if which.isEmpty then Stream.empty
-        else session.stream(Statements.selectAtomDigests(which))(which, 1024)
+      )(using Transaction[F], Services.ServiceAccess): F[List[Observation.Id]] =
+        if which.isEmpty then List.empty.pure[F]
+        else session.execute(Statements.SortObservationIds)(which)
+
+      override def selectAtomDigests(
+        which: List[Observation.Id],
+        after: Option[Observation.Id],
+        limit: PosInt
+      )(using Transaction[F], Services.ServiceAccess): F[List[(Observation.Id, Short, AtomDigest)]] =
+        if which.isEmpty then List.empty.pure[F]
+        else
+          val af = Statements.selectAtomDigests(which, after, limit)
+          session.execute(af.fragment.query(Statements.atom_digest_row))(af.argument)
 
       /**
        * Marks ongoing steps as abandoned and deletes any steps that are
@@ -1826,7 +1859,23 @@ object SequenceService:
         ) VALUES $enc
       """.command
 
-    def selectAtomDigests(which: List[Observation.Id]): Query[which.type, (Observation.Id, Short, AtomDigest)] =
+    // Sorted as the column is, so the order matches selectAtomDigests.
+    val SortObservationIds: Query[List[Observation.Id], Observation.Id] =
+      sql"""
+        SELECT DISTINCT c_observation_id
+        FROM unnest(${_gid[Observation.Id]}::d_observation_id[]) AS t(c_observation_id)
+        ORDER BY c_observation_id
+      """.query(observation_id)
+
+    // The cursor condition is added only when there is a cursor, so that first
+    // and later pages are separate statements.  A single statement with an
+    // optional cursor gets a generic plan that rereads every row of the batch
+    // before the cursor once Postgres stops planning it for each execution.
+    def selectAtomDigests(
+      which: List[Observation.Id],
+      after: Option[Observation.Id],
+      limit: PosInt
+    ): AppliedFragment =
       sql"""
         SELECT
           #$AtomDigestRowColumns
@@ -1834,8 +1883,16 @@ object SequenceService:
           t_atom_digest
         WHERE
           c_observation_id IN ${observation_id.list(which).values}
+      """.apply(which) |+|
+      after.foldMap: a =>
+        sql"""
+          AND c_observation_id > $observation_id
+        """.apply(a)
+      |+|
+      sql"""
         ORDER BY c_observation_id, c_atom_index
-      """.query(atom_digest_row)
+        LIMIT $int4
+      """.apply(limit.value)
 
     final case class DynamicTable[D](
       name:    String,

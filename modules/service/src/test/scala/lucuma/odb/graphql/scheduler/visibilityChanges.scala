@@ -34,9 +34,13 @@ class visibilityChanges extends SchedulerRoutesSuite with ExecutionTestSupportFo
         headers = hs
       )
 
-  private def fetchVisibilityChanges(user: User, since: Instant): IO[(Status, String)] =
+  private def fetchVisibilityChanges(
+    user:      User,
+    since:     Instant,
+    pageSizes: SchedulerRoutes.PageSizes = SchedulerRoutes.PageSizes.Default
+  ): IO[(Status, String)] =
     visibilityRequest(user, since).flatMap: request =>
-      withRoutes(user, request).flatMap: response =>
+      withRoutes(user, request, pageSizes).flatMap: response =>
         response.as[String].map(response.status -> _)
 
   private def fetchGzip(user: User, since: Instant): IO[(Status, String)] =
@@ -249,6 +253,26 @@ class visibilityChanges extends SchedulerRoutesSuite with ExecutionTestSupportFo
       assert(hasObs(b, o1))
       assert(hasObs(b, o2))
 
+  test("pages split a run of observations sharing one invalidation time"):
+    for
+      p         <- createProgram
+      t         <- createTargetWithProfileAs(pi, p)
+      o1        <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      o2        <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      o3        <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      // Re-stamps all three observations in one transaction, so at one time.
+      _         <- changeProgramActivePeriod(p)
+      stamp     <- obsInvalidation(o1)
+      (s0, all) <- fetchVisibilityChanges(serviceUser, stamp)
+      (s1, one) <- fetchVisibilityChanges(serviceUser, stamp, SinglePages)
+    yield
+      assertEquals(s0, Status.Ok)
+      assertEquals(s1, Status.Ok)
+      assertEquals(List(o1, o2, o3).map(o => obsTimestamp(all, o)), List.fill(3)(Some(stamp)))
+      assertEquals(one, all)
+      val obsTimes = all.linesIterator.filter(_.startsWith("o-")).map(l => Instant.parse(l.split("\t")(1))).toList
+      assertEquals(obsTimes, obsTimes.sorted)
+
   test("an observation remains listed across every workflow state, including completed"):
     for
       p       <- createProgram
@@ -272,6 +296,46 @@ class visibilityChanges extends SchedulerRoutesSuite with ExecutionTestSupportFo
     yield
       assertEquals(st, Status.Ok)
       assert(hasObs(b, o))
+
+  test("reading one row per page returns the same changes in the same order"):
+    for
+      p         <- createProgram
+      t0        <- createTargetWithProfileAs(pi, p)
+      t1        <- createTargetWithProfileAs(pi, p)
+      _         <- createGmosNorthLongSlitObservationAs(pi, p, List(t0))
+      _         <- createGmosNorthLongSlitObservationAs(pi, p, List(t1))
+      _         <- createGmosNorthLongSlitObservationAs(pi, p, List(t0, t1))
+      (s0, all) <- fetchVisibilityChanges(serviceUser, Epoch)
+      (s1, one) <- fetchVisibilityChanges(serviceUser, Epoch, SinglePages)
+    yield
+      assertEquals(s0, Status.Ok)
+      assertEquals(s1, Status.Ok)
+      assert(all.linesIterator.size >= 5)
+      assertEquals(one, all)
+
+  test("a change made while paging is not passed over by the newest time in the response"):
+    for
+      p     <- createProgram
+      t     <- createTargetWithProfileAs(pi, p)
+      o1    <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      o2    <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      o3    <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      since <- obsInvalidation(o1)
+      req   <- visibilityRequest(serviceUser, since)
+      resp  <- withRoutes(serviceUser, req, SinglePages)  // reads only o1's page
+      _     <- observationInvalidation(o1)                 // already paged
+      _     <- observationInvalidation(o3)                 // not yet paged, stamped later
+      body  <- resp.as[String]
+      newest = body.linesIterator.map(line => Instant.parse(line.split("\t")(1))).max
+      (_, next) <- fetchVisibilityChanges(serviceUser, newest)
+      o1Time    <- obsInvalidation(o1)
+    yield
+      assertEquals(resp.status, Status.Ok)
+      assert(hasObs(body, o1))
+      assert(hasObs(body, o2))
+      assert(!hasObs(body, o3), "o3 was stamped after the request started")
+      assertEquals(obsTimestamp(next, o1), Some(o1Time))
+      assert(hasObs(next, o3))
 
   test("a gzip-encoded response can be decompressed"):
     for
