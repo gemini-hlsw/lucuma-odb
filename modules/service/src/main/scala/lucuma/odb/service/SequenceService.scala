@@ -108,6 +108,17 @@ trait SequenceService[F[_]]:
   )(using Transaction[F], Services.ServiceAccess): F[Unit]
 
   /**
+   * The distinct ids among `which`, in the order the database sorts
+   * observation ids, which is the order `selectAtomDigests` returns them in.
+   * Sorting a request before splitting it into batches makes the batches
+   * together come out in one overall order, whatever the batch size.  (The
+   * database's text order differs from the numeric order of `Observation.Id`.)
+   */
+  def sortObservationIds(
+    which: List[Observation.Id]
+  )(using Transaction[F], Services.ServiceAccess): F[List[Observation.Id]]
+
+  /**
    * Selects up to `limit` atom digests of the given observations, ordered by
    * observation and atom index, starting after the (observation, atom index)
    * `after` (or from the beginning if `None`).  The result is fully
@@ -438,6 +449,12 @@ object SequenceService:
           _ <- session.execute(Statements.DeleteAtomDigests)(observationId)
           _ <- insert.compile.drain
         yield ()
+
+      override def sortObservationIds(
+        which: List[Observation.Id]
+      )(using Transaction[F], Services.ServiceAccess): F[List[Observation.Id]] =
+        if which.isEmpty then List.empty.pure[F]
+        else session.execute(Statements.SortObservationIds)(which)
 
       override def selectAtomDigests(
         which: List[Observation.Id],
@@ -1840,6 +1857,14 @@ object SequenceService:
           #$AtomDigestRowColumns
         ) VALUES $enc
       """.command
+
+    // Sorted as the column is, so the order matches selectAtomDigests.
+    val SortObservationIds: Query[List[Observation.Id], Observation.Id] =
+      sql"""
+        SELECT DISTINCT c_observation_id
+        FROM unnest(${_gid[Observation.Id]}::d_observation_id[]) AS t(c_observation_id)
+        ORDER BY c_observation_id
+      """.query(observation_id)
 
     // The cursor condition is added only when there is a cursor, so that first
     // and later pages are separate statements.  A single statement with an

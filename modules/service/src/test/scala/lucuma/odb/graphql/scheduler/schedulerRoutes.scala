@@ -236,6 +236,31 @@ class schedulerRoutes extends SchedulerRoutesSuite with ExecutionTestSupportForG
         withRoutes(serviceUser, request, pageSizes)
           .assertUncompressedAtoms(Status.Ok, List(oid0 -> List(a0, a1, a2, a3), oid1 -> List(a0, a1, a2, a3)))
 
+  test("atom order doesn't depend on request order or page sizes"):
+    val setup: IO[(Observation.Id, Observation.Id)] =
+      for
+        p  <- createProgram
+        t  <- createTargetWithProfileAs(pi, p)
+        o0 <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        _  <- runObscalcUpdate(p, o0)
+        o1 <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        _  <- runObscalcUpdate(p, o1)
+      yield (o0, o1)
+
+    def body(pageSizes: SchedulerRoutes.PageSizes, oids: Observation.Id*): IO[String] =
+      atomsRequest(serviceUser, oids.map(_.toString)*).flatMap: request =>
+        withRoutes(serviceUser, request, pageSizes).flatMap(_.as[String])
+
+    setup.flatMap: (oid0, oid1) =>
+      for
+        forward  <- body(SchedulerRoutes.PageSizes.Default, oid0, oid1)
+        reversed <- body(SchedulerRoutes.PageSizes.Default, oid1, oid0)
+        single   <- body(SinglePages, oid1, oid0)
+      yield
+        assertEquals(forward.linesIterator.size, 8)
+        assertEquals(reversed, forward)
+        assertEquals(single, forward)
+
   test("gzip"):
     val setup: IO[Observation.Id] =
       for

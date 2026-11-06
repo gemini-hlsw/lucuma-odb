@@ -288,6 +288,9 @@ object SchedulerRoutes:
               // The ids are read in batches, and each batch in pages of rows,
               // each page in its own short transaction, so that memory and bind
               // parameters stay bounded however many ids or atoms there are.
+              // The database sorts the ids first, so that the batches come out
+              // in the same order as the rows within each one: the response
+              // order then doesn't depend on the request order or batch size.
               def fetch(cursor: AtomCursor): F[(List[AtomRow], Option[AtomCursor])] =
                 val limit = pageSizes.rowLimit
                 superUserTransaction(user)(sequenceService.selectAtomDigests(cursor.batch, cursor.after, limit))
@@ -300,9 +303,10 @@ object SchedulerRoutes:
                       )((oid, idx, _) => cursor.copy(after = (oid, idx).some).some)
                     (page, next)
 
-              validIds.distinct.grouped(pageSizes.observationBatchSize.value).toList match
-                case Nil     => Ok()
-                case b :: bs => pagedBody(AtomCursor(b, bs, None))(fetch).flatMap(rows => Ok(encode(rows.map(tsv))))
+              superUserTransaction(user)(sequenceService.sortObservationIds(validIds)).flatMap: sortedIds =>
+                sortedIds.grouped(pageSizes.observationBatchSize.value).toList match
+                  case Nil     => Ok()
+                  case b :: bs => pagedBody(AtomCursor(b, bs, None))(fetch).flatMap(rows => Ok(encode(rows.map(tsv))))
         }.handleErrorWith:
            case _: AccessControlException       => Forbidden()
            case EntityLimiter.EntityTooLarge(_) => PayloadTooLarge(s"Request body exceeds $MaxAtomsRequestBytes bytes")
