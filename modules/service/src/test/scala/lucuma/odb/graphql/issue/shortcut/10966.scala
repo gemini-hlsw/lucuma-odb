@@ -166,7 +166,7 @@ class ShortCut_10966
       assertEquals(telRm, none)
       assertTelluricSteps(steps)
 
-  test("an IFU telluric drops the science's explicit read mode but keeps its offsets"):
+  test("an LR-IFU telluric drops the science's explicit read mode but keeps its offsets"):
     for
       pid    <- createProgramAs(pi)
       tid    <- createTargetWithProfileAs(pi, pid)
