@@ -8,6 +8,7 @@ import lucuma.core.enums.DaytimeCalibrationObservingModeType
 import lucuma.core.enums.Instrument
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig
+import lucuma.core.model.sequence.gnirs.GnirsDynamicConfig
 import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig
 import lucuma.odb.sequence.util.HashBytes
 
@@ -34,6 +35,10 @@ final case class Config(
   def gmosSouthSets: List[CalibrationSet[DynamicConfig.GmosSouth]] =
     sets.collect:
       case s @ CalibrationSet(setup = InstrumentSetup.GmosSouth(c)) => s.copy(setup = c)
+
+  def gnirsSets: List[CalibrationSet[GnirsDynamicConfig]] =
+    sets.collect:
+      case s @ CalibrationSet(setup = InstrumentSetup.Gnirs(c)) => s.copy(setup = c)
 
   def igrins2Sets: List[CalibrationSet[Igrins2DynamicConfig]] =
     sets.collect:

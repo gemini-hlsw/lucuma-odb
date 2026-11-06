@@ -95,6 +95,8 @@ trait WavelengthMapping[F[_]]
       wavelengthMappingAtPath(CalibrationSetType / "gmosNorth" / "centralWavelength", GmosNorthCalibrationSetupTable.CentralWavelength.Value, GmosNorthCalibrationSetupTable.CentralWavelength.SyntheticId),
       wavelengthMappingAtPath(CalibrationSetType / "gmosSouth" / "centralWavelength", GmosSouthCalibrationSetupTable.CentralWavelength.Value, GmosSouthCalibrationSetupTable.CentralWavelength.SyntheticId),
       wavelengthMappingAtPath(CalibrationSetType / "flamingos2" / "centralWavelength", Flamingos2CalibrationSetupTable.CentralWavelength, Flamingos2CalibrationSetupTable.Id),
+      wavelengthMappingAtPath(CalibrationSetType / "gnirs" / "centralWavelength", GnirsCalibrationSetupTable.CentralWavelength, GnirsCalibrationSetupTable.Id),
+      wavelengthMappingAtPath(CalibrationSetType / "gnirs" / "acquisitionMirrorOut" / "wavelength", GnirsCalibrationSetupTable.AcquisitionMirrorOut.Wavelength, GnirsCalibrationSetupTable.AcquisitionMirrorOut.SyntheticId),
       wavelengthMappingAtPath(CalibrationSetType / "gmosNorth" / "gratingConfig" / "wavelength", GmosNorthCalibrationSetupTable.Grating.Wavelength, GmosNorthCalibrationSetupTable.Id),
       wavelengthMappingAtPath(CalibrationSetType / "gmosSouth" / "gratingConfig" / "wavelength", GmosSouthCalibrationSetupTable.Grating.Wavelength, GmosSouthCalibrationSetupTable.Id),
       wavelengthMappingAtPath(TimeAndCountExposureTimeModeType / "at", ExposureTimeModeView.TimeAndCount.At, ExposureTimeModeView.TimeAndCount.SyntheticId),

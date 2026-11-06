@@ -6,12 +6,18 @@ package table
 
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GnirsCodecs.*
+import org.tpolecat.typename.TypeName
 import skunk.codec.numeric.int4
+import skunk.codec.numeric.int8
 
 trait GnirsDynamicView[F[_]] extends BaseMapping[F]:
 
-  object GnirsDynamicView extends TableDef("v_gnirs_dynamic"):
-    val Id: ColumnRef                = col("c_step_id",            step_id)
+  class GnirsDynamicTable[I](
+    name:   String,
+    idName: String,
+    id:     skunk.Codec[I]
+  )(using TypeName[I]) extends TableDef(name):
+    val Id: ColumnRef                = col(idName,                id)
     val Instrument: ColumnRef        = col("c_instrument",         instrument)
     val ExposureTime: ColumnRef      = col("c_exposure_time",      time_span)
     val Coadds: ColumnRef            = col("c_coadds",             int4_pos)
@@ -26,7 +32,19 @@ trait GnirsDynamicView[F[_]] extends BaseMapping[F]:
     val ReadMode: ColumnRef          = col("c_read_mode",          gnirs_read_mode)
 
     object AcquisitionMirrorOut:
-      val SyntheticId: ColumnRef = col("c_acquisition_mirror_out_id", step_id.embedded)
+      val SyntheticId: ColumnRef = col("c_acquisition_mirror_out_id", id.embedded)
       val Prism: ColumnRef       = col("c_prism",                     gnirs_prism.embedded)
       val Grating: ColumnRef     = col("c_grating",                   gnirs_grating.embedded)
       val Wavelength: ColumnRef  = col("c_grating_wavelength",        wavelength_pm.embedded)
+
+  object GnirsDynamicView extends GnirsDynamicTable(
+    "v_gnirs_dynamic",
+    "c_step_id",
+    step_id
+  )
+
+  object GnirsCalibrationSetupTable extends GnirsDynamicTable(
+    "v_gnirs_daytime_calibration_setup",
+    "c_set_id",
+    int8
+  )

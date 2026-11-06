@@ -10,6 +10,8 @@ import lucuma.core.enums.CalibrationSetType
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig
+import lucuma.core.model.sequence.gnirs.GnirsAcquisitionMirrorMode
+import lucuma.core.model.sequence.gnirs.GnirsDynamicConfig
 import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig
 import lucuma.odb.json.all.transport.given
 import lucuma.odb.sequence.util.HashBytes
@@ -51,6 +53,7 @@ enum InstrumentSetup:
   case Flamingos2(config: Flamingos2DynamicConfig)
   case GmosNorth(config: DynamicConfig.GmosNorth)
   case GmosSouth(config: DynamicConfig.GmosSouth)
+  case Gnirs(config: GnirsDynamicConfig)
   case Igrins2(config: Igrins2DynamicConfig)
 
   def instrument: lucuma.core.enums.Instrument =
@@ -58,16 +61,22 @@ enum InstrumentSetup:
       case Flamingos2(_) => lucuma.core.enums.Instrument.Flamingos2
       case GmosNorth(_)  => lucuma.core.enums.Instrument.GmosNorth
       case GmosSouth(_)  => lucuma.core.enums.Instrument.GmosSouth
+      case Gnirs(_)      => lucuma.core.enums.Instrument.Gnirs
       case Igrins2(_)    => lucuma.core.enums.Instrument.Igrins2
 
   /**
-   * The set kinds this instrument may be given.  The Flamingos 2 and
-   * IGRINS-2 lists are mirrored by the kind triggers in V1378 and V1379, keep
-   * them in step.
+   * The set kinds this instrument may be given.  The Flamingos 2, IGRINS-2
+   * and GNIRS lists are mirrored by the kind triggers in V1378, V1379 and
+   * V1388, keep them in step.  With the acquisition mirror in GNIRS also
+   * drops the arc kinds, which the trigger does not check.
    */
   def allowedKinds: List[CalibrationSetType] =
     this match
       case Flamingos2(_) | Igrins2(_)  => CalibrationSetType.values.toList.filterNot(k => k === CalibrationSetType.Bias || k === CalibrationSetType.DaytimeObserve)
+      case Gnirs(c)                    =>
+        CalibrationSetType.values.toList.filterNot: k =>
+          k === CalibrationSetType.Bias ||
+          (c.acquisitionMirror === GnirsAcquisitionMirrorMode.In && (k === CalibrationSetType.Arc || k === CalibrationSetType.SmartArc))
       case GmosNorth(_) | GmosSouth(_) => CalibrationSetType.values.toList
 
   /** Whether the setup disperses light, which an arc requires. */
@@ -76,6 +85,7 @@ enum InstrumentSetup:
       case Flamingos2(c) => c.disperser.isDefined
       case GmosNorth(c)  => c.gratingConfig.isDefined
       case GmosSouth(c)  => c.gratingConfig.isDefined
+      case Gnirs(c)      => c.acquisitionMirror =!= GnirsAcquisitionMirrorMode.In
       case Igrins2(_)    => true
 
 object InstrumentSetup:
@@ -85,12 +95,14 @@ object InstrumentSetup:
       case (Flamingos2(a), Flamingos2(b)) => a === b
       case (GmosNorth(a), GmosNorth(b))   => a === b
       case (GmosSouth(a), GmosSouth(b))   => a === b
+      case (Gnirs(a), Gnirs(b))           => a === b
       case (Igrins2(a), Igrins2(b))       => a === b
       case _                              => false
 
   private given HashBytes[Flamingos2DynamicConfig] = HashBytes.forJsonEncoder
   private given HashBytes[DynamicConfig.GmosNorth] = HashBytes.forJsonEncoder
   private given HashBytes[DynamicConfig.GmosSouth] = HashBytes.forJsonEncoder
+  private given HashBytes[GnirsDynamicConfig]      = HashBytes.forJsonEncoder
   private given HashBytes[Igrins2DynamicConfig]    = HashBytes.forJsonEncoder
 
   given HashBytes[InstrumentSetup] with
@@ -100,3 +112,4 @@ object InstrumentSetup:
         case GmosSouth(c)  => Array.concat(Array[Byte](1), HashBytes[DynamicConfig.GmosSouth].hashBytes(c))
         case Flamingos2(c) => Array.concat(Array[Byte](2), HashBytes[Flamingos2DynamicConfig].hashBytes(c))
         case Igrins2(c)    => Array.concat(Array[Byte](3), HashBytes[Igrins2DynamicConfig].hashBytes(c))
+        case Gnirs(c)      => Array.concat(Array[Byte](4), HashBytes[GnirsDynamicConfig].hashBytes(c))

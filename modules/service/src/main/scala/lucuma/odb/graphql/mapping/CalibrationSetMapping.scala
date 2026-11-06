@@ -19,21 +19,27 @@ import lucuma.core.enums.GcalArc
 import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.odb.logic.DaytimeCalibrationExpansion
+import lucuma.odb.logic.DaytimeInstrument
 import lucuma.odb.logic.SmartGcalImplementation
+import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.service.Services
 
 import Services.Syntax.*
 import table.DaytimeCalibrationSetView
 import table.Flamingos2DynamicTables
 import table.GmosDynamicTables
+import table.GnirsDynamicView
 import table.Igrins2DynamicTable
 
 trait CalibrationSetMapping[F[_]: Concurrent] extends DaytimeCalibrationSetView[F]
                                                  with Flamingos2DynamicTables[F]
                                                  with GmosDynamicTables[F]
+                                                 with GnirsDynamicView[F]
                                                  with Igrins2DynamicTable[F]
                                                  with KeyValueEffectHandler[F]:
   this: SkunkMapping[F] =>
+
+  def timeEstimateCalculator: TimeEstimateCalculatorImplementation.ForInstrumentMode
 
   def services(using User): Resource[F, Services[F]]
 
@@ -49,7 +55,8 @@ trait CalibrationSetMapping[F[_]: Concurrent] extends DaytimeCalibrationSetView[
       SqlObject("gmosNorth", Join(DaytimeCalibrationSetView.Id, GmosNorthCalibrationSetupTable.Id)),
       SqlObject("gmosSouth", Join(DaytimeCalibrationSetView.Id, GmosSouthCalibrationSetupTable.Id)),
       SqlObject("flamingos2", Join(DaytimeCalibrationSetView.Id, Flamingos2CalibrationSetupTable.Id)),
-      SqlObject("igrins2", Join(DaytimeCalibrationSetView.Id, Igrins2CalibrationSetupTable.Id))
+      SqlObject("igrins2", Join(DaytimeCalibrationSetView.Id, Igrins2CalibrationSetupTable.Id)),
+      SqlObject("gnirs", Join(DaytimeCalibrationSetView.Id, GnirsCalibrationSetupTable.Id))
     )
 
   // A manual set's count is its explicit one; a smart set's is what the Smart
@@ -63,7 +70,8 @@ trait CalibrationSetMapping[F[_]: Concurrent] extends DaytimeCalibrationSetView[
           val exp = SmartGcalImplementation.fromService(smartGcalService)
           daytimeCalibrationService.select(keys.map(_._1).distinct).flatMap: cfgs =>
             cfgs.toList.traverse: (oid, cfg) =>
-              DaytimeCalibrationExpansion.setCounts(exp, oid, cfg).map: counts =>
+              val di = DaytimeInstrument.forInstrument(cfg.instrument, timeEstimateCalculator, exp, sequenceService)
+              DaytimeCalibrationExpansion.setCounts(di, oid, cfg).map: counts =>
                 counts.zipWithIndex.map((n, i) => (oid, i) -> n.success)
             .map: all =>
               // A set removed between the two reads answers null, not an error.

@@ -16,6 +16,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig
+import lucuma.core.model.sequence.gnirs.GnirsDynamicConfig
 import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
@@ -28,6 +29,7 @@ import lucuma.odb.service.Services.Syntax.session
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Flamingos2Codecs.*
 import lucuma.odb.util.GmosCodecs.*
+import lucuma.odb.util.GnirsCodecs.*
 import lucuma.odb.util.Igrins2Codecs.*
 import skunk.*
 import skunk.codec.boolean.bool
@@ -90,6 +92,7 @@ object DaytimeCalibrationService:
               case InstrumentSetup.GmosNorth(c)  => session.execute(Statements.InsertGmosNorthSetup)((setId, oid, c)).void
               case InstrumentSetup.GmosSouth(c)  => session.execute(Statements.InsertGmosSouthSetup)((setId, oid, c)).void
               case InstrumentSetup.Igrins2(c)    => session.execute(Statements.InsertIgrins2Setup)((setId, oid, c)).void
+              case InstrumentSetup.Gnirs(c)      => session.execute(Statements.InsertGnirsSetup)((setId, oid, c)).void
 
       override def insert(
         input: DaytimeCalibrationInput.Create,
@@ -211,13 +214,15 @@ object DaytimeCalibrationService:
        gmos_north_dynamic.opt  *:
        gmos_south_dynamic.opt  *:
        flamingos_2_dynamic.opt *:
-       igrins_2_dynamic.opt
+       igrins_2_dynamic.opt    *:
+       gnirs_dynamic.opt
       ).emap:
-        case (k, n, g, Some(north), None, None, None) => CalibrationSet(k, n, g, InstrumentSetup.GmosNorth(north)).asRight
-        case (k, n, g, None, Some(south), None, None) => CalibrationSet(k, n, g, InstrumentSetup.GmosSouth(south)).asRight
-        case (k, n, g, None, None, Some(f2), None)    => CalibrationSet(k, n, g, InstrumentSetup.Flamingos2(f2)).asRight
-        case (k, n, g, None, None, None, Some(ig))    => CalibrationSet(k, n, g, InstrumentSetup.Igrins2(ig)).asRight
-        case _                                        => "Calibration set without exactly one instrument setup".asLeft
+        case (k, n, g, Some(north), None, None, None, None) => CalibrationSet(k, n, g, InstrumentSetup.GmosNorth(north)).asRight
+        case (k, n, g, None, Some(south), None, None, None) => CalibrationSet(k, n, g, InstrumentSetup.GmosSouth(south)).asRight
+        case (k, n, g, None, None, Some(f2), None, None)    => CalibrationSet(k, n, g, InstrumentSetup.Flamingos2(f2)).asRight
+        case (k, n, g, None, None, None, Some(ig), None)    => CalibrationSet(k, n, g, InstrumentSetup.Igrins2(ig)).asRight
+        case (k, n, g, None, None, None, None, Some(gn))    => CalibrationSet(k, n, g, InstrumentSetup.Gnirs(gn)).asRight
+        case _                                              => "Calibration set without exactly one instrument setup".asLeft
 
     def selectInstrument[A <: NonEmptyList[Observation.Id]](a: A): Query[a.type, (Observation.Id, Instrument)] =
       sql"""
@@ -247,12 +252,14 @@ object DaytimeCalibrationService:
           #${encodeColumns("n".some, GmosSequenceService.Statements.GmosDynamicColumns)},
           #${encodeColumns("so".some, GmosSequenceService.Statements.GmosDynamicColumns)},
           #${encodeColumns("f".some, Flamingos2SequenceService.Statements.Flamingos2DynamicColumns)},
-          #${encodeColumns("i".some, Igrins2SequenceService.Statements.Igrins2DynamicColumns)}
+          #${encodeColumns("i".some, Igrins2SequenceService.Statements.Igrins2DynamicColumns)},
+          #${encodeColumns("g".some, GnirsSequenceService.Statements.GnirsDynamicColumns)}
         FROM t_daytime_calibration_set s
         LEFT JOIN t_gmos_north_daytime_calibration_setup n ON n.c_set_id = s.c_set_id
         LEFT JOIN t_gmos_south_daytime_calibration_setup so ON so.c_set_id = s.c_set_id
         LEFT JOIN t_flamingos_2_daytime_calibration_setup f ON f.c_set_id = s.c_set_id
         LEFT JOIN t_igrins_2_daytime_calibration_setup i ON i.c_set_id = s.c_set_id
+        LEFT JOIN t_gnirs_daytime_calibration_setup g ON g.c_set_id = s.c_set_id
         WHERE
           s.c_observation_id IN (${observation_id.nel(a)})
         ORDER BY s.c_observation_id, s.c_position
@@ -325,6 +332,15 @@ object DaytimeCalibrationService:
           c_observation_id,
           #${encodeColumns(none, Igrins2SequenceService.Statements.Igrins2DynamicColumns)}
         ) SELECT $int8, $observation_id, $igrins_2_dynamic
+      """.command
+
+    val InsertGnirsSetup: Command[(Long, Observation.Id, GnirsDynamicConfig)] =
+      sql"""
+        INSERT INTO t_gnirs_daytime_calibration_setup (
+          c_set_id,
+          c_observation_id,
+          #${encodeColumns(none, GnirsSequenceService.Statements.GnirsDynamicColumns)}
+        ) SELECT $int8, $observation_id, $gnirs_dynamic
       """.command
 
     def delete[A <: NonEmptyList[Observation.Id]](a: A): Command[a.type] =

@@ -81,6 +81,7 @@ trait TimeSpanMapping[F[_]] extends AllocationTable[F]
       timeSpanMappingAtPath(CalibrationSetType / "gmosSouth" / "exposure", GmosSouthCalibrationSetupTable.ExposureTime)(GmosSouthCalibrationSetupTable.Id),
       timeSpanMappingAtPath(CalibrationSetType / "flamingos2" / "exposure", Flamingos2CalibrationSetupTable.ExposureTime)(Flamingos2CalibrationSetupTable.Id),
       timeSpanMappingAtPath(CalibrationSetType / "igrins2" / "exposure", Igrins2CalibrationSetupTable.ExposureTime)(Igrins2CalibrationSetupTable.Id),
+      timeSpanMappingAtPath(CalibrationSetType / "gnirs" / "exposure", GnirsCalibrationSetupTable.ExposureTime)(GnirsCalibrationSetupTable.Id),
       timeSpanMappingAtPath(StepRecordType / "igrins2" / "exposure", Igrins2DynamicTable.ExposureTime)(Igrins2DynamicTable.Id),
       timeSpanMappingAtPath(StepRecordType / "gnirs" / "exposure", GnirsDynamicView.ExposureTime)(GnirsDynamicView.Id),
       timeSpanMappingAtPath(TimeAndCountExposureTimeModeType / "time", TimeAndCount.Time)(TimeAndCount.SyntheticId),

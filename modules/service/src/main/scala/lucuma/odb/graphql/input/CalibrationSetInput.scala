@@ -84,6 +84,7 @@ object CalibrationSetInput:
       case InstrumentSetup.GmosNorth(c)  => InstrumentSetup.GmosNorth(c.copy(exposure = TimeSpan.Zero))
       case InstrumentSetup.GmosSouth(c)  => InstrumentSetup.GmosSouth(c.copy(exposure = TimeSpan.Zero))
       case InstrumentSetup.Flamingos2(c) => InstrumentSetup.Flamingos2(c.copy(exposure = TimeSpan.Zero))
+      case InstrumentSetup.Gnirs(c)      => InstrumentSetup.Gnirs(c.copy(exposure = TimeSpan.Zero))
       case InstrumentSetup.Igrins2(c)    => InstrumentSetup.Igrins2(c.copy(exposure = TimeSpan.Zero))
 
   // A smart arc on an undispersed setup can never resolve, so it is refused up
@@ -113,15 +114,17 @@ object CalibrationSetInput:
         GmosNorthDynamicInput.Binding.Option("gmosNorth", rNorth),
         GmosSouthDynamicInput.Binding.Option("gmosSouth", rSouth),
         Flamingos2DynamicInput.Binding.Option("flamingos2", rFlamingos2),
-        Igrins2DynamicInput.Binding.Option("igrins2", rIgrins2)
+        Igrins2DynamicInput.Binding.Option("igrins2", rIgrins2),
+        GnirsDynamicInput.Binding.Option("gnirs", rGnirs)
       ) =>
         val rSetup: Result[InstrumentSetup] =
-          (rNorth, rSouth, rFlamingos2, rIgrins2).parFlatMapN:
-            case (Some(n), None, None, None) => InstrumentSetup.GmosNorth(n).success
-            case (None, Some(s), None, None) => InstrumentSetup.GmosSouth(s).success
-            case (None, None, Some(f), None) => InstrumentSetup.Flamingos2(f).success
-            case (None, None, None, Some(i)) => InstrumentSetup.Igrins2(i).success
-            case _                           => Result.failure("Exactly one instrument setup (`gmosNorth`, `gmosSouth`, `flamingos2` or `igrins2`) must be given.")
+          (rNorth, rSouth, rFlamingos2, rIgrins2, rGnirs).parFlatMapN:
+            case (Some(n), None, None, None, None) => InstrumentSetup.GmosNorth(n).success
+            case (None, Some(s), None, None, None) => InstrumentSetup.GmosSouth(s).success
+            case (None, None, Some(f), None, None) => InstrumentSetup.Flamingos2(f).success
+            case (None, None, None, Some(i), None) => InstrumentSetup.Igrins2(i).success
+            case (None, None, None, None, Some(g)) => InstrumentSetup.Gnirs(g).success
+            case _                                 => Result.failure("Exactly one instrument setup (`gmosNorth`, `gmosSouth`, `flamingos2`, `igrins2` or `gnirs`) must be given.")
 
         (rKind, rCount, rGcal, rSetup).parFlatMapN: (kind, count, gcal, setup) =>
           (checkKind(kind, setup), explicitCountFor(kind, count), gcalFor(kind, gcal, setup.instrument)).parMapN: (_, n, g) =>

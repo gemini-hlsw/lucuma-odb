@@ -7,7 +7,6 @@ import cats.Monad
 import cats.data.EitherT
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.PosInt
-import lucuma.core.enums.Instrument
 import lucuma.core.model.Observation
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.SmartGcalExpander
@@ -16,7 +15,6 @@ import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.daytimecal.CalibrationSet
 import lucuma.odb.sequence.daytimecal.Config
 import lucuma.odb.sequence.daytimecal.DaytimeCalibration
-import lucuma.odb.sequence.daytimecal.StaticConfigs as DaytimeStatics
 
 /**
  * Resolves the smart rows of a daytime calibration through the instrument's
@@ -62,13 +60,10 @@ object DaytimeCalibrationExpansion:
 
   /** `setCounts` for a whole daytime calibration, dispatching on its instrument. */
   def setCounts[F[_]: Monad](
-    exp: SmartGcalImplementation.ForInstrument[F],
-    oid: Observation.Id,
-    cfg: Config
+    instrument: Option[DaytimeInstrument[F]],
+    oid:        Observation.Id,
+    cfg:        Config
   ): F[List[Option[PosInt]]] =
-    cfg.instrument match
-      case Instrument.Flamingos2 => setCounts(exp.flamingos2, DaytimeStatics.Flamingos2, oid, cfg.flamingos2Sets)
-      case Instrument.GmosNorth  => setCounts(exp.gmosNorth,  DaytimeStatics.GmosNorth,  oid, cfg.gmosNorthSets)
-      case Instrument.GmosSouth  => setCounts(exp.gmosSouth,  DaytimeStatics.GmosSouth,  oid, cfg.gmosSouthSets)
-      case Instrument.Igrins2    => setCounts(exp.igrins2,    DaytimeStatics.Igrins2,    oid, cfg.igrins2Sets)
-      case _                     => cfg.sets.map(_.explicitCount).pure[F]
+    instrument match
+      case Some(di) => setCounts(di.expander, di.static, oid, di.sets(cfg))
+      case None     => cfg.sets.map(_.explicitCount).pure[F]
