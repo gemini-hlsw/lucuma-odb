@@ -34,8 +34,8 @@ object SmartGnirsLoader:
   given Encoder[TableKey] =
     (
       gnirs_pixel_scale   *:
-      gnirs_grating       *:
-      gnirs_prism         *:
+      gnirs_grating.opt   *:
+      gnirs_prism.opt     *:
       wavelength_pm_range *:
       gnirs_fpu_slit.opt  *:
       gnirs_fpu_other.opt *:

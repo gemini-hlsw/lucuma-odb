@@ -51,9 +51,6 @@ object Science:
   val ScienceCycleTitle: NonEmptyString =
     NonEmptyString.unsafeFrom("Science Cycle")
 
-  val NighttimeCalTitle: NonEmptyString =
-    NonEmptyString.unsafeFrom("Nighttime Calibrations")
-
   val DaytimePinholeTitle: NonEmptyString =
     NonEmptyString.unsafeFrom("Daytime Pinhole")
 
@@ -212,11 +209,11 @@ object Science:
 
     private def segment(b: WavelengthBlock): List[ProtoAtom[ProtoStep[GnirsDynamicConfig]]] =
       val science = List.fill(b.goalCycles.value)(
-        ProtoAtom(atomTitle(ScienceCycleTitle, b.titleSuffix).some, b.steps.scienceSteps)
+        ProtoAtom(AtomTitle(ScienceCycleTitle, b.titleSuffix).some, b.steps.scienceSteps)
       )
       val closing =
         if b.goalCycles.value === 0 then None
-        else b.steps.cals.map(cals => ProtoAtom(atomTitle(NighttimeCalTitle, b.titleSuffix).some, cals))
+        else b.steps.cals.map(cals => ProtoAtom(AtomTitle(AtomTitle.NighttimeCal, b.titleSuffix).some, cals))
       science ++ closing.toList
 
     // Atom ids come from the atom's index within a single builder, so every
@@ -226,13 +223,6 @@ object Science:
 
   private def nm(sw: CentralWavelengthConfig): String =
     f"${sw.centralWavelength.toNanometers.value.value.toDouble}%.0f nm"
-
-  /**
-   * Atom title for a block of steps taken at one central wavelength: bare when
-   * the suffix is absent, parenthesised after the base otherwise.
-   */
-  private def atomTitle(base: NonEmptyString, suffix: Option[String]): NonEmptyString =
-    suffix.fold(base)(t => NonEmptyString.unsafeFrom(s"${base.value} ($t)"))
 
   /**
    * The atom title suffix for each entry of `ws`, in list order: `None` throughout when
@@ -322,7 +312,7 @@ object Science:
     val atoms: NonEmptyList[(NonEmptyString, ProtoStep[GnirsDynamicConfig])] =
       distinctWavelengths
         .zip(titleSuffixes(distinctWavelengths, config.wavelengths.length > 1))
-        .map((sw, suffix) => (atomTitle(DaytimePinholeTitle, suffix), flat(sw)))
+        .map((sw, suffix) => (AtomTitle(DaytimePinholeTitle, suffix), flat(sw)))
 
     DaytimeSmartGcal.sequence(observationId, estimator, static, namespace, expander, atoms)
 

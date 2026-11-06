@@ -788,9 +788,7 @@ object SmartGcalService:
         eqOrNull("s.c_fpu_other", gnirs_fpu_other, GnirsFpu.other.getOption(key.fpu)),
         eqOrNull("s.c_fpu_ifu", gnirs_fpu_ifu, GnirsFpu.ifu.getOption(key.fpu)),
         sql"s.c_well_depth      = ${gnirs_well_depth}"(key.wellDepth),
-        key.wavelength.fold(void"s.c_wavelength_range IS NULL")(
-          sql"s.c_wavelength_range @> ${wavelength_pm}"
-        ),
+        sql"s.c_wavelength_range @> ${wavelength_pm}"(key.wavelength),
         whereSmartGcalType(sgt),
       )
 
@@ -820,8 +818,8 @@ object SmartGcalService:
       Int                         ,
       PosLong                     ,
       GnirsPixelScale             ,
-      GnirsGrating                ,
-      GnirsPrism                  ,
+      Option[GnirsGrating]        ,
+      Option[GnirsPrism]          ,
       BoundedInterval[Wavelength] ,
       GnirsFpu                    ,
       GnirsWellDepth              ,
@@ -848,8 +846,8 @@ object SmartGcalService:
           $int4,
           $int8_pos,
           $gnirs_pixel_scale,
-          $gnirs_grating,
-          $gnirs_prism,
+          ${gnirs_grating.opt},
+          ${gnirs_prism.opt},
           $wavelength_pm_range,
           ${gnirs_fpu_slit.opt},
           ${gnirs_fpu_other.opt},
@@ -862,8 +860,8 @@ object SmartGcalService:
         Int                         ,
         PosLong                     ,
         GnirsPixelScale             ,
-        GnirsGrating                ,
-        GnirsPrism                  ,
+        Option[GnirsGrating]        ,
+        Option[GnirsPrism]          ,
         BoundedInterval[Wavelength] ,
         GnirsFpu                    ,
         GnirsWellDepth              ,
