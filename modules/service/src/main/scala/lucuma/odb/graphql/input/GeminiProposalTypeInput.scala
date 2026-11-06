@@ -13,7 +13,6 @@ import grackle.Result
 import lucuma.core.enums.ConsiderForBand3
 import lucuma.core.enums.ExchangePartner
 import lucuma.core.enums.Instrument
-import lucuma.core.enums.Partner
 import lucuma.core.enums.ScienceSubtype
 import lucuma.core.model.IntPercent
 import lucuma.core.model.ProgramUser
@@ -34,7 +33,7 @@ object GeminiProposalTypeInput:
   // Gemini partner splits, never both.
   private def exchangeXorSplits(
     exchangePartner: Option[ExchangePartner],
-    partnerSplits:   Option[Map[Partner, IntPercent]]
+    partnerSplits:   Option[PartnerSplits]
   ): Result[Unit] =
     Result
       .failure("Specify either 'partnerSplits' or 'exchangePartner', not both.")
@@ -42,18 +41,18 @@ object GeminiProposalTypeInput:
 
   case class Create(
     scienceSubtype:          ScienceSubtype,
-    minPercentTime:          IntPercent               = HundredPercent,
-    minPercentTotal:         Option[IntPercent]       = none,
-    totalTime:               Option[TimeSpan]         = none,
-    partnerSplits:           Map[Partner, IntPercent] = Map.empty,
-    exchangePartner:         Option[ExchangePartner]  = none,
-    reviewerId:              Option[ProgramUser.Id]   = none,
-    mentorId:                Option[ProgramUser.Id]   = none,
-    aeonMultiFacility:       Boolean                  = false,
-    aeonRequiredInstruments: List[Instrument]         = Nil,
-    jwstSynergy:             Boolean                  = false,
-    usLongTerm:              Boolean                  = false,
-    considerForBand3:        ConsiderForBand3         = ConsiderForBand3.Unset
+    minPercentTime:          IntPercent              = HundredPercent,
+    minPercentTotal:         Option[IntPercent]      = none,
+    totalTime:               Option[TimeSpan]        = none,
+    partnerSplits:           PartnerSplits           = PartnerSplits.Empty,
+    exchangePartner:         Option[ExchangePartner] = none,
+    reviewerId:              Option[ProgramUser.Id]  = none,
+    mentorId:                Option[ProgramUser.Id]  = none,
+    aeonMultiFacility:       Boolean                 = false,
+    aeonRequiredInstruments: List[Instrument]        = Nil,
+    jwstSynergy:             Boolean                 = false,
+    usLongTerm:              Boolean                 = false,
+    considerForBand3:        ConsiderForBand3        = ConsiderForBand3.Unset
   ):
     def asEdit: Edit =
       Edit(
@@ -93,7 +92,7 @@ object GeminiProposalTypeInput:
     val minPercentTime: Lens[Create, IntPercent]                  = Focus[Create](_.minPercentTime)
     val minPercentTotal: Lens[Create, Option[IntPercent]]         = Focus[Create](_.minPercentTotal)
     val totalTime: Lens[Create, Option[TimeSpan]]                 = Focus[Create](_.totalTime)
-    val partnerSplits: Lens[Create, Map[Partner, IntPercent]]     = Focus[Create](_.partnerSplits)
+    val partnerSplits: Lens[Create, PartnerSplits]                = Focus[Create](_.partnerSplits)
     val exchangePartner: Lens[Create, Option[ExchangePartner]]    = Focus[Create](_.exchangePartner)
     val reviewerId: Lens[Create, Option[ProgramUser.Id]]          = Focus[Create](_.reviewerId)
     val mentorId: Lens[Create, Option[ProgramUser.Id]]            = Focus[Create](_.mentorId)
@@ -225,18 +224,18 @@ object GeminiProposalTypeInput:
 
   case class Edit(
     scienceSubtype:          ScienceSubtype,
-    minPercentTime:          Option[IntPercent]                 = None,
-    minPercentTotal:         Nullable[IntPercent]               = Nullable.Null,
-    totalTime:               Nullable[TimeSpan]                 = Nullable.Null,
-    partnerSplits:           Nullable[Map[Partner, IntPercent]] = Nullable.Null,
-    exchangePartner:         Nullable[ExchangePartner]          = Nullable.Null,
-    reviewerId:              Nullable[ProgramUser.Id]           = Nullable.Null,
-    mentorId:                Nullable[ProgramUser.Id]           = Nullable.Null,
-    aeonMultiFacility:       Option[Boolean]                    = None,
-    aeonRequiredInstruments: Nullable[List[Instrument]]         = Nullable.Absent,
-    jwstSynergy:             Option[Boolean]                    = None,
-    usLongTerm:              Option[Boolean]                    = None,
-    considerForBand3:        Option[ConsiderForBand3]           = None
+    minPercentTime:          Option[IntPercent]         = None,
+    minPercentTotal:         Nullable[IntPercent]       = Nullable.Null,
+    totalTime:               Nullable[TimeSpan]         = Nullable.Null,
+    partnerSplits:           Nullable[PartnerSplits]    = Nullable.Null,
+    exchangePartner:         Nullable[ExchangePartner]  = Nullable.Null,
+    reviewerId:              Nullable[ProgramUser.Id]   = Nullable.Null,
+    mentorId:                Nullable[ProgramUser.Id]   = Nullable.Null,
+    aeonMultiFacility:       Option[Boolean]            = None,
+    aeonRequiredInstruments: Nullable[List[Instrument]] = Nullable.Absent,
+    jwstSynergy:             Option[Boolean]            = None,
+    usLongTerm:              Option[Boolean]            = None,
+    considerForBand3:        Option[ConsiderForBand3]   = None
   ):
     def asCreate: Create =
       Create.DefaultFor(scienceSubtype).update:

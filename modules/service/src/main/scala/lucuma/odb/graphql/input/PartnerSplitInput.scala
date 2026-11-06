@@ -9,12 +9,30 @@ import cats.syntax.all.*
 import grackle.Result
 import lucuma.core.enums.Partner
 import lucuma.core.model.IntPercent
+import lucuma.core.model.ProgramUser
+import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.*
 
 case class PartnerSplitInput(
   partner: Partner,
   percent: IntPercent,
+  leadId:  Nullable[ProgramUser.Id]
 )
+
+/**
+ * A complete set of partner splits, with any explicit partner lead choices that came with them.
+ * `leads` holds an entry only for a split whose `leadId` was given: `Some(id)` to choose `id`, and
+ * `None` to discard the current lead in favor of the default.
+ */
+case class PartnerSplits(
+  percents: Map[Partner, IntPercent],
+  leads:    Map[Partner, Option[ProgramUser.Id]]
+):
+  def isEmpty: Boolean  = percents.isEmpty
+  def nonEmpty: Boolean = percents.nonEmpty
+
+object PartnerSplits:
+  val Empty: PartnerSplits = PartnerSplits(Map.empty, Map.empty)
 
 object PartnerSplitInput:
 
@@ -23,12 +41,20 @@ object PartnerSplitInput:
       case List(
         PartnerBinding("partner", rPartner),
         IntPercentBinding("percent", rPercent),
+        ProgramUserIdBinding.Nullable("leadId", rLead)
       ) =>
-        (rPartner, rPercent).parMapN(apply)
+        (rPartner, rPercent, rLead).parMapN(apply)
 
-  val BindingAll: Matcher[Map[Partner, IntPercent]] =
+  val BindingAll: Matcher[PartnerSplits] =
     Binding.List.Option.rmap: splits =>
-      val map = splits.getOrElse(List.empty).map(a => (a.partner -> a.percent)).toMap
+      val all = splits.getOrElse(List.empty)
+      val map = all.map(a => (a.partner -> a.percent)).toMap
+
+      // An absent leadId makes no choice; null asks for the default.
+      val leads: Map[Partner, Option[ProgramUser.Id]] =
+        all.flatMap: a =>
+          a.leadId.fold((a.partner -> none).some, none, id => (a.partner -> id.some).some)
+        .toMap
 
       (
         Result
@@ -37,4 +63,4 @@ object PartnerSplitInput:
         Result
           .failure("Percentages must sum to exactly 100.")
           .unlessA(splits.forall(_.foldMap(_.percent.value) === 100))
-      ).parTupled.as(map)
+      ).parTupled.as(PartnerSplits(map, leads))

@@ -170,6 +170,7 @@ fragment Proposal on Proposal {
       partnerSplits {
         partner
         percent
+        lead { ...ProgramUser }
       }
       exchangePartner
       aeonMultiFacility { requiredInstruments }
@@ -205,6 +206,7 @@ fragment Proposal on Proposal {
       partnerSplits {
         partner
         percent
+        lead { ...ProgramUser }
       }
       exchangePartner
       considerForBand3
@@ -223,6 +225,7 @@ fragment Proposal on Proposal {
     partnerSplits {
       partner
       percent
+      lead { ...ProgramUser }
     }
   }
 
@@ -231,6 +234,7 @@ fragment Proposal on Proposal {
     partnerSplits {
       partner
       percent
+      lead { ...ProgramUser }
     }
   }
 }
