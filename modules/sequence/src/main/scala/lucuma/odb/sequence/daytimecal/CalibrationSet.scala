@@ -67,12 +67,16 @@ enum InstrumentSetup:
   /**
    * The set kinds this instrument may be given.  The Flamingos 2, IGRINS-2
    * and GNIRS lists are mirrored by the kind triggers in V1378, V1379 and
-   * V1385, keep them in step.
+   * V1388, keep them in step.  With the acquisition mirror in GNIRS also
+   * drops the arc kinds, which the trigger does not check.
    */
   def allowedKinds: List[CalibrationSetType] =
     this match
       case Flamingos2(_) | Igrins2(_)  => CalibrationSetType.values.toList.filterNot(k => k === CalibrationSetType.Bias || k === CalibrationSetType.DaytimeObserve)
-      case Gnirs(_)                    => CalibrationSetType.values.toList.filterNot(_ === CalibrationSetType.Bias)
+      case Gnirs(c)                    =>
+        CalibrationSetType.values.toList.filterNot: k =>
+          k === CalibrationSetType.Bias ||
+          (c.acquisitionMirror === GnirsAcquisitionMirrorMode.In && (k === CalibrationSetType.Arc || k === CalibrationSetType.SmartArc))
       case GmosNorth(_) | GmosSouth(_) => CalibrationSetType.values.toList
 
   /** Whether the setup disperses light, which an arc requires. */

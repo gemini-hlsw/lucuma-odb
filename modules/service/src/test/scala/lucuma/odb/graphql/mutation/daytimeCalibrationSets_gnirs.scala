@@ -320,11 +320,12 @@ class daytimeCalibrationSets_gnirs extends OdbSuite with DatabaseOperations with
       _   <- expectRejected(pid, s"{ kind: BIAS, explicitCount: 1, ${spectroscopy(0)} }", "must be one of DARK, FLAT, ARC, DAYTIME_OBSERVE, SMART_FLAT, SMART_ARC, DAY_BASELINE, not BIAS")
     yield ()
 
-  test("a smart arc needs the acquisition mirror out; a manual arc does not"):
+  test("arcs need the acquisition mirror out; pupil images are flats or observes"):
     for
       pid <- createProgramAs(staff)
-      _   <- expectRejected(pid, s"{ kind: SMART_ARC, ${imaging(1)} }", "A SMART_ARC calibration set needs a disperser.")
-      _   <- createWithSets(pid, s"{ kind: ARC, explicitCount: 1, $arcGcal, ${imaging(1)} }")
+      _   <- expectRejected(pid, s"{ kind: SMART_ARC, ${imaging(1)} }", "must be one of DARK, FLAT, DAYTIME_OBSERVE, SMART_FLAT, DAY_BASELINE, not SMART_ARC")
+      _   <- expectRejected(pid, s"{ kind: ARC, explicitCount: 1, $arcGcal, ${imaging(1)} }", "must be one of DARK, FLAT, DAYTIME_OBSERVE, SMART_FLAT, DAY_BASELINE, not ARC")
+      _   <- createWithSets(pid, s"{ kind: FLAT, explicitCount: 1, $flatGcal, ${imaging(1)} }, { kind: DAYTIME_OBSERVE, explicitCount: 1, ${imaging(1)} }")
     yield ()
 
   test("the setup must be for the mode's instrument"):
