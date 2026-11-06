@@ -44,7 +44,9 @@ abstract class SchedulerRoutesSuite extends OdbSuite:
    * use of the services opens its own database session and closes it when
    * that use ends, while the shared resources stay open until the response
    * body has been read.  A page that outlives its session then fails here
-   * (on a closed connection) rather than passing on a shared one.
+   * (on a closed connection) rather than passing on a shared one.  The
+   * services are for `user`, so the route must ask for them as that user
+   * (the one the request authenticates as); asking as anyone else fails.
    */
   protected def withRoutes(
     user:      User,
@@ -53,7 +55,10 @@ abstract class SchedulerRoutesSuite extends OdbSuite:
   ): IO[Response[IO]] =
     servicesFor(user).allocated.flatMap: (srv, release) =>
       val services: [A] => User => (Services[IO] => IO[A]) => IO[A] =
-        [A] => (_: User) => (fa: Services[IO] => IO[A]) => session.use(s => fa(srv(s)))
+        [A] => (u: User) => (fa: Services[IO] => IO[A]) =>
+          IO.raiseError(new AssertionError(s"services requested as ${u.id}, not ${user.id}"))
+            .whenA(u.id =!= user.id) *>
+          session.use(s => fa(srv(s)))
 
       SchedulerRoutes(services, ssoClient, pageSizes)
         .orNotFound

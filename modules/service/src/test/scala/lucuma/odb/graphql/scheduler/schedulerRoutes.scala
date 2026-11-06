@@ -78,10 +78,11 @@ class schedulerRoutes extends SchedulerRoutesSuite with ExecutionTestSupportForG
     val control = "a\u0000b\u001b[2Jc"              // NUL and an ANSI escape
     val bidi    = "x\u202Ey\\z"                     // bidi override and a backslash
     val emoji   = ("w" * 31) + "\uD83D\uDE00" + "v"  // 33 code points, emoji 32nd
-    atomsRequest(serviceUser, control, bidi, emoji).flatMap: request =>
+    val tag     = "a\uDB40\uDC01b"                    // U+E0001, an invisible tag beyond U+FFFF
+    atomsRequest(serviceUser, control, bidi, emoji, tag).flatMap: request =>
       withRoutes(serviceUser, request).assertResponse(
         Status.BadRequest,
-        s"Unable to parse observation ids: a\\u0000b\\u001b[2Jc, x\\u202ey\\\\z, ${"w" * 31}\uD83D\uDE00...".some
+        s"Unable to parse observation ids: a\\u0000b\\u001b[2Jc, x\\u202ey\\\\z, ${"w" * 31}\uD83D\uDE00..., a\\u{e0001}b".some
       )
 
   test("line too long"):
@@ -292,6 +293,16 @@ class schedulerRoutes extends SchedulerRoutesSuite with ExecutionTestSupportForG
         assertEquals(forward.linesIterator.size, 8)
         assertEquals(reversed, forward)
         assertEquals(single, forward)
+
+  test("requested ids are sorted as the database orders them, not numerically"):
+    // The batches must come out in the order rows are sorted within each one,
+    // which is Postgres's text order: o-1000 < o-1a < o-a < o-fff.  Ordering
+    // Observation.Id numerically would give o-a < o-1a < o-fff < o-1000.
+    val ids = List("o-fff", "o-a", "o-1000", "o-1a", "o-a").flatMap(Observation.Id.parse)
+    withServices(serviceUser): services =>
+      services.transactionally(services.sequenceService.sortObservationIds(ids))
+    .map: sorted =>
+      assertEquals(sorted.map(_.toString), List("o-1000", "o-1a", "o-a", "o-fff"))
 
   test("gzip"):
     val setup: IO[Observation.Id] =
