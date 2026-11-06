@@ -15,6 +15,7 @@ import lucuma.core.enums.GnirsAcquisitionType
 import lucuma.core.enums.GnirsCamera
 import lucuma.core.enums.GnirsDecker
 import lucuma.core.enums.GnirsFilter
+import lucuma.core.enums.GnirsFpuIfu
 import lucuma.core.enums.GnirsGrating
 import lucuma.core.enums.GnirsPrism
 import lucuma.core.enums.GnirsReadMode
@@ -34,6 +35,7 @@ import lucuma.core.model.sequence.gnirs.GnirsFocusMotorStep
 import lucuma.core.model.sequence.gnirs.GnirsFocusMotorStepsValue
 import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.core.model.sequence.gnirs.defaultIfuTelescopeConfigs
+import lucuma.core.model.sequence.gnirs.gnirsIfuTelescopeConfigPresets
 import lucuma.odb.data.ExposureTimeModeId
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.data.Nullable
@@ -85,8 +87,9 @@ trait GnirsSpectroscopyService[F[_]]:
    * Reset `oid`'s configuration by clearing, for a telluric, the explicit read
    * mode and, for long slit, any explicit slit offset override.  The read mode
    * then follows the telluric's own exposure time rather than the science's.
-   * The telluric offsets come from v_gnirs_spectroscopy's role-aware default;
-   * IFU has no such default, so its offsets are kept.
+   * The long slit telluric offsets come from v_gnirs_spectroscopy's role-aware
+   * default. The HR IFU takes core's "Telluric" preset; the LR IFU has no
+   * telluric preset, so its offsets are kept.
    */
   def resetTelluricConfig(oid: Observation.Id)(using Transaction[F]): F[Unit]
 
@@ -102,6 +105,11 @@ object GnirsSpectroscopyService:
   private val DefaultCoadds: PosInt = PosInt.unsafeFrom(1)
 
   val CentralWavelengthConfigTableName: String = "t_gnirs_central_wavelength_config"
+
+  // Core keys the IFU presets by display name; only the HR IFU has a telluric one.
+  private val HighResolutionIfuTelluricConfigs: Option[NonEmptyList[TelescopeConfig]] =
+    gnirsIfuTelescopeConfigPresets(GnirsFpuIfu.HighResolution).collectFirst:
+      case ("Telluric", configs) => configs
 
   /**
    * One central wavelength entry together with its position in the list, used as the
@@ -443,7 +451,7 @@ object GnirsSpectroscopyService:
           session.exec(Statements.cloneWavelengths(originalId, newId, etms)).unlessA(etms.isEmpty)
 
       override def resetTelluricConfig(oid: Observation.Id)(using Transaction[F]): F[Unit] =
-        session.exec(Statements.applyGnirsTelluricDefaults(oid))
+        session.exec(Statements.applyGnirsTelluricDefaults(oid, HighResolutionIfuTelluricConfigs))
 
       override def collapseTelluricWavelengths(oid: Observation.Id)(using Transaction[F]): F[Unit] =
         session.execute(Statements.RaiseWavelengthCoaddsToGroupMax)(oid) *>
@@ -754,15 +762,22 @@ object GnirsSpectroscopyService:
     // explicit read mode and, for long slit, any explicit offset override.
     // v_gnirs_spectroscopy computes the long slit telluric pattern itself,
     // role-aware; IFU offsets have no derived default, so they stay.
-    def applyGnirsTelluricDefaults(oid: Observation.Id): AppliedFragment =
+    def applyGnirsTelluricDefaults(
+      oid:                 Observation.Id,
+      ifuTelluricConfigs:  Option[NonEmptyList[TelescopeConfig]]
+    ): AppliedFragment =
       sql"""
         UPDATE t_gnirs_spectroscopy
         SET
           c_read_mode         = CASE WHEN NOT is_telluric_calibration(c_observation_id) THEN c_read_mode END,
           c_slit_offset_mode  = CASE WHEN c_observing_mode_type = 'gnirs_ifu' THEN c_slit_offset_mode  END,
-          c_telescope_configs = CASE WHEN c_observing_mode_type = 'gnirs_ifu' THEN c_telescope_configs END
+          c_telescope_configs = CASE
+                                  WHEN c_observing_mode_type <> 'gnirs_ifu' THEN NULL
+                                  WHEN c_fpu_ifu = 'HighResolution'         THEN COALESCE(${text.opt}, c_telescope_configs)
+                                  ELSE c_telescope_configs
+                                END
         WHERE c_observation_id = $observation_id
-      """.apply(oid)
+      """.apply(ifuTelluricConfigs.map(ToSkyFormat.reverseGet), oid)
 
     val RaiseWavelengthCoaddsToGroupMax: Command[Observation.Id] =
       sql"""
