@@ -119,7 +119,7 @@ class executionSciGnirsImaging extends ExecutionTestSupportForGnirs:
   // The flats atom closing a filter's science; its title names the filter when
   // the observation has more than one.
   private def flatsAtom(filter: GnirsFilter, p: Int = 0, q: Int = 0, multipleFilters: Boolean = true): Json =
-    val title = if multipleFilters then s"Nighttime Calibrations ${filter.shortName}" else "Nighttime Calibrations"
+    val title = if multipleFilters then s"Nighttime Calibrations (${filter.shortName})" else "Nighttime Calibrations"
     json"""
       {
         "description": $title,
@@ -526,8 +526,8 @@ class executionSciGnirsImaging extends ExecutionTestSupportForGnirs:
       expect(pi, gnirsScienceQuery(oid, 100.some), expectedScience(atoms).asRight)
 
   test("a filter without a smart flat row gets no flats"):
-    // The fixture has no K row (the real table's thermal-IR gap: GCAL saturates
-    // there), so K's science stands alone while J still gets its flats.
+    // L lies past the table's last imaging row (2.49 µm): GCAL saturates in the
+    // thermal IR, so L's science stands alone while J still gets its flats.
     val mode =
       s"""
         gnirsImaging: {
@@ -536,9 +536,9 @@ class executionSciGnirsImaging extends ExecutionTestSupportForGnirs:
           filters: [
             { filter: J },
             {
-              filter: K
+              filter: ORDER2
               exposureTimeMode: {
-                timeAndCount: { time: { seconds: 10.0 }, count: 1, at: { nanometers: 2200.0 } }
+                timeAndCount: { time: { seconds: 10.0 }, count: 1, at: { nanometers: 3500.0 } }
               }
             }
           ]
@@ -555,7 +555,7 @@ class executionSciGnirsImaging extends ExecutionTestSupportForGnirs:
     val atoms =
       List.fill(2)(sciAtom(GnirsFilter.J, 10.secondTimeSpan)) ++
       List(flatsAtom(GnirsFilter.J)) ++
-      List(sciAtomOf(sciStep(GnirsFilter.K, 10.secondTimeSpan, readMode = GnirsReadMode.Bright.some)))
+      List(sciAtomOf(sciStep(GnirsFilter.Order2, 10.secondTimeSpan, readMode = GnirsReadMode.Bright.some)))
 
     setup.flatMap: oid =>
       expect(pi, gnirsScienceQuery(oid, 100.some), expectedScience(atoms).asRight)

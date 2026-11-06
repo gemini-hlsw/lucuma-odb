@@ -117,7 +117,7 @@ object MosTelluric:
       builder.buildStream:
         Stream.emits:
           List.fill(1.max(goalCycles.value))(ProtoAtom(ScienceAtomTitle.some, steps.science)) :+
-            ProtoAtom(Science.NighttimeCalTitle.some, steps.cals)
+            ProtoAtom(AtomTitle.NighttimeCal.some, steps.cals)
 
   def instantiate[F[_]: Monad](
     observationId: Observation.Id,
