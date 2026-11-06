@@ -146,7 +146,11 @@ object ProposalService {
      * out of a log, away from the program that produced it.
      */
     def submissionError(e: ProposalSubmissionError, pid: Program.Id): OdbError =
-      s"${e.message} (program $pid)".invalidArg
+      submissionError(e.message, pid)
+
+    /** A shared rule whose message names a particular case, such as a partner. */
+    def submissionError(message: String, pid: Program.Id): OdbError =
+      s"$message (program $pid)".invalidArg
 
     def invalidProgramType(pid: Program.Id, progType: ProgramType): OdbError =
       s"Program $pid is of type $progType. Only Science programs can have proposals.".invalidArg
@@ -386,19 +390,36 @@ object ProposalService {
          * sum-to-100 rule does not apply to it; an external (Keck or Subaru)
          * proposal apportions its time across Gemini partners and does.
          */
+        private val splitsApply: Boolean =
+          exchangePartner.isEmpty && (
+            isExternal ||
+            scienceSubtype.exists(s => s === ScienceSubtype.Classical || s === ScienceSubtype.Queue)
+          )
+
+        private val splitsValid: Boolean =
+          !splitsApply || splitsSum === 100
+
+        // Matching investigators against the splits is only meaningful once
+        // every investigator is affiliated and the splits themselves add up.
+        private val canMatchInvestigators: Boolean =
+          splitsValid && !hasUnspecifiedInvestigatorPartner
+
         private def validateSplits(pid: Program.Id): Result[Unit] =
-          val splitsApply =
-            exchangePartner.isEmpty && (
-              isExternal ||
-              scienceSubtype.exists(s => s === ScienceSubtype.Classical || s === ScienceSubtype.Queue)
-            )
-          val splitsValid = !splitsApply || splitsSum === 100
           (
             submissionError(InvalidPartnerSplits, pid).asFailure.unlessA(splitsValid),
-            // Matching investigators against the splits is only meaningful once
-            // every investigator is affiliated and the splits themselves add up.
-            validateRequestedPartners(pid).whenA(splitsValid && !hasUnspecifiedInvestigatorPartner)
+            validateRequestedPartners(pid).whenA(canMatchInvestigators)
           ).parTupled.void
+
+        /**
+         * Each partner with requested time needs a lead, though only once some
+         * investigator is eligible: a partner with none is reported by the rule
+         * that requires a matching investigator instead.  `missing` comes from
+         * `PartnerLeadService.missing`.
+         */
+        private def validatePartnerLeads(pid: Program.Id, missing: List[Partner]): Result[Unit] =
+          missing
+            .traverse_(p => submissionError(ProposalSubmissionError.missingPartnerLead(p), pid).asFailure)
+            .whenA(splitsApply && canMatchInvestigators)
 
         /**
          * What every investigator -- the PI and each co-investigator -- must
@@ -473,6 +494,7 @@ object ProposalService {
           pid: Program.Id,
           hasDefinedObservations: Boolean,
           hasUndefinedObservations: Boolean,
+          missingPartnerLeads: List[Partner],
           newStatus: ProposalStatus
         ): Result[Unit] =
           (
@@ -490,6 +512,7 @@ object ProposalService {
               .whenA(hasUnspecifiedInvestigatorPartner),
             validateInvestigators(pid),
             submissionError(UninvitedInvestigator, pid).asFailure.whenA(hasUninvitedInvestigator),
+            validatePartnerLeads(pid, missingPartnerLeads),
             submissionError(NoDefinedObservations, pid).asFailure.unlessA(hasDefinedObservations),
             submissionError(UndefinedObservations, pid).asFailure.whenA(hasUndefinedObservations)
           ).parTupled.unlessA(newStatus === ProposalStatus.NotSubmitted)
@@ -536,7 +559,7 @@ object ProposalService {
 
           val eSum =
             if set.hasType then
-              set.partnerSplits.fold(0.toLong, splitsSum, m => m.values.map(_.value.toLong).sum)
+              set.partnerSplits.fold(0.toLong, splitsSum, m => m.percents.values.map(_.value.toLong).sum)
             else splitsSum
 
           val newSubtype =
@@ -792,8 +815,11 @@ object ProposalService {
         val insertSplits: ResultT[F, Unit] =
           ResultT.liftF(
             Services.asSuperUser:
-              partnerSplitsService.insertSplits(input.SET.partnerSplits, input.programId)
+              partnerSplitsService.insertSplits(input.SET.partnerSplits.percents, input.programId)
           )
+
+        val syncLeads: ResultT[F, Unit] =
+          ResultT(partnerLeadService.sync(input.programId, input.SET.partnerSplits.leads))
 
         val insertRequiredInstruments: ResultT[F, Unit] =
           input.SET.gemini
@@ -810,6 +836,7 @@ object ProposalService {
           _ <- updateProgram(p, c)
           _ <- insert
           _ <- insertSplits
+          _ <- syncLeads
           _ <- insertRequiredInstruments
         } yield input.programId).value
 
@@ -867,8 +894,13 @@ object ProposalService {
         def updateSplits(pid: Program.Id, set: ProposalPropertiesInput.Edit): ResultT[F, Unit] =
           ResultT.liftF(set.partnerSplits.foldPresent( splits =>
             Services.asSuperUser:
-              partnerSplitsService.updateSplits(splits.getOrElse(Map.empty), pid)
+              partnerSplitsService.updateSplits(splits.fold(Map.empty)(_.percents), pid)
           ).sequence.void)
+
+        // Run once the splits are in place, whether or not this edit changed
+        // them: a change of proposal type or exchange partner can remove them.
+        def syncLeads(pid: Program.Id, set: ProposalPropertiesInput.Edit): ResultT[F, Unit] =
+          ResultT(partnerLeadService.sync(pid, set.partnerSplits.toOption.fold(Map.empty)(_.leads)))
 
         // Replace-the-whole-list semantics: absent leaves the set alone, null
         // and empty both clear it.
@@ -901,6 +933,7 @@ object ProposalService {
           _      <- updateRequiredInstruments(pid, set)
           _      <- updateProgram(pid, before, after)
           _      <- updateSplits(pid, set).unlessA(splitsFirst(set))
+          _      <- syncLeads(pid, set)
         } yield pid).value
       }
 
@@ -925,7 +958,8 @@ object ProposalService {
               val deleteDependents: F[Unit] =
                 Services.asSuperUser:
                   partnerSplitsService.deleteSplits(input.programId) *>
-                    tacFeedbackService.deleteAllTacFeedback(input.programId)
+                    tacFeedbackService.deleteAllTacFeedback(input.programId) *>
+                    partnerLeadService.syncAll(List(input.programId))
               deleteDependents *>
                 session.execute(Statements.ResetProgramTypeToScience)(input.programId).as(true.success)
             case c         => OdbError.InvalidArgument(s"Could not delete proposal in ${input.programId}: $c".some).asFailure.pure[F]
@@ -945,6 +979,7 @@ object ProposalService {
           pid: Program.Id,
           ctx: ProposalContext,
           states: Set[ObservationWorkflowState],
+          missingLeads: List[Partner],
           oldStatus: ProposalStatus,
           newStatus: ProposalStatus
         ): Result[Unit] =
@@ -957,6 +992,7 @@ object ProposalService {
                      pid,
                      states.contains(ObservationWorkflowState.Defined),
                      states.contains(ObservationWorkflowState.Undefined),
+                     missingLeads,
                      newStatus
                    ),
                    ctx.validateDeadline(pid, newStatus)
@@ -982,9 +1018,10 @@ object ProposalService {
                   val go2 =
                     for
                       info      <- ResultT(ProposalContext.lookup(pid))
+                      missing   <- ResultT.liftF(partnerLeadService.missing(pid))
                       oldStatus  = info.status
                       newStatus  = input.status
-                      _         <- ResultT.fromResult(validate(pid, info, states, oldStatus, newStatus))
+                      _         <- ResultT.fromResult(validate(pid, info, states, missing, oldStatus, newStatus))
                       _         <- ResultT.liftF(update(pid, input.status))
                       _         <- ResultT(configurationService.canonicalizeAll(pid)).whenA(oldStatus === ProposalStatus.NotSubmitted && newStatus === ProposalStatus.Submitted)
                       _         <- ResultT.liftF(Services.asSuperUser(pdfSummaryJobService.enqueue(pid)).void).whenA(oldStatus === ProposalStatus.NotSubmitted && newStatus === ProposalStatus.Submitted)
