@@ -4,11 +4,10 @@
 package lucuma.odb.graphql
 package mapping
 
+import grackle.Path
 import io.circe.syntax.given
 import lucuma.core.model.sequence.ghost.CentralWavelength
 import lucuma.odb.json.wavelength.query.given
-
-import grackle.Path
 
 import table.GhostDynamicTable
 
@@ -37,9 +36,8 @@ trait GhostDynamicMapping[F[_]] extends GhostDynamicTable[F]:
       )
     )
 
-  // The generated sequences are JSON without the fixed central wavelength, so
-  // the type-bound field serves every path the table mappings do not.
+  // Generated steps are JSON without the fixed central wavelength.
   lazy val GhostDynamicMappings: List[TypeMapping] =
-    ObjectMapping(GhostDynamicType)(CirceField("centralWavelength", CentralWavelength.asJson)) ::
+    ObjectMapping(GhostStepType / "instrumentConfig")(CirceField("centralWavelength", CentralWavelength.asJson)) ::
     dynamicMappingsAtPath(StepRecordType / "ghost", GhostDynamicTable) ++
     dynamicMappingsAtPath(CalibrationSetType / "ghost", GhostCalibrationSetupTable)

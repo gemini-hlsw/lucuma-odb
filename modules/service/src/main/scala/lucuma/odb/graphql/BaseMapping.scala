@@ -207,6 +207,7 @@ trait BaseMapping[F[_]]
   lazy val GhostReadModeType                       = schema.ref("GhostReadMode")
   lazy val GhostResolutionModeType                 = schema.ref("GhostResolutionMode")
   lazy val GhostStaticType                         = schema.ref("GhostStatic")
+  lazy val GhostStepType                           = schema.ref("GhostStep")
   lazy val GmosAmpCountType                        = schema.ref("GmosAmpCount")
   lazy val GmosAmpGainType                         = schema.ref("GmosAmpGain")
   lazy val GmosAmpReadModeType                     = schema.ref("GmosAmpReadMode")
