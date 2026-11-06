@@ -217,8 +217,8 @@ object SchedulerRoutes:
 
   /** Where the next page of visibility changes starts. */
   private enum VisibilityCursor:
-    case Observations(after: Option[Observation.Id])
-    case Targets(after: Option[Target.Id])
+    case Observations(after: Option[(Timestamp, Observation.Id)])
+    case Targets(after: Option[(Timestamp, Target.Id)])
 
   /**
    * A response body read one page at a time, each page fetched (and fully
@@ -320,10 +320,11 @@ object SchedulerRoutes:
         }
 
       case req @ GET -> Root / "scheduler" / "visibility-changes" :? SinceMatcher(since) =>
-        // All observations first, then all targets, each paged by id.  Every
-        // page shares an upper bound fixed when the request starts, so nothing
-        // stamped while paging is returned and the newest time in the response
-        // can't pass a change to a row that was already paged.
+        // All observations first, then all targets, each paged in order of
+        // invalidation time and then id.  Every page shares an upper bound
+        // fixed when the request starts, so nothing stamped while paging is
+        // returned and the newest time in the response can't pass a change to
+        // a row that was already paged.
         def fetch(user: User, until: Timestamp)(cursor: VisibilityCursor): F[(List[VisibilityChange], Option[VisibilityCursor])] =
           val limit = pageSizes.rowLimit
 
@@ -331,12 +332,12 @@ object SchedulerRoutes:
             case VisibilityCursor.Observations(after) =>
               superUserTransaction(user)(visibilityService.selectObservationChanges(since, until, after, limit))
                 .map: page =>
-                  val next = lastOfFull(page, limit).fold(VisibilityCursor.Targets(None))(c => VisibilityCursor.Observations(c.id.some))
+                  val next = lastOfFull(page, limit).fold(VisibilityCursor.Targets(None))(c => VisibilityCursor.Observations((c.invalidatedAt, c.id).some))
                   (page, next.some)
             case VisibilityCursor.Targets(after)      =>
               superUserTransaction(user)(visibilityService.selectTargetChanges(since, until, after, limit))
                 .map: page =>
-                  (page, lastOfFull(page, limit).map(c => VisibilityCursor.Targets(c.id.some)))
+                  (page, lastOfFull(page, limit).map(c => VisibilityCursor.Targets((c.invalidatedAt, c.id).some)))
 
         ssoClient.require(req) { user =>
           for

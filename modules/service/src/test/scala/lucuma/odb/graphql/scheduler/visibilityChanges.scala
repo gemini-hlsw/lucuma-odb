@@ -253,6 +253,26 @@ class visibilityChanges extends SchedulerRoutesSuite with ExecutionTestSupportFo
       assert(hasObs(b, o1))
       assert(hasObs(b, o2))
 
+  test("pages split a run of observations sharing one invalidation time"):
+    for
+      p         <- createProgram
+      t         <- createTargetWithProfileAs(pi, p)
+      o1        <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      o2        <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      o3        <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      // Re-stamps all three observations in one transaction, so at one time.
+      _         <- changeProgramActivePeriod(p)
+      stamp     <- obsInvalidation(o1)
+      (s0, all) <- fetchVisibilityChanges(serviceUser, stamp)
+      (s1, one) <- fetchVisibilityChanges(serviceUser, stamp, SinglePages)
+    yield
+      assertEquals(s0, Status.Ok)
+      assertEquals(s1, Status.Ok)
+      assertEquals(List(o1, o2, o3).map(o => obsTimestamp(all, o)), List.fill(3)(Some(stamp)))
+      assertEquals(one, all)
+      val obsTimes = all.linesIterator.filter(_.startsWith("o-")).map(l => Instant.parse(l.split("\t")(1))).toList
+      assertEquals(obsTimes, obsTimes.sorted)
+
   test("an observation remains listed across every workflow state, including completed"):
     for
       p       <- createProgram
