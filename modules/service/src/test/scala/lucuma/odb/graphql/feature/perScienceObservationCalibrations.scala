@@ -2771,8 +2771,8 @@ class perScienceObservationCalibrations
   private def seedGnirsXdSmartGcal: IO[Unit] =
     val key = Gnirs.TableKey(
       GnirsPixelScale.PixelScale_0_15,
-      GnirsGrating.D32,
-      GnirsPrism.Sxd,
+      GnirsGrating.D32.some,
+      GnirsPrism.Sxd.some,
       BoundedInterval.unsafeOpenUpper(
         Wavelength.fromIntNanometers(900).get,
         Wavelength.fromIntNanometers(2560).get

@@ -6,6 +6,7 @@ package lucuma.odb.graphql.query
 import cats.data.NonEmptySet
 import cats.effect.IO
 import cats.syntax.foldable.*
+import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.numeric.PosLong
 import io.circe.Json
@@ -50,8 +51,8 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
   private def gnirsSmartKey(pixelScale: GnirsPixelScale): Gnirs.TableKey =
     Gnirs.TableKey(
       pixelScale,
-      GnirsGrating.D111,
-      GnirsPrism.Mirror,
+      GnirsGrating.D111.some,
+      GnirsPrism.Mirror.some,
       BoundedInterval.unsafeOpenUpper(
         Wavelength.fromIntNanometers(900).get,
         Wavelength.fromIntNanometers(5600).get
@@ -68,8 +69,8 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
   private val gnirsThermalIrKey: Gnirs.TableKey =
     Gnirs.TableKey(
       GnirsPixelScale.PixelScale_0_05,
-      GnirsGrating.D10,
-      GnirsPrism.Mirror,
+      GnirsGrating.D10.some,
+      GnirsPrism.Mirror.some,
       BoundedInterval.unsafeOpenUpper(
         Wavelength.fromIntNanometers(2800).get,
         Wavelength.fromIntNanometers(4200).get
@@ -109,8 +110,8 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
   private val gnirsCrossDispersedArcOnlyKey: Gnirs.TableKey =
     Gnirs.TableKey(
       GnirsPixelScale.PixelScale_0_05,
-      GnirsGrating.D111,
-      GnirsPrism.Lxd,
+      GnirsGrating.D111.some,
+      GnirsPrism.Lxd.some,
       BoundedInterval.unsafeOpenUpper(
         Wavelength.fromIntNanometers(900).get,
         Wavelength.fromIntNanometers(2560).get
@@ -146,6 +147,50 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
       PosInt.unsafeFrom(1),
       LegacyInstrumentConfig(TimeSpan.unsafeFromMicroseconds(10_000_000L), PosInt.unsafeFrom(3))
     )
+
+  // Imaging flats, mirroring the real 0.15"/pix rows for J (1.17-1.37 µm, 1.5s,
+  // ND4.0) and H (1.47-1.80 µm, 12s, ND4-5): lamp-on then lamp-off exposures,
+  // keyed by the filter's wavelength with no grating or prism (mirror in) and
+  // the acquisition FPU.  Two of each rather than the real eight or six, to keep
+  // the expected sequences short.
+  private def gnirsImagingKey(pixelScale: GnirsPixelScale, loNm: Int, hiNm: Int): Gnirs.TableKey =
+    Gnirs.TableKey(
+      pixelScale,
+      none,
+      none,
+      BoundedInterval.unsafeOpenUpper(
+        Wavelength.fromIntNanometers(loNm).get,
+        Wavelength.fromIntNanometers(hiNm).get
+      ),
+      GnirsFpu.Other(GnirsFpuOther.Acquisition),
+      GnirsWellDepth.Shallow
+    )
+
+  val GnirsImagingFlatCount: Int = 2
+
+  private def gnirsImagingFlat(filter: GcalFilter, shutter: GcalShutter, exposure: TimeSpan): SmartGcalValue.Legacy =
+    SmartGcalValue(
+      Gcal(
+        Gcal.Lamp.fromContinuum(GcalContinuum.IrGreyBodyHigh),
+        filter,
+        GcalDiffuser.Ir,
+        shutter
+      ),
+      GcalBaselineType.Night,
+      PosInt.unsafeFrom(GnirsImagingFlatCount),
+      LegacyInstrumentConfig(exposure, PosInt.unsafeFrom(1))
+    )
+
+  val GnirsImagingFlatExposureJ: TimeSpan = TimeSpan.unsafeFromMicroseconds(1_500_000L)
+  val GnirsImagingFlatExposureH: TimeSpan = TimeSpan.unsafeFromMicroseconds(12_000_000L)
+
+  private def gnirsImagingRows(pixelScale: GnirsPixelScale): List[Gnirs.TableRow] =
+    List(
+      (1170, 1370, GcalFilter.Nd40, GnirsImagingFlatExposureJ),
+      (1470, 1800, GcalFilter.Nd45, GnirsImagingFlatExposureH)
+    ).flatMap: (lo, hi, filter, exposure) =>
+      List(GcalShutter.Open, GcalShutter.Closed).map: shutter =>
+        Gnirs.TableRow(PosLong.unsafeFrom(1), gnirsImagingKey(pixelScale, lo, hi), gnirsImagingFlat(filter, shutter, exposure))
 
   // Compose with any seeding contributed by other mixed-in support traits
   // (e.g. Flamingos2) rather than replacing it.
@@ -184,6 +229,7 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
         Gnirs.TableRow(PosLong.unsafeFrom(1), gnirsThermalIrShallowKey, gnirsThermalIrShallowFlat),
         Gnirs.TableRow(PosLong.unsafeFrom(1), gnirsCrossDispersedArcOnlyKey, gnirsSmartArc)
       )
+      ::: List(GnirsPixelScale.PixelScale_0_05, GnirsPixelScale.PixelScale_0_15).flatMap(gnirsImagingRows)
 
     prior >>
       servicesFor(pi /* doesn't matter */).map(_(s)).use: services =>

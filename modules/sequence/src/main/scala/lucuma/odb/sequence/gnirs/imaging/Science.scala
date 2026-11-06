@@ -5,6 +5,7 @@ package lucuma.odb.sequence
 package gnirs
 package imaging
 
+import cats.Monad
 import cats.Order
 import cats.Order.catsKernelOrderingForOrder
 import cats.data.NonEmptyList
@@ -14,6 +15,7 @@ import cats.effect.Sync
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.PosInt
+import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Chunk
 import fs2.Pure
 import fs2.Stream
@@ -45,6 +47,9 @@ import java.util.UUID
 
 object Science:
 
+  val NighttimeCalTitle: NonEmptyString =
+    NonEmptyString.unsafeFrom("Nighttime Calibrations")
+
   object ProtoSequences extends GnirsSequenceState:
 
     def setup(config: Config): State[GnirsDynamicConfig, Unit] =
@@ -69,6 +74,24 @@ object Science:
         _ <- GnirsDynamicConfig.readMode := config.explicitReadMode.getOrElse(readMode)
       yield ()
 
+    private def flatsTitle(filter: GnirsFilter, multipleFilters: Boolean): NonEmptyString =
+      if multipleFilters then NonEmptyString.unsafeFrom(s"${NighttimeCalTitle.value} ${filter.shortName}")
+      else NighttimeCalTitle
+
+    /**
+     * The flats closing a filter's science: a single smart flat at the last
+     * science position, guiding off, for SmartGcal to expand into the lamp-on
+     * and lamp-off exposures its table prescribes. The state must hold the
+     * filter's science configuration, which keys the lookup.
+     */
+    def flatsAtom(
+      filter:          GnirsFilter,
+      multipleFilters: Boolean,
+      last:            TelescopeConfig
+    ): State[GnirsDynamicConfig, ProtoAtom[ProtoStep[GnirsDynamicConfig]]] =
+      flatStep(last.copy(guiding = StepGuideState.Disabled), ObserveClass.NightCal)
+        .map(ProtoAtom.one(flatsTitle(filter, multipleFilters).some, _))
+
     def grouped(
       config:             Config,
       time:               NonEmptyMap[GnirsFilter, Zipper[Result]],
@@ -81,18 +104,22 @@ object Science:
       def oneFilter(filter: GnirsFilter): State[GnirsDynamicConfig, Stream[Pure, ProtoAtom[ProtoStep[GnirsDynamicConfig]]]] =
         val integrationTime = time(filter).get.focus._2
         for
-          _   <- setFilter(config, filter, integrationTime, readModes(filter).get)
-          sky <- skyOffsets
-                   .traverse: offset =>
-                     scienceStep(offset, ObserveClass.Science)
-          obj <- ExposuresPerOffset.repeat(offsets, exposuresPerOffset, integrationTime.frameCount)
-                   .traverse: offset =>
-                     scienceStep(offset, ObserveClass.Science)
+          _     <- setFilter(config, filter, integrationTime, readModes(filter).get)
+          sky   <- skyOffsets
+                     .traverse: offset =>
+                       scienceStep(offset, ObserveClass.Science)
+          obj   <- ExposuresPerOffset.repeat(offsets, exposuresPerOffset, integrationTime.frameCount)
+                     .traverse: offset =>
+                       scienceStep(offset, ObserveClass.Science)
+          flats <- (sky ++ obj ++ sky).lastOption.traverse: last =>
+                     flatsAtom(filter, time.length > 1, last.telescopeConfig)
         yield
           // If there are no sky positions, then each exposure is an atom.
           // If there are sky positions, then we group them into a single atom.
-          if sky.isEmpty then Stream.emits(obj.map(ProtoAtom.one(none, _)))
-          else Stream.emit(ProtoAtom(none, NonEmptyList.fromListUnsafe(sky ++ obj ++ sky)))
+          val science: List[ProtoAtom[ProtoStep[GnirsDynamicConfig]]] =
+            if sky.isEmpty then obj.map(ProtoAtom.one(none, _))
+            else List(ProtoAtom(none, NonEmptyList.fromListUnsafe(sky ++ obj ++ sky)))
+          Stream.emits(science ++ flats)
 
       Stream
         .emits(time.keys.toNonEmptyList.toList.sorted)
@@ -150,26 +177,50 @@ object Science:
               .groupAdjacentBy(_._2)
               .map(_._2.map(_._1))
 
+      // A filter's exposures are spread over every stop, so its flats can only
+      // close the whole sequence: one atom per filter, at the last position.
+      def flats(last: TelescopeConfig): State[GnirsDynamicConfig, List[ProtoAtom[ProtoStep[GnirsDynamicConfig]]]] =
+        filters.traverse: filter =>
+          setFilter(config, filter, filterTimes(filter), readModes(filter).get) *>
+            flatsAtom(filter, filters.sizeIs > 1, last)
+
       val prog = for
         _ <- setup(config)
         b <- skySteps(skyList)
         g <- groups
         a <- skySteps(skyList.reverse)
-      yield g.flatMap: chunk =>
-        if skyList.isEmpty then
-          Stream.emits(chunk.toList.map(ProtoAtom.one(none, _)))
-        else
-          Stream.emit(ProtoAtom(none, NonEmptyList.fromListUnsafe(b ++ chunk.toList ++ a)))
+        f <- flats(a.lastOption.map(_.telescopeConfig).orElse(offsets.lastOption).getOrElse(TelescopeConfig.Default))
+      yield
+        val science: Stream[Pure, ProtoAtom[ProtoStep[GnirsDynamicConfig]]] = g.flatMap: chunk =>
+          if skyList.isEmpty then
+            Stream.emits(chunk.toList.map(ProtoAtom.one(none, _)))
+          else
+            Stream.emit(ProtoAtom(none, NonEmptyList.fromListUnsafe(b ++ chunk.toList ++ a)))
+        science ++ Stream.emits(f)
 
       prog.runA(initialDynamicConfig).value
 
   object ScienceGenerator:
+
+    /**
+     * Expands the smart flats. A filter the SmartGcal table does not cover
+     * gets no flats rather than failing the sequence: the red cameras (deep
+     * well) image in the thermal IR, where GCAL saturates and no row exists.
+     */
+    private def expandFlats[F[_]: Monad](
+      expander: SmartGcalExpander[F, GnirsStaticConfig, GnirsDynamicConfig],
+      static:   GnirsStaticConfig,
+      atoms:    Stream[Pure, ProtoAtom[ProtoStep[GnirsDynamicConfig]]]
+    ): F[List[ProtoAtom[ProtoStep[GnirsDynamicConfig]]]] =
+      atoms.compile.toList.flatTraverse: atom =>
+        expander.expandAtom(static, atom).map(_.toOption.toList)
 
     def instantiate[F[_]: Sync](
       observationId: Observation.Id,
       estimator:     StepTimeEstimateCalculator[GnirsStaticConfig, GnirsDynamicConfig],
       static:        GnirsStaticConfig,
       namespace:     UUID,
+      expander:      SmartGcalExpander[F, GnirsStaticConfig, GnirsDynamicConfig],
       config:        Config,
       time:          Either[OdbError, NonEmptyMap[GnirsFilter, Zipper[Result]]]
     )(using Order[GnirsFilter]): F[Either[OdbError, SequenceGenerator[GnirsDynamicConfig]]] =
@@ -226,16 +277,18 @@ object Science:
             generateOffsets(offsets, NonNegInt.MinValue, skyOffsets)(ExposuresPerOffset.groupedOffsetCount(_, exposuresPerOffset)).map: (o, s) =>
               ProtoSequences.grouped(config, nem, readModes, o, s, exposuresPerOffset)
 
-        protoAtoms.map: v =>
-          ImagingSequence.makeGenerator(estimator, static, namespace, v)
+        protoAtoms
+          .flatMap(expandFlats(expander, static, _))
+          .map(atoms => ImagingSequence.makeGenerator(estimator, static, namespace, Stream.emits(atoms)))
 
   def gnirs[F[_]: Sync](
     observationId: Observation.Id,
     estimator:     StepTimeEstimateCalculator[GnirsStaticConfig, GnirsDynamicConfig],
     static:        GnirsStaticConfig,
     namespace:     UUID,
+    expander:      SmartGcalExpander[F, GnirsStaticConfig, GnirsDynamicConfig],
     config:        Config,
     time:          Either[OdbError, GnirsImaging]
   ): F[Either[OdbError, SequenceGenerator[GnirsDynamicConfig]]] =
     given Order[GnirsFilter] = ImagingSequence.wavelengthOrder(config.variant)(_.centralWavelength)
-    ScienceGenerator.instantiate(observationId, estimator, static, namespace, config, time.map(_.science))
+    ScienceGenerator.instantiate(observationId, estimator, static, namespace, expander, config, time.map(_.science))

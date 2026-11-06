@@ -27,19 +27,13 @@ import lucuma.core.parser.MiscParsers.posInt
 import lucuma.core.util.parser.UtilParsers.posSecondsTimeSpan
 import lucuma.odb.smartgcal.data.Gnirs.FileEntry
 import lucuma.odb.smartgcal.data.Gnirs.FileKey
+import lucuma.odb.smartgcal.data.Gnirs.FileMode
 import lucuma.odb.smartgcal.data.SmartGcalValue
 import lucuma.odb.smartgcal.data.SmartGcalValue.LegacyInstrumentConfig
 
 trait GnirsParsers:
   import common.*
   import util.*
-
-  // Spectroscopy rows produce calibrations; imaging rows are skipped (Obsolete).
-  private val mode: Parser[Boolean] =
-    oneOf(
-      "Spectroscopy" -> true,
-      "Imaging"      -> false
-    ).withContext("GNIRS mode")
 
   val pixelScale: Parser[NonEmptyList[GnirsPixelScale]] =
     // The pixel scale column is quoted in the source file, e.g. "0.05""/pix".
@@ -131,24 +125,41 @@ trait GnirsParsers:
       )
     }
 
-  // The search-key columns, in the file's physical order, paired with whether
-  // the row is a spectroscopy row. Imaging rows make the whole row obsolete.
-  private val fileKey: Parser[(Boolean, FileKey)] =
+  // Imaging lines leave the disperser, cross-disperser and FPU columns as
+  // wildcards: the mirror is in and the acquisition FPU is the only one used.
+  private val wildcard: Parser[Unit] =
+    Parser.char('*').withContext("GNIRS wildcard")
+
+  // The search-key columns after the mode, in the file's physical order.
+  private val spectroscopyKey: Parser[FileKey] =
     (
-      (mode            <* columnSep) ~
       (pixelScale      <* columnSep) ~
       (disperser       <* columnSep) ~
       (crossDispersed  <* columnSep) ~
       (wavelengthRange <* columnSep) ~
       (fpu             <* columnSep) ~
       wellDepth
-    ).map { case ((((((spec, ps), disp), xd), wr), us), wd) =>
-      (spec, FileKey(ps, disp, xd, wr, us, wd))
+    ).map { case (((((ps, disp), xd), wr), us), wd) =>
+      FileKey(ps, FileMode.Spectroscopy(disp, xd, us), wr, wd)
     }
 
-  val fileEntry: Parser[Availability[FileEntry]] =
-    ((fileKey <* columnSep) ~ legacyValue).map { case ((spec, key), value) =>
-      if spec then Availability.Current(FileEntry(key, value)) else Availability.Obsolete
+  private val imagingKey: Parser[FileKey] =
+    (
+      (pixelScale      <* columnSep) ~
+      (wildcard        <* columnSep) ~
+      (wildcard        <* columnSep) ~
+      (wavelengthRange <* columnSep) ~
+      (wildcard        <* columnSep) ~
+      wellDepth
+    ).map { case (((((ps, _), _), wr), _), wd) =>
+      FileKey(ps, FileMode.Imaging, wr, wd)
     }
+
+  // The mode column selects how the rest of the key is read.
+  val fileKey: Parser[FileKey] =
+    (oneOf("Spectroscopy" -> spectroscopyKey, "Imaging" -> imagingKey).withContext("GNIRS mode") <* columnSep).flatMap(identity)
+
+  val fileEntry: Parser[FileEntry] =
+    ((fileKey <* columnSep) ~ legacyValue).map(FileEntry.apply)
 
 object gnirs extends GnirsParsers
