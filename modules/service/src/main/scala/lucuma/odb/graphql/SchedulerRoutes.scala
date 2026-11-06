@@ -5,6 +5,8 @@ package lucuma.odb.graphql
 
 import cats.Monad
 import cats.Parallel
+import cats.data.Kleisli
+import cats.data.OptionT
 import cats.effect.*
 import cats.effect.std.SecureRandom
 import cats.effect.std.UUIDGen
@@ -106,10 +108,11 @@ object SchedulerRoutes:
         s"${Gid[Target.Id].show(id)}\t${invalidatedAt.toInstant}"
 
   /**
-   * Maximum accepted size of a request body.  An observation id line is ~20
-   * bytes, so this leaves room for tens of thousands of ids.
+   * Maximum accepted size of a request body, for every scheduler route.  An
+   * atoms request's observation id line is ~20 bytes, so this leaves room for
+   * tens of thousands of ids.
    */
-  val MaxAtomsRequestBytes: Long = 1024L * 1024L
+  val MaxRequestBytes: Long = 1024L * 1024L
 
   /**
    * Maximum accepted length of a line in an atoms request.  A valid observation
@@ -295,10 +298,7 @@ object SchedulerRoutes:
                 sortedIds.grouped(pageSizes.observationBatchSize.value).toList match
                   case Nil     => Ok()
                   case b :: bs => pagedBody(AtomCursor(b, bs, None))(fetch).flatMap(rows => Ok(encode(rows.map(tsv))))
-        }.handleErrorWith:
-           case _: AccessControlException       => Forbidden()
-           case EntityLimiter.EntityTooLarge(_) => PayloadTooLarge(s"Request body exceeds $MaxAtomsRequestBytes bytes")
-           case other                           => other.raiseError[F, Response[F]]
+        }
 
       case req @ GET -> Root / "scheduler" / "visibility-changes" :? SinceMatcher(since) =>
         // All observations first, then all targets, each paged by id.  Every
@@ -326,8 +326,14 @@ object SchedulerRoutes:
             changes <- pagedBody(VisibilityCursor.Observations(None))(fetch(user, until))
             resp    <- Ok(encode(changes.map(visibilityTsv)))
           yield resp
-        }.handleErrorWith:
-           case _: AccessControlException => Forbidden()
-           case other                     => other.raiseError[F, Response[F]]
+        }
 
-    GZip(EntityLimiter(routes, MaxAtomsRequestBytes), level = DeflateParams.Level.NINE)
+    // Every scheduler route checks access and has its request body limited, so
+    // the resulting errors are answered here, for all of them.
+    val limited = EntityLimiter(routes, MaxRequestBytes)
+    val handled = Kleisli: (req: Request[F]) =>
+      limited(req).recoverWith:
+        case _: AccessControlException       => OptionT.liftF(Forbidden())
+        case EntityLimiter.EntityTooLarge(_) => OptionT.liftF(PayloadTooLarge(s"Request body exceeds $MaxRequestBytes bytes"))
+
+    GZip(handled, level = DeflateParams.Level.NINE)
