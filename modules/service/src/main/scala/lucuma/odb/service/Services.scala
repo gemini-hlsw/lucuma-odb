@@ -65,6 +65,9 @@ trait Services[F[_]]:
   /** The associated `User`. */
   def user: User
 
+  /** The step time estimators, one per instrument mode. */
+  def timeEstimateCalculator: TimeEstimateCalculatorImplementation.ForInstrumentMode
+
   /** Availability metadata (hardcoded for now). */
   def metadata: Metadata = Metadata.placeholder
 
@@ -337,7 +340,7 @@ object Services:
       val gaiaClient = gaiaClient0
       val s3FileService = s3FileService0
       val commitHash = commitHash0
-      val tc = tc0
+      val timeEstimateCalculator = tc0
 
       given Services[F] = this // need is for `instantiate` calls below
 
@@ -441,12 +444,12 @@ object Services:
       // `Services` instance.
       lazy val attachmentFileService = AttachmentFileService.instantiate(s3FileService)
       lazy val emailService = EmailService.fromConfigAndClient(emailConfig, httpClient)
-      lazy val generator = Generator.instantiate(commitHash, tc)
+      lazy val generator = Generator.instantiate(commitHash, timeEstimateCalculator)
       lazy val archiveDuplicationSearchService = ArchiveDuplicationSearchService.instantiate(goaClient0)
       lazy val guideService = GuideService.instantiate(gaiaClient, commitHash)
       lazy val itcService = ItcService.instantiate(itcClient)
       lazy val proposalService = ProposalService.instantiate(emailConfig)
-      lazy val sequenceService = SequenceService.instantiate(tc)
+      lazy val sequenceService = SequenceService.instantiate(timeEstimateCalculator)
       lazy val pdfSummaryJobService = PdfSummaryJobService.instantiate(s3FileService)
       lazy val trackingService = TrackingService.instantiate(horizonsClient)
       lazy val telluricTargetsService: TelluricTargetsService[F] = TelluricTargetsService.instantiate(telluricClient0, hminCache0)
@@ -512,6 +515,7 @@ object Services:
     def pdfSummaryJobService[F[_]](using Services[F]): PdfSummaryJobService[F] = summon[Services[F]].pdfSummaryJobService
     def smartGcalService[F[_]](using Services[F]): SmartGcalService[F] = summon[Services[F]].smartGcalService
     def sequenceService[F[_]](using Services[F]): SequenceService[F] = summon[Services[F]].sequenceService
+    def timeEstimateCalculator[F[_]](using Services[F]): TimeEstimateCalculatorImplementation.ForInstrumentMode = summon[Services[F]].timeEstimateCalculator
     def tacFeedbackService[F[_]](using Services[F]): TacFeedbackService[F] = summon[Services[F]].tacFeedbackService
     def targetService[F[_]](using Services[F]): TargetService[F] = summon[Services[F]].targetService
     def trackingService[F[_]](using Services[F]): TrackingService[F] = summon[Services[F]].trackingService

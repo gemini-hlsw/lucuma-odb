@@ -3,6 +3,7 @@
 
 package lucuma.odb.service
 
+import cats.data.NonEmptyChain
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.implicits.*
@@ -22,10 +23,17 @@ import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.input.CalibrationSetInput
 import lucuma.odb.graphql.input.DaytimeCalibrationInput
+import lucuma.odb.logic.DaytimeCalibrationExpansion
+import lucuma.odb.logic.DaytimeInstrument
+import lucuma.odb.logic.SmartGcalImplementation
 import lucuma.odb.sequence.daytimecal.CalibrationSet
 import lucuma.odb.sequence.daytimecal.Config
+import lucuma.odb.sequence.daytimecal.DaytimeCalibration
 import lucuma.odb.sequence.daytimecal.InstrumentSetup
 import lucuma.odb.service.Services.Syntax.session
+import lucuma.odb.service.Services.Syntax.sequenceService
+import lucuma.odb.service.Services.Syntax.smartGcalService
+import lucuma.odb.service.Services.Syntax.timeEstimateCalculator
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Flamingos2Codecs.*
 import lucuma.odb.util.GmosCodecs.*
@@ -94,24 +102,44 @@ object DaytimeCalibrationService:
               case InstrumentSetup.Igrins2(c)    => session.execute(Statements.InsertIgrins2Setup)((setId, oid, c)).void
               case InstrumentSetup.Gnirs(c)      => session.execute(Statements.InsertGnirsSetup)((setId, oid, c)).void
 
+      private def insertUnchecked(
+        input: DaytimeCalibrationInput.Create,
+        which: List[Observation.Id]
+      ): F[Result[Unit]] =
+        session.prepareR(Statements.Insert).use: ps =>
+          which
+            .traverse: oid =>
+              ps.execute((oid, input.instrument)).flatMap:
+                case Completion.Insert(1) => insertSets(oid, input.sets).as(Result.unit)
+                case other                => Result.failure(s"Expected single insert, got $other.").pure
+            .map(_.sequenceVoid)
+
+      // Every smart row must be mapped today: the lookup generation will run
+      // has to find a table row.  Each unmapped row is its own problem.
+      private def checkMapped(oid: Observation.Id, config: Config): F[Result[Unit]] =
+        val exp = SmartGcalImplementation.fromService(smartGcalService)
+        val di  = DaytimeInstrument.forInstrument(config.instrument, timeEstimateCalculator, exp, sequenceService)
+        DaytimeCalibrationExpansion.resolve(di, oid, config).map: results =>
+          val problems = results.zip(config.sets).zipWithIndex.collect:
+            case ((Left(m), set), i) if set.kind.isSmart =>
+              OdbError.InvalidArgument(DaytimeCalibration.rowMessage(i, set.kind, m).some).asProblem
+          NonEmptyChain.fromSeq(problems).fold(Result.unit)(Result.Failure(_))
+
       override def insert(
         input: DaytimeCalibrationInput.Create,
         which: List[Observation.Id]
       )(using Transaction[F]): F[Result[Unit]] =
-        val doInsert: F[Result[Unit]] =
-          session.prepareR(Statements.Insert).use: ps =>
-            which
-              .traverse: oid =>
-                ps.execute((oid, input.instrument)).flatMap:
-                  case Completion.Insert(1) => insertSets(oid, input.sets).as(Result.unit)
-                  case other                => Result.failure(s"Expected single insert, got $other.").pure
-              .map(_.sequenceVoid)
-
         // A mode switch into a daytime calibration arrives here too; its rows
         // may not land on an observation whose sequence is already materialized.
         (NonEmptyList.fromList(which), input.sets) match
-          case (Some(oids), _ :: _) => checkNotMaterialized(oids).flatMap(_.traverse(_ => doInsert).map(_.flatten))
-          case _                    => doInsert
+          case (Some(oids), _ :: _) =>
+            (for
+              _ <- ResultT(checkNotMaterialized(oids))
+              _ <- ResultT(checkMapped(oids.head, input))
+              _ <- ResultT(insertUnchecked(input, which))
+            yield ()).value
+          case _                    =>
+            insertUnchecked(input, which)
 
       override def delete(
         which: List[Observation.Id]
@@ -147,6 +175,11 @@ object DaytimeCalibrationService:
             val materialized: F[Result[Unit]] =
               if SET.sets.isDefined then checkNotMaterialized(oids) else Result.unit.pure
 
+            val mapped: F[Result[Unit]] =
+              (SET.sets, SET.instrument.orElse(existing.values.headOption.map(_.instrument)))
+                .mapN((sets, inst) => checkMapped(oids.head, Config(inst, sets)))
+                .getOrElse(Result.unit.pure)
+
             val updateInstrument: F[Unit] =
               SET.instrument.traverse_ : inst =>
                 val af = Statements.updateInstrument(inst, oids)
@@ -160,6 +193,7 @@ object DaytimeCalibrationService:
             (for
               _ <- ResultT(checks.pure)
               _ <- ResultT(materialized)
+              _ <- ResultT(mapped)
               _ <- ResultT.liftF(updateInstrument *> replaceSets)
             yield ()).value
 
@@ -171,7 +205,7 @@ object DaytimeCalibrationService:
           case None         =>
             Concurrent[F].raiseError(new RuntimeException(s"Clone: original observation $originalId has no daytime calibration config."))
           case Some(config) =>
-            insert(config, List(newId)).flatMap: res =>
+            insertUnchecked(config, List(newId)).flatMap: res =>
               res.toEither match
                 case Left(Left(t))   => Concurrent[F].raiseError(t)
                 case Left(Right(ps)) => Concurrent[F].raiseError(new RuntimeException(s"Clone: insert failed: ${ps.toList.mkString(", ")}"))

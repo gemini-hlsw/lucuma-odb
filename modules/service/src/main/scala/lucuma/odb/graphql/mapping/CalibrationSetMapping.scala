@@ -50,7 +50,8 @@ trait CalibrationSetMapping[F[_]: Concurrent] extends DaytimeCalibrationSetView[
       SqlField("position",      DaytimeCalibrationSetView.Position, hidden = true),
       SqlField("kind",          DaytimeCalibrationSetView.Kind),
       SqlField("explicitCount", DaytimeCalibrationSetView.ExplicitCount),
-      EffectField("count",      countHandler, List("observationId", "position")),
+      EffectField("count",        resolutionHandler, List("observationId", "position")),
+      EffectField("mappingError", resolutionHandler, List("observationId", "position")),
       SqlObject("gcal"),
       SqlObject("gmosNorth", Join(DaytimeCalibrationSetView.Id, GmosNorthCalibrationSetupTable.Id)),
       SqlObject("gmosSouth", Join(DaytimeCalibrationSetView.Id, GmosSouthCalibrationSetupTable.Id)),
@@ -60,10 +61,10 @@ trait CalibrationSetMapping[F[_]: Concurrent] extends DaytimeCalibrationSetView[
     )
 
   // A manual set's count is its explicit one; a smart set's is what the Smart
-  // GCAL lookup returns, resolved per observation so one lookup pass serves
-  // every row of it.
-  private lazy val countHandler: EffectHandler[F] =
-    keyedBatchEffectHandler[(Observation.Id, Int), Option[PosInt]](
+  // GCAL lookup returns, or the lookup's complaint.  Resolved per observation
+  // so one lookup pass serves every row of it, and both fields.
+  private lazy val resolutionHandler: EffectHandler[F] =
+    keyedBatchEffectHandler[(Observation.Id, Int), Option[Either[String, PosInt]]](
       c => (c.fieldAs[Observation.Id]("observationId"), c.fieldAs[Int]("position")).tupled,
       (keys, _) =>
         services.useTransactionally:
@@ -71,13 +72,17 @@ trait CalibrationSetMapping[F[_]: Concurrent] extends DaytimeCalibrationSetView[
           daytimeCalibrationService.select(keys.map(_._1).distinct).flatMap: cfgs =>
             cfgs.toList.traverse: (oid, cfg) =>
               val di = DaytimeInstrument.forInstrument(cfg.instrument, timeEstimateCalculator, exp, sequenceService)
-              DaytimeCalibrationExpansion.setCounts(di, oid, cfg).map: counts =>
-                counts.zipWithIndex.map((n, i) => (oid, i) -> n.success)
+              DaytimeCalibrationExpansion.resolve(di, oid, cfg).map: results =>
+                results.zipWithIndex.map((r, i) => (oid, i) -> r.some.success)
             .map: all =>
               // A set removed between the two reads answers null, not an error.
               val found = all.flatten.toMap
-              keys.map(k => k -> found.getOrElse(k, none[PosInt].success)).toMap,
-      (_, n) => n.map(_.value).asJson.success
+              keys.map(k => k -> found.getOrElse(k, none[Either[String, PosInt]].success)).toMap,
+      {
+        case ("count", r)        => r.flatMap(_.toOption).map(_.value).asJson.success
+        case ("mappingError", r) => r.flatMap(_.left.toOption).asJson.success
+        case (f, _)              => Result.internalError(s"Unexpected calibration set field: $f")
+      }
     )
 
   lazy val CalibrationSetGcalMapping: ObjectMapping =

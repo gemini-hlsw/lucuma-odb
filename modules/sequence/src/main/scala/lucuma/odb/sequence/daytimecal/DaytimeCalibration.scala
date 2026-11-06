@@ -46,9 +46,13 @@ object DaytimeCalibration:
   private def unavailable(oid: Observation.Id, index: Int, kind: CalibrationSetType, msg: String): OdbError =
     OdbError.SequenceUnavailable(oid, s"Calibration set ${index + 1} (${kind.name})$msg".some)
 
+  /** A complaint about one set, prefixed with the row as the user sees it. */
+  def rowMessage(index: Int, kind: CalibrationSetType, msg: String): String =
+    s"Calibration set ${index + 1} (${kind.name}): $msg."
+
   /** The complaint for a smart set whose lookup failed. */
   def lookupFailed(oid: Observation.Id, index: Int, kind: CalibrationSetType, error: String): OdbError =
-    unavailable(oid, index, kind, s": $error.")
+    OdbError.SequenceUnavailable(oid, rowMessage(index, kind, error).some)
 
   private def stepConfig(oid: Observation.Id, index: Int, set: CalibrationSet[?]): Either[OdbError, StepConfig] =
     (set.kind, set.gcal) match

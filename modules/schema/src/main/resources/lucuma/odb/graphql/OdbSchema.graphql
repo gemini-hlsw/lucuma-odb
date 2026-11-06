@@ -6395,6 +6395,13 @@ type CalibrationSet {
   count: PosInt
 
   """
+  Why a smart set has no `count`: the Smart GCAL lookup finds no mapping for
+  the setup, and the sequence cannot be generated until it does.  Null for a
+  manual set and for a mapped smart set.
+  """
+  mappingError: String
+
+  """
   Exposures requested for this setup, as given on input.  Always present for
   a manual step, always null for a smart step.
   """

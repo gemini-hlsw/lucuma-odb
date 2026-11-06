@@ -7,13 +7,20 @@ package mutation
 import cats.effect.IO
 import cats.syntax.either.*
 import cats.syntax.option.*
+import clue.ResponseException
+import eu.timepit.refined.types.numeric.PosLong
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorClueExtensions.fromGraphQLError
 import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
+import lucuma.odb.service.Services
+import lucuma.odb.smartgcal.data.Gmos
+import skunk.syntax.all.*
 
 /**
  * Smart calibration sets resolve through the Smart GCAL tables seeded by
@@ -74,6 +81,45 @@ class daytimeCalibrationSets_smart extends ExecutionTestSupportForGmos with Dayt
       query    = createQuery(pid, sets),
       expected = { case OdbError.InvalidArgument(Some(m)) if m.contains(fragment) => () }
     )
+
+  // One InvalidArgument per unmapped row, in row order.
+  private def expectUnmapped(query: String, rows: List[(Int, String)]): IO[Unit] =
+    this.query(staff, query).intercept[ResponseException[Any]].map: e =>
+      val ms = e.errors.toList.flatMap(OdbError.fromGraphQLError(_).toList).collect:
+        case OdbError.InvalidArgument(Some(m)) => m
+      assertEquals(ms.length, rows.length, ms.mkString("\n"))
+      rows.zip(ms).foreach: (row, m) =>
+        val (n, kind) = row
+        assert(m.startsWith(s"Calibration set $n ($kind): missing Smart GCAL mapping: GmosNorth"), m)
+
+  private val b1200Key: Gmos.TableKey.North =
+    gn_key_1_00.copy(gratingConfig = gn_key_1_00.gratingConfig.map(_.copy(grating = GmosNorthGrating.B1200_G5301)))
+
+  // The unmapped setup gains rows, so its sets can be written, and loses them
+  // again to model a table reload.
+  private def seedB1200: IO[Unit] =
+    withSession: s =>
+      servicesFor(staff).map(_(s)).use: services =>
+        services.transactionally:
+          Services.asSuperUser:
+            services.smartGcalService.insertGmosNorth(901, Gmos.TableRow(PosLong.unsafeFrom(1), b1200Key, gmos_flat)) *>
+              services.smartGcalService.insertGmosNorth(902, Gmos.TableRow(PosLong.unsafeFrom(1), b1200Key, gmos_arc))
+
+  private def withdrawB1200: IO[Unit] =
+    withSession(_.execute(sql"DELETE FROM t_smart_gmos_north WHERE c_disperser = 'B1200_G5301'".command).void)
+
+  private def setsQuery(oid: Observation.Id): String =
+    s"""
+      query {
+        observation(observationId: ${oid.asJson}) {
+          observingMode {
+            daytimeCalibration {
+              calibrationSets { kind explicitCount count mappingError gcal { continuum } gmosNorth { exposure { seconds } } }
+            }
+          }
+        }
+      }
+    """
 
   private val atomSelection: String =
     """
@@ -184,28 +230,48 @@ class daytimeCalibrationSets_smart extends ExecutionTestSupportForGmos with Dayt
   test("smart rows store no count or gcal and a zero exposure; count is the lookup's"):
     for
       pid <- createProgramAs(staff)
-      oid <- createWithSets(pid, s"{ kind: SMART_FLAT, ${setup()} }, { kind: DAY_BASELINE, ${setup()} }, { kind: SMART_ARC, ${setup(mapped = false)} }, { kind: DARK, explicitCount: 4, ${setup()} }")
-      res <- query(staff, s"""
-        query {
-          observation(observationId: ${oid.asJson}) {
-            observingMode {
-              daytimeCalibration {
-                calibrationSets { kind explicitCount count gcal { continuum } gmosNorth { exposure { seconds } } }
-              }
-            }
-          }
-        }
-      """)
+      oid <- createWithSets(pid, s"{ kind: SMART_FLAT, ${setup()} }, { kind: DAY_BASELINE, ${setup()} }, { kind: SMART_ARC, ${setup()} }, { kind: DARK, explicitCount: 4, ${setup()} }")
+      res <- query(staff, setsQuery(oid))
     yield assertEquals(
       res.hcursor.downFields("observation", "observingMode", "daytimeCalibration", "calibrationSets").focus.get,
       json"""
         [
-          { "kind": "SMART_FLAT",   "explicitCount": null, "count": 1,    "gcal": null, "gmosNorth": { "exposure": { "seconds": 0.000000 } } },
-          { "kind": "DAY_BASELINE", "explicitCount": null, "count": 1,    "gcal": null, "gmosNorth": { "exposure": { "seconds": 0.000000 } } },
-          { "kind": "SMART_ARC",    "explicitCount": null, "count": null, "gcal": null, "gmosNorth": { "exposure": { "seconds": 0.000000 } } },
-          { "kind": "DARK",         "explicitCount": 4,    "count": 4,    "gcal": null, "gmosNorth": { "exposure": { "seconds": 7.000000 } } }
+          { "kind": "SMART_FLAT",   "explicitCount": null, "count": 1, "mappingError": null, "gcal": null, "gmosNorth": { "exposure": { "seconds": 0.000000 } } },
+          { "kind": "DAY_BASELINE", "explicitCount": null, "count": 1, "mappingError": null, "gcal": null, "gmosNorth": { "exposure": { "seconds": 0.000000 } } },
+          { "kind": "SMART_ARC",    "explicitCount": null, "count": 1, "mappingError": null, "gcal": null, "gmosNorth": { "exposure": { "seconds": 0.000000 } } },
+          { "kind": "DARK",         "explicitCount": 4,    "count": 4, "mappingError": null, "gcal": null, "gmosNorth": { "exposure": { "seconds": 7.000000 } } }
         ]
       """
+    )
+
+  test("an unmapped smart row is refused on create, naming each one"):
+    for
+      pid <- createProgramAs(staff)
+      _   <- expectUnmapped(
+        createQuery(pid, s"{ kind: SMART_FLAT, ${setup(mapped = false)} }, { kind: DARK, explicitCount: 2, ${setup(mapped = false)} }, { kind: SMART_ARC, ${setup(mapped = false)} }"),
+        List(1 -> "Smart Flat", 3 -> "Smart Arc")
+      )
+    yield ()
+
+  test("an unmapped smart row is refused on update and nothing changes"):
+    for
+      pid <- createProgramAs(staff)
+      oid <- createWithSets(pid, s"{ kind: SMART_FLAT, ${setup()} }")
+      _   <- expectUnmapped(
+        s"""
+          mutation {
+            updateObservations(input: {
+              SET: { observingMode: { daytimeCalibration: { calibrationSets: [{ kind: SMART_ARC, ${setup(mapped = false)} }] } } }
+              WHERE: { id: { EQ: ${oid.asJson} } }
+            }) { observations { id } }
+          }
+        """,
+        List(1 -> "Smart Arc")
+      )
+      res <- query(staff, setsQuery(oid))
+    yield assertEquals(
+      res.hcursor.downFields("observation", "observingMode", "daytimeCalibration", "calibrationSets").downArray.downField("kind").require[String],
+      "SMART_FLAT"
     )
 
   test("smart rows expand to the lookup's steps, one atom each, all DAY_CAL"):
@@ -233,20 +299,26 @@ class daytimeCalibrationSets_smart extends ExecutionTestSupportForGmos with Dayt
       )
     yield ()
 
-  // A generation failure is reported by the execution config and the digest;
-  // the workflow does not look at it, as for every other mode.
-  test("a smart row with no mapping fails generation, naming the row"):
+  // A row written while mapped may lose its table row later.  Generation then
+  // fails naming the row, the row reports why, and the workflow does not look
+  // at it, as for every other mode.  A clone copies the row as it is.
+  test("a smart row that loses its mapping fails generation, naming the row"):
     for
       pid <- createProgramAs(staff)
+      _   <- seedB1200
       oid <- createWithSets(pid, s"{ kind: SMART_FLAT, ${setup()} }, { kind: SMART_ARC, ${setup(mapped = false)} }")
+      _   <- withdrawB1200
+      res <- query(staff, setsQuery(oid))
+      _   <- cloneObservationAs(staff, oid)
       _   <- expectOdbError(
         user     = staff,
         query    = executionQuery(oid),
         expected = { case OdbError.SequenceUnavailable(_, Some(m)) if m.startsWith("Calibration set 2 (Smart Arc): missing Smart GCAL mapping") => () }
       )
       _   <- runObscalcUpdate(pid, oid)
-      res <- query(staff, workflowQuery(oid))
-    yield assertEquals(
-      res.hcursor.downFields("observation", "workflow", "value", "state").require[String],
-      "DEFINED"
-    )
+      wf  <- query(staff, workflowQuery(oid))
+    yield
+      val rows = res.hcursor.downFields("observation", "observingMode", "daytimeCalibration", "calibrationSets").downArray
+      assertEquals(rows.downField("mappingError").require[Option[String]], none)
+      assert(rows.right.downField("mappingError").require[String].startsWith("missing Smart GCAL mapping: GmosNorth"))
+      assertEquals(wf.hcursor.downFields("observation", "workflow", "value", "state").require[String], "DEFINED")

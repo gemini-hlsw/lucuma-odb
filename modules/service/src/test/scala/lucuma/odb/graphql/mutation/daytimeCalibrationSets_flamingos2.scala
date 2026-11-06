@@ -16,13 +16,14 @@ import lucuma.core.enums.SequenceType
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.odb.data.OdbError
+import lucuma.odb.graphql.query.ExecutionTestSupportForFlamingos2
 
-class daytimeCalibrationSets_flamingos2 extends OdbSuite with DatabaseOperations with DaytimeCalibrationOps:
-
-  val staff       = TestUsers.Standard.staff(3, 103)
-  val serviceUser = TestUsers.service(4)
-
-  override val validUsers = List(staff, serviceUser)
+/**
+ * Smart calibration sets resolve through the Smart GCAL rows seeded by
+ * ExecutionTestSupportForFlamingos2: R1200JH + JH + 2 px slit has a flat and
+ * an arc.
+ */
+class daytimeCalibrationSets_flamingos2 extends ExecutionTestSupportForFlamingos2 with DaytimeCalibrationOps:
 
   private def setup(
     exposureSeconds: Int,
@@ -360,7 +361,7 @@ class daytimeCalibrationSets_flamingos2 extends OdbSuite with DatabaseOperations
   test("smart kinds are accepted on Flamingos 2"):
     for
       pid <- createProgramAs(staff)
-      oid <- createWithSets(pid, s"{ kind: SMART_FLAT, ${setup(1, slit = true)} }, { kind: DAY_BASELINE, ${setup(1, slit = true)} }")
+      oid <- createWithSets(pid, s"{ kind: SMART_FLAT, ${setup(1, filter = "JH", slit = true)} }, { kind: SMART_ARC, ${setup(1, filter = "JH", slit = true)} }")
       res <- query(staff, s"""
         query {
           observation(observationId: ${oid.asJson}) {
@@ -370,5 +371,5 @@ class daytimeCalibrationSets_flamingos2 extends OdbSuite with DatabaseOperations
       """)
     yield assertEquals(
       res.hcursor.downFields("observation", "observingMode", "daytimeCalibration", "calibrationSets").focus.get,
-      json"""[ { "kind": "SMART_FLAT", "gcal": null }, { "kind": "DAY_BASELINE", "gcal": null } ]"""
+      json"""[ { "kind": "SMART_FLAT", "gcal": null }, { "kind": "SMART_ARC", "gcal": null } ]"""
     )
