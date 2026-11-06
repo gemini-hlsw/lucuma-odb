@@ -36,7 +36,6 @@ import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.sequence.data.ItcInput
 import lucuma.odb.service.CalibrationConfigSubset.*
-import lucuma.odb.service.CalibrationsService.PerProgramPerConfigCalibrationTypes
 import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs.*
@@ -148,7 +147,7 @@ object PerProgramPerConfigCalibrationsService:
         uniqueSci: List[CalibrationConfigSubset],
         calibs: List[ObsExtract[CalibrationConfigSubset]]
       ): Map[CalibrationRole, List[CalibrationConfigSubset]] =
-        PerProgramPerConfigCalibrationTypes.map { calibType =>
+        ObsExtract.PerProgramPerConfigCalibrationTypes.map { calibType =>
           val sciConfigs = uniqueSci.map(config =>
             CalibrationConfigMatcher.matcherFor(config, calibType).normalize(config)
           ).distinct
@@ -381,7 +380,7 @@ object PerProgramPerConfigCalibrationsService:
           // unique GMOS configurations
           uniqueSci       = uniqueConfiguration(activeGmosSci)
           // Extract props from all science observations, normalized per calibration type.
-          propsByRole     = PerProgramPerConfigCalibrationTypes
+          propsByRole     = ObsExtract.PerProgramPerConfigCalibrationTypes
                               .map(role => role -> calObsProps(toConfigForCalibration(allSci), role)).toMap
           // Create ideal targets for each site
           gnTgt           = CalibrationIdealTargets(Site.GN, when, calibTargets)

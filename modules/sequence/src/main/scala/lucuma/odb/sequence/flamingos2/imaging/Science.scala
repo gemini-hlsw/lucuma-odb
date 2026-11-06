@@ -8,7 +8,6 @@ package imaging
 import cats.Monad
 import cats.Order
 import cats.Order.catsKernelOrderingForOrder
-import cats.data.EitherT
 import cats.data.NonEmptyList
 import cats.data.NonEmptyMap
 import cats.data.State
@@ -25,11 +24,9 @@ import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.ObserveClass
-import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepGuideState
 import lucuma.core.math.Offset
 import lucuma.core.model.Observation
-import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig as F2
@@ -45,7 +42,7 @@ import lucuma.odb.sequence.data.TelescopeConfigGenerator
 import lucuma.odb.sequence.imaging.ExposuresPerOffset
 import lucuma.odb.sequence.imaging.ImagingSequence
 import lucuma.odb.sequence.imaging.Variant
-import lucuma.odb.sequence.util.AtomBuilder
+import lucuma.odb.sequence.util.DaytimeSmartGcal
 import lucuma.odb.sequence.util.definitionError
 import lucuma.refined.*
 
@@ -267,18 +264,7 @@ object Science:
       if filters.length > 1 then NonEmptyString.unsafeFrom(s"${DaytimeFlatTitle.value} ${filter.shortName}")
       else DaytimeFlatTitle
 
-    filters
-      .traverse: filter =>
-        EitherT(expander.expandStep(static, flat(filter)))
-          .map(steps => ProtoAtom(title(filter).some, steps))
-      .bimap(
-        m => definitionError(observationId, m),
-        atoms =>
-          val builder = AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Science)
-          new SequenceGenerator[F2]:
-            def generate: Stream[Pure, Atom[F2]] =
-              builder.buildStream(Stream.emits(atoms.toList))
-      ).value
+    DaytimeSmartGcal.sequence(observationId, estimator, static, namespace, expander, filters.map(f => (title(f), flat(f))))
 
   def flamingos2[F[_]: Sync](
     observationId: Observation.Id,

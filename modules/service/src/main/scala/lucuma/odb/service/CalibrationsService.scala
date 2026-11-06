@@ -87,7 +87,6 @@ trait CalibrationsService[F[_]] {
 }
 
 object CalibrationsService extends CalibrationObservations {
-  val PerProgramPerConfigCalibrationTypes = List(CalibrationRole.SpectroPhotometric, CalibrationRole.Twilight)
 
   private def targetCoordinates(when: Instant)(
     rows: List[(Target.Id, String, CalibrationRole, RightAscension, Declination, Epoch, Option[ProperMotion.RA], Option[ProperMotion.Dec], Option[RadialVelocity], Option[Parallax])]
@@ -150,7 +149,7 @@ object CalibrationsService extends CalibrationObservations {
           for {
             _                <- info"=== Recalculating calibrations for program ID: $pid, reference instant $referenceInstant, changed oids: ${changedOids.toList} ==="
             // Read calibration targets (shared resource)
-            calibTargets     <- calibrationTargets(PerProgramPerConfigCalibrationTypes, referenceInstant)
+            calibTargets     <- calibrationTargets(ObsExtract.PerProgramPerConfigCalibrationTypes, referenceInstant)
             // Get all science and calibration observations (regardless of workflow state)
             allSci           <- allObservations(pid, ObservationSelection.Science)
             _                <- (info"Program ID: $pid has ${allSci.length} science observations: ${allSci.map(_.id)}").whenA(allSci.nonEmpty)
@@ -191,7 +190,7 @@ object CalibrationsService extends CalibrationObservations {
           tgts <- o match {
                   case Some(_, cr, Some(ot), Some(PerProgramSite(site))) =>
                     session
-                      .execute(Statements.selectCalibrationTargets(PerProgramPerConfigCalibrationTypes))(PerProgramPerConfigCalibrationTypes)
+                      .execute(Statements.selectCalibrationTargets(ObsExtract.PerProgramPerConfigCalibrationTypes))(ObsExtract.PerProgramPerConfigCalibrationTypes)
                       .map(targetCoordinates(ot.toInstant).map(CalibrationIdealTargets(site, ot.toInstant, _)).map(_.bestTarget(cr)))
                   case _ =>
                     none.pure[F]
