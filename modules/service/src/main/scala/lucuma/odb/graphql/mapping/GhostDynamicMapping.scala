@@ -8,32 +8,38 @@ import io.circe.syntax.given
 import lucuma.core.model.sequence.ghost.CentralWavelength
 import lucuma.odb.json.wavelength.query.given
 
+import grackle.Path
+
 import table.GhostDynamicTable
 
 trait GhostDynamicMapping[F[_]] extends GhostDynamicTable[F]:
 
-  def detectorMapping(channel: GhostDynamicTable.Channel): ObjectMapping =
-    ObjectMapping(GhostDynamicType / channel.name)(
-      SqlField("id", GhostDynamicTable.Id, key = true, hidden = true),
+  private def detectorMappingAtPath(path: Path, table: GhostDynamicTable[?], channel: table.Channel): ObjectMapping =
+    ObjectMapping(path / channel.name)(
+      SqlField("id", table.Id, key = true, hidden = true),
       SqlObject("exposureTime"),
       SqlField("exposureCount", channel.ExposureCount),
       SqlField("binning",       channel.Binning),
       SqlField("readMode",      channel.ReadMode)
     )
 
-  lazy val GhostDynamicMapping: ObjectMapping =
-    ObjectMapping(GhostDynamicType)(
-      SqlField("id", GhostDynamicTable.Id, key = true, hidden = true),
-      SqlObject("red"),
-      SqlObject("blue"),
-      SqlField("ifu1FiberAgitator", GhostDynamicTable.FiberAgitator.Ifu1),
-      SqlField("ifu2FiberAgitator", GhostDynamicTable.FiberAgitator.Ifu2),
-      CirceField("centralWavelength", CentralWavelength.asJson)
+  private def dynamicMappingsAtPath(path: Path, table: GhostDynamicTable[?]): List[TypeMapping] =
+    List(
+      detectorMappingAtPath(path, table, table.Blue),
+      detectorMappingAtPath(path, table, table.Red),
+      ObjectMapping(path)(
+        SqlField("id", table.Id, key = true, hidden = true),
+        SqlObject("red"),
+        SqlObject("blue"),
+        SqlField("ifu1FiberAgitator", table.FiberAgitator.Ifu1),
+        SqlField("ifu2FiberAgitator", table.FiberAgitator.Ifu2),
+        CirceField("centralWavelength", CentralWavelength.asJson)
+      )
     )
 
+  // The generated sequences are JSON without the fixed central wavelength, so
+  // the type-bound field serves every path the table mappings do not.
   lazy val GhostDynamicMappings: List[TypeMapping] =
-    List(
-      detectorMapping(GhostDynamicTable.Blue),
-      detectorMapping(GhostDynamicTable.Red),
-      GhostDynamicMapping
-    )
+    ObjectMapping(GhostDynamicType)(CirceField("centralWavelength", CentralWavelength.asJson)) ::
+    dynamicMappingsAtPath(StepRecordType / "ghost", GhostDynamicTable) ++
+    dynamicMappingsAtPath(CalibrationSetType / "ghost", GhostCalibrationSetupTable)

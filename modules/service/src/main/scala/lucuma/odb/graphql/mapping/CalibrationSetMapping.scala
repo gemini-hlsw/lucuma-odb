@@ -27,12 +27,14 @@ import lucuma.odb.service.Services
 import Services.Syntax.*
 import table.DaytimeCalibrationSetView
 import table.Flamingos2DynamicTables
+import table.GhostDynamicTable
 import table.GmosDynamicTables
 import table.GnirsDynamicView
 import table.Igrins2DynamicTable
 
 trait CalibrationSetMapping[F[_]: Concurrent] extends DaytimeCalibrationSetView[F]
                                                  with Flamingos2DynamicTables[F]
+                                                 with GhostDynamicTable[F]
                                                  with GmosDynamicTables[F]
                                                  with GnirsDynamicView[F]
                                                  with Igrins2DynamicTable[F]
@@ -56,7 +58,8 @@ trait CalibrationSetMapping[F[_]: Concurrent] extends DaytimeCalibrationSetView[
       SqlObject("gmosSouth", Join(DaytimeCalibrationSetView.Id, GmosSouthCalibrationSetupTable.Id)),
       SqlObject("flamingos2", Join(DaytimeCalibrationSetView.Id, Flamingos2CalibrationSetupTable.Id)),
       SqlObject("igrins2", Join(DaytimeCalibrationSetView.Id, Igrins2CalibrationSetupTable.Id)),
-      SqlObject("gnirs", Join(DaytimeCalibrationSetView.Id, GnirsCalibrationSetupTable.Id))
+      SqlObject("gnirs", Join(DaytimeCalibrationSetView.Id, GnirsCalibrationSetupTable.Id)),
+      SqlObject("ghost", Join(DaytimeCalibrationSetView.Id, GhostCalibrationSetupTable.Id))
     )
 
   // A manual set's count is its explicit one; a smart set's is what the Smart

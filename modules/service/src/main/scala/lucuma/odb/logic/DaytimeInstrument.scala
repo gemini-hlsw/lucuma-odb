@@ -25,8 +25,7 @@ import skunk.Transaction
 /**
  * What the daytime calibration paths need from one instrument, gathered so
  * that reading, generating, estimating and materializing a daytime sequence
- * dispatch on the instrument once.  GHOST has no Calibration Sets yet, so its
- * sets are always empty and it only ever reads a stored sequence.
+ * dispatch on the instrument once.
  */
 trait DaytimeInstrument[F[_]]:
   type S
@@ -114,7 +113,7 @@ object DaytimeInstrument:
           StaticConfigs.Ghost,
           calculator.ghostStep,
           exp.ghost,
-          _ => Nil,
+          _.ghostSets,
           InstrumentExecutionConfig.Ghost.apply,
           sequence.selectGhostSequence(_, _, _),
           sequence.materializeGhostExecutionConfig(_, _, _)
