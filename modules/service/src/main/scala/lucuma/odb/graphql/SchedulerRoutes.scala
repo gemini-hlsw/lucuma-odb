@@ -190,8 +190,10 @@ object SchedulerRoutes:
 
   /**
    * How much is read per transaction.  Every page holds at most `rowLimit`
-   * rows (atom digests or visibility changes).  Atom digests are also read
-   * for at most `observationBatchSize` requested observations at a time,
+   * rows (atom digests or visibility changes), except that an observation
+   * with more atoms than that is read whole in a page of its own (its atoms
+   * are capped by the sequence generator's atom limit).  Atom digests are also
+   * read for at most `observationBatchSize` requested observations at a time,
    * which bounds the number of bind parameters in each query.
    */
   case class PageSizes(
@@ -205,13 +207,12 @@ object SchedulerRoutes:
 
   /**
    * Where the next page of atom digests starts: in the observations of `batch`
-   * after the (observation, atom index) `after`, with the `rest` of the
-   * batches still to come.
+   * after observation `after`, with the `rest` of the batches still to come.
    */
   private case class AtomCursor(
     batch: List[Observation.Id],
     rest:  List[List[Observation.Id]],
-    after: Option[(Observation.Id, Short)]
+    after: Option[Observation.Id]
   )
 
   /** Where the next page of visibility changes starts. */
@@ -282,17 +283,35 @@ object SchedulerRoutes:
               // The database sorts the ids first, so that the batches come out
               // in the same order as the rows within each one: the response
               // order then doesn't depend on the request order or batch size.
+              //
+              // A page never ends partway through an observation: each
+              // observation's atoms come from a single statement, so a sequence
+              // rewritten between pages can't come back as a mix of old and new
+              // atoms.  When the limit cuts the last observation of a page
+              // short, its rows are dropped and the next page starts with it,
+              // unless it is the page's only observation, which is then reread
+              // whole.
               def fetch(cursor: AtomCursor): F[(List[AtomRow], Option[AtomCursor])] =
                 val limit = pageSizes.rowLimit
-                superUserTransaction(user)(sequenceService.selectAtomDigests(cursor.batch, cursor.after, limit))
-                  .map: page =>
-                    val next =
-                      lastOfFull(page, limit).fold(
-                        cursor.rest match
-                          case b :: bs => AtomCursor(b, bs, None).some
-                          case Nil     => none
-                      )((oid, idx, _) => cursor.copy(after = (oid, idx).some).some)
-                    (page, next)
+                val nextBatch =
+                  cursor.rest match
+                    case b :: bs => AtomCursor(b, bs, None).some
+                    case Nil     => none
+
+                superUserTransaction(user):
+                  sequenceService.selectAtomDigests(cursor.batch, cursor.after, limit).flatMap: page =>
+                    lastOfFull(page, limit) match
+                      case None              =>
+                        (page, nextBatch).pure[F]
+                      case Some((last, _, _)) =>
+                        val (complete, _) = page.span(_._1 =!= last)
+                        complete.lastOption match
+                          case Some((oid, _, _)) =>
+                            (complete, cursor.copy(after = oid.some).some).pure[F]
+                          case None              =>
+                            sequenceService
+                              .selectAtomDigests(List(last), None, PosInt.MaxValue)
+                              .map(whole => (whole, cursor.copy(after = last.some).some))
 
               superUserTransaction(user)(sequenceService.sortObservationIds(validIds)).flatMap: sortedIds =>
                 sortedIds.grouped(pageSizes.observationBatchSize.value).toList match

@@ -120,15 +120,16 @@ trait SequenceService[F[_]]:
 
   /**
    * Selects up to `limit` atom digests of the given observations, ordered by
-   * observation and atom index, starting after the (observation, atom index)
+   * observation and atom index, starting with the first observation after
    * `after` (or from the beginning if `None`).  The result is fully
    * materialized so that it cannot outlive the transaction; callers read a
    * large result one page per transaction, and pass many observations in
-   * batches to stay within the bind-parameter limit.
+   * batches to stay within the bind-parameter limit.  The last observation of
+   * a full page may be cut short by the limit.
    */
   def selectAtomDigests(
     which: List[Observation.Id],
-    after: Option[(Observation.Id, Short)],
+    after: Option[Observation.Id],
     limit: PosInt
   )(using Transaction[F], Services.ServiceAccess): F[List[(Observation.Id, Short, AtomDigest)]]
 
@@ -458,7 +459,7 @@ object SequenceService:
 
       override def selectAtomDigests(
         which: List[Observation.Id],
-        after: Option[(Observation.Id, Short)],
+        after: Option[Observation.Id],
         limit: PosInt
       )(using Transaction[F], Services.ServiceAccess): F[List[(Observation.Id, Short, AtomDigest)]] =
         if which.isEmpty then List.empty.pure[F]
@@ -1872,7 +1873,7 @@ object SequenceService:
     // before the cursor once Postgres stops planning it for each execution.
     def selectAtomDigests(
       which: List[Observation.Id],
-      after: Option[(Observation.Id, Short)],
+      after: Option[Observation.Id],
       limit: PosInt
     ): AppliedFragment =
       sql"""
@@ -1885,7 +1886,7 @@ object SequenceService:
       """.apply(which) |+|
       after.foldMap: a =>
         sql"""
-          AND (c_observation_id, c_atom_index) > ($observation_id, $int2)
+          AND c_observation_id > $observation_id
         """.apply(a)
       |+|
       sql"""

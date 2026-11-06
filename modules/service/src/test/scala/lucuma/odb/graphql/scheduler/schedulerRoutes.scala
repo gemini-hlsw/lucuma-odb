@@ -21,8 +21,10 @@ import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
 import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
+import lucuma.odb.util.Codecs.observation_id
 import org.http4s.*
 import org.http4s.implicits.*
+import skunk.implicits.*
 
 class schedulerRoutes extends SchedulerRoutesSuite with ExecutionTestSupportForGmos:
 
@@ -217,24 +219,54 @@ class schedulerRoutes extends SchedulerRoutesSuite with ExecutionTestSupportForG
         withRoutes(serviceUser, request, SinglePages)
           .assertUncompressedAtoms(Status.Ok, List(oid0 -> List(a0, a1, a2, a3), oid1 -> List(a0, a1, a2, a3)))
 
-  test("atoms read in pages that split observations"):
-    val setup: IO[(Observation.Id, Observation.Id)] =
-      for
-        p  <- createProgram
-        t  <- createTargetWithProfileAs(pi, p)
-        o0 <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-        _  <- runObscalcUpdate(p, o0)
-        o1 <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-        _  <- runObscalcUpdate(p, o1)
-      yield (o0, o1)
+  private def rowLimit(n: Int): SchedulerRoutes.PageSizes =
+    SchedulerRoutes.PageSizes(PosInt.unsafeFrom(1000), PosInt.unsafeFrom(n))
 
-    // One batch of eight atoms in pages of three: the second page ends one
-    // observation and starts the next, and the last page is short.
-    val pageSizes = SchedulerRoutes.PageSizes(PosInt.unsafeFrom(1000), PosInt.unsafeFrom(3))
-    setup.flatMap: (oid0, oid1) =>
+  private val twoObservations: IO[(Observation.Id, Observation.Id)] =
+    for
+      p  <- createProgram
+      t  <- createTargetWithProfileAs(pi, p)
+      o0 <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      _  <- runObscalcUpdate(p, o0)
+      o1 <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      _  <- runObscalcUpdate(p, o1)
+    yield (o0, o1)
+
+  test("an observation cut short by the row limit is read whole on the next page"):
+    // Two observations of four atoms in pages of five: the first page reaches
+    // into the second observation, which is left for the next page.
+    twoObservations.flatMap: (oid0, oid1) =>
       atomsRequest(serviceUser, oid0.toString, oid1.toString).flatMap: request =>
-        withRoutes(serviceUser, request, pageSizes)
+        withRoutes(serviceUser, request, rowLimit(5))
           .assertUncompressedAtoms(Status.Ok, List(oid0 -> List(a0, a1, a2, a3), oid1 -> List(a0, a1, a2, a3)))
+
+  test("an observation with more atoms than the row limit is read whole"):
+    // Pages of three can't hold an observation of four atoms.
+    twoObservations.flatMap: (oid0, oid1) =>
+      atomsRequest(serviceUser, oid0.toString, oid1.toString).flatMap: request =>
+        withRoutes(serviceUser, request, rowLimit(3))
+          .assertUncompressedAtoms(Status.Ok, List(oid0 -> List(a0, a1, a2, a3), oid1 -> List(a0, a1, a2, a3)))
+
+  test("a sequence rewritten between pages is not mixed with its old atoms"):
+    // Gives every atom digest of the observation a new id, as a rewrite would.
+    def rewrite(oid: Observation.Id): IO[Unit] =
+      withSession: s =>
+        s.execute(
+          sql"UPDATE t_atom_digest SET c_atom_id = 'a-' || gen_random_uuid() WHERE c_observation_id = $observation_id".command
+        )(oid).void
+
+    def body(response: Response[IO]): IO[String] = response.as[String]
+
+    twoObservations.flatMap: (oid0, _) =>
+      for
+        request  <- atomsRequest(serviceUser, oid0.toString)
+        before   <- withRoutes(serviceUser, request).flatMap(body)
+        response <- withRoutes(serviceUser, request, rowLimit(2))  // reads the first page
+        _        <- rewrite(oid0)
+        paged    <- body(response)
+      yield
+        assertEquals(before.linesIterator.size, 4)
+        assertEquals(paged, before)
 
   test("atom order doesn't depend on request order or page sizes"):
     val setup: IO[(Observation.Id, Observation.Id)] =
