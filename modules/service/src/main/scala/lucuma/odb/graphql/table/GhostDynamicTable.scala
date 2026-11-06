@@ -6,11 +6,17 @@ package table
 
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GhostCodecs.*
+import org.tpolecat.typename.TypeName
+import skunk.codec.numeric.int8
 
 trait GhostDynamicTable[F[_]] extends BaseMapping[F]:
 
-  object GhostDynamicTable extends TableDef("t_ghost_dynamic"):
-    val Id: ColumnRef         = col("c_step_id",    step_id)
+  class GhostDynamicTable[I](
+    name:   String,
+    idName: String,
+    id:     skunk.Codec[I]
+  )(using TypeName[I]) extends TableDef(name):
+    val Id: ColumnRef         = col(idName,         id)
     val Instrument: ColumnRef = col("c_instrument", instrument)
 
     abstract class Channel(val name: String):
@@ -25,3 +31,15 @@ trait GhostDynamicTable[F[_]] extends BaseMapping[F]:
     object FiberAgitator:
       val Ifu1: ColumnRef = col("c_ifu1_fiber_agitator", ghost_ifu1_fiber_agitator)
       val Ifu2: ColumnRef = col("c_ifu2_fiber_agitator", ghost_ifu2_fiber_agitator)
+
+  object GhostDynamicTable extends GhostDynamicTable(
+    "t_ghost_dynamic",
+    "c_step_id",
+    step_id
+  )
+
+  object GhostCalibrationSetupTable extends GhostDynamicTable(
+    "t_ghost_daytime_calibration_setup",
+    "c_set_id",
+    int8
+  )

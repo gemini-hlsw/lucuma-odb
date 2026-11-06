@@ -18,6 +18,7 @@ import lucuma.core.enums.GcalShutter
 import lucuma.core.enums.Instrument
 import lucuma.core.model.sequence.StepConfig.Gcal
 import lucuma.core.model.sequence.StepConfig.Gcal.Lamp
+import lucuma.core.model.sequence.ghost.GhostDetector
 import lucuma.core.util.TimeSpan
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.sequence.daytimecal.CalibrationSet
@@ -77,8 +78,12 @@ object CalibrationSetInput:
       case _               => count.success
 
   // A bias takes no exposure and a smart kind gets its exposure time from the
-  // lookup, so neither keeps what the setup says.
+  // lookup, so neither keeps what the setup says.  The GHOST lookup supplies
+  // each detector's exposure count as well.
   private def zeroExposure(kind: CalibrationSetType, setup: InstrumentSetup): InstrumentSetup =
+    def ghostDetector(d: GhostDetector): GhostDetector =
+      if kind.isSmart then d.copy(exposureTime = TimeSpan.Zero, exposureCount = PosInt.unsafeFrom(1))
+      else d.copy(exposureTime = TimeSpan.Zero)
     if kind =!= CalibrationSetType.Bias && !kind.isSmart then setup
     else setup match
       case InstrumentSetup.GmosNorth(c)  => InstrumentSetup.GmosNorth(c.copy(exposure = TimeSpan.Zero))
@@ -86,6 +91,8 @@ object CalibrationSetInput:
       case InstrumentSetup.Flamingos2(c) => InstrumentSetup.Flamingos2(c.copy(exposure = TimeSpan.Zero))
       case InstrumentSetup.Gnirs(c)      => InstrumentSetup.Gnirs(c.copy(exposure = TimeSpan.Zero))
       case InstrumentSetup.Igrins2(c)    => InstrumentSetup.Igrins2(c.copy(exposure = TimeSpan.Zero))
+      case InstrumentSetup.Ghost(c)      =>
+        InstrumentSetup.Ghost(c.copy(red = ghostDetector(c.red.value).asRed, blue = ghostDetector(c.blue.value).asBlue))
 
   // A smart arc on an undispersed setup can never resolve, so it is refused up
   // front rather than at generation.
@@ -115,16 +122,18 @@ object CalibrationSetInput:
         GmosSouthDynamicInput.Binding.Option("gmosSouth", rSouth),
         Flamingos2DynamicInput.Binding.Option("flamingos2", rFlamingos2),
         Igrins2DynamicInput.Binding.Option("igrins2", rIgrins2),
-        GnirsDynamicInput.Binding.Option("gnirs", rGnirs)
+        GnirsDynamicInput.Binding.Option("gnirs", rGnirs),
+        GhostDynamicInput.Binding.Option("ghost", rGhost)
       ) =>
         val rSetup: Result[InstrumentSetup] =
-          (rNorth, rSouth, rFlamingos2, rIgrins2, rGnirs).parFlatMapN:
-            case (Some(n), None, None, None, None) => InstrumentSetup.GmosNorth(n).success
-            case (None, Some(s), None, None, None) => InstrumentSetup.GmosSouth(s).success
-            case (None, None, Some(f), None, None) => InstrumentSetup.Flamingos2(f).success
-            case (None, None, None, Some(i), None) => InstrumentSetup.Igrins2(i).success
-            case (None, None, None, None, Some(g)) => InstrumentSetup.Gnirs(g).success
-            case _                                 => Result.failure("Exactly one instrument setup (`gmosNorth`, `gmosSouth`, `flamingos2`, `igrins2` or `gnirs`) must be given.")
+          (rNorth, rSouth, rFlamingos2, rIgrins2, rGnirs, rGhost).parFlatMapN:
+            case (Some(n), None, None, None, None, None) => InstrumentSetup.GmosNorth(n).success
+            case (None, Some(s), None, None, None, None) => InstrumentSetup.GmosSouth(s).success
+            case (None, None, Some(f), None, None, None) => InstrumentSetup.Flamingos2(f).success
+            case (None, None, None, Some(i), None, None) => InstrumentSetup.Igrins2(i).success
+            case (None, None, None, None, Some(g), None) => InstrumentSetup.Gnirs(g).success
+            case (None, None, None, None, None, Some(h)) => InstrumentSetup.Ghost(h).success
+            case _                                       => Result.failure("Exactly one instrument setup (`gmosNorth`, `gmosSouth`, `flamingos2`, `igrins2`, `gnirs` or `ghost`) must be given.")
 
         (rKind, rCount, rGcal, rSetup).parFlatMapN: (kind, count, gcal, setup) =>
           (checkKind(kind, setup), explicitCountFor(kind, count), gcalFor(kind, gcal, setup.instrument)).parMapN: (_, n, g) =>
