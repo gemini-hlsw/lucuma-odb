@@ -34,6 +34,7 @@ trait ProgramUserMapping[F[_]]
       SqlField("id", ProgramUserView.ProgramUserId, key = true),
       SqlField("programId", ProgramUserView.ProgramId, hidden = true),
       SqlField("userId", ProgramUserView.UserId, hidden = true),
+      SqlField("writerUserId", ProgramUserView.WriterUserId, hidden = true),
       SqlField("role", ProgramUserView.Role),
       SqlField("linkType", ProgramUserView.PartnerLink, hidden = true),
       SqlField("geminiPartner", ProgramUserView.GeminiPartner, hidden = true),
