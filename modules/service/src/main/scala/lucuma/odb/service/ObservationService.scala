@@ -48,6 +48,7 @@ import lucuma.core.model.ElevationRange
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Group
 import lucuma.core.model.ImageQuality
+import lucuma.core.model.Attachment
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationReference
 import lucuma.core.model.Program
@@ -1003,6 +1004,11 @@ object ObservationService {
         max             = max
       )
 
+    // A MOS mask is cut for one position angle, so MOS observations start fixed.
+    private def defaultPosAngleConstraintMode(mode: Option[ObservingModeInput.Create]): PosAngleConstraintMode =
+      if mode.flatMap(_.observingModeType).exists(_.isMos) then PosAngleConstraintMode.Fixed
+      else PosAngleConstraintMode.Unbounded
+
     def insertObservation(
       programId: Program.Id,
       SET:       ObservationPropertiesInput.Create,
@@ -1017,8 +1023,9 @@ object ObservationService {
           SET.subtitle,
           SET.existence.getOrElse(Existence.Default),
           SET.scienceBand,
-          SET.posAngleConstraint.flatMap(_.mode).getOrElse(PosAngleConstraintMode.Unbounded),
+          SET.posAngleConstraint.flatMap(_.mode).getOrElse(defaultPosAngleConstraintMode(SET.observingMode)),
           SET.posAngleConstraint.flatMap(_.angle).getOrElse(Angle.Angle0),
+          SET.posAngleConstraint.flatMap(_.angle).fold(SET.observingMode.flatMap(_.maskAttachmentId))(_ => none),
           SET.targetEnvironment.flatMap(_.explicitBase),
           cs.getOrElse(ConstraintSetInput.NominalConstraints),
           SET.scienceRequirements,
@@ -1046,6 +1053,7 @@ object ObservationService {
       scienceBand:         Option[ScienceBand],
       posAngleConsMode:    PosAngleConstraintMode,
       posAngle:            Angle,
+      maskAttachment:      Option[Attachment.Id],
       explicitBase:        Option[Coordinates],
       constraintSet:       ConstraintSet,
       scienceRequirements: Option[ScienceRequirementsInput],
@@ -1078,6 +1086,7 @@ object ObservationService {
            existence                                                                                                              ,
            scienceBand                                                                                                            ,
            posAngleConsMode                                                                                                       ,
+           maskAttachment                                                                                                         ,
            posAngle                                                                                                               ,
            explicitBase.map(_.ra)                                                                                                 ,
            explicitBase.map(_.dec)                                                                                                ,
@@ -1133,6 +1142,7 @@ object ObservationService {
       Existence                        ,
       Option[ScienceBand]              ,
       PosAngleConstraintMode           ,
+      Option[Attachment.Id]            ,
       Angle                            ,
       Option[RightAscension]           ,
       Option[Declination]              ,
@@ -1224,7 +1234,12 @@ object ObservationService {
           $existence,
           ${science_band.opt},
           $pac_mode,
-          $angle_µas,
+          COALESCE(
+            (SELECT (c_mask_definition->'positionAngle'->>'microarcseconds')::bigint
+               FROM t_attachment
+              WHERE c_attachment_id = ${attachment_id.opt}),
+            $angle_µas
+          ),
           ${right_ascension.opt},
           ${declination.opt},
           $cloud_extinction_preset,

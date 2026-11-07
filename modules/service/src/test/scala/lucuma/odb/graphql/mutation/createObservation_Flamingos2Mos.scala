@@ -577,3 +577,29 @@ class createObservation_Flamingos2Mos extends OdbSuite with MosMaskSupport:
                )).asLeft
              )
     yield ()
+
+  test("Flamingos-2 MOS defaults to a fixed position angle of 0"):
+    for
+      pid <- createProgramAs(pi)
+      tid <- createTargetAs(pi, pid)
+      oid <- create(pid, tid, """
+               flamingos2Mos: {
+                 disperser: R1200_JH
+                 filter: JH
+                 customMask: { slitWidth: CUSTOM_WIDTH_2_PIX }
+               }
+             """)
+      _   <- expect(pi, s"""
+               query {
+                 observation(observationId: "$oid") {
+                   posAngleConstraint { mode angle { degrees } }
+                 }
+               }
+             """, json"""
+               {
+                 "observation": {
+                   "posAngleConstraint": { "mode": "FIXED", "angle": { "degrees": 0 } }
+                 }
+               }
+             """.asRight)
+    yield ()

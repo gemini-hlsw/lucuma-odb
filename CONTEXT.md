@@ -87,6 +87,10 @@ _Avoid_: MDF name, mask file name, mask id.
 The design parsed out of a Mask Attachment's file at upload and recorded on the attachment: Mask Instrument, pixel scale, pointing, position angle, dispersion direction and the slit list. Names the *design*, where the Mask Attachment names the file, the Mask Name the plate and the Custom Mask the FPU. Derived data — the uploaded file remains the source of truth and the definition can always be rebuilt from it. A file that cannot be parsed, or that records no position angle, rejects the upload, so a definition exists exactly for masks accepted since parsing began.
 _Avoid_: mask metadata, mask blob (names the storage, not the concept), ODF (names the file format). Also beware the unrelated `lucuma.core.model.MaskDefinition`, which is the "assigned or not yet assigned" state of a Custom Mask's Mask Attachment, not a design at all.
 
+**Mask Design Angle**:
+The position angle recorded in a Mask Definition: the one angle the mask's slitlets land on their targets at. A MOS observation must therefore carry a Fixed position angle constraint (any other mode is a configuration error) and, once a Mask Definition is attached, is expected to be fixed at exactly this angle (a dismissable warning otherwise). A Custom Mask without a Mask Definition imposes no angle, only the Fixed mode.
+_Avoid_: mask PA, design PA, required angle.
+
 **Mask Instrument**:
 The instrument a Mask Attachment's plate was cut for — one of GMOS North, GMOS South or Flamingos-2, the three that do MOS at Gemini. Read from the mask file, so always part of the Mask Definition and never entered. The two GMOS arms are distinct answers, not one, because a plate is machined for one arm and cannot be mounted in the other. Always present on a Mask Attachment: a design that names anything else is refused on upload.
 _Avoid_: mask site (the site does not distinguish GMOS from Flamingos-2), mask type.

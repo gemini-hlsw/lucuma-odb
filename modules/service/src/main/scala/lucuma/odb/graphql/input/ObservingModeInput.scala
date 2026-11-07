@@ -10,6 +10,8 @@ import cats.syntax.parallel.*
 import cats.syntax.partialOrder.*
 import cats.syntax.traverse.*
 import grackle.Result
+import lucuma.core.model.Attachment
+import lucuma.core.model.Defined
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.model.Access
 import lucuma.odb.graphql.binding.*
@@ -58,6 +60,13 @@ object ObservingModeInput:
         .orElse(gnirsSpectroscopy.map(_.observingModeType))
         .orElse(igrins2LongSlit.map(_.observingModeType))
         .orElse(visitor.map(_.mode))
+
+    /** The MOS mask attached at creation, if any. */
+    def maskAttachmentId: Option[Attachment.Id] =
+      gmosNorthMos.map(_.customMask.mask)
+        .orElse(gmosSouthMos.map(_.customMask.mask))
+        .orElse(flamingos2Mos.map(_.customMask.mask))
+        .collect { case Defined(id) => id }
 
     def needsStaffAccess: Boolean =
       daytimeCalibration.isDefined                    ||
