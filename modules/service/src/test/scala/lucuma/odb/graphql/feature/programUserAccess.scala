@@ -7,6 +7,7 @@ package feature
 import cats.effect.IO
 import cats.syntax.either.*
 import cats.syntax.foldable.*
+import cats.syntax.traverse.*
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
@@ -114,3 +115,13 @@ class programUserAccess extends OdbSuite:
     setup.flatMap: (pid, _) =>
       readProgram(coiRo, pid, visible = true) >>
       readProgram(external, pid, visible = true)
+
+  test("COI_RO and EXTERNAL pass the service read check"):
+    def hasReadAccess(u: User, pid: Program.Id): IO[Boolean] =
+      withServices(u): services =>
+        services.transactionally:
+          services.programUserService.userHasReadAccess(pid)
+
+    setup.flatMap: (pid, _) =>
+      List(pi, coi, coiRo, external).traverse(hasReadAccess(_, pid)).map: rs =>
+        assertEquals(rs, List(true, true, true, true))
