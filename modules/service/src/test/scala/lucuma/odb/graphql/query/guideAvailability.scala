@@ -301,10 +301,18 @@ class guideAvailability extends ExecutionTestSupportForGmos with GuideEnvironmen
         p <- createProgramAs(pi)
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthMosObservationAs(pi, p, List(t))
+        _ <- query(pi, s"""
+               mutation {
+                 updateObservations(input: {
+                   SET: { posAngleConstraint: { mode: FIXED, angle: { degrees: 160 } } }
+                   WHERE: { id: { EQ: "$o" } }
+                 }) { observations { id } }
+               }
+             """)
       } yield o
+    // A MOS observation is created fixed, so only its own angle can be offered.
     val periods = List(
-      makeAvailabilityPeriod(oct31_2023, feb01_2024, earlyAnglesMosImaging),
-      makeAvailabilityPeriod(feb01_2024, feb28_2024, laterAnglesMosImaging)
+      makeAvailabilityPeriod(oct31_2023, feb28_2024, List(160))
     )
     val expected = availabilityResult("V1647 Orionis", periods).asRight
     setup.flatMap { oid =>

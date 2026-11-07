@@ -379,12 +379,18 @@ class guideEnvironmentGMOS extends ExecutionTestSupportForGmos with GuideEnviron
       expect(pi, guideEnvironmentQuery(oid), expected = pwfs2ImagingResult)
     }
 
+  // A MOS observation is created with a fixed position angle, so the angle
+  // the mask was designed for is set explicitly rather than left to AGS.
+  private def setFixedPosAngle(oid: Observation.Id, degrees: Int): IO[Unit] =
+    query(pi, updateObservationsMutation(oid, s"posAngleConstraint: { mode: FIXED, angle: { degrees: $degrees } }", "observations { id }")).void
+
   test("GMOS North MOS with oiwfs"):
     val setup: IO[Observation.Id] =
       for {
         p <- createProgramAs(pi)
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthMosObservationAs(pi, p, List(t))
+        _ <- setFixedPosAngle(o, 200)
         _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
       } yield o
     setup.flatMap { oid =>
@@ -397,6 +403,7 @@ class guideEnvironmentGMOS extends ExecutionTestSupportForGmos with GuideEnviron
         p <- createProgramAs(pi)
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosSouthMosObservationAs(pi, p, List(t))
+        _ <- setFixedPosAngle(o, 200)
         _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
       } yield o
     setup.flatMap { oid =>

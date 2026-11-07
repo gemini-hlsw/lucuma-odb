@@ -740,7 +740,8 @@ trait GuideEnvironmentSuite extends ExecutionTestSupport:
 
   val pwfs2Result: Either[List[String], Json] = pwfs2ResultAt(350)
 
-  val pwfs2MosResult: Either[List[String], Json] = pwfs2ResultAt(30)
+  // MOS observations are created fixed at 0, so AGS searches only there.
+  val pwfs2MosResult: Either[List[String], Json] = pwfs2ResultAt(0)
 
   val pwfs2ImagingResult =
     json"""
