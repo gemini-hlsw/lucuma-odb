@@ -405,11 +405,6 @@ object ObservationValidationInfo {
         ) s ON TRUE
       """
 
-    /**
-     * The position angle recorded in the attached mask's definition, for the
-     * MOS modes.  Null for any other mode, for a MOS observation without a
-     * mask, and for a mask uploaded before its file was parsed.
-     */
     val MaskPositionAngle: Fragment[Void] =
       sql"""
         LEFT JOIN LATERAL (

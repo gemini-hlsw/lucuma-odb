@@ -42,13 +42,13 @@ import lucuma.core.math.RightAscension
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
 import lucuma.core.model.Access
+import lucuma.core.model.Attachment
 import lucuma.core.model.CloudExtinction
 import lucuma.core.model.ConstraintSet
 import lucuma.core.model.ElevationRange
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Group
 import lucuma.core.model.ImageQuality
-import lucuma.core.model.Attachment
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationReference
 import lucuma.core.model.Program

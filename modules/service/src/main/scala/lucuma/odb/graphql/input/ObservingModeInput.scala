@@ -10,10 +10,10 @@ import cats.syntax.parallel.*
 import cats.syntax.partialOrder.*
 import cats.syntax.traverse.*
 import grackle.Result
-import lucuma.core.model.Attachment
-import lucuma.core.model.Defined
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.model.Access
+import lucuma.core.model.Attachment
+import lucuma.core.model.Defined
 import lucuma.odb.graphql.binding.*
 
 object ObservingModeInput:

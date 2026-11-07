@@ -23,9 +23,7 @@ import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.service.workflow.validator.PosAngleValidator
 
 /**
- * MOS observations checked against `PosAngleValidator`: the position angle
- * must be fixed, and once a mask design is attached, fixed at the angle the
- * mask was designed for.
+ * MOS observations checked against `PosAngleValidator`.
  */
 class observation_workflow_mos extends ExecutionTestSupportForGmos with MosMaskSupport:
 
