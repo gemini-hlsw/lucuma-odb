@@ -116,29 +116,25 @@ class executionSciGnirsImaging extends ExecutionTestSupportForGnirs:
       case GnirsFilter.J => GnirsImagingFlatExposureJ
       case _             => GnirsImagingFlatExposureH
 
-  // The flats atom closing a filter's science; its title names the filter when
-  // the observation has more than one.
-  private def flatsAtom(filter: GnirsFilter, p: Int = 0, q: Int = 0, multipleFilters: Boolean = true): Json =
-    val title = if multipleFilters then s"Nighttime Calibrations (${filter.shortName})" else "Nighttime Calibrations"
-    json"""
-      {
-        "description": $title,
-        "observeClass": "NIGHT_CAL",
-        "steps": ${List.fill(2 * GnirsImagingFlatCount)(flatStep(filter, flatExposure(filter), p, q)).asJson}
-      }
-    """
+  // The flats closing a filter's science, in the same atom.
+  private def flatSteps(filter: GnirsFilter, p: Int, q: Int): List[Json] =
+    List.fill(2 * GnirsImagingFlatCount)(flatStep(filter, flatExposure(filter), p, q))
 
-  private def sciAtomOf(steps: Json*): Json =
+  private def sciAtomOf(steps: List[Json]): Json =
     json"""
       {
         "description": null,
         "observeClass": "SCIENCE",
-        "steps": ${steps.toList.asJson}
+        "steps": ${steps.asJson}
       }
     """
 
-  private def sciAtom(filter: GnirsFilter, exposureTime: TimeSpan, p: Int = 0, q: Int = 0): Json =
-    sciAtomOf(sciStep(filter, exposureTime, p, q))
+  private def sciAtom(filter: GnirsFilter, exposureTime: TimeSpan, p: Int, q: Int): Json =
+    sciAtomOf(List(sciStep(filter, exposureTime, p, q)))
+
+  // A filter's science exposures and its flats, at the last science position.
+  private def filterAtom(science: List[Json], filter: GnirsFilter, p: Int = 0, q: Int = 0): Json =
+    sciAtomOf(science ++ flatSteps(filter, p, q))
 
   private def expectedScience(atoms: List[Json]): Json =
     json"""
@@ -172,12 +168,13 @@ class executionSciGnirsImaging extends ExecutionTestSupportForGnirs:
         o <- createObservationWithModeAs(pi, p, List(t), mode)
       yield o
 
-    // Increasing wavelength: J (1.25um) before H/Order4 (1.65um).
+    // Increasing wavelength: J (1.25um) before H/Order4 (1.65um). Each filter
+    // is one atom: its exposures and then its flats.
     val atoms =
-      List.fill(2)(sciAtom(GnirsFilter.J, 10.secondTimeSpan)) ++
-      List(flatsAtom(GnirsFilter.J)) ++
-      List.fill(3)(sciAtom(GnirsFilter.Order4, 25.secondTimeSpan)) ++
-      List(flatsAtom(GnirsFilter.Order4))
+      List(
+        filterAtom(List.fill(2)(sciStep(GnirsFilter.J, 10.secondTimeSpan)), GnirsFilter.J),
+        filterAtom(List.fill(3)(sciStep(GnirsFilter.Order4, 25.secondTimeSpan)), GnirsFilter.Order4)
+      )
 
     setup.flatMap: oid =>
       expect(pi, gnirsScienceQuery(oid, 100.some), expectedScience(atoms).asRight)
@@ -219,10 +216,10 @@ class executionSciGnirsImaging extends ExecutionTestSupportForGnirs:
 
     // Time-and-count takes the default read mode (Bright at 10s), S/N the ITC's.
     val atoms =
-      List.fill(2)(sciAtomOf(sciStep(GnirsFilter.J, 10.secondTimeSpan, coadds = 4, readMode = GnirsReadMode.Bright.some))) ++
-      List(flatsAtom(GnirsFilter.J)) ++
-      List.fill(3)(sciAtomOf(sciStep(GnirsFilter.Order4, 25.secondTimeSpan))) ++
-      List(flatsAtom(GnirsFilter.Order4))
+      List(
+        filterAtom(List.fill(2)(sciStep(GnirsFilter.J, 10.secondTimeSpan, coadds = 4, readMode = GnirsReadMode.Bright.some)), GnirsFilter.J),
+        filterAtom(List.fill(3)(sciStep(GnirsFilter.Order4, 25.secondTimeSpan)), GnirsFilter.Order4)
+      )
 
     setup.flatMap: oid =>
       expect(pi, gnirsScienceQuery(oid, 100.some), expectedScience(atoms).asRight)
@@ -259,10 +256,10 @@ class executionSciGnirsImaging extends ExecutionTestSupportForGnirs:
       yield o
 
     val atoms =
-      List.fill(2)(sciAtomOf(sciStep(GnirsFilter.J, 25.secondTimeSpan, readMode = GnirsReadMode.Bright.some))) ++
-      List(flatsAtom(GnirsFilter.J)) ++
-      List.fill(3)(sciAtomOf(sciStep(GnirsFilter.Order4, 500.msTimeSpan, readMode = GnirsReadMode.VeryBright.some))) ++
-      List(flatsAtom(GnirsFilter.Order4))
+      List(
+        filterAtom(List.fill(2)(sciStep(GnirsFilter.J, 25.secondTimeSpan, readMode = GnirsReadMode.Bright.some)), GnirsFilter.J),
+        filterAtom(List.fill(3)(sciStep(GnirsFilter.Order4, 500.msTimeSpan, readMode = GnirsReadMode.VeryBright.some)), GnirsFilter.Order4)
+      )
 
     setup.flatMap: oid =>
       expect(pi, gnirsScienceQuery(oid, 100.some), expectedScience(atoms).asRight)
@@ -287,10 +284,10 @@ class executionSciGnirsImaging extends ExecutionTestSupportForGnirs:
 
     // The flats' read mode follows their own exposure, not the explicit one.
     val atoms =
-      List.fill(2)(sciAtomOf(sciStep(GnirsFilter.J, 10.secondTimeSpan, readMode = GnirsReadMode.Bright.some))) ++
-      List(flatsAtom(GnirsFilter.J)) ++
-      List.fill(3)(sciAtomOf(sciStep(GnirsFilter.Order4, 25.secondTimeSpan, readMode = GnirsReadMode.Bright.some))) ++
-      List(flatsAtom(GnirsFilter.Order4))
+      List(
+        filterAtom(List.fill(2)(sciStep(GnirsFilter.J, 10.secondTimeSpan, readMode = GnirsReadMode.Bright.some)), GnirsFilter.J),
+        filterAtom(List.fill(3)(sciStep(GnirsFilter.Order4, 25.secondTimeSpan, readMode = GnirsReadMode.Bright.some)), GnirsFilter.Order4)
+      )
 
     setup.flatMap: oid =>
       expect(pi, gnirsScienceQuery(oid, 100.some), expectedScience(atoms).asRight)
@@ -314,10 +311,10 @@ class executionSciGnirsImaging extends ExecutionTestSupportForGnirs:
 
     // Decreasing wavelength: H/Order4 before J.
     val atoms =
-      List.fill(3)(sciAtom(GnirsFilter.Order4, 25.secondTimeSpan)) ++
-      List(flatsAtom(GnirsFilter.Order4)) ++
-      List.fill(2)(sciAtom(GnirsFilter.J, 10.secondTimeSpan)) ++
-      List(flatsAtom(GnirsFilter.J))
+      List(
+        filterAtom(List.fill(3)(sciStep(GnirsFilter.Order4, 25.secondTimeSpan)), GnirsFilter.Order4),
+        filterAtom(List.fill(2)(sciStep(GnirsFilter.J, 10.secondTimeSpan)), GnirsFilter.J)
+      )
 
     setup.flatMap: oid =>
       expect(pi, gnirsScienceQuery(oid, 100.some), expectedScience(atoms).asRight)
@@ -359,17 +356,15 @@ class executionSciGnirsImaging extends ExecutionTestSupportForGnirs:
         o <- createObservationWithModeAs(pi, p, List(t), mode)
       yield o
 
-    // One atom per filter: sky, sky, object exposures, sky, sky.
+    // One atom per filter: sky, sky, object exposures, sky, sky, then the
+    // flats at the last (sky) position.
     def mkAtom(filter: GnirsFilter, t: TimeSpan, count: Int): Json =
-      sciAtomOf((skyPair(filter, t) ++ List.fill(count)(sciStep(filter, t)) ++ skyPair(filter, t))*)
+      filterAtom(skyPair(filter, t) ++ List.fill(count)(sciStep(filter, t)) ++ skyPair(filter, t), filter, 20, 20)
 
-    // The flats follow at the last (sky) position of each filter.
     val atoms =
       List(
         mkAtom(GnirsFilter.J, 10.secondTimeSpan, 2),
-        flatsAtom(GnirsFilter.J, 20, 20),
-        mkAtom(GnirsFilter.Order4, 25.secondTimeSpan, 3),
-        flatsAtom(GnirsFilter.Order4, 20, 20)
+        mkAtom(GnirsFilter.Order4, 25.secondTimeSpan, 3)
       )
 
     setup.flatMap: oid =>
@@ -404,13 +399,11 @@ class executionSciGnirsImaging extends ExecutionTestSupportForGnirs:
     val skyTail = skyPair(fh, th).reverse ++ skyPair(fj, tj).reverse
 
     // Interleaving spreads each filter over the whole sequence, so the flats
-    // close it, one atom per filter at the last (sky) position.
+    // of both filters close the last atom, at its last (sky) position.
     val atoms =
       List(
-        sciAtomOf((skyHead ++ List(sciStep(fj, tj), sciStep(fh, th), sciStep(fh, th)) ++ skyTail)*),
-        sciAtomOf((skyHead ++ List(sciStep(fj, tj), sciStep(fh, th)) ++ skyTail)*),
-        flatsAtom(fj, 10, 10),
-        flatsAtom(fh, 10, 10)
+        sciAtomOf(skyHead ++ List(sciStep(fj, tj), sciStep(fh, th), sciStep(fh, th)) ++ skyTail),
+        sciAtomOf(skyHead ++ List(sciStep(fj, tj), sciStep(fh, th)) ++ skyTail ++ flatSteps(fj, 10, 10) ++ flatSteps(fh, 10, 10))
       )
 
     setup.flatMap: oid =>
@@ -453,13 +446,21 @@ class executionSciGnirsImaging extends ExecutionTestSupportForGnirs:
     exposuresPerOffsetTest(
       s"grouped: { skyCount: 0, exposuresPerOffset: 2, $objectOffsetsInput }",
       List(
-        sciAtom(GnirsFilter.J,      10.secondTimeSpan, 1, 1),
-        sciAtom(GnirsFilter.J,      10.secondTimeSpan, 1, 1),
-        flatsAtom(GnirsFilter.J, 1, 1),
-        sciAtom(GnirsFilter.Order4, 25.secondTimeSpan, 1, 1),
-        sciAtom(GnirsFilter.Order4, 25.secondTimeSpan, 1, 1),
-        sciAtom(GnirsFilter.Order4, 25.secondTimeSpan, 2, 2),
-        flatsAtom(GnirsFilter.Order4, 2, 2)
+        filterAtom(
+          List(
+            sciStep(GnirsFilter.J, 10.secondTimeSpan, 1, 1),
+            sciStep(GnirsFilter.J, 10.secondTimeSpan, 1, 1)
+          ),
+          GnirsFilter.J, 1, 1
+        ),
+        filterAtom(
+          List(
+            sciStep(GnirsFilter.Order4, 25.secondTimeSpan, 1, 1),
+            sciStep(GnirsFilter.Order4, 25.secondTimeSpan, 1, 1),
+            sciStep(GnirsFilter.Order4, 25.secondTimeSpan, 2, 2)
+          ),
+          GnirsFilter.Order4, 2, 2
+        )
       )
     )
 
@@ -473,9 +474,7 @@ class executionSciGnirsImaging extends ExecutionTestSupportForGnirs:
         sciAtom(GnirsFilter.J,      10.secondTimeSpan, 1, 1),
         sciAtom(GnirsFilter.Order4, 25.secondTimeSpan, 2, 2),
         sciAtom(GnirsFilter.Order4, 25.secondTimeSpan, 2, 2),
-        sciAtom(GnirsFilter.Order4, 25.secondTimeSpan, 3, 3),
-        flatsAtom(GnirsFilter.J, 3, 3),
-        flatsAtom(GnirsFilter.Order4, 3, 3)
+        sciAtomOf(List(sciStep(GnirsFilter.Order4, 25.secondTimeSpan, 3, 3)) ++ flatSteps(GnirsFilter.J, 3, 3) ++ flatSteps(GnirsFilter.Order4, 3, 3))
       )
     )
 
@@ -491,43 +490,27 @@ class executionSciGnirsImaging extends ExecutionTestSupportForGnirs:
         }
       """,
       List(
-        sciAtom(GnirsFilter.J,      10.secondTimeSpan, 1, 1),
-        sciAtom(GnirsFilter.J,      10.secondTimeSpan, 1, 1),
-        flatsAtom(GnirsFilter.J, 1, 1),
-        sciAtom(GnirsFilter.Order4, 25.secondTimeSpan, 1, 1),
-        sciAtom(GnirsFilter.Order4, 25.secondTimeSpan, 1, 1),
-        sciAtom(GnirsFilter.Order4, 25.secondTimeSpan, 2, 2),
-        flatsAtom(GnirsFilter.Order4, 2, 2)
+        filterAtom(
+          List(
+            sciStep(GnirsFilter.J, 10.secondTimeSpan, 1, 1),
+            sciStep(GnirsFilter.J, 10.secondTimeSpan, 1, 1)
+          ),
+          GnirsFilter.J, 1, 1
+        ),
+        filterAtom(
+          List(
+            sciStep(GnirsFilter.Order4, 25.secondTimeSpan, 1, 1),
+            sciStep(GnirsFilter.Order4, 25.secondTimeSpan, 1, 1),
+            sciStep(GnirsFilter.Order4, 25.secondTimeSpan, 2, 2)
+          ),
+          GnirsFilter.Order4, 2, 2
+        )
       )
     )
 
-  test("a single filter's flats atom carries the bare title"):
-    val mode =
-      s"""
-        gnirsImaging: {
-          camera: SHORT_BLUE
-          variant: { grouped: { skyCount: 0 } }
-          filters: [ { filter: J } ]
-        }
-      """
-
-    val setup: IO[Observation.Id] =
-      for
-        p <- createProgram
-        t <- createTargetWithProfileAs(pi, p)
-        o <- createObservationWithModeAs(pi, p, List(t), mode)
-      yield o
-
-    val atoms =
-      List.fill(2)(sciAtom(GnirsFilter.J, 10.secondTimeSpan)) ++
-      List(flatsAtom(GnirsFilter.J, multipleFilters = false))
-
-    setup.flatMap: oid =>
-      expect(pi, gnirsScienceQuery(oid, 100.some), expectedScience(atoms).asRight)
-
   test("a filter without a smart flat row gets no flats"):
     // L lies past the table's last imaging row (2.49 µm): GCAL saturates in the
-    // thermal IR, so L's science stands alone while J still gets its flats.
+    // thermal IR, so L's exposures stay one atom each while J gets its flats.
     val mode =
       s"""
         gnirsImaging: {
@@ -553,9 +536,10 @@ class executionSciGnirsImaging extends ExecutionTestSupportForGnirs:
       yield o
 
     val atoms =
-      List.fill(2)(sciAtom(GnirsFilter.J, 10.secondTimeSpan)) ++
-      List(flatsAtom(GnirsFilter.J)) ++
-      List(sciAtomOf(sciStep(GnirsFilter.Order2, 10.secondTimeSpan, readMode = GnirsReadMode.Bright.some)))
+      List(
+        filterAtom(List.fill(2)(sciStep(GnirsFilter.J, 10.secondTimeSpan)), GnirsFilter.J),
+        sciAtomOf(List(sciStep(GnirsFilter.Order2, 10.secondTimeSpan, readMode = GnirsReadMode.Bright.some)))
+      )
 
     setup.flatMap: oid =>
       expect(pi, gnirsScienceQuery(oid, 100.some), expectedScience(atoms).asRight)
