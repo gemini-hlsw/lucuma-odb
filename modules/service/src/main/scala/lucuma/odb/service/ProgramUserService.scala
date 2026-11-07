@@ -656,7 +656,7 @@ object ProgramUserService:
     ): Option[AppliedFragment] =
       user.role match
         case GuestRole                    => existsUserAsPi(programId, user.id).some
-        case StandardRole.Pi(_)           => (void"(" |+| existsProgramUserInRole(programId, user.id, List(ProgramUserRole.Pi, ProgramUserRole.Coi, ProgramUserRole.CoiRO, ProgramUserRole.SupportPrimary, ProgramUserRole.SupportSecondary)) |+| void")").some
+        case StandardRole.Pi(_)           => (void"(" |+| existsProgramUserInRole(programId, user.id, List(ProgramUserRole.Pi, ProgramUserRole.Coi, ProgramUserRole.CoiRO, ProgramUserRole.External, ProgramUserRole.SupportPrimary, ProgramUserRole.SupportSecondary)) |+| void")").some
         case StandardRole.Ngo(_, partner) => existsNgoReadAccess(programId, partner).some
         case ServiceRole(_) |
              StandardRole.Admin(_) |
