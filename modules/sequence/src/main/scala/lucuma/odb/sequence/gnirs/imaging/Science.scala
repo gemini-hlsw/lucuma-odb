@@ -15,7 +15,6 @@ import cats.effect.Sync
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.PosInt
-import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Chunk
 import fs2.Pure
 import fs2.Stream
@@ -85,20 +84,12 @@ object Science:
         .runA(initialDynamicConfig)
         .value
 
-    private def flatsTitle(filter: GnirsFilter, multipleFilters: Boolean): NonEmptyString =
-      AtomTitle(AtomTitle.NighttimeCal, Option.when(multipleFilters)(filter.shortName))
-
     // The flats closing a filter's science, at the last science position with
-    // guiding off.
-    private def flatsAtom(
-      flats:           Flats,
-      filter:          GnirsFilter,
-      multipleFilters: Boolean,
-      last:            TelescopeConfig
-    ): Option[ProtoAtom[ProtoStep[GnirsDynamicConfig]]] =
-      flats.get(filter).map: steps =>
-        val telescopeConfig: TelescopeConfig = last.copy(guiding = StepGuideState.Disabled)
-        ProtoAtom(flatsTitle(filter, multipleFilters).some, steps.map(ProtoStep.telescopeConfig.replace(telescopeConfig)))
+    // guiding off. They share the science atom so that the two are scheduled
+    // together.
+    private def flatSteps(flats: Flats, filter: GnirsFilter, last: TelescopeConfig): List[ProtoStep[GnirsDynamicConfig]] =
+      val telescopeConfig: TelescopeConfig = last.copy(guiding = StepGuideState.Disabled)
+      flats.get(filter).foldMap(_.toList.map(ProtoStep.telescopeConfig.replace(telescopeConfig)))
 
     def grouped(
       config:             Config,
@@ -121,14 +112,13 @@ object Science:
                      .traverse: offset =>
                        scienceStep(offset, ObserveClass.Science)
         yield
-          // If there are no sky positions, then each exposure is an atom.
-          // If there are sky positions, then we group them into a single atom.
-          val science: List[ProtoAtom[ProtoStep[GnirsDynamicConfig]]] =
-            if sky.isEmpty then obj.map(ProtoAtom.one(none, _))
-            else List(ProtoAtom(none, NonEmptyList.fromListUnsafe(sky ++ obj ++ sky)))
-          val cals: Option[ProtoAtom[ProtoStep[GnirsDynamicConfig]]] =
-            (sky ++ obj ++ sky).lastOption.flatMap(last => flatsAtom(flats, filter, time.length > 1, last.telescopeConfig))
-          Stream.emits(science ++ cals)
+          val science: List[ProtoStep[GnirsDynamicConfig]] = sky ++ obj ++ sky
+          val cals: List[ProtoStep[GnirsDynamicConfig]]    =
+            science.lastOption.foldMap(last => flatSteps(flats, filter, last.telescopeConfig))
+          // Without sky positions or flats each exposure is an atom. Otherwise
+          // the filter is a single atom.
+          if sky.isEmpty && cals.isEmpty then Stream.emits(obj.map(ProtoAtom.one(none, _)))
+          else Stream.emit(ProtoAtom(none, NonEmptyList.fromListUnsafe(science ++ cals)))
 
       Stream
         .emits(time.keys.toNonEmptyList.toList.sorted)
@@ -187,11 +177,11 @@ object Science:
               .groupAdjacentBy(_._2)
               .map(_._2.map(_._1))
 
-      // A filter's exposures are spread over every stop, so its flats can only
-      // close the whole sequence: one atom per filter, at the position of the
-      // last science step.
-      def cals(last: ProtoStep[GnirsDynamicConfig]): List[ProtoAtom[ProtoStep[GnirsDynamicConfig]]] =
-        filters.flatMap(filter => flatsAtom(flats, filter, filters.sizeIs > 1, last.telescopeConfig))
+      // A filter's exposures are spread over every stop, so the flats can only
+      // close the whole sequence: those of every filter, in order, join the
+      // last science atom at the position of its last step.
+      def cals(last: ProtoStep[GnirsDynamicConfig]): List[ProtoStep[GnirsDynamicConfig]] =
+        filters.flatMap(filter => flatSteps(flats, filter, last.telescopeConfig))
 
       val prog = for
         _ <- setup(config)
@@ -204,9 +194,9 @@ object Science:
             Stream.emits(chunk.toList.map(ProtoAtom.one(none, _)))
           else
             Stream.emit(ProtoAtom(none, NonEmptyList.fromListUnsafe(b ++ chunk.toList ++ a)))
-        science.zipWithNext.flatMap:
-          case (atom, None) => Stream.emit(atom) ++ Stream.emits(cals(atom.steps.last))
-          case (atom, _)    => Stream.emit(atom)
+        science.zipWithNext.map:
+          case (atom, None) => ProtoAtom(atom.description, atom.steps ++ cals(atom.steps.last))
+          case (atom, _)    => atom
 
       prog.runA(initialDynamicConfig).value
 
