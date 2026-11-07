@@ -1106,7 +1106,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] with UserEnv {
           idSelectFromPredicate(
             ProgramUserType,
             and(List(
-              Predicates.programUser.program.isWritableBy(user),
+              Predicates.programUser.isWritableBy(user),
               input.WHERE.getOrElse(True)
             ))
           ).flatTraverse: which =>
