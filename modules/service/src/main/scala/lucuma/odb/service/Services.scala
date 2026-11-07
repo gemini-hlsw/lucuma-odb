@@ -222,6 +222,9 @@ trait Services[F[_]]:
   /** The `PartnerSplitsService`. */
   def partnerSplitsService: PartnerSplitsService[F]
 
+  /** The `PartnerLeadService`. */
+  def partnerLeadService: PartnerLeadService[F]
+
   /** The `ProgramNoteService`. */
   def programNoteService: ProgramNoteService[F]
 
@@ -415,6 +418,7 @@ object Services:
       lazy val observingModeServices = ObservingModeServices.instantiate
       lazy val telescopeConfigGeneratorService = TelescopeConfigGeneratorService.instantiate
       lazy val partnerSplitsService = PartnerSplitsService.instantiate
+      lazy val partnerLeadService = PartnerLeadService.instantiate
       lazy val programNoteService = ProgramNoteService.instantiate
       lazy val tooTriggerService = TooTriggerService.instantiate
       lazy val programUserService = ProgramUserService.instantiate
@@ -504,6 +508,7 @@ object Services:
     def observingModeServices[F[_]](using Services[F]): ObservingModeServices[F] = summon[Services[F]].observingModeServices
     def offsetGeneratorService[F[_]](using Services[F]): TelescopeConfigGeneratorService[F] = summon[Services[F]].telescopeConfigGeneratorService
     def partnerSplitsService[F[_]](using Services[F]): PartnerSplitsService[F] = summon[Services[F]].partnerSplitsService
+    def partnerLeadService[F[_]](using Services[F]): PartnerLeadService[F] = summon[Services[F]].partnerLeadService
     def programNoteService[F[_]](using Services[F]): ProgramNoteService[F] = summon[Services[F]].programNoteService
     def tooTriggerService[F[_]](using Services[F]): TooTriggerService[F] = summon[Services[F]].tooTriggerService
     def programService[F[_]](using Services[F]): ProgramService[F] = summon[Services[F]].programService

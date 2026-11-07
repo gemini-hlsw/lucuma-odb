@@ -5020,6 +5020,15 @@ type PartnerSplit {
 
   "Percentage of requested time that should be associated with the partner."
   percent: IntPercent!
+
+  """
+  The partner lead: the investigator the partner contacts during ITAC.  Each
+  partner with requested time needs a lead before the proposal can be submitted.
+  The lead is an investigator affiliated with the partner, and the PI is always
+  the lead of the PI's own partner (a non-partner PI leads US).  Null until a
+  lead is assigned, and always null for a partner without requested time.
+  """
+  lead: ProgramUser
 }
 
 """
@@ -5031,6 +5040,16 @@ input PartnerSplitInput {
 
   "Percentage of requested time that should be associated with the partner."
   percent: IntPercent!
+
+  """
+  The partner lead, which must be an investigator affiliated with the partner
+  (and must be the PI for the PI's own partner).  When omitted, the current
+  lead is kept while still eligible.  When null, the current lead is discarded.
+  Either way, a lead that needs no choice is assigned automatically: the PI for
+  the PI's own partner, and otherwise the only eligible investigator.  Ignored
+  for a partner without requested time.
+  """
+  leadId: ProgramUserId
 }
 
 """
@@ -5266,6 +5285,12 @@ type ProgramUser {
   This property is only meaningful for classical proposals.
   """
   classicalVisitor: Boolean!
+
+  """
+  Whether this investigator is the partner lead for their partner (see
+  `PartnerSplit.lead`).
+  """
+  isPartnerLead: Boolean!
 
   """
   Name created preferentially from the fields of the preferred profile, falling back

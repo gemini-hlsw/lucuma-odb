@@ -210,9 +210,9 @@ object ProgramUserService:
                 .changeProgramUserRole(input.programUserId, prevRole, input.newRole, pid, user)
                 .flatTraverse: af =>
                   session.prepare(af.fragment.command).flatMap: pq =>
-                    pq.execute(af.argument).map:
-                      case Completion.Update(1) => input.programUserId.success
-                      case _                    => OdbError.NotAuthorized(user.id).asFailure
+                    pq.execute(af.argument).flatMap:
+                      case Completion.Update(1) => partnerLeadService.syncAll(List(pid)).as(input.programUserId.success)
+                      case _                    => OdbError.NotAuthorized(user.id).asFailure.pure
 
       override def changePrincipalInvestigator(
         input: ChangePrincipalInvestigatorInput
@@ -240,6 +240,7 @@ object ProgramUserService:
               (for
                 _ <- ResultT(execUpdate(Statements.demoteCurrentPi(pid, user), OdbError.NotAuthorized(user.id)))
                 _ <- ResultT(execUpdate(Statements.promoteCoiToPi(input.programUserId), OdbError.UpdateFailed("Failed to promote the coinvestigator to PI.".some)))
+                _ <- ResultT.liftF(partnerLeadService.syncAll(List(pid)))
               yield input.programUserId).value
 
       override def deleteProgramUser(
@@ -255,17 +256,22 @@ object ProgramUserService:
                 .deleteProgramUser(id, role, pid, user)
                 .flatTraverse: af =>
                   session.prepare(af.fragment.command).flatMap: pq =>
-                    pq.execute(af.argument).map:
-                      case Completion.Delete(1) => true.success
-                      case _                    => OdbError.NotAuthorized(user.id).asFailure
+                    pq.execute(af.argument).flatMap:
+                      case Completion.Delete(1) => partnerLeadService.syncAll(List(pid)).as(true.success)
+                      case _                    => OdbError.NotAuthorized(user.id).asFailure.pure
 
       override def updateProperties(
         SET:   ProgramUserPropertiesInput,
         which: AppliedFragment
       )(using Transaction[F]): F[Result[List[ProgramUser.Id]]] =
         Statements.updateProgramUsers(user, SET, which).fold(Nil.success.pure[F]): af =>
-          session.prepareR(af.fragment.query(program_user_id)).use: pq =>
-            pq.stream(af.argument, chunkSize = 1024).compile.toList.map(_.success)
+          session.prepareR(af.fragment.query(program_user_id *: program_id)).use: pq =>
+            pq.stream(af.argument, chunkSize = 1024).compile.toList.flatMap: rows =>
+              // A change of affiliation can change who leads which partner.
+              partnerLeadService
+                .syncAll(rows.map(_._2))
+                .whenA(SET.partnerLink.isDefined)
+                .as(rows.map(_._1).success)
 
       override def linkInvitationAccept(
         id: ProgramUser.Id
@@ -423,11 +429,13 @@ object ProgramUserService:
           case (Some(u), None   ) => void" AND " |+| u
           case (Some(u), Some(a)) => void" AND " |+| u |+| void" AND " |+| a
         .map: ac =>
+          // Only an investigator may lead a partner.
           sql"""
             UPDATE t_program_user
-               SET c_role = $program_user_role
+               SET c_role         = $program_user_role,
+                   c_partner_lead = c_partner_lead AND $bool
              WHERE c_program_user_id = $program_user_id
-          """(nextRole, targetProgramUserId) |+| ac
+          """(nextRole, nextRole.isInvestigator, targetProgramUserId) |+| ac
 
     /**
      * Access check for changing a program's PI: the source user must have staff
@@ -450,9 +458,11 @@ object ProgramUserService:
       sourceUser: User
     ): AppliedFragment =
       val base =
+        // A non-partner PI leads US only as PI.
         sql"""
           UPDATE t_program_user
-             SET c_role = $program_user_role
+             SET c_role         = $program_user_role,
+                 c_partner_lead = c_partner_lead AND c_partner_link <> 'has_non_partner'
            WHERE c_program_id = $program_id
              AND c_role = $program_user_role
         """(ProgramUserRole.Coi, programId, ProgramUserRole.Pi)
@@ -803,6 +813,9 @@ object ProgramUserService:
           SET.classicalVisitor.map(upClassicalVisitor)
         ).flattenOption :::
         SET.partnerLink.toList.flatMap { pl => List(
+          // A lead whose affiliation changes no longer leads their old partner;
+          // the partner lead service picks a new one afterwards.
+          sql"c_partner_lead     = c_partner_lead AND c_partner_link = $partner_link_type AND c_gemini_partner IS NOT DISTINCT FROM ${partner.opt}"(pl.linkType, pl.geminiPartnerOption),
           sql"c_partner_link     = $partner_link_type"(pl.linkType),
           sql"c_gemini_partner   = ${partner.opt}"(pl.geminiPartnerOption),
           sql"c_exchange_partner = ${exchange_partner.opt}"(pl.exchangePartnerOption)
@@ -829,7 +842,7 @@ object ProgramUserService:
 
         (access.fold(up): exists =>
           up |+| void" AND " |+| exists
-        ) |+| sql" RETURNING #$alias.c_program_user_id"(Void)
+        ) |+| sql" RETURNING #$alias.c_program_user_id, #$alias.c_program_id"(Void)
 
     end updateProgramUsers
   end Statements
