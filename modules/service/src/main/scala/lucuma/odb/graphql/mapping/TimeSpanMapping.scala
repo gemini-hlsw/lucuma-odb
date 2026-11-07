@@ -75,6 +75,8 @@ trait TimeSpanMapping[F[_]] extends AllocationTable[F]
       timeSpanMappingAtPath(StepRecordType / "flamingos2" / "exposure", Flamingos2DynamicView.ExposureTime)(Flamingos2DynamicView.Id),
       timeSpanMappingAtPath(StepRecordType / "ghost" / "red" / "exposureTime", GhostDynamicTable.Red.ExposureTime)(GhostDynamicTable.Id),
       timeSpanMappingAtPath(StepRecordType / "ghost" / "blue" / "exposureTime", GhostDynamicTable.Blue.ExposureTime)(GhostDynamicTable.Id),
+      timeSpanMappingAtPath(CalibrationSetType / "ghost" / "red" / "exposureTime", GhostCalibrationSetupTable.Red.ExposureTime)(GhostCalibrationSetupTable.Id),
+      timeSpanMappingAtPath(CalibrationSetType / "ghost" / "blue" / "exposureTime", GhostCalibrationSetupTable.Blue.ExposureTime)(GhostCalibrationSetupTable.Id),
       timeSpanMappingAtPath(StepRecordType / "gmosNorth" / "exposure", GmosNorthDynamicTable.ExposureTime)(GmosNorthDynamicTable.Id),
       timeSpanMappingAtPath(StepRecordType / "gmosSouth" / "exposure", GmosSouthDynamicTable.ExposureTime)(GmosSouthDynamicTable.Id),
       timeSpanMappingAtPath(CalibrationSetType / "gmosNorth" / "exposure", GmosNorthCalibrationSetupTable.ExposureTime)(GmosNorthCalibrationSetupTable.Id),
