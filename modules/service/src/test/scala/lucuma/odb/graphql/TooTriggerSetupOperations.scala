@@ -112,22 +112,7 @@ trait TooTriggerSetupOperations extends ObservingModeSetupOperations { this: Odb
 
   /** Reads the observation's workflow state together with the transitions it is offered. */
   def tooWorkflowStateAndTransitions(pid: Program.Id, oid: Observation.Id, user: User): IO[(ObservationWorkflowState, List[ObservationWorkflowState])] =
-    runObscalcUpdateAs(tooObscalcUser, pid, oid) *>
-    query(
-      user,
-      s"""
-        query {
-          observation(observationId: ${oid.asJson}) {
-            workflow { value { state validTransitions } }
-          }
-        }
-      """
-    ).map: js =>
-      val c = js.hcursor.downFields("observation", "workflow", "value")
-      (
-        c.downField("state").require[ObservationWorkflowState],
-        c.downField("validTransitions").require[List[ObservationWorkflowState]]
-      )
+    runObscalcUpdateAs(tooObscalcUser, pid, oid) *> queryObservationWorkflowStateAndTransitionsAs(user, oid)
 
   /** Recomputes obscalc, then reads the cached workflow state back. */
   def tooWorkflowState(pid: Program.Id, oid: Observation.Id, user: User): IO[ObservationWorkflowState] =

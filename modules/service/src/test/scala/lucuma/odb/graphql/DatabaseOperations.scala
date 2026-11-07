@@ -29,6 +29,7 @@ import lucuma.core.enums.GeminiCallForProposalsType
 import lucuma.core.enums.Gender
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.KeckInstrument
+import lucuma.core.enums.ObservationValidationCode
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.Observatory
 import lucuma.core.enums.ObservingModeType
@@ -3758,6 +3759,55 @@ trait DatabaseOperations { this: OdbSuite =>
         }
       """
     ).map(_.hcursor.downFields("observation", "workflow", "value", "state").require[ObservationWorkflowState])
+
+  /** Reads the observation's cached workflow state together with the transitions it is offered. */
+  def queryObservationWorkflowStateAndTransitionsAs(user: User, oid: Observation.Id): IO[(ObservationWorkflowState, List[ObservationWorkflowState])] =
+    query(
+      user,
+      s"""
+        query {
+          observation(observationId: ${oid.asJson}) {
+            workflow { value { state validTransitions } }
+          }
+        }
+      """
+    ).map: js =>
+      val c = js.hcursor.downFields("observation", "workflow", "value")
+      (
+        c.downField("state").require[ObservationWorkflowState],
+        c.downField("validTransitions").require[List[ObservationWorkflowState]]
+      )
+
+  /** Reads the observation's cached validation errors and warnings, as (code, messages) pairs. */
+  def queryObservationValidationsAs(user: User, oid: Observation.Id): IO[List[(ObservationValidationCode, List[String])]] =
+    query(
+      user,
+      s"""
+        query {
+          observation(observationId: ${oid.asJson}) {
+            workflow {
+              value {
+                validationErrors {
+                  code
+                  messages
+                }
+              }
+            }
+          }
+        }
+      """
+    ).map: json =>
+      json
+        .hcursor
+        .downFields("observation", "workflow", "value", "validationErrors")
+        .values
+        .toList
+        .flatten
+        .map: v =>
+          (
+            v.hcursor.downField("code").require[ObservationValidationCode],
+            v.hcursor.downField("messages").require[List[String]]
+          )
 
   private def itcQuery(oids: Observation.Id*) =
     s"""

@@ -69,36 +69,9 @@ class observation_workflow_mos extends ExecutionTestSupportForGmos with MosMaskS
     ).void
 
   private def validations(oid: Observation.Id): IO[List[(ObservationValidationCode, List[String])]] =
-    query(
-      pi,
-      s"""
-        query {
-          observation(observationId: ${oid.asJson}) {
-            workflow {
-              value {
-                validationErrors {
-                  code
-                  messages
-                }
-              }
-            }
-          }
-        }
-      """
-    ).map: json =>
-      json
-        .hcursor
-        .downFields("observation", "workflow", "value", "validationErrors")
-        .values
-        .toList
-        .flatten
-        .map: v =>
-          (
-            v.hcursor.downField("code").require[ObservationValidationCode],
-            v.hcursor.downField("messages").require[List[String]]
-          )
-        .filter: (code, _) =>
-          code === ObservationValidationCode.ConfigurationError || code === ObservationValidationCode.ConfigurationWarning
+    queryObservationValidationsAs(pi, oid).map:
+      _.filter: (code, _) =>
+        code === ObservationValidationCode.ConfigurationError || code === ObservationValidationCode.ConfigurationWarning
 
   private def error(msgs: String*): (ObservationValidationCode, List[String]) =
     (ObservationValidationCode.ConfigurationError, msgs.toList)
@@ -197,24 +170,8 @@ class observation_workflow_mos extends ExecutionTestSupportForGmos with MosMaskS
       _          <- expectValidations(pid, oid)
     yield ()
 
-  // Workflow transitions.  Reaching Defined with Ready on offer needs an
-  // accepted proposal, an approved configuration request, an ITC result and a
-  // science band, so these set up a full program around one GMOS North MOS
-  // observation.
-
   private def stateAndTransitions(pid: Program.Id, oid: Observation.Id): IO[(ObservationWorkflowState, List[ObservationWorkflowState])] =
-    for
-      _  <- runObscalcUpdate(pid, oid)
-      js <- query(pi, s"""
-              query {
-                observation(observationId: ${oid.asJson}) {
-                  workflow { value { state validTransitions } }
-                }
-              }
-            """)
-    yield
-      val c = js.hcursor.downFields("observation", "workflow", "value")
-      (c.downField("state").require[ObservationWorkflowState], c.downField("validTransitions").require[List[ObservationWorkflowState]])
+    runObscalcUpdate(pid, oid) *> queryObservationWorkflowStateAndTransitionsAs(pi, oid)
 
   private def acceptedMosObservation(maskAngle: Option[Angle]): IO[(Program.Id, Observation.Id)] =
     for

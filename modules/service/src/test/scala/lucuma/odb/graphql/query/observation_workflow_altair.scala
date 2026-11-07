@@ -6,7 +6,6 @@ package query
 
 import cats.effect.IO
 import cats.syntax.all.*
-import io.circe.syntax.*
 import lucuma.core.enums.ObservationValidationCode
 import lucuma.core.model.Observation
 import lucuma.odb.service.workflow.validator.AltairValidator
@@ -79,34 +78,7 @@ class observation_workflow_altair extends ExecutionTestSupportForGnirs:
     ).void
 
   private def validations(oid: Observation.Id): IO[List[(ObservationValidationCode, List[String])]] =
-    query(
-      pi,
-      s"""
-        query {
-          observation(observationId: ${oid.asJson}) {
-            workflow {
-              value {
-                validationErrors {
-                  code
-                  messages
-                }
-              }
-            }
-          }
-        }
-      """
-    ).map: json =>
-      json
-        .hcursor
-        .downFields("observation", "workflow", "value", "validationErrors")
-        .values
-        .toList
-        .flatten
-        .map: v =>
-          (
-            v.hcursor.downField("code").require[ObservationValidationCode],
-            v.hcursor.downField("messages").require[List[String]]
-          )
+    queryObservationValidationsAs(pi, oid)
 
   private def error(msgs: String*): (ObservationValidationCode, List[String]) =
     (ObservationValidationCode.ConfigurationError, msgs.toList)

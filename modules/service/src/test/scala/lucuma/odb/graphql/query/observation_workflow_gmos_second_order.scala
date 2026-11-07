@@ -7,7 +7,6 @@ package query
 import cats.effect.IO
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.PosLong
-import io.circe.syntax.*
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosGratingOrder
 import lucuma.core.enums.GmosNorthFilter
@@ -79,34 +78,7 @@ class observation_workflow_gmos_second_order extends ExecutionTestSupportForGmos
   }
 
   private def validations(oid: Observation.Id): IO[List[(ObservationValidationCode, List[String])]] =
-    query(
-      pi,
-      s"""
-        query {
-          observation(observationId: ${oid.asJson}) {
-            workflow {
-              value {
-                validationErrors {
-                  code
-                  messages
-                }
-              }
-            }
-          }
-        }
-      """
-    ).map: json =>
-      json
-        .hcursor
-        .downFields("observation", "workflow", "value", "validationErrors")
-        .values
-        .toList
-        .flatten
-        .map: v =>
-          (
-            v.hcursor.downField("code").require[ObservationValidationCode],
-            v.hcursor.downField("messages").require[List[String]]
-          )
+    queryObservationValidationsAs(pi, oid)
 
   private def secondOrderValidations(oid: Observation.Id): IO[List[List[String]]] =
     validations(oid).map(_.collect { case (ObservationValidationCode.SecondOrderOverlap, msgs) => msgs })
