@@ -7,13 +7,19 @@ package query
 import cats.effect.IO
 import cats.syntax.all.*
 import io.circe.syntax.*
+import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservationValidationCode
+import lucuma.core.enums.ObservationWorkflowState
+import lucuma.core.enums.ScienceBand
+import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.math.Angle
 import lucuma.core.model.Attachment
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
+import lucuma.core.syntax.timespan.*
+import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.service.workflow.validator.PosAngleValidator
 
 /**
@@ -190,3 +196,76 @@ class observation_workflow_mos extends ExecutionTestSupportForGmos with MosMaskS
       _          <- setPosAngle(oid, "AVERAGE_PARALLACTIC", 0)
       _          <- expectValidations(pid, oid)
     yield ()
+
+  // Workflow transitions.  Reaching Defined with Ready on offer needs an
+  // accepted proposal, an approved configuration request, an ITC result and a
+  // science band, so these set up a full program around one GMOS North MOS
+  // observation.
+
+  private def stateAndTransitions(pid: Program.Id, oid: Observation.Id): IO[(ObservationWorkflowState, List[ObservationWorkflowState])] =
+    for
+      _  <- runObscalcUpdate(pid, oid)
+      js <- query(pi, s"""
+              query {
+                observation(observationId: ${oid.asJson}) {
+                  workflow { value { state validTransitions } }
+                }
+              }
+            """)
+    yield
+      val c = js.hcursor.downFields("observation", "workflow", "value")
+      (c.downField("state").require[ObservationWorkflowState], c.downField("validTransitions").require[List[ObservationWorkflowState]])
+
+  private def acceptedMosObservation(maskAngle: Option[Angle]): IO[(Program.Id, Observation.Id)] =
+    for
+      cfp <- createGeminiCallForProposalsAs(staff)
+      pid <- createProgramWithNonPartnerPi(pi)
+      aid <- maskAngle.traverse(a => insertMosMaskAttachment(pid, "GN2025AQ001-05_ODF.fits", Instrument.GmosNorth, a.some))
+      _   <- addProposal(pi, pid, cfp.some, None)
+      _   <- addPartnerSplits(pi, pid)
+      _   <- addCoisAs(pi, pid)
+      tid <- createTargetWithProfileAs(pi, pid)
+      oid <- createObservationWithModeAs(pi, pid, List(tid), gmosNorthMos(aid))
+      _   <- createConfigurationRequestAs(pi, oid).flatMap(setConfigurationRequestStatusAs(staff, _, ConfigurationRequestStatus.Approved))
+      _   <- computeItcResultAs(pi, oid)
+      _   <- setProposalStatus(staff, pid, "ACCEPTED")
+      _   <- setAllocationsAs(staff, pid, List(AllocationInput(TimeAccountingCategory.US, ScienceBand.Band1, 4.hourTimeSpan)))
+      _   <- setScienceBandAs(pi, oid, ScienceBand.Band1.some)
+    yield (pid, oid)
+
+  import ObservationWorkflowState.*
+
+  test("transitions: a fixed MOS observation is Defined and may become Ready"):
+    for
+      (pid, oid) <- acceptedMosObservation(none)
+      st         <- stateAndTransitions(pid, oid)
+    yield assertEquals(st, (Defined, List(Inactive, Ready)))
+
+  test("transitions: an unfixed MOS observation is Undefined and may only go Inactive"):
+    for
+      (pid, oid) <- acceptedMosObservation(none)
+      _          <- setPosAngle(oid, "AVERAGE_PARALLACTIC", 0)
+      st         <- stateAndTransitions(pid, oid)
+    yield assertEquals(st, (Undefined, List(Inactive)))
+
+  test("transitions: the mask angle warning keeps the observation Defined but withholds Ready"):
+    for
+      (pid, oid) <- acceptedMosObservation(Angle.fromDoubleDegrees(45.0).some)
+      _          <- setPosAngle(oid, "FIXED", 30)
+      withWarn   <- stateAndTransitions(pid, oid)
+      _          <- setPosAngle(oid, "FIXED", 45)
+      matched    <- stateAndTransitions(pid, oid)
+    yield
+      assertEquals(withWarn, (Defined, List(Inactive)))
+      assertEquals(matched, (Defined, List(Inactive, Ready)))
+
+  test("transitions: unfixing a Ready observation suppresses Ready until it is fixed again"):
+    for
+      (pid, oid) <- acceptedMosObservation(none)
+      _          <- stateAndTransitions(pid, oid)
+      _          <- setObservationWorkflowState(pi, oid, Ready)
+      unfixed    <- setPosAngle(oid, "UNBOUNDED", 0) *> stateAndTransitions(pid, oid)
+      refixed    <- setPosAngle(oid, "FIXED", 0) *> stateAndTransitions(pid, oid)
+    yield
+      assertEquals(unfixed, (Undefined, List(Inactive)))
+      assertEquals(refixed, (Ready, List(Inactive, Defined)))
