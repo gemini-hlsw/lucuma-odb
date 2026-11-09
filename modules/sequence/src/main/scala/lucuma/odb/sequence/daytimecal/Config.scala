@@ -7,6 +7,7 @@ import cats.Eq
 import lucuma.core.enums.DaytimeCalibrationObservingModeType
 import lucuma.core.enums.Instrument
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
+import lucuma.core.model.sequence.ghost.GhostDynamicConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.model.sequence.gnirs.GnirsDynamicConfig
 import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig
@@ -27,6 +28,10 @@ final case class Config(
   def flamingos2Sets: List[CalibrationSet[Flamingos2DynamicConfig]] =
     sets.collect:
       case s @ CalibrationSet(setup = InstrumentSetup.Flamingos2(c)) => s.copy(setup = c)
+
+  def ghostSets: List[CalibrationSet[GhostDynamicConfig]] =
+    sets.collect:
+      case s @ CalibrationSet(setup = InstrumentSetup.Ghost(c)) => s.copy(setup = c)
 
   def gmosNorthSets: List[CalibrationSet[DynamicConfig.GmosNorth]] =
     sets.collect:
