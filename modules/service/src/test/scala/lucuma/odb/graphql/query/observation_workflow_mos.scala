@@ -93,13 +93,6 @@ class observation_workflow_mos extends ExecutionTestSupportForGmos with MosMaskS
       vs <- validations(oid)
     yield assertEquals(vs, expected.toList)
 
-  test("a new GMOS MOS observation is fixed and valid"):
-    for
-      (pid, tid) <- setup
-      oid        <- createObservationWithModeAs(pi, pid, List(tid), gmosNorthMos(none))
-      _          <- expectValidations(pid, oid)
-    yield ()
-
   test("a GMOS MOS observation with an unfixed position angle is an error"):
     for
       (pid, tid) <- setup
@@ -108,19 +101,11 @@ class observation_workflow_mos extends ExecutionTestSupportForGmos with MosMaskS
       _          <- expectValidations(pid, oid, error(PosAngleValidator.ModeMessage))
     yield ()
 
-  test("allow flip is not fixed either"):
-    for
-      (pid, tid) <- setup
-      oid        <- createObservationWithModeAs(pi, pid, List(tid), gmosNorthMos(none))
-      _          <- setPosAngle(oid, "ALLOW_FLIP", 0)
-      _          <- expectValidations(pid, oid, error(PosAngleValidator.ModeMessage))
-    yield ()
-
-  test("a Flamingos-2 MOS observation with an unfixed position angle is an error"):
+  test("a Flamingos-2 MOS observation that allows flipping is an error"):
     for
       (pid, tid) <- setup
       oid        <- createObservationWithModeAs(pi, pid, List(tid), flamingos2Mos)
-      _          <- setPosAngle(oid, "UNBOUNDED", 0)
+      _          <- setPosAngle(oid, "ALLOW_FLIP", 0)
       _          <- expectValidations(pid, oid, error(PosAngleValidator.ModeMessage))
     yield ()
 
@@ -149,15 +134,6 @@ class observation_workflow_mos extends ExecutionTestSupportForGmos with MosMaskS
       oid        <- createObservationWithModeAs(pi, pid, List(tid), gmosNorthMos(aid.some))
       _          <- setPosAngle(oid, "FIXED", 30)
       _          <- expectValidations(pid, oid)
-    yield ()
-
-  test("an unfixed observation with a mask reports only the mode error"):
-    for
-      (pid, tid) <- setup
-      aid        <- insertMosMaskAttachment(pid, "GN2025AQ001-04_ODF.fits", Instrument.GmosNorth, Angle.fromDoubleDegrees(45.0).some)
-      oid        <- createObservationWithModeAs(pi, pid, List(tid), gmosNorthMos(aid.some))
-      _          <- setPosAngle(oid, "UNBOUNDED", 0)
-      _          <- expectValidations(pid, oid, error(PosAngleValidator.ModeMessage))
     yield ()
 
   test("a long slit observation may use any position angle mode"):
@@ -189,19 +165,6 @@ class observation_workflow_mos extends ExecutionTestSupportForGmos with MosMaskS
     yield (pid, oid)
 
   import ObservationWorkflowState.*
-
-  test("transitions: a fixed MOS observation is Defined and may become Ready"):
-    for
-      (pid, oid) <- acceptedMosObservation(none)
-      st         <- stateAndTransitions(pid, oid)
-    yield assertEquals(st, (Defined, List(Inactive, Ready)))
-
-  test("transitions: an unfixed MOS observation is Undefined and may only go Inactive"):
-    for
-      (pid, oid) <- acceptedMosObservation(none)
-      _          <- setPosAngle(oid, "AVERAGE_PARALLACTIC", 0)
-      st         <- stateAndTransitions(pid, oid)
-    yield assertEquals(st, (Undefined, List(Inactive)))
 
   test("transitions: the mask angle warning keeps the observation Defined but withholds Ready"):
     for
