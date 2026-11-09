@@ -838,7 +838,10 @@ object ProposalService {
           _ <- insertSplits
           _ <- syncLeads
           _ <- insertRequiredInstruments
-        } yield input.programId).value
+        } yield input.programId).value.flatTap: r =>
+          // A failed `Result` is a value, not a raised error, so a step that fails after the
+          // proposal is written (a rejected partner lead, for one) would otherwise commit it.
+          transaction.rollback.unlessA(r.hasValue)
 
       }
 
@@ -934,7 +937,10 @@ object ProposalService {
           _      <- updateProgram(pid, before, after)
           _      <- updateSplits(pid, set).unlessA(splitsFirst(set))
           _      <- syncLeads(pid, set)
-        } yield pid).value
+        } yield pid).value.flatTap: r =>
+          // A failed `Result` is a value, not a raised error, so a step that fails after the
+          // proposal is written (a rejected partner lead, for one) would otherwise commit it.
+          transaction.rollback.unlessA(r.hasValue)
       }
 
       override def timeRequest(pid: Program.Id)(using Transaction[F]): F[Option[CalculatedValue[CategorizedTimeRange]]] =

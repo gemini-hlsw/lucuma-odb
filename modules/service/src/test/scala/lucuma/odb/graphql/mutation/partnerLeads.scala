@@ -106,6 +106,32 @@ class partnerLeads extends OdbSuite:
   private def assertLeads(pid: Program.Id, expected: (Partner, ProgramUser.Id)*): IO[Unit] =
     leadsOf(pid).map(assertEquals(_, expected.toMap))
 
+  /** The percentage for each partner split, or `None` when the program has no proposal. */
+  private def splitsOf(pid: Program.Id): IO[Option[Map[Partner, Int]]] =
+    query(
+      service,
+      s"""
+        query {
+          program(programId: "$pid") {
+            proposal {
+              gemini {
+                ... on Queue { partnerSplits { partner percent } }
+              }
+            }
+          }
+        }
+      """
+    ).map: js =>
+      val proposal = js.hcursor.downFields("program", "proposal")
+      Option.when(proposal.focus.exists(!_.isNull)):
+        proposal.downFields("gemini", "partnerSplits").values.toList.flatten.flatMap: s =>
+          val c = s.hcursor
+          for
+            p   <- c.downField("partner").as[String].toOption.flatMap(t => Enumerated[Partner].fromTag(t.toLowerCase))
+            pct <- c.downField("percent").as[Int].toOption
+          yield p -> pct
+        .toMap
+
   private def coi(pid: Program.Id, p: Partner): IO[ProgramUser.Id] =
     addProgramUserAs(pi, pid, ProgramUserRole.Coi, link(p))
 
@@ -163,6 +189,46 @@ class partnerLeads extends OdbSuite:
       ca       <- coi(pid, CA)
       _        <- setSplitsExpectingError(pid, (CA, 100, Lead.Choose(ca)))
     yield ()
+
+  test("a rejected lead leaves the proposal unchanged"):
+    for
+      (pid, piId) <- proposal(link(CA))
+      ar          <- coi(pid, AR)
+      _           <- coi(pid, BR)
+      _           <- setSplits(pid, (CA, 100, Lead.Omit))
+      _           <- setSplitsExpectingError(pid, (CA, 50, Lead.Omit), (BR, 50, Lead.Choose(ar)))
+      splits      <- splitsOf(pid)
+      _           <- assertLeads(pid, CA -> piId)
+    yield assertEquals(splits, Some(Map(CA -> 100)))
+
+  test("a rejected lead creates no proposal"):
+    for
+      pid    <- createProgramWithPiAffiliation(pi, link(CA))
+      ar     <- coi(pid, AR)
+      _      <- coi(pid, BR)
+      _      <- expectOdbError(
+                  user     = pi,
+                  query    = s"""
+                    mutation {
+                      createProposal(input: {
+                        programId: "$pid"
+                        SET: {
+                          category: GALACTIC_OTHER
+                          gemini: {
+                            queue: {
+                              partnerSplits: ${splitsArg(List((CA, 50, Lead.Omit), (BR, 50, Lead.Choose(ar))))}
+                            }
+                          }
+                        }
+                      }) {
+                        proposal { category }
+                      }
+                    }
+                  """,
+                  expected = { case OdbError.InvalidArgument(_) => }
+                )
+      splits <- splitsOf(pid)
+    yield assertEquals(splits, None)
 
   test("a partner without requested time has no lead"):
     for
