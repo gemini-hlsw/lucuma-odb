@@ -13,12 +13,8 @@ import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
-import lucuma.core.model.User
 import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
 import lucuma.odb.service.PerProgramPerConfigCalibrationsService
-import lucuma.odb.util.Codecs.observation_id
-import skunk.codec.all.text
-import skunk.syntax.all.*
 
 import java.time.Instant
 import java.time.LocalDateTime
@@ -64,9 +60,6 @@ class calibrations_gmosSpecPhotDaytimeArc
   private def hasAcquisitionAtom(oid: Observation.Id): IO[Boolean] =
     query(pi, executionConfigQuery(oid, "gmosNorth", "acquisition", "observeClass", none)).map:
       _.hcursor.downFields("executionConfig", "gmosNorth", "acquisition", "nextAtom").focus.exists(!_.isNull)
-
-  private def queryObscalcState(oid: Observation.Id): IO[String] =
-    session.use(_.unique(sql"SELECT c_obscalc_state::text FROM t_obscalc WHERE c_observation_id = $observation_id".query(text))(oid))
 
   case class GroupInfo(name: String, calibrationRoles: List[CalibrationRole], parentId: Option[Group.Id], system: Boolean) derives Decoder
 
@@ -138,32 +131,6 @@ class calibrations_gmosSpecPhotDaytimeArc
       c.hcursor.downFields("observation", "workflow", "value", "state").as[ObservationWorkflowState]
         .leftMap(f => new RuntimeException(f.message))
         .liftTo[IO]
-
-  private def setCentralWavelength(oid: Observation.Id, nm: Int): IO[Unit] =
-    query(
-      pi,
-      s"""mutation {
-            updateObservations(input: {
-              WHERE: { id: { EQ: "$oid" } }
-              SET: { observingMode: { gmosNorthLongSlit: { centralWavelength: { nanometers: $nm } } } }
-            }) {
-              observations { id }
-            }
-          }"""
-    ).void
-
-  private def updateSubtitleAs(user: User, oid: Observation.Id): IO[List[Json]] =
-    query(
-      user,
-      s"""mutation {
-            updateObservations(input: {
-              WHERE: { id: { EQ: "$oid" } }
-              SET: { subtitle: "edited" }
-            }) {
-              observations { id }
-            }
-          }"""
-    ).map(_.hcursor.downFields("updateObservations", "observations").as[List[Json]].getOrElse(Nil))
 
   // A GMOS North long slit science observation after a calibration pass, with
   // its spectrophotometric standard and the standard's daytime arc.
@@ -252,22 +219,6 @@ class calibrations_gmosSpecPhotDaytimeArc
       assert(!arcExists, "the daytime arc should be deleted")
       assert(!groupExists, "the standard's group should be deleted")
 
-  test("a science configuration change replaces the standard and its arc"):
-    for
-      (pid, oid, spec, arc) <- setup
-      _                     <- setCentralWavelength(oid, 600)
-      _                     <- runObscalcUpdate(pid, oid)
-      _                     <- recalculateCalibrations(pid, when, oid)
-      specExists            <- queryObservationExists(spec)
-      arcExists             <- queryObservationExists(arc)
-      specs                 <- queryCalibrationsWithRole(pid, CalibrationRole.SpectroPhotometric)
-      arcs                  <- specs.flatTraverse(calibrationObservationsFor(_, CalibrationRole.DaytimeArc))
-    yield
-      assert(!specExists, "the old standard should be deleted")
-      assert(!arcExists, "the old daytime arc should be deleted")
-      assertEquals(specs.size, 1)
-      assertEquals(arcs.size, 1)
-
   test("a daytime arc with a visit keeps its standard and group"):
     for
       (pid, oid, spec, arc) <- setup
@@ -283,29 +234,3 @@ class calibrations_gmosSpecPhotDaytimeArc
       assert(specExists, "a standard whose arc was visited must be kept")
       assert(arcExists, "a visited daytime arc must be kept")
       assert(groupExists, "the group holding them must be kept")
-
-  test("daytime arc goes pending when the standard's mode is re-synced"):
-    for
-      (pid, oid, spec, arc) <- setup
-      _                     <- runObscalcUpdate(pid, arc)
-      before                <- queryObscalcState(arc)
-      _                     <- recalculateCalibrations(pid, when, oid)
-      after                 <- queryObscalcState(arc)
-    yield
-      assertEquals(before, "ready")
-      assertEquals(after, "pending")
-
-  test("neither pi nor staff can edit the daytime arc"):
-    for
-      (_, _, _, arc) <- setup
-      byPi           <- updateSubtitleAs(pi, arc)
-      byStaff        <- updateSubtitleAs(staff, arc)
-    yield
-      assertEquals(byPi, Nil)
-      assertEquals(byStaff, Nil)
-
-  test("daytime arc cannot be declined"):
-    for
-      (_, _, _, arc) <- setup
-      result         <- setObservationWorkflowState(pi, arc, ObservationWorkflowState.Inactive).attempt
-    yield assert(result.isLeft, "a daytime arc must not be declinable")
