@@ -4,6 +4,7 @@
 package lucuma.odb.graphql
 package feature
 
+import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.syntax.all.*
 import io.circe.Decoder
@@ -234,3 +235,24 @@ class calibrations_gmosSpecPhotDaytimeArc
       assert(specExists, "a standard whose arc was visited must be kept")
       assert(arcExists, "a visited daytime arc must be kept")
       assert(groupExists, "the group holding them must be kept")
+
+  // The arc is deleted through the service, as a user cannot, to get an executed
+  // standard without one, as those from before daytime arcs existed.  The pass
+  // replaces an executed standard with a fresh one, which gets its own arc.
+  test("an executed standard gets no daytime arc"):
+    for
+      (pid, oid, spec, arc) <- setup
+      sid                   <- firstScienceStepId(serviceUser, spec)
+      vid                   <- recordVisitAs(serviceUser, spec)
+      _                     <- addEndStepEvent(sid, vid)
+      _                     <- withServices(serviceUser): services =>
+                                 services.session.transaction.use: xa =>
+                                   services.observationService.deleteCalibrationObservations(NonEmptyList.one(arc))(using xa)
+      _                     <- recalculateCalibrations(pid, when, oid)
+      arcs                  <- calibrationObservationsFor(spec, CalibrationRole.DaytimeArc)
+      specs                 <- queryCalibrationsWithRole(pid, CalibrationRole.SpectroPhotometric)
+      newArc                <- specs.filterNot(_ === spec).traverse(calibrationObservationFor(_, CalibrationRole.DaytimeArc))
+    yield
+      assertEquals(arcs, Nil, "an executed standard gets no daytime arc")
+      assertEquals(specs.size, 2, "the executed standard is replaced by a fresh one")
+      assert(newArc.forall(_.isDefined), "the fresh standard gets its own arc")

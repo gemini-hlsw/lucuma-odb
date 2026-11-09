@@ -287,7 +287,7 @@ A system-generated calibration observation taken for one Flamingos-2 imaging sci
 _Avoid_: imaging flat (the step kind, not the observation), smart flat (a row kind), daytime calibration (the staff-made observation).
 
 **Daytime Arc**:
-A system-generated calibration observation taken for one GMOS spectrophotometric standard (long slit or IFU): it carries the standard's GMOS mode, kept in step by the ODB, and the `DAYTIME_ARC` calibration role. It is the standard's only arc; the standard's own sequence takes flats but no night arc. The standard and its arc share a system group nested in the program's Calibrations group, created with the standard and removed with it unless either has a visit. Its sequence is one Smart GCAL arc per wavelength dither of the standard, in the standard's order; it has no target and uses no ITC. Not a Daytime Calibration (staff hand-made, its own mode).
+A system-generated calibration observation taken for one GMOS spectrophotometric standard (long slit or IFU): it carries the standard's GMOS mode, kept in step by the ODB, and the `DAYTIME_ARC` calibration role. It is the standard's only arc; the standard's own sequence takes flats but no night arc. The standard and its arc share a system group nested in the program's Calibrations group, created with the standard, never for a standard that has started executing, and removed with it unless either has a visit. Its sequence is one Smart GCAL arc per wavelength dither of the standard, in the standard's order; it has no target and uses no ITC. Not a Daytime Calibration (staff hand-made, its own mode).
 _Avoid_: specphot arc (names the parent, not the kind), smart arc (a row kind), night arc (the arc a science sequence takes beside its flats).
 
 **Daytime Calibration Mode**:

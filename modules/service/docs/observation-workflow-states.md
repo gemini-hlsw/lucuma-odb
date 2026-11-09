@@ -157,8 +157,7 @@ Tellurics, daytime pinholes and daytime flats are auto-created alongside their s
 observation, and a daytime arc alongside its GMOS spectrophotometric standard, in a
 group of its own nested in the program's Calibrations group. None normally has
 transitions of its own — each inherits the user state of the parent observation in
-its group. SC-8458 carves out one exception, for tellurics only (see
-`../../../docs/adr/0008-telluric-decline-override.md`).
+its group. SC-8458 carves out one exception, for tellurics only.
 
 A telluric that is `Inactive` only because its science observation is inactive
 offers no transitions — there is no override to clear. Both calibration carve-outs

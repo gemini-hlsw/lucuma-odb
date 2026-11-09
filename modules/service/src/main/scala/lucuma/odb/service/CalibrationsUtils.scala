@@ -8,11 +8,14 @@ import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegInt
+import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.numeric.PosInt
+import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.ExecutionState
+import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ScienceBand
@@ -37,9 +40,12 @@ import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.BlindOffsetType
+import lucuma.odb.data.Existence
+import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.graphql.input.ConstraintSetInput
+import lucuma.odb.graphql.input.GroupPropertiesInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
 import lucuma.odb.graphql.input.ObservingModeInput
 import lucuma.odb.graphql.input.PosAngleConstraintInput
@@ -64,11 +70,14 @@ import lucuma.odb.sequence.gnirs.spectroscopy.Config as GnirsSpectroscopyConfig
 import lucuma.odb.sequence.igrins2.longslit.Config as Igrins2Config
 import lucuma.odb.service.CalibrationConfigSubset.*
 import lucuma.odb.service.Services.Syntax.*
+import lucuma.odb.syntax.observingModeType.*
 import lucuma.odb.util.Codecs
 import lucuma.odb.util.Codecs.*
 import lucuma.refined.*
 import org.typelevel.otel4s.trace.Tracer
 import skunk.AppliedFragment
+import skunk.Command
+import skunk.Query
 import skunk.Transaction
 import skunk.syntax.all.*
 
@@ -598,3 +607,156 @@ object SpecPhotoExposureTime:
       case _: (CalibrationConfigSubset.GmosNConfigs | CalibrationConfigSubset.GmosSConfigs)       => LongSlit
       case _: (CalibrationConfigSubset.GmosNIfuConfigs | CalibrationConfigSubset.GmosSIfuConfigs) => Ifu
     ExposureTimeMode.TimeAndCountMode(time, Count, wavelengthAt.getOrElse(config.centralWavelength))
+
+/**
+ * Operations on per-observation calibration groups: the system group built
+ * around one parent observation, and the generated daytime calibrations
+ * (pinhole, flat, arc) it may hold, target-less GCAL observations that copy
+ * the parent's configuration.
+ */
+trait ObsCalibrationOperations:
+
+  def newObsCalibrationGroup[F[_]: MonadThrow: Services: Transaction](
+    pid:              Program.Id,
+    name:             NonEmptyString,
+    parentGroupId:    Option[Group.Id],
+    parentIndex:      Option[NonNegShort],
+    maximumInterval:  Option[TimeSpan],
+    calibrationRoles: List[CalibrationRole],
+    parentOid:        Observation.Id
+  ): F[Group.Id] =
+    groupService.createGroup(
+      Services.asSuperUser:
+        AccessControl.unchecked(
+          GroupService.NewGroup(
+            SET = GroupPropertiesInput.Create(
+              name = name.some,
+              description = none,
+              minimumRequired = none,
+              ordered = false,
+              minimumInterval = none,
+              maximumInterval = maximumInterval,
+              sameNight = false,
+              minimumObservationsPerNight = none,
+              maximumObservationsPerNight = none,
+              parentGroupId = parentGroupId,
+              parentGroupIndex = parentIndex,
+              existence = Existence.Present
+            ),
+            initialContents = List(Right(parentOid))
+          ),
+          pid,
+          program_id
+        ),
+      system = true,
+      calibrationRoles = calibrationRoles
+    ).orError
+
+  // No target, a fixed position angle and no science requirements: the
+  // exposure comes from SmartGcal.
+  def insertDaytimeCalibration[F[_]: MonadThrow: Services: Transaction](
+    pid:             Program.Id,
+    gid:             Group.Id,
+    calibrationRole: CalibrationRole
+  ): F[Observation.Id] =
+    observationService
+      .createObservation(
+        Services.asSuperUser:
+          AccessControl.unchecked(
+            ObservationPropertiesInput.Create.Default.copy(
+              posAngleConstraint = PosAngleConstraintInput(
+                                     mode  = PosAngleConstraintMode.Fixed.some,
+                                     angle = Angle.Angle0.some
+                                   ).some,
+              constraintSet      = none,
+              group              = gid.some
+            ),
+            pid,
+            program_id
+          ),
+        calibrationRole = calibrationRole.some
+      ).orError
+
+  def selectObservingModeTypes[F[_]: MonadThrow: Services](
+    oids: List[Observation.Id]
+  ): F[Map[Observation.Id, Option[ObservingModeType]]] =
+    session.execute(ObsCalibrationOperations.Statements.SelectObservingModeTypes)(oids).map(_.toMap)
+
+  /** Copies the source's band, constraints and science requirements onto the target. */
+  def syncObservationConfiguration[F[_]: MonadThrow: Services](
+    sourceOid: Observation.Id,
+    targetOid: Observation.Id
+  ): F[Unit] =
+    session.execute(ObsCalibrationOperations.Statements.SyncObservationConfiguration)((sourceOid, targetOid)).void
+
+  /**
+   * Replaces the target's observing mode and exposure time modes with a copy
+   * of the source's.
+   */
+  def replaceObservingMode[F[_]: MonadThrow: Services: Transaction](
+    sourceOid:  Observation.Id,
+    sourceMode: Option[ObservingModeType],
+    targetOid:  Observation.Id,
+    targetMode: Option[ObservingModeType]
+  ): F[Unit] =
+    Services.asSuperUser:
+      for
+        _ <- targetMode.traverse_(observingModeServices.delete(_, List(targetOid)))
+        _ <- sourceMode.traverse_ : _ =>
+               exposureTimeModeService.deleteMany(
+                 List(targetOid),
+                 ExposureTimeModeRole.Requirement,
+                 ExposureTimeModeRole.Acquisition,
+                 ExposureTimeModeRole.Science
+               )
+        _ <- sourceMode.traverse_ : m =>
+               session.execute(ObsCalibrationOperations.Statements.UpdateObservingModeType)((m.some, m.instrumentOption, targetOid)) *>
+                 observingModeServices.clone(m, sourceOid, targetOid)
+      yield ()
+
+object ObsCalibrationOperations:
+
+  object Statements:
+
+    val SelectObservingModeTypes: Query[List[Observation.Id], (Observation.Id, Option[ObservingModeType])] =
+      sql"""
+        SELECT c_observation_id, c_observing_mode_type
+        FROM   t_observation
+        WHERE  c_observation_id = ANY(${_gid[Observation.Id]})
+      """.query(observation_id *: observing_mode_type.opt)
+
+    val UpdateObservingModeType: Command[(Option[ObservingModeType], Option[Instrument], Observation.Id)] =
+      sql"""
+        UPDATE t_observation
+        SET    c_observing_mode_type = ${observing_mode_type.opt},
+               c_instrument          = ${Codecs.instrument.opt}
+        WHERE  c_observation_id = $observation_id
+      """.command
+
+    val SyncObservationConfiguration: Command[(Observation.Id, Observation.Id)] =
+      sql"""
+        UPDATE t_observation target
+        SET
+          c_science_band             = source.c_science_band,
+          c_cloud_extinction         = source.c_cloud_extinction,
+          c_image_quality            = source.c_image_quality,
+          c_sky_background           = source.c_sky_background,
+          c_water_vapor              = source.c_water_vapor,
+          c_air_mass_min             = source.c_air_mass_min,
+          c_air_mass_max             = source.c_air_mass_max,
+          c_hour_angle_min           = source.c_hour_angle_min,
+          c_hour_angle_max           = source.c_hour_angle_max,
+          c_spec_wavelength          = source.c_spec_wavelength,
+          c_spec_resolution          = source.c_spec_resolution,
+          c_spec_wavelength_coverage = source.c_spec_wavelength_coverage,
+          c_spec_focal_plane         = source.c_spec_focal_plane,
+          c_spec_focal_plane_angle   = source.c_spec_focal_plane_angle,
+          c_spec_capability          = source.c_spec_capability,
+          c_img_minimum_fov          = source.c_img_minimum_fov,
+          c_img_narrow_filters       = source.c_img_narrow_filters,
+          c_img_broad_filters        = source.c_img_broad_filters,
+          c_img_combined_filters     = source.c_img_combined_filters
+        FROM t_observation source
+        WHERE source.c_observation_id = $observation_id
+          AND target.c_observation_id = $observation_id
+      """.command

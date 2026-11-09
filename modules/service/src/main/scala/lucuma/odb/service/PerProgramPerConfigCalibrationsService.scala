@@ -11,11 +11,9 @@ import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.enums.CalibrationRole
-import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.Site
-import lucuma.core.math.Angle
 import lucuma.core.math.Coordinates
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
@@ -28,12 +26,10 @@ import lucuma.odb.data.Existence
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.data.GroupTree
 import lucuma.odb.data.Nullable
-import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.graphql.input.GmosLongSlitInput
 import lucuma.odb.graphql.input.GroupPropertiesInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
 import lucuma.odb.graphql.input.ObservingModeInput
-import lucuma.odb.graphql.input.PosAngleConstraintInput
 import lucuma.odb.graphql.input.ScienceRequirementsInput
 import lucuma.odb.graphql.input.SpectroscopyScienceRequirementsInput
 import lucuma.odb.graphql.mapping.AccessControl
@@ -42,7 +38,6 @@ import lucuma.odb.sequence.data.ItcInput
 import lucuma.odb.service.CalibrationConfigSubset.*
 import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.service.Services.Syntax.*
-import lucuma.odb.syntax.observingModeType.*
 import lucuma.odb.util.Codecs.*
 import lucuma.refined.*
 import org.typelevel.log4cats.Logger
@@ -50,7 +45,6 @@ import org.typelevel.log4cats.LoggerFactory
 import org.typelevel.log4cats.syntax.*
 import org.typelevel.otel4s.trace.Tracer
 import skunk.AppliedFragment
-import skunk.Command
 import skunk.Query
 import skunk.Transaction
 import skunk.syntax.all.*
@@ -70,7 +64,7 @@ object PerProgramPerConfigCalibrationsService:
   val CalibrationsGroupName: NonEmptyString = "Calibrations".refined
 
   def instantiate[F[_]: {Concurrent, Services, Tracer, LoggerFactory as LF}]: PerProgramPerConfigCalibrationsService[F] =
-    new PerProgramPerConfigCalibrationsService[F] with CalibrationObservations with WorkflowStateQueries[F]:
+    new PerProgramPerConfigCalibrationsService[F] with CalibrationObservations with ObsCalibrationOperations with WorkflowStateQueries[F]:
       given Logger[F] = LF.getLoggerFromName("per-program-calibrations")
 
       private def calObsProps(
@@ -243,17 +237,15 @@ object PerProgramPerConfigCalibrationsService:
         for
           unnecessary <- excludeOngoingAndCompleted(candidates, identity)
           specPhots   <- selectSpecPhots(pid).map(_.filter(sp => unnecessary.contains(sp.oid)))
-          arcs         = specPhots.flatMap(sp => sp.arc.tupleLeft(sp.oid))
-          // A standard whose arc has executed stays, as the arc does.
-          deletable   <- excludeObsCalibrationsFromDeletion(arcs, _._2)
-          kept         = arcs.map(_._1).toSet -- deletable.map(_._1).toSet
-          toDelete     = unnecessary.filterNot(kept.contains)
+          // An arc that has executed or been visited keeps its standard and group.
+          arcs        <- excludeObsCalibrationsFromDeletion(specPhots.flatMap(_.arc), identity)
+          kept         = specPhots.filter(_.arc.exists(a => !arcs.contains(a)))
+          toDelete     = unnecessary.filterNot(kept.map(_.oid).contains)
           // The arc leaves the group before its standard does, as the group trigger requires.
-          deletedArcs  = deletable.collect { case (sp, arc) if !kept.contains(sp) => arc }
-          _           <- NonEmptyList.fromList(deletedArcs).traverse_(observationService.deleteCalibrationObservations)
+          _           <- NonEmptyList.fromList(arcs).traverse_(observationService.deleteCalibrationObservations)
           _           <- NonEmptyList.fromList(toDelete).traverse_(observationService.deleteCalibrationObservations)
-          _           <- specPhots.filter(sp => toDelete.contains(sp.oid)).flatMap(_.group).traverse_(groupService.deleteSystemGroup(pid, _))
-        yield toDelete ++ deletedArcs
+          _           <- specPhots.diff(kept).flatMap(_.group).traverse_(groupService.deleteSystemGroup(pid, _))
+        yield toDelete ++ arcs
       }
 
       // A spectrophotometric standard with the system group that holds it and its
@@ -268,107 +260,44 @@ object PerProgramPerConfigCalibrationsService:
       private def selectSpecPhots(pid: Program.Id): F[List[SpecPhot]] =
         session.execute(Statements.selectSpecPhots)(pid).map(_.map(SpecPhot.apply))
 
-      private def newSpecPhotGroup(
-        pid:    Program.Id,
-        parent: Group.Id,
-        sp:     SpecPhot
-      )(using Transaction[F]): F[Group.Id] =
-        val name = NonEmptyString.unsafeFrom(s"${sp.modeType.fold("gmos")(_.tag)}/calibration/${sp.oid.show}")
-        groupService.createGroup(
-          Services.asSuperUser:
-            AccessControl.unchecked(
-              GroupService.NewGroup(
-                SET = GroupPropertiesInput.Create(
-                  name = name.some,
-                  description = none,
-                  minimumRequired = none,
-                  ordered = false,
-                  minimumInterval = none,
-                  maximumInterval = none,
-                  sameNight = false,
-                  minimumObservationsPerNight = none,
-                  maximumObservationsPerNight = none,
-                  parentGroupId = parent.some,
-                  parentGroupIndex = none,
-                  existence = Existence.Present
-                ),
-                initialContents = List(Right(sp.oid))
-              ),
-              pid,
-              program_id
-            ),
-          system = true,
-          calibrationRoles = List(CalibrationRole.DaytimeArc)
-        ).orError
-
-      // A daytime arc is an internal GCAL calibration: no target, a fixed
-      // position angle, and no science requirements (the exposure comes from
-      // SmartGcal).
-      private def insertDaytimeArc(pid: Program.Id, gid: Group.Id)(using Transaction[F]): F[Observation.Id] =
-        val obsInput = ObservationPropertiesInput.Create(
-          subtitle            = none,
-          scienceBand         = none,
-          posAngleConstraint  = PosAngleConstraintInput(
-                                  mode  = PosAngleConstraintMode.Fixed.some,
-                                  angle = Angle.Angle0.some
-                                ).some,
-          targetEnvironment   = none,
-          constraintSet       = none,
-          scheduling          = none,
-          attachments         = none,
-          scienceRequirements = none,
-          observingMode       = none,
-          existence           = Existence.Present.some,
-          group               = gid.some,
-          groupIndex          = none,
-          observerNotes       = none,
-          priority            = none,
-          qaStateOverride     = none
+      private def newSpecPhotGroup(pid: Program.Id, parent: Group.Id, sp: SpecPhot)(using Transaction[F]): F[Group.Id] =
+        newObsCalibrationGroup(
+          pid,
+          NonEmptyString.unsafeFrom(s"${sp.modeType.fold("gmos")(_.tag)}/calibration/${sp.oid.show}"),
+          parent.some,
+          none,
+          none,
+          List(CalibrationRole.DaytimeArc),
+          sp.oid
         )
-        observationService
-          .createObservation(
-            Services.asSuperUser(AccessControl.unchecked(obsInput, pid, program_id)),
-            calibrationRole = CalibrationRole.DaytimeArc.some
-          ).orError
 
       // The arc carries a copy of its standard's observing mode, exposure time
-      // modes included, and the standard's band and constraints.
-      private def syncArcConfiguration(specOid: Observation.Id, arcOid: Observation.Id)(using Transaction[F]): F[Unit] =
-        Services.asSuperUser:
-          for
-            modes <- session.execute(Statements.selectObservingModeTypes)(List(specOid, arcOid)).map(_.toMap)
-            sm     = modes.get(specOid).flatten
-            tm     = modes.get(arcOid).flatten
-            _     <- session.execute(Statements.syncObservationConfiguration)((specOid, arcOid))
-            _     <- tm.traverse_(m => observingModeServices.delete(m, List(arcOid)))
-            _     <- exposureTimeModeService.deleteMany(
-                       List(arcOid),
-                       ExposureTimeModeRole.Requirement,
-                       ExposureTimeModeRole.Acquisition,
-                       ExposureTimeModeRole.Science
-                     )
-            _     <- sm.traverse_ : m =>
-                       session.execute(Statements.updateObservingModeType)((m.some, m.instrumentOption, arcOid)) *>
-                         observingModeServices.clone(m, specOid, arcOid)
-          yield ()
+      // modes included, and the standard's band and constraints.  An existing
+      // arc already has the standard's mode type, as a standard's never changes.
+      private def syncArcConfiguration(sp: SpecPhot, arcOid: Observation.Id, isNew: Boolean)(using Transaction[F]): F[Unit] =
+        syncObservationConfiguration(sp.oid, arcOid) *>
+          replaceObservingMode(sp.oid, sp.modeType, arcOid, if isNew then none else sp.modeType)
 
-      // Every present standard gets its group, nested in the Calibrations group,
-      // and one daytime arc kept in step with it unless the arc has executed.
+      // Every unexecuted standard gets its group, nested in the Calibrations
+      // group, and one daytime arc kept in step with it unless the arc has
+      // executed.  An executed standard is left as it is, arc or no arc.
       private def syncDaytimeArcs(pid: Program.Id)(using Transaction[F], ServiceAccess): F[List[Observation.Id]] =
         def sync(parent: Group.Id, sp: SpecPhot): F[Option[Observation.Id]] =
           for
             gid <- sp.group.fold(newSpecPhotGroup(pid, parent, sp))(_.pure[F])
             res <- sp.arc match
                      case None      =>
-                       insertDaytimeArc(pid, gid).flatTap(syncArcConfiguration(sp.oid, _)).map(_.some)
+                       insertDaytimeCalibration(pid, gid, CalibrationRole.DaytimeArc)
+                         .flatTap(syncArcConfiguration(sp, _, isNew = true))
+                         .map(_.some)
                      case Some(arc) =>
                        excludeOngoingAndCompleted(List(arc), identity)
-                         .flatMap(_.traverse_(syncArcConfiguration(sp.oid, _)))
+                         .flatMap(_.traverse_(syncArcConfiguration(sp, _, isNew = false)))
                          .as(none[Observation.Id])
           yield res
 
         for
-          specPhots <- selectSpecPhots(pid)
+          specPhots <- selectSpecPhots(pid).flatMap(excludeOngoingAndCompleted(_, _.oid))
           parent    <- calibrationsGroup(pid, specPhots.size)
           added     <- parent.fold(List.empty[Observation.Id].pure[F]): cg =>
                          specPhots.traverse(sync(cg, _)).map(_.flatten)
@@ -503,8 +432,8 @@ object PerProgramPerConfigCalibrationsService:
         groupService.selectGroups(pid).flatMap:
           case GroupTree.Root(_, children) =>
             children.collectFirst {
-              case GroupTree.Branch(groupId = gid, children = children, name = Some(CalibrationsGroupName), system = true)
-                if children.isEmpty => gid
+              case GroupTree.Branch(groupId = gid, children = obs, name = Some(CalibrationsGroupName), system = true)
+                if obs.isEmpty => gid
             }.traverse_(groupService.deleteSystemGroup(pid, _))
           case _                           =>
             Applicative[F].unit
@@ -593,47 +522,3 @@ object PerProgramPerConfigCalibrationsService:
           )
         GROUP BY g.c_group_id
       """.query(group_id *: _gid[Observation.Id])
-
-    val selectObservingModeTypes: Query[List[Observation.Id], (Observation.Id, Option[ObservingModeType])] =
-      sql"""
-        SELECT c_observation_id, c_observing_mode_type
-        FROM   t_observation
-        WHERE  c_observation_id = ANY(${_gid[Observation.Id]})
-      """.query(observation_id *: observing_mode_type.opt)
-
-    val updateObservingModeType: Command[(Option[ObservingModeType], Option[Instrument], Observation.Id)] =
-      sql"""
-        UPDATE t_observation
-        SET    c_observing_mode_type = ${observing_mode_type.opt},
-               c_instrument          = ${instrument.opt}
-        WHERE  c_observation_id = $observation_id
-      """.command
-
-    // The standard's band, constraints and science requirements, copied to its arc.
-    val syncObservationConfiguration: Command[(Observation.Id, Observation.Id)] =
-      sql"""
-        UPDATE t_observation target
-        SET
-          c_science_band             = source.c_science_band,
-          c_cloud_extinction         = source.c_cloud_extinction,
-          c_image_quality            = source.c_image_quality,
-          c_sky_background           = source.c_sky_background,
-          c_water_vapor              = source.c_water_vapor,
-          c_air_mass_min             = source.c_air_mass_min,
-          c_air_mass_max             = source.c_air_mass_max,
-          c_hour_angle_min           = source.c_hour_angle_min,
-          c_hour_angle_max           = source.c_hour_angle_max,
-          c_spec_wavelength          = source.c_spec_wavelength,
-          c_spec_resolution          = source.c_spec_resolution,
-          c_spec_wavelength_coverage = source.c_spec_wavelength_coverage,
-          c_spec_focal_plane         = source.c_spec_focal_plane,
-          c_spec_focal_plane_angle   = source.c_spec_focal_plane_angle,
-          c_spec_capability          = source.c_spec_capability,
-          c_img_minimum_fov          = source.c_img_minimum_fov,
-          c_img_narrow_filters       = source.c_img_narrow_filters,
-          c_img_broad_filters        = source.c_img_broad_filters,
-          c_img_combined_filters     = source.c_img_combined_filters
-        FROM t_observation source
-        WHERE source.c_observation_id = $observation_id
-          AND target.c_observation_id = $observation_id
-      """.command

@@ -96,7 +96,7 @@ class ShortCut_6598 extends ExecutionTestSupportForGmos:
 
       val specPhotoCount = calibrationsWithRoleAndTargets.count(_._1.contains(CalibrationRole.SpectroPhotometric))
       val twilightCount = calibrationsWithRoleAndTargets.count(_._1.contains(CalibrationRole.Twilight))
-      // A standard's daytime arc has no target by design, so it is not a case of this bug.
+      // A standard's daytime arc has no target by design.
       val untargetedCount = calibrationsWithRoleAndTargets.count:
         case (Some(role), _, false) => role =!= CalibrationRole.DaytimeArc
         case _                      => false

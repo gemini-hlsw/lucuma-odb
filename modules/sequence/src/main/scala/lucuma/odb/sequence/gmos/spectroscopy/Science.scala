@@ -52,6 +52,7 @@ import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.util.AtomBuilder
 import lucuma.odb.sequence.util.DaytimeSmartGcal
+import lucuma.refined.*
 import monocle.Lens
 
 import java.util.UUID
@@ -99,7 +100,7 @@ object Science:
   val TwilightExposureTime: TimeSpan =
     30.secondTimeSpan
 
-  val DaytimeArcTitle: NonEmptyString = NonEmptyString.unsafeFrom("Daytime Arc")
+  val DaytimeArcTitle: NonEmptyString = "Daytime Arc".refined
 
   extension (t: Timestamp)
     def plusCalValidityPeriod: Timestamp =
@@ -318,9 +319,7 @@ object Science:
 
       /**
        * The arcs of a daytime arc calibration: one smart GCAL arc per wavelength
-       * dither, at that dither's wavelength, titled by the dither when there is
-       * more than one.  The exposure and lamps come from SmartGcal and the steps
-       * are DayCal, so they cost no program time.
+       * dither, at that dither's wavelength.
        */
       def daytimeArcs(config: Config[G, L, U]): NonEmptyList[(NonEmptyString, ProtoStep[D])] =
         val λ       = config.centralWavelength
