@@ -80,3 +80,19 @@ $$;
 
 COMMENT ON FUNCTION observation_is_suspended(d_observation_id) IS
   'Whether staff have suspended the observation, and it isn''t complete.';
+
+-- Obscalc stores each workflow's transitions, and GraphQL reads those.  Every
+-- Ongoing observation calculated before now stored [Completed] alone, so staff
+-- would not be offered the suspension until something else invalidated it.
+-- No other state's transitions changed: nothing can be suspended yet.
+DO $$
+DECLARE
+  ongoing d_observation_id[];
+BEGIN
+  SELECT array_agg(c_observation_id) INTO ongoing
+    FROM t_obscalc
+   WHERE c_workflow_state = 'ongoing'::e_workflow_state;
+
+  CALL invalidate_obscalc_many(ongoing);
+END;
+$$;
