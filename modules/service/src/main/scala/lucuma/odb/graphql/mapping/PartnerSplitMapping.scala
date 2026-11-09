@@ -7,14 +7,16 @@ package mapping
 
 import grackle.skunk.SkunkMapping
 import lucuma.odb.graphql.table.PartnerSplitTable
+import lucuma.odb.graphql.table.ProgramUserView
 
-trait PartnerSplitMapping[F[_]] extends PartnerSplitTable[F] {
+trait PartnerSplitMapping[F[_]] extends PartnerSplitTable[F] with ProgramUserView[F] {
 
   lazy val PartnerSplitMapping =
     ObjectMapping(PartnerSplitType)(
       SqlField("program_id", PartnerSplitTable.ProgramId, key = true, hidden = true),
       SqlField("partner", PartnerSplitTable.Partner, key = true),
       SqlField("percent", PartnerSplitTable.Percent),
+      SqlObject("lead", Join(PartnerSplitTable.LeadId, ProgramUserView.ProgramUserId))
     )
 
   }
