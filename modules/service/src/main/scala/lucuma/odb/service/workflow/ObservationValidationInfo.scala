@@ -371,15 +371,16 @@ object ObservationValidationInfo {
     /**
      * Joins `s`, holding `c_observation_id` and `c_workflow_user_state`: for
      * an observation `o` that is a per-observation calibration (a telluric, or
-     * a daytime pinhole or imaging flat), the science observation in its group; otherwise
-     * no row.  This is the one association rule: the workflow inherits the
-     * science observation's user state through it, and group progress
-     * evaluates a calibration with the science observation it names.
+     * a daytime pinhole, flat or arc), the parent observation in its group:
+     * the science observation, or the spectrophotometric standard a daytime
+     * arc is taken for.  Otherwise no row.  This is the one association rule:
+     * the workflow inherits the parent's user state through it, and group
+     * progress evaluates a calibration with the parent it names.
      *
-     * A per-observation calibration group holds a single science observation:
+     * A per-observation calibration group holds a single parent observation:
      * the calibrations service builds the group around it, and observations
      * can't be moved in or out (`ObservationService`).  Should a group ever
-     * hold more, "the" science observation is the first in group order.  But
+     * hold more, "the" parent is the first in group order.  But
      * a calibration shared by several science observations would need its
      * own rule (it is needed while any of them needs it, say), and this is
      * the place to define it.
@@ -397,7 +398,8 @@ object ObservationValidationInfo {
                  sci.c_workflow_user_state
           FROM   t_observation sci
           WHERE  o.c_calibration_role = ANY(ARRAY[#$roles]::e_calibration_role[])
-            AND  sci.c_calibration_role IS NULL
+            AND  sci.c_observation_id <> o.c_observation_id
+            AND  (sci.c_calibration_role IS NULL OR sci.c_calibration_role = 'spectrophotometric')
             AND  sci.c_group_id  = o.c_group_id
             AND  sci.c_existence = 'present'
           ORDER BY sci.c_group_index

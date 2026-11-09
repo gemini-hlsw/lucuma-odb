@@ -197,12 +197,13 @@ object ObsExtract:
   val PerProgramPerConfigCalibrationTypes: List[CalibrationRole] =
     List(CalibrationRole.SpectroPhotometric, CalibrationRole.Twilight)
 
-  // Roles generated into the system group attached to a single science
-  // observation.  Disjoint from the per-program roles (CalibrationRolesSuite);
-  // the DB function is_obs_calibration_group hardcodes the same three, and
+  // Roles generated into the system group attached to a single parent
+  // observation: a science observation or, for a daytime arc, a spectrophotometric
+  // standard.  Disjoint from the per-program roles (CalibrationRolesSuite); the DB
+  // function is_obs_calibration_group hardcodes the same four, and
   // groupObservationsPerNight checks they agree.
   val PerObservationCalibrationRoles: List[CalibrationRole] =
-    List(CalibrationRole.Telluric, CalibrationRole.DaytimePinhole, CalibrationRole.DaytimeFlat)
+    List(CalibrationRole.Telluric, CalibrationRole.DaytimePinhole, CalibrationRole.DaytimeFlat, CalibrationRole.DaytimeArc)
 
   def perObsFilter: PartialFunction[ObsExtract[ObservingMode], ObsExtract[ObservingMode]] =
     case d @ ObsExtract(data = _: Flamingos2Config)    => d
@@ -380,7 +381,8 @@ object WorkflowStateQueries:
         FROM t_observation t
         JOIN t_observation sci
           ON sci.c_group_id = t.c_group_id
-         AND sci.c_calibration_role IS NULL
+         AND sci.c_observation_id <> t.c_observation_id
+         AND (sci.c_calibration_role IS NULL OR sci.c_calibration_role = 'spectrophotometric')
         JOIN v_generator_params sci_gp
           ON sci_gp.c_observation_id = sci.c_observation_id
         WHERE t.c_calibration_role IS NOT NULL
