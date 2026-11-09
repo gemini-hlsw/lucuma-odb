@@ -84,6 +84,8 @@ trait Database[F[_]] {
   /** Return the SSO service user itself. Requests to other services should be done on behalf of this user. */
   def getSsoServiceUser: F[ServiceUser]
 
+  /** Invalidate a single session. Returns `true` if a session was deleted. */
+  def deleteSessionToken(token: SessionToken): F[Boolean]
   def deleteAllSessionTokensForUser(uid: User.Id): F[Unit]
   def deleteAllSessionTokensForRole(id: StandardRole.Id): F[Unit]
   def deleteRole(id: StandardRole.Id): F[Unit]
@@ -207,6 +209,14 @@ object Database extends Codecs {
 
           }
         }
+
+      def deleteSessionToken(token: SessionToken): F[Boolean] =
+        T.span("deleteSessionToken").surround:
+          s.prepareR(sql"DELETE FROM lucuma_session WHERE refresh_token = $session_token".command)
+            .use(_.execute(token))
+            .map:
+              case Delete(n) => n > 0
+              case _         => false
 
       def deleteAllSessionTokensForUser(uid: User.Id): F[Unit] =
         T.span("deleteAllSessionTokensForUser").surround {
