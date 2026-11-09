@@ -27,7 +27,7 @@ import lucuma.itc.SignalToNoiseAt
 import lucuma.odb.data.OdbError
 import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
-import lucuma.odb.graphql.query.ObservingModeSetupOperations 
+import lucuma.odb.graphql.query.ObservingModeSetupOperations
 import lucuma.odb.util.Codecs.observation_id
 import skunk.implicits.*
 
