@@ -27,6 +27,7 @@ trait ProgramUserView[F[_]] extends BaseMapping[F] {
     val ClassicalVisitor  = col("c_classical_visitor", bool)
     val DisplayName       = col("c_display_name", text.opt)
     val Email             = col("c_email", varchar.opt)
+    val WriterUserId      = col("c_writer_user_id", user_id.opt)
 
     object Preferred extends UserProfileTable[ColumnRef]:
       override val GivenName  = col("c_preferred_given_name", varchar.opt)
