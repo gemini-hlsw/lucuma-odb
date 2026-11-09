@@ -78,6 +78,7 @@ object ObservationValidator:
       TooActivationValidator                   |+|
       OpportunityTargetValidator               |+|
       OtherConfigErrorValidator                |+|
+      PosAngleValidator                        |+|
       ConditionsProbabilityValidator
 
     // Checks downstream of the ITC.  The steps checked come from the sequence,

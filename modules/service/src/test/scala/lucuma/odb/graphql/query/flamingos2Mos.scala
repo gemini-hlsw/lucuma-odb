@@ -179,8 +179,21 @@ class flamingos2Mos extends OdbSuite with ObservingModeSetupOperations:
         """.asRight
       )
 
+  // A MOS observation is created with a fixed position angle, so the angle
+  // the mask was designed for is set explicitly rather than left to AGS.
+  private def setFixedPosAngle(oid: Observation.Id, degrees: Int): IO[Unit] =
+    query(user, s"""
+      mutation {
+        updateObservations(input: {
+          SET: { posAngleConstraint: { mode: FIXED, angle: { degrees: $degrees } } }
+          WHERE: { id: { EQ: "$oid" } }
+        }) { observations { id } }
+      }
+    """).void
+
   test("the guide environment resolves"):
     setup.flatMap: (_, oid, _) =>
+      setFixedPosAngle(oid, 270) *>
       setObservationTimeAndDuration(user, oid, ObsTime.some, ObsDuration.some) *>
       expect(
         user     = user,

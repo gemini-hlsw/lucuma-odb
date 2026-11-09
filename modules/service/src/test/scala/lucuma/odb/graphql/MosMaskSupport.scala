@@ -8,6 +8,7 @@ import cats.syntax.eq.*
 import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.enums.Instrument
+import lucuma.core.math.Angle
 import lucuma.core.model.Attachment
 import lucuma.core.model.Program
 import lucuma.odb.util.Codecs.*
@@ -22,9 +23,10 @@ import skunk.syntax.all.*
  * Rows are inserted straight into the database rather than through the file
  * service and S3, so the setup depends only on the database.
  *
- * The mask definition written here is a stub carrying only the instrument,
- * which is all the schema reads: the instrument column is generated from that
- * one key.  Suites that need a real design upload a real file instead.
+ * The mask definition written here is a stub carrying the instrument, which
+ * the schema reads to generate the instrument column, and optionally the
+ * position angle the mask was designed for.  Suites that need a real design
+ * upload a real file instead.
  */
 trait MosMaskSupport:
   self: OdbSuite =>
@@ -32,7 +34,8 @@ trait MosMaskSupport:
   protected def insertMosMaskAttachment(
     pid:            Program.Id,
     fileName:       String,
-    maskInstrument: Instrument
+    maskInstrument: Instrument,
+    positionAngle:  Option[Angle] = None
   ): IO[Attachment.Id] =
     val q: Query[(Program.Id, String, String, Json), Attachment.Id] =
       sql"""
@@ -48,7 +51,7 @@ trait MosMaskSupport:
         VALUES ($program_id, 'mos_mask', $text, 42, 'unused', $text, $jsonb)
         RETURNING c_attachment_id
       """.query(attachment_id)
-    withSession(_.unique(q)(pid, fileName, maskName(fileName), stubDefinition(maskInstrument)))
+    withSession(_.unique(q)(pid, fileName, maskName(fileName), stubDefinition(maskInstrument, positionAngle)))
 
   /** A non-mask observation attachment, which carries no instrument. */
   protected def insertObsAttachment(
@@ -74,5 +77,8 @@ trait MosMaskSupport:
   private def maskName(fileName: String): String =
     fileName.stripSuffix("_ODF.fits").toUpperCase
 
-  private def stubDefinition(instrument: Instrument): Json =
-    Json.obj("instrument" -> instrument.asJson)
+  private def stubDefinition(instrument: Instrument, positionAngle: Option[Angle]): Json =
+    Json.obj(
+      "instrument"    -> instrument.asJson,
+      "positionAngle" -> positionAngle.map(a => Json.obj("microarcseconds" -> a.toMicroarcseconds.asJson)).asJson
+    ).dropNullValues

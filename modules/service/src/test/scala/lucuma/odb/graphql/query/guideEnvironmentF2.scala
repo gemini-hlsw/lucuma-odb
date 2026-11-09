@@ -231,12 +231,15 @@ class guideEnvironmentF2 extends ExecutionTestSupportForFlamingos2
     setup.flatMap: oid =>
       expect(pi, guideEnvironmentQuery(oid), expected = flamingos2ImagingResult("Nonsidereal Target", GuideProbe.PWFS2, 250.0))
 
+  // A MOS observation is created with a fixed position angle, so the angle
+  // the mask was designed for is set explicitly rather than left to AGS.
   test("Flamingos2 MOS with oiwfs"):
     val setup: IO[Observation.Id] =
       for
         p <- createProgramAs(pi)
         t <- createTargetWithProfileAs(pi, p)
         o <- createFlamingos2MosObservationAs(pi, p, List(t))
+        _ <- query(pi, updateObservationsMutation(o, "posAngleConstraint: { mode: FIXED, angle: { degrees: 270 } }", "observations { id }"))
         _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
       yield o
 
@@ -255,4 +258,4 @@ class guideEnvironmentF2 extends ExecutionTestSupportForFlamingos2
       yield o
 
     setup.flatMap: oid =>
-      expect(pi, guideEnvironmentQuery(oid), expected = pwfs2ResultAt(340))
+      expect(pi, guideEnvironmentQuery(oid), expected = pwfs2ResultAt(0))

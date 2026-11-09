@@ -11,6 +11,7 @@ import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.math.Angle
 import lucuma.core.model.Attachment
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -538,3 +539,72 @@ class createObservation_GmosMos extends OdbSuite with MosMaskSupport:
                )).asLeft
              )
     yield ()
+
+  private def posAngleConstraint(oid: Observation.Id): IO[(String, BigDecimal)] =
+    query(pi, s"""
+      query {
+        observation(observationId: "$oid") {
+          posAngleConstraint { mode angle { degrees } }
+        }
+      }
+    """).map: js =>
+      val c = js.hcursor.downFields("observation", "posAngleConstraint")
+      (c.downField("mode").require[String], c.downFields("angle", "degrees").require[BigDecimal])
+
+  test("GMOS North MOS defaults to a fixed position angle of 0"):
+    for
+      pid <- createProgramAs(pi)
+      tid <- createTargetAs(pi, pid)
+      oid <- create(pid, tid, """
+               gmosNorthMos: {
+                 grating: R831_G5302
+                 customMask: { slitWidth: CUSTOM_WIDTH_0_50 }
+                 centralWavelength: { nanometers: 500 }
+               }
+             """)
+      pac <- posAngleConstraint(oid)
+    yield assertEquals(pac, ("FIXED", BigDecimal(0)))
+
+  test("GMOS North MOS defaults to the attached mask's position angle"):
+    for
+      pid <- createProgramAs(pi)
+      tid <- createTargetAs(pi, pid)
+      aid <- insertMosMaskAttachment(pid, "GN2025AQ001-07_ODF.fits", Instrument.GmosNorth, Angle.fromDoubleDegrees(45.0).some)
+      oid <- create(pid, tid, s"""
+               gmosNorthMos: {
+                 grating: R831_G5302
+                 customMask: { slitWidth: CUSTOM_WIDTH_0_50, attachmentId: "$aid" }
+                 centralWavelength: { nanometers: 500 }
+               }
+             """)
+      pac <- posAngleConstraint(oid)
+    yield assertEquals(pac, ("FIXED", BigDecimal(45)))
+
+  test("an explicit position angle constraint wins over the MOS default"):
+    for
+      pid <- createProgramAs(pi)
+      tid <- createTargetAs(pi, pid)
+      aid <- insertMosMaskAttachment(pid, "GN2025AQ001-08_ODF.fits", Instrument.GmosNorth, Angle.fromDoubleDegrees(45.0).some)
+      oid <- query(pi, s"""
+               mutation {
+                 createObservation(input: {
+                   programId: ${pid.asJson}
+                   SET: {
+                     targetEnvironment: { asterism: ${List(tid).asJson} }
+                     scienceRequirements: { $scienceRequirements }
+                     posAngleConstraint: { mode: AVERAGE_PARALLACTIC, angle: { degrees: 10 } }
+                     observingMode: {
+                       gmosNorthMos: {
+                         grating: R831_G5302
+                         customMask: { slitWidth: CUSTOM_WIDTH_0_50, attachmentId: "$aid" }
+                         centralWavelength: { nanometers: 500 }
+                       }
+                     }
+                   }
+                 }) {
+                   observation { id }
+                 }
+               }
+             """).map(_.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id])
+      pac <- posAngleConstraint(oid)
+    yield assertEquals(pac, ("AVERAGE_PARALLACTIC", BigDecimal(10)))
