@@ -480,8 +480,8 @@ class tooTriggerWorkflow extends ExecutionTestSupportForGmos with TooTriggerSetu
 
   // Staff may suspend an executing observation and resume it.  The request was
   // accepted when execution began, so suspending finds nothing to withdraw, and
-  // resuming (which clears the user state rather than restoring Ready) requests
-  // nothing new: the one accepted row is the whole history.
+  // resuming requests nothing new: the one accepted row is the whole history.
+  // The suspension isn't kept in the user state, so the PI's ready survives it.
   test("suspending and resuming an accepted ToO leaves its trigger alone"):
     for
       (pid, oid, _) <- createTooObservationAs(pi, staff)
@@ -501,7 +501,7 @@ class tooTriggerWorkflow extends ExecutionTestSupportForGmos with TooTriggerSetu
       assertEquals(ts1,   List((Accepted, None)))
       assertEquals(s2,    ObservationWorkflowState.Ongoing)
       assertEquals(ts2,   List((Accepted, None)))
-      assertEquals(state, None)
+      assertEquals(state, Some("ready"))
 
   // Every later event finds nothing left in 'requested', so acceptance is
   // idempotent and does not mint a second terminal row.

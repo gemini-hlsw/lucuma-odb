@@ -1135,6 +1135,7 @@ object GeneratorParamsService {
         sql"""gp.c_program_id = $program_id""".apply(programId)              |+|
         void""" AND ob.c_existence = 'present' """                           |+|
         void""" AND ob.c_workflow_user_state is distinct from 'inactive' """ |+|
+        void""" AND NOT observation_is_suspended(ob.c_observation_id) """ |+|
         selector                                                             |+|
         existsUserReadAccess(user, programId).fold(AppliedFragment.empty) { af => void""" AND """ |+| af }
     }

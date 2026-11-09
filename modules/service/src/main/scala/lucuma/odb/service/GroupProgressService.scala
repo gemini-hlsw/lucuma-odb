@@ -16,6 +16,7 @@ import lucuma.odb.service.workflow.ObservationValidationInfo
 import lucuma.odb.syntax.instrument.*
 import lucuma.odb.util.Codecs.*
 import skunk.*
+import skunk.codec.boolean.bool
 import skunk.implicits.*
 
 import Services.Syntax.*
@@ -74,14 +75,18 @@ object GroupProgressService:
        observation_id.opt                   *:
        user_state.opt                       *:
        user_state.opt                       *:
+       bool                                 *:
+       bool                                 *:
        observation_qa_state.opt             *:
        core_timestamp.opt                   *:
        core_timestamp.opt                   *:
        lucuma.odb.util.Codecs.site.opt      *:
        instrument.opt
-      ).map: (oid, state, role, sci, own, science, qa, start, completion, visitSite, inst) =>
-        // Inactive as the workflow decides it.
-        val inactive = ObservationValidationInfo.effectiveUserState(role, own, science).contains(ObservationWorkflowState.Inactive)
+      ).map: (oid, state, role, sci, own, science, ownSuspended, scienceSuspended, qa, start, completion, visitSite, inst) =>
+        // Inactive as the workflow decides it: set inactive, or suspended by staff.
+        val inactive =
+          ObservationValidationInfo.effectiveUserState(role, own, science).contains(ObservationWorkflowState.Inactive) ||
+          ObservationValidationInfo.effectiveSuspended(role, ownSuspended, scienceSuspended)
         // Where it was observed, if it has been; otherwise its instrument's site.
         oid -> ObservationFacts(state, role, sci, inactive, qa, start, completion, visitSite.orElse(inst.map(_.site)))
 
@@ -100,6 +105,8 @@ object GroupProgressService:
           s.c_observation_id,
           o.c_workflow_user_state,
           s.c_workflow_user_state,
+          COALESCE(x.c_suspended, false),
+          COALESCE(s.c_suspended, false),
           -- The evaluator reads QA only for an observation completed at a
           -- known time, so the dataset aggregate runs only for those.
           CASE WHEN t.c_completion_time IS NOT NULL THEN
@@ -136,6 +143,7 @@ object GroupProgressService:
           o.c_instrument
         FROM t_observation o
         JOIN v_execution_timestamps t ON t.c_observation_id = o.c_observation_id
+        LEFT JOIN t_observation_execution x ON x.c_observation_id = o.c_observation_id
         ${ObservationValidationInfo.Statements.AssociatedScienceObservation}
         WHERE o.c_observation_id = ANY(${_gid[Observation.Id]})
           AND o.c_existence  = 'present'

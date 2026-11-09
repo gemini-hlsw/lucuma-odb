@@ -243,13 +243,14 @@ object ObservationWorkflowService {
                 case Defined    => Option.unless(hasWarnings)(Ready)
 
         // Our final state is the execution state (if any), else the user state (if any), else the validation state,
-        // except that staff may set an ongoing observation inactive.  A completed one stays completed.
+        // except that an ongoing observation that staff have suspended is inactive.  A completed one stays completed.
+        // The user state never overrides execution: an observation set inactive and executed anyway is ongoing.
         val state: ObservationWorkflowState =
           (executionState, userStatus(validationStatus)) match
-            case (None, None)                    => validationStatus
-            case (None, Some(us))                => us
-            case (Some(Ongoing), Some(Inactive)) => Inactive
-            case (Some(es), _)                   => es
+            case (None, None)                                 => validationStatus
+            case (None, Some(us))                             => us
+            case (Some(Ongoing), _) if info.effectiveSuspended => Inactive
+            case (Some(es), _)                                => es
 
         // The transitions below are the ones staff could take.  Which of them are
         // staff-only is decided in one place, StaffOnlyTransitions, applied at the
@@ -262,7 +263,7 @@ object ObservationWorkflowService {
         val canUpdateExecutionState: Boolean =
           info.isVisitor
 
-        // An ongoing observation may be set inactive, and set back.  Not a
+        // An ongoing observation may be suspended (set inactive), and resumed.  Not a
         // per-observation calibration though: those follow their science observation.
         val canSuspendExecution: Boolean =
           !isPerObsCalibration
@@ -272,8 +273,10 @@ object ObservationWorkflowService {
             // A telluric may be declined (set to Inactive)
             state match
               case Inactive =>
-                if info.userState.contains(Inactive)
-                then List(executionState.getOrElse(info.associatedUserState.getOrElse(validationStatus)))
+                // An executing telluric is inactive only while its science
+                // observation is suspended, which it follows.
+                if info.userState.contains(Inactive) && executionState.isEmpty
+                then List(info.associatedUserState.getOrElse(validationStatus))
                 else Nil
               case _ =>
                 List(Inactive)
@@ -282,7 +285,7 @@ object ObservationWorkflowService {
             case Inactive   =>
               executionState match
                 case None     => List(validationStatus)
-                case Some(es) => Option.when(canSuspendExecution)(es).toList
+                case Some(es) => Option.when(canSuspendExecution)(es).toList // suspended
             case Undefined  => List(Inactive)
             case Unapproved => List(Inactive)
             case Defined    =>
@@ -499,6 +502,10 @@ object ObservationWorkflowService {
                     session.prepareR(Statements.UpdateUserState).use: pc =>
                       pc.execute(state, oid).void
 
+                  def updateSuspended(oid: Observation.Id, suspended: Boolean): F[Unit] =
+                    session.prepareR(Statements.UpdateSuspended).use: pc =>
+                      pc.execute(suspended, oid).void
+
                   def updateDeclaredState(oid: Observation.Id, state: Option[ExecutionState]): F[Unit] =
                     session.prepareR(Statements.UpdateDeclaredState).use: pc =>
                       val es: Option[DeclaredExecutionState] = state.map:
@@ -530,6 +537,16 @@ object ObservationWorkflowService {
                     // Same for everyone
                     case (Ongoing, Completed) =>
                       updateDeclaredState(oid, Some(Completed))
+                        .as(Result.unit)
+
+                    // Only for staff: suspending an executing observation, and
+                    // resuming it.  The user state is left alone.
+                    case (Ongoing, Inactive) =>
+                      updateSuspended(oid, true)
+                        .as(Result.unit)
+
+                    case (Inactive, Ongoing) =>
+                      updateSuspended(oid, false)
                         .as(Result.unit)
 
                     // Reinstating a declined telluric clears its override so it
@@ -724,6 +741,13 @@ object ObservationWorkflowService {
       sql"""
         UPDATE t_observation
         SET c_workflow_user_state = ${user_state.opt}
+        WHERE c_observation_id = $observation_id
+      """.command
+
+    val UpdateSuspended: Command[(Boolean, Observation.Id)] =
+      sql"""
+        UPDATE t_observation_execution
+        SET c_suspended = $bool
         WHERE c_observation_id = $observation_id
       """.command
 

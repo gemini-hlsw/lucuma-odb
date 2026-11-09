@@ -28,30 +28,34 @@ example to stop the scheduler from picking up a partly executed observation:
 
 - Only staff and above can do it; a PI is offered neither edge. Per-observation
   calibrations are excluded, because they go inactive with their science observation.
-- A stored `Inactive` user state overrides an `Ongoing` execution state, but not
-  `Completed`.
-- Only a staff suspension can be stored on an executing observation. The
-  database clears `'inactive'` from the user state at the observation's first
-  non-slew execution event (V1394), the moment it becomes `Ongoing`. So an
-  `Inactive` set before execution, by a PI or anyone else, does not survive the
-  observatory executing the observation anyway.
-- A suspension survives later events, because only the first one clears it.
-  Otherwise suspending in the middle of a step would be undone at once by that
-  step's own end. Execution does not check the workflow, so if the sequence
-  finishes while the observation is suspended, it becomes `Completed`. When
-  obscalc stores that `Completed` workflow, the database clears the user state
-  again (V1394), because `Inactive` means nothing on a completed observation.
-- Going back to `Ongoing` clears the user state rather than restoring `Ready`.
-  A Target of Opportunity's request was already accepted when execution began,
-  so restoring `Ready` would request a second trigger.
+- The suspension is not a user state. It is a flag of its own,
+  `c_suspended` on `t_observation_execution` (V1394), and it overrides an
+  `Ongoing` execution state, but not `Completed`. The user state is what the PI
+  (or anyone, before execution) asked for, and execution overrides it as it
+  always has: an observation set `Inactive` and executed anyway is `Ongoing`,
+  and its `'inactive'` stays stored.
+- The flag lives on `t_observation_execution` because that is the row event
+  processing locks first (V1227). Telling a suspension apart from a user state
+  inside one column would mean rewriting `t_observation` from event processing
+  and obscalc, after `t_obscalc` is locked, which is the reverse of the order
+  observation edits take and could deadlock.
+- A suspension survives later events. Execution does not check the workflow,
+  so if the sequence finishes while the observation is suspended, it becomes
+  `Completed`. The flag stays set; should the observation stop being complete it
+  is suspended again, until staff resume it.
+- Going back to `Ongoing` clears the flag and nothing else. The user state was
+  never touched, so a Target of Opportunity's `ready` survives the suspension.
 - The observation stays locked for editing. Edit checks (`filterState`) count
-  the execution state as well as the workflow state and its transitions, so an
-  inactive observation that has started executing is treated as executing.
-- Everything that leaves out observations with `c_workflow_user_state =
-  'inactive'` now leaves this one out as well. That covers program and group time
-  estimates, group progress (an inactive, incomplete element doesn't count),
-  program-level calibration generation, and the observations considered for
-  configuration requests. Time already charged is unaffected.
+  the execution state as well as the workflow state and its transitions, so a
+  suspended observation is treated as executing.
+- Program and group time estimates, group progress (an inactive, incomplete
+  element doesn't count) and program-level calibration generation leave out a
+  suspended observation as they leave out an inactive one; the SQL ones use
+  `observation_is_suspended`, which ignores the flag once obscalc has stored
+  `Completed`. The proposal-side readers of the user state (the observations
+  considered for configuration requests, the proposal summary's instruments and
+  AEON required instruments) look at the PI's user state only. Time already
+  charged is unaffected.
 
 ### Defined and Unapproved
 
@@ -138,10 +142,9 @@ There is deliberately no per-trigger approval: the proposal's ToO activation
 ceiling, frozen at acceptance (V1245), is the authorization. Nor is there a
 status meaning "executing": the request is `ACCEPTED` at the first non-slew
 execution event (V1275), the same instant the observation becomes `Ongoing`.
-So a running observation has no live trigger to withdraw. When staff set an
-ongoing ToO `Inactive`, the user state leaves `ready`, but the withdrawal finds
-no `REQUESTED` row and the accepted one stays as it is. Setting the observation
-back to `Ongoing` leaves the user state empty, which requests nothing.
+So a running observation has no live trigger to withdraw. Suspending an
+ongoing ToO doesn't touch its user state at all, so its `ready` stays, nothing
+is withdrawn, and resuming it requests nothing: the accepted row stays as it is.
 
 The exception is a visitor-mode observation that staff declare `Ongoing` before
 any event. That transition clears `ready` too, so it withdraws a request that
@@ -211,8 +214,8 @@ pauses while the science is suspended and resumes when it returns to `Ongoing`.
 Program-level calibrations behave differently: an executing observation set
 `Inactive` stops needing the ones not yet taken, so they are removed, and they
 are generated again if it returns to `Ongoing`. A declined
-telluric that is executed anyway loses its override at its first execution
-event, like any other inactive observation, and shows as `Ongoing`.
+telluric that is executed anyway shows as `Ongoing`: execution overrides its
+override, as it overrides any user state, though the override stays stored.
 
 ## Transition conditions
 
@@ -223,7 +226,7 @@ event, like any other inactive observation, and shows as `Ongoing`.
 | `Ongoing -> Inactive`, `Inactive -> Ongoing` | staff access or above, and not a per-observation calibration (`Telluric`, `DaytimePinhole`, `DaytimeFlat`) |
 | `Completed -> Ongoing` | execution state was explicitly declared complete, not naturally complete |
 | `Telluric -> Inactive` | calibration role is `Telluric` and `state <= Ready` |
-| `Telluric Inactive -> inherited` | the telluric's own `c_workflow_user_state` is `Inactive` |
+| `Telluric Inactive -> inherited` | the telluric's own `c_workflow_user_state` is `Inactive`, and it isn't executing |
 
 Exchange observations (Keck/Subaru) run off-Gemini and have no
 `Ready`/`Ongoing`/`Completed` lifecycle at all; `Inactive` is their only
@@ -238,14 +241,14 @@ independent sources, in this precedence order:
 |---|---|---|
 | `ExecutionState` | `Ongoing`, `Completed` | `c_declared_execution_state`, else the generator's execution state |
 | `UserState` | `Inactive`, `Ready` | `c_workflow_user_state` — for a ToO observation, `Ready` also maintains a row in `t_too_trigger` |
+| suspension | `Inactive` | `t_observation_execution.c_suspended`, set by staff on an executing observation |
 | `ValidationState` | `Undefined`, `Unapproved`, `Defined` | validation codes computed from the observation |
 
 Execution wins over user state, which wins over validation — except that a
-validation error suppresses a stored `Ready` (but never a stored `Inactive`),
-and a stored `Inactive` wins over an `Ongoing` execution state (but never over
-`Completed`). The database keeps that last case to staff suspensions: it clears
-`'inactive'` at the first non-slew execution event and when obscalc stores a
-`Completed` workflow (V1394).
+validation error suppresses a stored `Ready` (but never a stored `Inactive`).
+A suspension wins over an `Ongoing` execution state, but never over
+`Completed`. A per-observation calibration takes its science observation's
+suspension, as it takes its user state.
 
 ## Stored transitions
 

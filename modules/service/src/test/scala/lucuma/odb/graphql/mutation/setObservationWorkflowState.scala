@@ -318,8 +318,17 @@ class setObservationWorkflowState
           .query(skunk.codec.text.text.opt)
       )(oid)
 
-  // An Inactive stored before execution (V1394) does not survive its start, so it
-  // cannot override Ongoing the way a staff suspension does.
+  /** Whether staff have suspended the observation, which no query exposes. */
+  def storedSuspended(oid: Observation.Id): IO[Boolean] =
+    withSession: session =>
+      session.unique(
+        sql"SELECT c_suspended FROM t_observation_execution WHERE c_observation_id = $observation_id"
+          .query(skunk.codec.boolean.bool)
+      )(oid)
+
+  // An Inactive set before execution is the PI's, not a suspension: execution
+  // overrides it, as it always has, and it stays stored.  Suspending and resuming
+  // the observation leave it alone.
   test("[Sidereal]    Inactive   ->  Ongoing when execution begins anyway"):
     for
       p <- createProgram
@@ -330,17 +339,26 @@ class setObservationWorkflowState
       _ <- assertIO(queryObservationWorkflowState(o), Inactive)
       v <- recordVisitAs(serviceUser, o)
       _ <- addSlewEventAs(serviceUser, o, SlewStage.StartSlew)
-      _ <- assertIO(storedUserState(o), "inactive".some) // a slew starts nothing
+      _ <- runObscalcUpdate(p, o)
+      _ <- assertIO(queryObservationWorkflowState(o), Inactive) // a slew starts nothing
       s <- firstScienceAtomStepIds(serviceUser, o)
       _ <- s.traverse(sid => addEndStepEvent(sid, v))
-      _ <- assertIO(storedUserState(o), none)
       _ <- runObscalcUpdate(p, o)
       _ <- assertIO(queryObservationWorkflowState(o), Ongoing)
+      _ <- assertIO(storedUserState(o), "inactive".some)
+      _ <- assertIO(storedSuspended(o), false)
       _ <- testTransitions(p, o, Ongoing, Completed)
+      _ <- setObservationWorkflowState(staff, o, Inactive)
+      _ <- assertIO(storedSuspended(o), true)
+      _ <- setObservationWorkflowState(staff, o, Ongoing)
+      _ <- assertIO(storedSuspended(o), false)
+      _ <- assertIO(storedUserState(o), "inactive".some)
+      _ <- runObscalcUpdate(p, o)
+      _ <- assertIO(queryObservationWorkflowState(o), Ongoing)
     yield ()
 
   // A suspension survives later events (here the rest of the sequence, which an
-  // observer may finish anyway), and is cleared once the observation completes.
+  // observer may finish anyway).  Completion overrides it, but leaves it stored.
   test("[Sidereal]    Inactive   ->  Completed when execution finishes"):
     for
       p <- createProgram
@@ -355,16 +373,14 @@ class setObservationWorkflowState
       _ <- setObservationWorkflowState(staff, o, Inactive)
       _ <- runObscalcUpdate(p, o)
       _ <- assertIO(queryObservationWorkflowState(o), Inactive)
+      _ <- assertIO(storedUserState(o), none)
       _ <- s.tail.init.traverse(sid => addEndStepEvent(sid, v))
       _ <- runObscalcUpdate(p, o)
       _ <- assertIO(queryObservationWorkflowState(o), Inactive)
-      _ <- assertIO(storedUserState(o), "inactive".some)
       _ <- addEndStepEvent(s.last, v)
       _ <- runObscalcUpdate(p, o)
       _ <- assertIO(queryObservationWorkflowState(o), Completed)
-      _ <- assertIO(storedUserState(o), none)
-      _ <- runObscalcUpdate(p, o) // the cleared user state invalidated it once more
-      _ <- assertIO(queryObservationWorkflowState(o), Completed)
+      _ <- assertIO(storedSuspended(o), true)
       _ <- testTransitionsAs(staff, p, o, Completed)
     yield ()
 

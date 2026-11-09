@@ -99,7 +99,9 @@ case class ObservationValidationInfo(
   hasSequenceSource:      Boolean = false, // set for daytime calibrations
   instrument:             Option[Instrument] = None,
   posAngleConstraint:     PosAngleConstraint = PosAngleConstraint.Unbounded,
-  maskPositionAngle:      Option[Angle] = None
+  maskPositionAngle:      Option[Angle] = None,
+  suspended:              Boolean = false,
+  associatedSuspended:    Boolean = false
 ) {
 
   def isDeclaredComplete: Boolean =
@@ -107,6 +109,9 @@ case class ObservationValidationInfo(
 
   def effectiveUserState: Option[UserState] =
     ObservationValidationInfo.effectiveUserState(calibrationRole, userState, associatedUserState)
+
+  def effectiveSuspended: Boolean =
+    ObservationValidationInfo.effectiveSuspended(calibrationRole, suspended, associatedSuspended)
 
   /* Has the proposal been accepted? */
   def isAccepted:Boolean =
@@ -201,6 +206,20 @@ object ObservationValidationInfo {
     if calibrationRole.contains(CalibrationRole.Telluric) && userState.contains(ObservationWorkflowState.Inactive) then Some(ObservationWorkflowState.Inactive)
     else if calibrationRole.exists(ObsExtract.PerObservationCalibrationRoles.contains) then associatedUserState
     else userState
+
+  /**
+   * Whether staff have suspended the observation's execution.  Only staff
+   * suspend, and only an executing observation; a per-observation calibration
+   * is never suspended itself but follows its science observation, as it does
+   * for the user state.
+   */
+  def effectiveSuspended(
+    calibrationRole:     Option[CalibrationRole],
+    suspended:           Boolean,
+    associatedSuspended: Boolean
+  ): Boolean =
+    if calibrationRole.exists(ObsExtract.PerObservationCalibrationRoles.contains) then associatedSuspended
+    else suspended
 
   def fetch[F[_]: Concurrent](
     oids: List[Observation.Id]
@@ -369,7 +388,8 @@ object ObservationValidationInfo {
   object Statements {
 
     /**
-     * Joins `s`, holding `c_observation_id` and `c_workflow_user_state`: for
+     * Joins `s`, holding `c_observation_id`, `c_workflow_user_state` and
+     * `c_suspended`: for
      * an observation `o` that is a per-observation calibration (a telluric, or
      * a daytime pinhole, flat or arc), the parent observation in its group:
      * the science observation, or the spectrophotometric standard a daytime
@@ -395,8 +415,10 @@ object ObservationValidationInfo {
       sql"""
         LEFT JOIN LATERAL (
           SELECT sci.c_observation_id,
-                 sci.c_workflow_user_state
+                 sci.c_workflow_user_state,
+                 sx.c_suspended
           FROM   t_observation sci
+          LEFT JOIN t_observation_execution sx ON sx.c_observation_id = sci.c_observation_id
           WHERE  o.c_calibration_role = ANY(ARRAY[#$roles]::e_calibration_role[])
             AND  sci.c_observation_id <> o.c_observation_id
             AND  (sci.c_calibration_role IS NULL OR sci.c_calibration_role = 'spectrophotometric')
@@ -496,8 +518,12 @@ object ObservationValidationInfo {
           o.c_altair_nd_filter,
           o.c_pac_mode,
           o.c_pac_angle,
-          mk.c_mask_position_angle
+          mk.c_mask_position_angle,
+          COALESCE(ox.c_suspended, false),
+          COALESCE(s.c_suspended, false)
         FROM t_observation o
+        LEFT JOIN t_observation_execution ox
+          ON ox.c_observation_id = o.c_observation_id
         JOIN t_program p on p.c_program_id = o.c_program_id
         LEFT JOIN t_proposal x
           ON o.c_program_id = x.c_program_id
@@ -538,16 +564,18 @@ object ObservationValidationInfo {
         cass_rotator.opt                *:
         altair_nd_filter.opt            *:
         pos_angle_constraint            *:
-        angle_µas.opt
+        angle_µas.opt                   *:
+        bool                            *:
+        bool
       )
       .map:
-        case (pid, tpe, oid, mode, inst, ra, dec, cal, isUserDefinedTelluric, state, ds, ps, too, sched, ceil, permitted, cfp, sci, state2, ce, iq, sb, wv, er, wl, ovcs, egp, altairMode, fieldLens, cassRotator, ndFilter, pac, maskPa) =>
+        case (pid, tpe, oid, mode, inst, ra, dec, cal, isUserDefinedTelluric, state, ds, ps, too, sched, ceil, permitted, cfp, sci, state2, ce, iq, sb, wv, er, wl, ovcs, egp, altairMode, fieldLens, cassRotator, ndFilter, pac, maskPa, susp, susp2) =>
           val cs = ConstraintSet(iq, ce, sb, wv, er)
           // All-or-nothing (field lens aside) is a DB CHECK; the fallbacks here
           // are unreachable in practice, not a second source of truth for them.
           val altair = altairMode.map: m =>
             AltairConfiguration(m, fieldLens, cassRotator.getOrElse(CassRotator.Following), ndFilter.getOrElse(AltairNdFilter.Out))
-          ObservationValidationInfo(pid, tpe, oid, cs, wl, mode, None, (ra, dec).mapN(Coordinates.apply), cal, isUserDefinedTelluric, state, ds, ps, too, sched, ceil, permitted, cfp, sci, Nil, state2, ovcs, explicitGuideProbe = egp, altair = altair, instrument = inst, posAngleConstraint = pac, maskPositionAngle = maskPa)
+          ObservationValidationInfo(pid, tpe, oid, cs, wl, mode, None, (ra, dec).mapN(Coordinates.apply), cal, isUserDefinedTelluric, state, ds, ps, too, sched, ceil, permitted, cfp, sci, Nil, state2, ovcs, explicitGuideProbe = egp, altair = altair, instrument = inst, posAngleConstraint = pac, maskPositionAngle = maskPa, suspended = susp, associatedSuspended = susp2)
 
     def ProgramAllocations[A <: NonEmptyList[Program.Id]](enc: Encoder[A]): Query[A, (Program.Id, ScienceBand)] =
       sql"""

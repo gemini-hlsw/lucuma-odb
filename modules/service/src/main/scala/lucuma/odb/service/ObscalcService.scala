@@ -567,6 +567,7 @@ object ObscalcService:
         WHERE c.c_observation_id = $observation_id
           AND c.c_odb_error IS NULL
           AND o.c_workflow_user_state IS DISTINCT FROM 'inactive'
+          AND NOT observation_is_suspended(o.c_observation_id)
       """
         .query(calculation_state *: full_categorized_time.opt)
         .map: (state, catTime) =>
@@ -582,6 +583,7 @@ object ObscalcService:
         WHERE c.c_program_id = $program_id
           AND c.c_odb_error IS NULL
           AND o.c_workflow_user_state IS DISTINCT FROM 'inactive'
+          AND NOT observation_is_suspended(o.c_observation_id)
       """
         .query(observation_id *: calculation_state *: full_categorized_time.opt)
         .map: (oid, state, catTime) =>
