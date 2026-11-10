@@ -48,11 +48,18 @@ import scala.util.Try
 
 object GmosLongSlitInput extends AcquisitionFilterCheck:
 
+  private val AllowedFpuTypes: Set[GmosFpuType] =
+    Set(GmosFpuType.LongSlit, GmosFpuType.MOS)
+
+  // Built-in MOS masks (e.g. the pinhole) are engineering masks, settable by staff only.
+  def isStaffOnlyFpu(fpuType: GmosFpuType): Boolean =
+    fpuType === GmosFpuType.MOS
+
   val AllowedGNFPUs: Set[GmosNorthFpu] =
-    GmosNorthFpu.values.filter(_.fpuType === GmosFpuType.LongSlit).toSet
+    GmosNorthFpu.values.filter(f => AllowedFpuTypes.contains(f.fpuType)).toSet
 
   val AllowedGSFPUs: Set[GmosSouthFpu] =
-    GmosSouthFpu.values.filter(_.fpuType === GmosFpuType.LongSlit).toSet
+    GmosSouthFpu.values.filter(f => AllowedFpuTypes.contains(f.fpuType)).toSet
 
   private val AllowedGNFPUNames: String =
     AllowedGNFPUs.toList.map(_.tag.toScreamingSnakeCase).sorted.mkString(", ")
@@ -61,11 +68,11 @@ object GmosLongSlitInput extends AcquisitionFilterCheck:
     AllowedGSFPUs.toList.map(_.tag.toScreamingSnakeCase).sorted.mkString(", ")
 
   private def validateNorthLongSlitFpu(fpu: GmosNorthFpu): Result[GmosNorthFpu] =
-    if fpu.fpuType === GmosFpuType.LongSlit then fpu.success
+    if AllowedGNFPUs.contains(fpu) then fpu.success
     else OdbError.InvalidArgument(s"'fpu' must be one of: $AllowedGNFPUNames".some).asFailure
 
   private def validateSouthLongSlitFpu(fpu: GmosSouthFpu): Result[GmosSouthFpu] =
-    if fpu.fpuType === GmosFpuType.LongSlit then fpu.success
+    if AllowedGSFPUs.contains(fpu) then fpu.success
     else OdbError.InvalidArgument(s"'fpu' must be one of: $AllowedGSFPUNames".some).asFailure
 
   val WavelengthDithersFormat: Format[String, List[WavelengthDither]] =
@@ -165,7 +172,8 @@ object GmosLongSlitInput extends AcquisitionFilterCheck:
         ObservingModeType.GmosNorthLongSlit
 
       def needsStaffAccess: Boolean =
-        filter.exists(_.filterType === FilterType.Engineering)
+        filter.exists(_.filterType === FilterType.Engineering) ||
+          isStaffOnlyFpu(fpu.fpuType)
 
     object North:
 
@@ -217,7 +225,8 @@ object GmosLongSlitInput extends AcquisitionFilterCheck:
         ObservingModeType.GmosSouthLongSlit
 
       def needsStaffAccess: Boolean =
-        filter.exists(_.filterType === FilterType.Engineering)
+        filter.exists(_.filterType === FilterType.Engineering) ||
+          isStaffOnlyFpu(fpu.fpuType)
 
     object South:
 
@@ -327,7 +336,8 @@ object GmosLongSlitInput extends AcquisitionFilterCheck:
         ObservingModeType.GmosNorthLongSlit
 
       def needsStaffAccess: Boolean =
-        filter.toOption.exists(_.filterType === FilterType.Engineering)
+        filter.toOption.exists(_.filterType === FilterType.Engineering) ||
+          fpu.exists(f => isStaffOnlyFpu(f.fpuType))
 
       val toCreate: Result[Create.North] =
         (
@@ -396,7 +406,8 @@ object GmosLongSlitInput extends AcquisitionFilterCheck:
         ObservingModeType.GmosSouthLongSlit
 
       def needsStaffAccess: Boolean =
-        filter.toOption.exists(_.filterType === FilterType.Engineering)
+        filter.toOption.exists(_.filterType === FilterType.Engineering) ||
+          fpu.exists(f => isStaffOnlyFpu(f.fpuType))
 
       val toCreate: Result[Create.South] =
         (
