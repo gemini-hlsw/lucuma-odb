@@ -90,3 +90,13 @@ CREATE VIEW v_flamingos_2_mos AS
       -- for the sparse field. Keep in sync.
       '[{"q":{"microarcseconds":1200000},"guiding":"ENABLED"},{"q":{"microarcseconds":-1200000},"guiding":"ENABLED"},{"q":{"microarcseconds":-1200000},"guiding":"ENABLED"},{"q":{"microarcseconds":1200000},"guiding":"ENABLED"}]'::text AS c_telescope_configs_default
   ) d;
+
+-- An automatic long slit acquisition is now classified by an ITC call at a
+-- fixed signal-to-noise rather than by its own exposure time. That is computed
+-- in code but can add or drop the sky steps, so every Flamingos 2 long slit
+-- obscalc result is stale. MOS keeps its sky steps and is unaffected.
+UPDATE t_obscalc c
+   SET c_obscalc_state = 'pending'
+  FROM t_observation o
+ WHERE c.c_observation_id = o.c_observation_id
+   AND o.c_observing_mode_type = 'flamingos_2_long_slit';
