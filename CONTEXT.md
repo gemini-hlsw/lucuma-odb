@@ -302,6 +302,10 @@ _Avoid_: calibration set (alone, in prose: the night-time estimating unit), conf
 Resolving a Smart Daytime Calibration Set, or a science sequence's smart GCAL step, into concrete GCAL steps from the per-instrument Smart GCAL tables, keyed by the Instrument Setup. Each matching table row yields its own lamp configuration, exposure time and exposure count. Smart flat and smart arc match by lamp type regardless of baseline, exactly as for science; Day Baseline matches every row tagged for the day baseline, flats and arcs alike, and is what the OT calls "Day Baseline GCAL". The lookup runs each time the sequence is generated, never when the row is written, so a reloaded table changes the plan; it does not by itself mark existing time estimates stale.
 _Avoid_: baseline (alone: there is also a night baseline, used by science), smart gcal (alone: ambiguous between the step kind and the lookup).
 
+**Mapped**:
+A Smart Daytime Calibration Set whose Smart GCAL Lookup finds at least one table row for its Instrument Setup and kind. Explore asks whether a set would be Mapped before saving it, through the `smartGcalMapping` query, which answers with the same reason the generation failure would give. A Manual row is always Mapped. A Smart row that is not Mapped blocks generation of the whole sequence and its count reads as unknown.
+_Avoid_: valid (too broad: a row can be well-formed yet unmapped), resolvable, calibratable, has a mapping (in prose, say Mapped).
+
 **Instrument Setup**:
 The single instrument state a Daytime Calibration Set is taken in: exactly what one step's dynamic configuration holds for that instrument, exposure time included. A bias ignores the exposure time and takes zero, and a Smart row stores zero since the Smart GCAL Lookup supplies it. A Flamingos-2 window cover may be left unset for any kind; the set never defaults it, unlike a hand-entered dark step. Once Iterators exist, a field an Iterator covers is still present here but ignored.
 _Avoid_: configuration, dynamic config (the storage shape, not the concept), base config.

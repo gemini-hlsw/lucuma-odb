@@ -6,9 +6,11 @@ package lucuma.odb.graphql
 package mapping
 
 import cats.Order.catsKernelOrderingForOrder
+import cats.effect.Concurrent
 import cats.effect.Resource
 import cats.syntax.all.*
 import eu.timepit.refined.cats.*
+import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Context
 import grackle.Env
@@ -44,6 +46,7 @@ import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.TooTrigger
 import lucuma.odb.graphql.binding.*
+import lucuma.odb.graphql.input.CalibrationSetInput
 import lucuma.odb.graphql.input.WhereCallForProposals
 import lucuma.odb.graphql.input.WhereConfigurationRequest
 import lucuma.odb.graphql.input.WhereDataset
@@ -67,22 +70,32 @@ import lucuma.odb.json.offset.query.given
 import lucuma.odb.json.sequence.given
 import lucuma.odb.json.time.query.given
 import lucuma.odb.json.wavelength.query.given
+import lucuma.odb.logic.DaytimeCalibrationExpansion
+import lucuma.odb.logic.DaytimeInstrument
 import lucuma.odb.logic.Generator
 import lucuma.odb.logic.Generator.FutureLimit
+import lucuma.odb.logic.SmartGcalImplementation
+import lucuma.odb.logic.TimeEstimateCalculatorImplementation
+import lucuma.odb.sequence.daytimecal.CalibrationSet
+import lucuma.odb.sequence.daytimecal.Config
+import lucuma.odb.sequence.daytimecal.InstrumentSetup
 import lucuma.odb.service.Services
 import skunk.Transaction
 
-trait QueryMapping[F[_]] extends Predicates[F] with UserEnv {
+trait QueryMapping[F[_]: Concurrent] extends Predicates[F] with UserEnv {
   this: SkunkMapping[F] =>
 
   private val ObservationIdParam  = "observationId"
   private val ObservationRefParam = "observationReference"
   private val FutureLimitParam    = "futureLimit"
+  private val InstrumentParam     = "instrument"
+  private val SetParam            = "set"
 
   // Resources defined in the final cake.
   def services(using User): Resource[F, Services[F]]
   def itcClient: ItcClient[F]
   def goaUsers: Set[User.Id]
+  def timeEstimateCalculator: TimeEstimateCalculatorImplementation.ForInstrumentMode
 
   lazy val QueryMapping: ObjectMapping =
     ObjectMapping(QueryType)(
@@ -97,6 +110,7 @@ trait QueryMapping[F[_]] extends Predicates[F] with UserEnv {
       SqlObject("events"),
       RootEffect.computeJson("executionConfig")(executionConfig),
       RootEffect.computeJson("goaDataDownloadAccess")(goaDataDownloadAccess),
+      RootEffect.computeJson("smartGcalMapping")(smartGcalMapping),
       SqlObject("group"),
       SqlObject("observation"),
       SqlObject("observations"),
@@ -129,6 +143,7 @@ trait QueryMapping[F[_]] extends Predicates[F] with UserEnv {
       Events,
       ExecutionConfig,
       GoaDataDownloadAccess,
+      SmartGcalMappingQuery,
       Group,
       ImagingConfigOptions,
       Observation_,
@@ -182,6 +197,33 @@ trait QueryMapping[F[_]] extends Predicates[F] with UserEnv {
       (o, l) <- ResultT(gatherArgs)
       r      <- ResultT(generate(o, l))
     yield r).value
+    }
+
+  // One lookup for the single set, as the save check and `count` run it.
+  private val smartGcalMapping: (Path, Env) => F[Result[Json]] = (_, env) =>
+    UserEnv.traverse(UserEnv.fromEnv(env)) {
+
+    def resolve(instrument: Instrument, set: CalibrationSet[InstrumentSetup]): F[Result[Either[String, PosInt]]] =
+      services.useNonTransactionally:
+        Services.asSuperUser:
+          val exp = SmartGcalImplementation.fromService(smartGcalService)
+          val di  = DaytimeInstrument.forInstrument(instrument, timeEstimateCalculator, exp, sequenceService)
+          DaytimeCalibrationExpansion.resolve(di, Config(instrument, List(set))).map:
+            case r :: Nil => r.success
+            case rs       => Result.internalError(s"Expected one calibration set resolution, found ${rs.length}.")
+
+    def toJson(r: Either[String, PosInt]): Json =
+      Json.obj(
+        "mapped"       -> r.isRight.asJson,
+        "mappingError" -> r.left.toOption.asJson,
+        "count"        -> r.toOption.map(_.value).asJson
+      )
+
+    (for
+      instrument <- ResultT.fromResult(env.getR[Instrument](InstrumentParam))
+      set        <- ResultT.fromResult(env.getR[CalibrationSet[InstrumentSetup]](SetParam))
+      r          <- ResultT(resolve(instrument, set))
+    yield toJson(r)).value
     }
 
   private val goaDataDownloadAccess: (Path, Env) => F[Result[Json]] = (_, e) =>
@@ -510,6 +552,16 @@ trait QueryMapping[F[_]] extends Predicates[F] with UserEnv {
           FutureLimitParam    -> limit
         )
   }
+
+  private lazy val SmartGcalMappingQuery: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
+    case (QueryType, "smartGcalMapping", List(
+      InstrumentBinding(InstrumentParam, rInstrument),
+      CalibrationSetInput.Binding(SetParam, rSet)
+    )) =>
+      val rArgs = (rInstrument, rSet).parFlatMapN: (i, s) =>
+        CalibrationSetInput.validateInstrument(i, List(s)).as((i, s))
+      Elab.liftR(rArgs).flatMap: (i, s) =>
+        Elab.env(InstrumentParam -> i, SetParam -> s)
 
   private lazy val GoaDataDownloadAccess: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
     case (QueryType, "goaDataDownloadAccess", List(

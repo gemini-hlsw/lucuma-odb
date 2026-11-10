@@ -250,3 +250,42 @@ class daytimeCalibrationSets_smart extends ExecutionTestSupportForGmos with Dayt
       res.hcursor.downFields("observation", "workflow", "value", "state").require[String],
       "DEFINED"
     )
+
+  private def mappingQuery(instrument: String, set: String): String =
+    s"""
+      query {
+        smartGcalMapping(instrument: $instrument, set: { $set }) { mapped mappingError count }
+      }
+    """
+
+  test("smartGcalMapping: a mapped smart set reports its count"):
+    expect(
+      user     = pi,
+      query    = mappingQuery("GMOS_NORTH", s"kind: SMART_FLAT, ${setup()}"),
+      expected = json"""{ "smartGcalMapping": { "mapped": true, "mappingError": null, "count": 1 } }""".asRight
+    )
+
+  // The text is the save refusal's and the row's, minus the row prefix.
+  test("smartGcalMapping: an unmapped smart set reports why, before it is saved"):
+    query(pi, mappingQuery("GMOS_NORTH", s"kind: SMART_ARC, ${setup(mapped = false)}")).map: res =>
+      val c = res.hcursor.downField("smartGcalMapping")
+      assertEquals(c.downField("mapped").require[Boolean], false)
+      assertEquals(c.downField("count").require[Option[Int]], none)
+      assert(c.downField("mappingError").require[String].startsWith("missing Smart GCAL mapping: GmosNorth"))
+
+  test("smartGcalMapping: a manual set is always mapped, with its explicit count"):
+    expect(
+      user     = pi,
+      query    = mappingQuery("GMOS_NORTH", s"kind: DARK, explicitCount: 4, ${setup()}"),
+      expected = json"""{ "smartGcalMapping": { "mapped": true, "mappingError": null, "count": 4 } }""".asRight
+    )
+
+  test("smartGcalMapping: the setup must be for the instrument"):
+    interceptGraphQL("Calibration set 1 is for GMOS North but the daytime calibration is for GMOS South.")(
+      query(pi, mappingQuery("GMOS_SOUTH", s"kind: SMART_FLAT, ${setup()}"))
+    )
+
+  test("smartGcalMapping: input rules are the save's"):
+    interceptGraphQL("Argument 'set' is invalid: A SMART_FLAT calibration set takes no `explicitCount`, Smart GCAL supplies it.")(
+      query(pi, mappingQuery("GMOS_NORTH", s"kind: SMART_FLAT, explicitCount: 2, ${setup()}"))
+    )

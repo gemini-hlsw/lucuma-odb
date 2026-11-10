@@ -42,15 +42,18 @@ object DaytimeCalibration:
   private val Telescope: TelescopeConfig =
     TelescopeConfig(Offset.Zero, StepGuideState.Disabled)
 
-  // Numbered from one, as the user sees the rows.
+  /** A complaint about one set, prefixed with the row as the user sees it. */
+  def rowMessage(index: Int, kind: CalibrationSetType, msg: String): String =
+    s"Calibration set ${index + 1} (${kind.name}): $msg."
+
   private def unavailable(oid: Observation.Id, index: Int, kind: CalibrationSetType, msg: String): OdbError =
-    OdbError.SequenceUnavailable(oid, s"Calibration set ${index + 1} (${kind.name})$msg".some)
+    OdbError.SequenceUnavailable(oid, rowMessage(index, kind, msg).some)
 
   /** The complaint for a smart set whose lookup failed. */
   def lookupFailed(oid: Observation.Id, index: Int, kind: CalibrationSetType, error: String): OdbError =
-    unavailable(oid, index, kind, s": $error.")
+    unavailable(oid, index, kind, error)
 
-  private def stepConfig(oid: Observation.Id, index: Int, set: CalibrationSet[?]): Either[OdbError, StepConfig] =
+  private def stepConfig(set: CalibrationSet[?]): Either[String, StepConfig] =
     (set.kind, set.gcal) match
       case (CalibrationSetType.Bias, _)                                => StepConfig.Bias.asRight
       case (CalibrationSetType.Dark, _)                                => StepConfig.Dark.asRight
@@ -59,26 +62,29 @@ object DaytimeCalibration:
       case (CalibrationSetType.SmartArc, _)                            => StepConfig.SmartGcal(SmartGcalType.Arc).asRight
       case (CalibrationSetType.DayBaseline, _)                         => StepConfig.SmartGcal(SmartGcalType.DayBaseline).asRight
       case (CalibrationSetType.Flat | CalibrationSetType.Arc, Some(g)) => g.asRight
-      case (k, None)                                                   =>
-        unavailable(oid, index, k, " has no GCAL configuration.").asLeft
+      case (_, None)                                                   => "no GCAL configuration".asLeft
 
-  private def stepCount(oid: Observation.Id, index: Int, set: CalibrationSet[?]): Either[OdbError, Int] =
+  private def stepCount(set: CalibrationSet[?]): Either[String, Int] =
     (set.kind.isSmart, set.explicitCount) match
       case (true, _)        => 1.asRight
       case (false, Some(n)) => n.value.asRight
-      case (false, None)    => unavailable(oid, index, set.kind, " has no exposure count.").asLeft
+      case (false, None)    => "no exposure count".asLeft
 
   private def description(set: CalibrationSet[?], count: Int): Option[NonEmptyString] =
     val s = if set.kind.isSmart then set.kind.name else s"${set.kind.name} x$count"
     NonEmptyString.from(s).toOption
 
   /** The step a smart set looks up, or the step a manual set repeats. */
-  def protoStep[D](oid: Observation.Id, index: Int, set: CalibrationSet[D]): Either[OdbError, ProtoStep[D]] =
-    stepConfig(oid, index, set).map(sc => ProtoStep(set.setup, sc, Telescope, ObserveClass.DayCal))
+  def protoStep[D](set: CalibrationSet[D]): Either[String, ProtoStep[D]] =
+    stepConfig(set).map(sc => ProtoStep(set.setup, sc, Telescope, ObserveClass.DayCal))
+
+  /** One set's atom, or the complaint about it without its row. */
+  def atom[D](set: CalibrationSet[D]): Either[String, ProtoAtom[ProtoStep[D]]] =
+    (protoStep(set), stepCount(set)).mapN: (step, count) =>
+      ProtoAtom(description(set, count), NonEmptyList(step, List.fill(count - 1)(step)))
 
   def protoAtom[D](oid: Observation.Id, index: Int, set: CalibrationSet[D]): Either[OdbError, ProtoAtom[ProtoStep[D]]] =
-    (protoStep(oid, index, set), stepCount(oid, index, set)).mapN: (step, count) =>
-      ProtoAtom(description(set, count), NonEmptyList(step, List.fill(count - 1)(step)))
+    atom(set).leftMap(unavailable(oid, index, set.kind, _))
 
   def protoAtoms[D](oid: Observation.Id, sets: List[CalibrationSet[D]]): Either[OdbError, List[ProtoAtom[ProtoStep[D]]]] =
     sets.zipWithIndex.traverse((s, i) => protoAtom(oid, i, s))

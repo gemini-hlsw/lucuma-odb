@@ -6483,6 +6483,26 @@ type CalibrationSetGcal {
 }
 
 """
+Whether a daytime calibration set would be Mapped if saved: for a smart set,
+whether the Smart GCAL lookup finds a table row for its setup and kind.
+"""
+type SmartGcalMapping {
+  mapped: Boolean!
+
+  """
+  Why the set is not mapped: the same message the saved set would report.
+  Null when `mapped` is true.
+  """
+  mappingError: String
+
+  """
+  Steps the set would contribute to the sequence, as `CalibrationSet.count`.
+  Null when `mapped` is false.
+  """
+  count: PosInt
+}
+
+"""
 Calibration set input.  Exactly one instrument setup must be given and it must
 match the mode's instrument.
 """
@@ -19718,6 +19738,18 @@ type Query {
     """
     futureLimit: NonNegInt = 25
   ): ExecutionConfig
+
+  """
+  Checks a daytime calibration set before it is saved.  A smart set is Mapped
+  when the Smart GCAL lookup finds a table row for its setup; an unmapped one
+  is refused on save.  Manual sets are always mapped.  The setup must be for
+  `instrument`.  GMOS table keys match wavelength ranges, so the mapped setups
+  cannot be listed up front: call this as the user edits, debounced.
+  """
+  smartGcalMapping(
+    instrument: Instrument!
+    set: CalibrationSetInput!
+  ): SmartGcalMapping!
 
   """
   Obtains a list of program references for which the user with ORCiD `orcidId`
