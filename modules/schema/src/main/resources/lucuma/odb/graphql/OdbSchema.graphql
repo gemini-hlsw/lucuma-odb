@@ -13541,6 +13541,11 @@ enum GmosNorthBuiltinFpu {
   GmosNorthBuiltinFpu IfuRed
   """
   IFU_RED
+
+  """
+  GmosNorthBuiltinFpu Pinhole
+  """
+  PINHOLE
 }
 
 """
@@ -14429,6 +14434,11 @@ enum GmosSouthBuiltinFpu {
   GmosSouthBuiltinFpu IfuNSRed
   """
   IFU_NS_RED
+
+  """
+  GmosSouthBuiltinFpu Pinhole
+  """
+  PINHOLE
 }
 
 """

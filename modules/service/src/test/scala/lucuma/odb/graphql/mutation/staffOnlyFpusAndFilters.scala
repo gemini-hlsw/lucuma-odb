@@ -134,6 +134,66 @@ class staffOnlyFpusAndFilters extends OdbSuite:
       )
     yield ()
 
+  private val GmosNorthPinhole: String =
+    """{
+      gmosNorthLongSlit: {
+        grating: R831_G5302
+        filter: R_PRIME
+        fpu: PINHOLE
+        centralWavelength: { nanometers: 500 }
+        exposureTimeMode: { signalToNoise: { value: 100.0 at: { nanometers: 500 } } }
+      }
+    }"""
+
+  test("PI cannot create a GMOS long slit with a pinhole"):
+    expectNotAuthorized:
+      for
+        pid <- createProgramAs(pi)
+        tid <- createTargetAs(pi, pid)
+        _   <- createWithMode(pi, pid, tid, GmosNorthPinhole)
+      yield ()
+
+  test("Staff can create a GMOS long slit with a pinhole"):
+    for
+      pid <- createProgramAs(pi)
+      tid <- createTargetAs(pi, pid)
+      _   <- createWithMode(staff, pid, tid, GmosNorthPinhole)
+    yield ()
+
+  test("PI cannot select a pinhole on GMOS South long slit update"):
+    expectNotAuthorized:
+      setup(ObservingModeType.GmosSouthLongSlit).flatMap: (_, _, oid) =>
+        updateMode(pi, oid, "{ gmosSouthLongSlit: { fpu: PINHOLE } }")
+
+  test("PI can edit other fields once staff selected a GMOS pinhole"):
+    for
+      (_, _, oid) <- setup(ObservingModeType.GmosNorthLongSlit)
+      _           <- updateMode(staff, oid, "{ gmosNorthLongSlit: { fpu: PINHOLE } }")
+      _           <- expect(
+        user  = pi,
+        query =
+          s"""
+            mutation {
+              updateObservations(input: {
+                SET: { observingMode: { gmosNorthLongSlit: { explicitRoi: CENTRAL_SPECTRUM } } }
+                WHERE: { id: { EQ: "$oid" } }
+              }) {
+                observations { observingMode { gmosNorthLongSlit { fpu explicitRoi } } }
+              }
+            }
+          """,
+        expected = Right(json"""
+          {
+            "updateObservations": {
+              "observations": [
+                { "observingMode": { "gmosNorthLongSlit": { "fpu": "PINHOLE", "explicitRoi": "CENTRAL_SPECTRUM" } } }
+              ]
+            }
+          }
+        """)
+      )
+    yield ()
+
   test("PI cannot create a GMOS long slit with an engineering filter"):
     expectNotAuthorized:
       for
