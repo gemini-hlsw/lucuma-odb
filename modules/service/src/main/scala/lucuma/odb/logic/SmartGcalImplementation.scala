@@ -3,12 +3,10 @@
 
 package lucuma.odb.logic
 
-import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.applicative.*
 import cats.syntax.either.*
 import cats.syntax.functor.*
-import cats.syntax.traverse.*
 import lucuma.core.enums.SmartGcalType
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepConfig.Gcal
@@ -25,7 +23,7 @@ import lucuma.core.model.sequence.gnirs.GnirsStaticConfig
 import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig
 import lucuma.core.model.sequence.igrins2.Igrins2StaticConfig
 import lucuma.odb.sequence.SmartGcalExpander
-import lucuma.odb.sequence.data.ProtoAtom
+import lucuma.odb.sequence.SmartGcalExpander.Missing
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.service.SmartGcalService
 import lucuma.odb.smartgcal.SmartGcalRules
@@ -36,11 +34,6 @@ import lucuma.odb.smartgcal.data.Gnirs
 import lucuma.odb.smartgcal.data.Igrins2
 
 object SmartGcalImplementation {
-
-  type Cache[K, D] = Map[(K, SmartGcalType), Either[String, NonEmptyList[(D => D, Gcal)]]]
-
-  private def emptyCache[K, D]: Cache[K, D] =
-      Map.empty
 
   def fromService[F[_]: Concurrent](
     service: SmartGcalService[F]
@@ -55,24 +48,13 @@ object SmartGcalImplementation {
     rules:     SmartGcalRules[D],
     toKey:     (S, D) => K,
     formatKey: K => String,
-    select:    (K, SmartGcalType) => F[List[(D => D, Gcal)]]
+    select:    (K, SmartGcalType) => F[Option[List[(D => D, Gcal)]]]
   ) extends SmartGcalExpander[F, S, D] {
 
-    private def expandAtomWithCache(
-      cache:  Cache[K, D],
-      static: S,
-      atom:   ProtoAtom[ProtoStep[D]]
-    ): F[(Cache[K, D], Either[String, ProtoAtom[ProtoStep[D]]])] =
-      atom
-        .steps
-        .mapAccumulateM(cache)(expandStepWithCache(_, static, _))
-        .map(_.map(_.flatSequence.map(steps => ProtoAtom(atom.description, steps))))
-
-    private def expandStepWithCache(
-      cache:  Cache[K, D],
+    override def expandStep(
       static: S,
       step:   ProtoStep[D]
-    ): F[(Cache[K, D], Either[String, NonEmptyList[ProtoStep[D]]])] =
+    ): F[Either[Missing, List[ProtoStep[D]]]] =
       step match {
         case ProtoStep(d, StepConfig.SmartGcal(sgt), t, o, b) =>
 
@@ -81,42 +63,20 @@ object SmartGcalImplementation {
             ProtoStep(rules.calibrationConfig(update(d)), gcal, t, o, b)
           }
 
-          def lookup(key: K): F[(Cache[K, D], Either[String, NonEmptyList[ProtoStep[D]]])] =
-            cache.get((key, sgt)).fold(
-              select(key, sgt).map {
-                case Nil    =>
-                  val error = s"missing Smart GCAL mapping: ${formatKey(key)}"
-                  (cache.updated((key, sgt), error.asLeft), error.asLeft)
-                case h :: t =>
-                 (
-                   cache.updated((key, sgt), NonEmptyList(h, t).asRight),
-                   NonEmptyList(toStep(h), t.map(toStep)).asRight
-                 )
-              }
-            ) { e => (cache, e.map(_.map(toStep))).pure[F] }
+          def lookup(key: K): F[Either[Missing, List[ProtoStep[D]]]] =
+            select(key, sgt).map:
+              _.map(_.map(toStep)).toRight(Missing.NoMapping(formatKey(key)))
 
           rules
             .lookupConfig(d)
             .fold(
-              error => (cache, error.asLeft[NonEmptyList[ProtoStep[D]]]).pure[F],
+              error => Missing.NoKey(error).asLeft[List[ProtoStep[D]]].pure[F],
               c     => lookup(toKey(static, c))
             )
 
         case ps@ProtoStep(_, _, _, _, _) =>
-          (cache, NonEmptyList.one(ps).asRight).pure[F]
+          List(ps).asRight[Missing].pure[F]
       }
-
-    override def expandStep(
-      static: S,
-      step:   ProtoStep[D]
-    ): F[Either[String, NonEmptyList[ProtoStep[D]]]] =
-      expandStepWithCache(emptyCache[K, D], static, step).map(_._2)
-
-    override def expandAtom(
-      static: S,
-      atom:   ProtoAtom[ProtoStep[D]]
-    ): F[Either[String, ProtoAtom[ProtoStep[D]]]] =
-      expandAtomWithCache(emptyCache[K, D], static, atom).map(_._2)
 
   }
 

@@ -26,7 +26,7 @@ object Imaging:
   ): F[Either[OdbError, StreamingExecutionConfig[Pure, Flamingos2StaticConfig, Flamingos2DynamicConfig]]] =
     EitherT(science)
       // Note acquisition is empty for imaging
-      .map(s => StreamingExecutionConfig(static, SequenceGenerator.empty.generate, s.generate))
+      .map(s => StreamingExecutionConfig.fromGenerators(static, SequenceGenerator.empty, s))
       .value
 
   def flamingos2[F[_]: Sync](

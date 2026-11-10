@@ -79,14 +79,16 @@ trait SmartGcalService[F[_]]:
    * @param ghost Ghost search information
    * @param sgt SmartGcal type of interest
    *
-   * @return list of tuples, each corresponding to a calibration step; each
-   *         tuple contains an update to the dynamic config to apply (e.g., to
-   *         set its exposure time) and the GCAL unit configuration to use
+   * @return none when no row matches; otherwise a list of tuples, each
+   *         corresponding to a calibration step (empty when only rows with a
+   *         zero step count match); each tuple contains an update to the
+   *         dynamic config to apply (e.g., to set its exposure time) and the
+   *         GCAL unit configuration to use
    */
   def selectGhost(
     ghost: GhostSearchKey,
     sgt:   SmartGcalType
-  )(using GuestAccess): F[List[(GhostDynamicConfig => GhostDynamicConfig, Gcal)]]
+  )(using GuestAccess): F[Option[List[(GhostDynamicConfig => GhostDynamicConfig, Gcal)]]]
 
   /**
    * Selects calibration information corresponding to the given search key and
@@ -95,14 +97,16 @@ trait SmartGcalService[F[_]]:
    * @param gn  GMOS North search information
    * @param sgt SmartGcal type of interest
    *
-   * @return list of tuples, each corresponding to a calibration step; each
-   *         tuple contains an update to the dynamic config to apply (e.g., to
-   *         set its exposure time) and the GCAL unit configuration to use
+   * @return none when no row matches; otherwise a list of tuples, each
+   *         corresponding to a calibration step (empty when only rows with a
+   *         zero step count match); each tuple contains an update to the
+   *         dynamic config to apply (e.g., to set its exposure time) and the
+   *         GCAL unit configuration to use
    */
   def selectGmosNorth(
     gn:  GmosNorthSearchKey,
     sgt: SmartGcalType
-  )(using GuestAccess): F[List[(GmosNorth => GmosNorth, Gcal)]]
+  )(using GuestAccess): F[Option[List[(GmosNorth => GmosNorth, Gcal)]]]
 
   /**
    * Selects calibration information corresponding to the given search key and
@@ -111,14 +115,16 @@ trait SmartGcalService[F[_]]:
    * @param gn  GMOS South search information
    * @param sgt SmartGcal type of interest
    *
-   * @return list of tuples, each corresponding to a calibration step; each
-   *         tuple contains an update to the dynamic config to apply (e.g., to
-   *         set its exposure time) and the GCAL unit configuration to use
+   * @return none when no row matches; otherwise a list of tuples, each
+   *         corresponding to a calibration step (empty when only rows with a
+   *         zero step count match); each tuple contains an update to the
+   *         dynamic config to apply (e.g., to set its exposure time) and the
+   *         GCAL unit configuration to use
    */
   def selectGmosSouth(
     gn:  GmosSouthSearchKey,
     sgt: SmartGcalType
-  )(using GuestAccess): F[List[(GmosSouth => GmosSouth, Gcal)]]
+  )(using GuestAccess): F[Option[List[(GmosSouth => GmosSouth, Gcal)]]]
 
   /**
    * Selects calibration information corresponding to the given search key and
@@ -127,19 +133,21 @@ trait SmartGcalService[F[_]]:
    * @param f2  Flamingos 2 search information
    * @param sgt SmartGcal type of interest
    *
-   * @return list of tuples, each corresponding to a calibration step; each
-   *         tuple contains an update to the dynamic config to apply (e.g., to
-   *         set its exposure time) and the GCAL unit configuration to use
+   * @return none when no row matches; otherwise a list of tuples, each
+   *         corresponding to a calibration step (empty when only rows with a
+   *         zero step count match); each tuple contains an update to the
+   *         dynamic config to apply (e.g., to set its exposure time) and the
+   *         GCAL unit configuration to use
    */
   def selectFlamingos2(
     f2:  Flamingos2SearchKey,
     sgt: SmartGcalType
-  )(using GuestAccess): F[List[(Flamingos2 => Flamingos2, Gcal)]]
+  )(using GuestAccess): F[Option[List[(Flamingos2 => Flamingos2, Gcal)]]]
 
   def selectIgrins2(
     key: Igrins2SearchKey.type,
     sgt: SmartGcalType
-  )(using GuestAccess): F[List[(Igrins2 => Igrins2, Gcal)]]
+  )(using GuestAccess): F[Option[List[(Igrins2 => Igrins2, Gcal)]]]
 
   /**
    * Selects calibration information corresponding to the given search key and
@@ -148,14 +156,16 @@ trait SmartGcalService[F[_]]:
    * @param key GNIRS search information
    * @param sgt SmartGcal type of interest
    *
-   * @return list of tuples, each corresponding to a calibration step; each
-   *         tuple contains an update to the dynamic config to apply (e.g., to
-   *         set its exposure time) and the GCAL unit configuration to use
+   * @return none when no row matches; otherwise a list of tuples, each
+   *         corresponding to a calibration step (empty when only rows with a
+   *         zero step count match); each tuple contains an update to the
+   *         dynamic config to apply (e.g., to set its exposure time) and the
+   *         GCAL unit configuration to use
    */
   def selectGnirs(
     key: GnirsSearchKey,
     sgt: SmartGcalType
-  )(using GuestAccess): F[List[(Gnirs => Gnirs, Gcal)]]
+  )(using GuestAccess): F[Option[List[(Gnirs => Gnirs, Gcal)]]]
 
   // N.B. Insertion is done by a flyway migration and not via the insert methods.
   // The insert here is intended for initializing a database for testing.
@@ -200,7 +210,7 @@ object SmartGcalService:
       override def selectGhost(
         ghost: GhostSearchKey,
         sgt:   SmartGcalType
-      )(using GuestAccess): F[List[(GhostDynamicConfig => GhostDynamicConfig, Gcal)]] =
+      )(using GuestAccess): F[Option[List[(GhostDynamicConfig => GhostDynamicConfig, Gcal)]]] =
         def update(
           g: GhostDynamicConfig,
           c: GhostUpdate
@@ -212,14 +222,15 @@ object SmartGcalService:
 
         session
           .execute(Statements.selectGhost(sgt))(ghost)
-          .map:
-            _.flatMap: (gcal, count, ghostConfig) =>
-              List.fill(count.value)((g => update(g, ghostConfig), gcal))
+          .map: rows =>
+            matched(rows):
+              rows.flatMap: (gcal, count, ghostConfig) =>
+                List.fill(count.value)((g => update(g, ghostConfig), gcal))
 
       override def selectGmosNorth(
         gn:  GmosNorthSearchKey,
         sgt: SmartGcalType
-      )(using GuestAccess): F[List[(GmosNorth => GmosNorth, Gcal)]] =
+      )(using GuestAccess): F[Option[List[(GmosNorth => GmosNorth, Gcal)]]] =
         selectGcal(Statements.selectGmosNorth(gn, sgt)) { exposureTime =>
           GmosNorth.exposure.replace(exposureTime)
         }
@@ -227,7 +238,7 @@ object SmartGcalService:
       override def selectGmosSouth(
         gs:  GmosSouthSearchKey,
         sgt: SmartGcalType
-      )(using GuestAccess): F[List[(GmosSouth => GmosSouth, Gcal)]] =
+      )(using GuestAccess): F[Option[List[(GmosSouth => GmosSouth, Gcal)]]] =
         selectGcal(Statements.selectGmosSouth(gs, sgt)) { exposureTime =>
           GmosSouth.exposure.replace(exposureTime)
         }
@@ -236,20 +247,25 @@ object SmartGcalService:
         af: AppliedFragment
       )(
         f: TimeSpan => D => D
-      ): F[List[(D => D, Gcal)]] =
+      ): F[Option[List[(D => D, Gcal)]]] =
         session
           .prepareR(af.fragment.query(step_config_gcal ~ int4_nonneg ~ time_span))
           .use(_.stream(af.argument, chunkSize = 16).compile.to(List))
-          .map {
-            _.flatMap { case ((gcal, count), exposureTime) =>
-              List.fill(count.value)(f(exposureTime) -> gcal)
-            }
-          }
+          .map: rows =>
+            matched(rows):
+              rows.flatMap { case ((gcal, count), exposureTime) =>
+                List.fill(count.value)(f(exposureTime) -> gcal)
+              }
+
+      // None when no row matched; rows with a zero step count (No-Calibration
+      // Rows) match but add no steps.
+      private def matched[A, B](rows: List[A])(steps: => List[B]): Option[List[B]] =
+        Option.when(rows.nonEmpty)(steps)
 
       def selectFlamingos2(
         f2:  Flamingos2SearchKey,
         sgt: SmartGcalType
-      )(using GuestAccess): F[List[(Flamingos2 => Flamingos2, Gcal)]] =
+      )(using GuestAccess): F[Option[List[(Flamingos2 => Flamingos2, Gcal)]]] =
         selectGcal(Statements.selectF2(f2, sgt)) { exposureTime =>
           Flamingos2.exposure.replace(exposureTime)
         }
@@ -257,7 +273,7 @@ object SmartGcalService:
       def selectIgrins2(
         key: Igrins2SearchKey.type,
         sgt: SmartGcalType
-      )(using GuestAccess): F[List[(Igrins2 => Igrins2, Gcal)]] =
+      )(using GuestAccess): F[Option[List[(Igrins2 => Igrins2, Gcal)]]] =
         selectGcal(Statements.selectIgrins2(key, sgt)): exposureTime =>
           Igrins2.exposure.replace(exposureTime)
 
@@ -266,15 +282,16 @@ object SmartGcalService:
       def selectGnirs(
         key: GnirsSearchKey,
         sgt: SmartGcalType
-      )(using GuestAccess): F[List[(Gnirs => Gnirs, Gcal)]] =
+      )(using GuestAccess): F[Option[List[(Gnirs => Gnirs, Gcal)]]] =
         val af: AppliedFragment = Statements.selectGnirs(key, sgt)
         session
           .prepareR(af.fragment.query(step_config_gcal ~ int4_nonneg ~ time_span ~ int4_pos))
           .use(_.stream(af.argument, chunkSize = 16).compile.to(List))
-          .map:
-            _.flatMap:
-              case (((gcal, count), exposureTime), coadds) =>
-                List.fill(count.value)(((_: Gnirs).copy(exposure = exposureTime, coadds = coadds)) -> gcal)
+          .map: rows =>
+            matched(rows):
+              rows.flatMap:
+                case (((gcal, count), exposureTime), coadds) =>
+                  List.fill(count.value)(((_: Gnirs).copy(exposure = exposureTime, coadds = coadds)) -> gcal)
 
       override def insertGhost(
         id:   Int,

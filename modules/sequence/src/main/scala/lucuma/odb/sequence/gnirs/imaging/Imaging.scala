@@ -46,7 +46,7 @@ object Imaging:
     (for
       a <- EitherT(Acquisition.instantiate(observationId, estimator, static, namespace, config, acquisitionItc, pinnedAcqType))
       s <- EitherT(science)
-    yield StreamingExecutionConfig(static, a.generate, s.generate)).value
+    yield StreamingExecutionConfig.fromGenerators(static, a, s)).value
 
   def gnirs[F[_]: Sync](
     observationId:  Observation.Id,

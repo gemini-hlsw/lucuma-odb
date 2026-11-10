@@ -331,7 +331,7 @@ class calibrations_f2ImagingDaytimeFlat
       assertEquals(before, "ready")
       assertEquals(after, "pending")
 
-  test("a filter without a smart gcal row fails only the daytime flat sequence"):
+  test("a daytime flat left with no flat at all fails, the science sequence does not"):
     for
       (pid, oid, flat) <- setup
       _                <- setImagingFilters(oid, List("K_LONG"))
@@ -339,7 +339,7 @@ class calibrations_f2ImagingDaytimeFlat
       flatResult       <- queryScienceAtoms(flat).attempt
       sciAtom          <- hasScienceAtom(oid)
     yield
-      assert(flatResult.left.exists(_.getMessage.contains(s"Could not generate a sequence for $flat: missing Smart GCAL mapping")), flatResult.toString)
+      assert(flatResult.left.exists(_.getMessage.contains(s"Could not generate a sequence for $flat: No Smart GCAL imaging flat is defined for this configuration")), flatResult.toString)
       assert(sciAtom, "the science sequence still generates")
 
   test("daytime flat with a visit survives the science leaving f2 imaging"):

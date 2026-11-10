@@ -7,7 +7,6 @@ package ghost.ifu
 import cats.Monad
 import cats.data.EitherT
 import fs2.Pure
-import fs2.Stream
 import lucuma.core.model.sequence.ghost.GhostDynamicConfig
 import lucuma.core.model.sequence.ghost.GhostStaticConfig
 import lucuma.odb.data.ItcScience.GhostIfu
@@ -31,4 +30,4 @@ object Ifu:
       r  = g.red.focus.value
       b  = g.blue.focus.value
       s <- EitherT(Science.instantiate(estimator, static, namespace, expander, config, r, b))
-    yield StreamingExecutionConfig(static, Stream.empty, s.generate)).value
+    yield StreamingExecutionConfig.fromGenerators(static, SequenceGenerator.empty, s)).value

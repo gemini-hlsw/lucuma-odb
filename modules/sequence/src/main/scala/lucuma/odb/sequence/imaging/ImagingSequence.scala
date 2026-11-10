@@ -13,6 +13,7 @@ import lucuma.core.enums.SequenceType
 import lucuma.core.enums.WavelengthOrder
 import lucuma.core.math.Wavelength
 import lucuma.core.model.sequence.Atom
+import lucuma.core.model.sequence.StepViolation
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.util.AtomBuilder
@@ -26,18 +27,23 @@ object ImagingSequence:
 
   /**
    * Builds a `SequenceGenerator` from a stream of proto atoms
-   * parameterized by the static and dynamic config types
+   * parameterized by the static and dynamic config types.  It reports the
+   * `missing` calibrations as its violations.
    */
   def makeGenerator[S, D](
     estimator:  StepTimeEstimateCalculator[S, D],
     static:     S,
     namespace:  UUID,
-    protoAtoms: Stream[Pure, ProtoAtom[ProtoStep[D]]]
+    protoAtoms: Stream[Pure, ProtoAtom[ProtoStep[D]]],
+    missing:    List[StepViolation] = List.empty
   ): SequenceGenerator[D] =
 
     case class ImagingGenerator(
       recordedSteps: Map[ProtoStep[D], Int]
     ) extends SequenceGenerator[D]:
+
+      override def violations: List[StepViolation] =
+        missing
 
       override def generate: Stream[Pure, Atom[D]] =
         val build = AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Science)

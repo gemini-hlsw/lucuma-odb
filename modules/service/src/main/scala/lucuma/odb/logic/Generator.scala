@@ -3,6 +3,7 @@
 
 package lucuma.odb.logic
 
+import cats.Order
 import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.applicative.*
@@ -41,6 +42,7 @@ import lucuma.core.model.sequence.SetupTime
 import lucuma.core.model.sequence.StepCheck
 import lucuma.core.model.sequence.StepDigest
 import lucuma.core.model.sequence.StepDigests
+import lucuma.core.model.sequence.StepViolation
 import lucuma.core.model.sequence.exposure.PendingExposureRules
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.Enumerated
@@ -66,6 +68,8 @@ import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
 import org.typelevel.log4cats.Logger
 import skunk.*
+
+import scala.collection.immutable.SortedSet
 
 import Generator.FutureLimit
 
@@ -325,8 +329,13 @@ object Generator:
           estimator: SetupTimeEstimateCalculator
         ): EitherT[F, OdbError, ExecutionDigest] =
 
-          def sequenceDigest(s: Stream[F, Atom[D]]): F[Either[OdbError, SequenceDigest]] =
-            s.fold(SequenceDigest.Zero.copy(executionState = ExecutionState.Completed).asRight[OdbError]) { case (eDigest, atom) =>
+          // `reported` are the violations the generator found outside of any step.
+          def sequenceDigest(s: Stream[F, Atom[D]], reported: List[StepViolation]): F[Either[OdbError, SequenceDigest]] =
+            val zero = SequenceDigest.Zero.copy(
+              executionState = ExecutionState.Completed,
+              stepViolations = SortedSet.from(reported)(using Order[StepViolation].toOrdering)
+            )
+            s.fold(zero.asRight[OdbError]) { case (eDigest, atom) =>
               eDigest.flatMap: digest =>
                 Either.cond(
                   digest.atomCount.value < SequenceAtomLimit,
@@ -337,8 +346,8 @@ object Generator:
 
           // Compute the SequenceDigests.
           for
-            a <- EitherT(sequenceDigest(stream.acquisition))
-            s <- EitherT(sequenceDigest(stream.science))
+            a <- EitherT(sequenceDigest(stream.acquisition, stream.acquisitionViolations))
+            s <- EitherT(sequenceDigest(stream.science, stream.scienceViolations))
             c  = if ctx.params.isSplittable then estimator.estimateSetupCount(s.timeEstimate.sum)
                  else NonNegInt.unsafeFrom(1)
             // Recentering is needed whether or not the observation may be split.

@@ -10,7 +10,9 @@ import cats.data.EitherT
 import cats.data.NonEmptyList
 import cats.data.NonEmptyVector
 import cats.data.State
+import cats.syntax.applicative.*
 import cats.syntax.either.*
+import cats.syntax.functor.*
 import cats.syntax.option.*
 import cats.syntax.order.*
 import eu.timepit.refined.types.numeric.NonNegInt
@@ -29,6 +31,7 @@ import lucuma.core.math.Offset
 import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Atom
+import lucuma.core.model.sequence.StepViolation
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.gnirs.GnirsAcquisitionMirrorMode
 import lucuma.core.model.sequence.gnirs.GnirsDynamicConfig
@@ -37,6 +40,7 @@ import lucuma.core.model.sequence.gnirs.GnirsGratingWavelength
 import lucuma.core.model.sequence.gnirs.GnirsStaticConfig
 import lucuma.itc.IntegrationTime
 import lucuma.odb.data.OdbError
+import lucuma.odb.sequence.SmartGcalExpander.Calibration
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.syntax.all.*
@@ -66,11 +70,15 @@ object Science:
 
   private object SeqState extends gnirs.GnirsSequenceState
 
-  /** `cals` holds the flat, the arc or both; empty for telluric sequences. */
+  /**
+   * `cals` holds the flat, the arc or both; empty for telluric sequences and
+   * when neither is defined.  `missing` reports the ones left out.
+   */
   case class StepDefinition(
     wavelength:   CentralWavelengthConfig,
     scienceSteps: NonEmptyList[ProtoStep[GnirsDynamicConfig]],
-    cals:         Option[NonEmptyList[ProtoStep[GnirsDynamicConfig]]]
+    cals:         Option[NonEmptyList[ProtoStep[GnirsDynamicConfig]]],
+    missing:      List[StepViolation]
   ):
     /**
      * Cycle count: round up so that we always deliver at least the requested
@@ -95,12 +103,12 @@ object Science:
       def expand[F[_]: Monad](
         static:   GnirsStaticConfig,
         expander: SmartGcalExpander[F, GnirsStaticConfig, GnirsDynamicConfig]
-      ): EitherT[F, String, StepDefinition] =
+      ): F[StepDefinition] =
 
-        cals.fold(EitherT.pure(StepDefinition(wavelength, scienceSteps, none))): (flat, arc) =>
+        cals.fold(StepDefinition(wavelength, scienceSteps, none, List.empty).pure[F]): (flat, arc) =>
           // 111/LXD, for instance, has arcs but no slit flat.
-          EitherT(expander.expandFlatAndOrArc(static, flat, arc))
-            .map(cs => StepDefinition(wavelength, scienceSteps, cs.some))
+          expander.expandFlatAndArc(static, flat, arc).map: (missing, cs) =>
+            StepDefinition(wavelength, scienceSteps, NonEmptyList.fromList(cs), missing)
 
     object PreDef:
 
@@ -166,7 +174,7 @@ object Science:
       calRole:  Option[CalibrationRole]
     ): EitherT[F, String, StepDefinition] =
       EitherT.fromEither[F](itcReadMode(time)).flatMap: readMode =>
-        PreDef(config, sw, time, readMode, calRole).expand(static, expander)
+        EitherT.liftF(PreDef(config, sw, time, readMode, calRole).expand(static, expander))
 
     /**
      * One step definition per central wavelength.  Each gets its own SmartGcal
@@ -215,6 +223,9 @@ object Science:
         if b.goalCycles.value === 0 then None
         else b.steps.cals.map(cals => ProtoAtom(AtomTitle(AtomTitle.NighttimeCal, b.titleSuffix).some, cals))
       science ++ closing.toList
+
+    override def violations: List[StepViolation] =
+      blocks.toVector.flatMap(_.steps.missing).distinct.toList
 
     // Atom ids come from the atom's index within a single builder, so every
     // segment must feed the same `buildStream`.
@@ -314,7 +325,7 @@ object Science:
         .zip(titleSuffixes(distinctWavelengths, config.wavelengths.length > 1))
         .map((sw, suffix) => (AtomTitle(DaytimePinholeTitle, suffix), flat(sw)))
 
-    DaytimeSmartGcal.sequence(observationId, estimator, static, namespace, expander, atoms)
+    DaytimeSmartGcal.sequence(observationId, estimator, static, namespace, expander, Calibration.SpectroscopicFlat, atoms)
 
   def instantiate[F[_]: Monad](
     observationId: Observation.Id,

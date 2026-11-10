@@ -561,13 +561,12 @@ class daytimeCalibrationSets_gnirs extends OdbSuite with DatabaseOperations with
 
   // The GNIRS Smart GCAL key has no grating when the acquisition mirror is in,
   // so a smart flat on an imaging setup never resolves.
-  test("a smart flat with the acquisition mirror in fails generation, naming the row"):
+  test("a smart flat with the acquisition mirror in is left out of the sequence"):
     for
       pid <- createProgramAs(staff)
       oid <- createWithSets(pid, s"{ kind: SMART_FLAT, ${spectroscopy(1)} }, { kind: SMART_FLAT, ${imaging(1)} }")
-      _   <- expectOdbError(
-        user     = staff,
-        query    = executionQuery(oid),
-        expected = { case OdbError.SequenceUnavailable(_, Some(m)) if m.startsWith("Calibration set 2 (Smart Flat): missing Smart GCAL mapping") => () }
-      )
-    yield ()
+      js  <- query(staff, executionQuery(oid))
+    yield
+      val science = js.hcursor.downFields("executionConfig", "gnirs", "science")
+      assert(science.downField("nextAtom").focus.exists(!_.isNull), js.spaces2)
+      assertEquals(science.downField("possibleFuture").values.map(_.size), 0.some, js.spaces2)

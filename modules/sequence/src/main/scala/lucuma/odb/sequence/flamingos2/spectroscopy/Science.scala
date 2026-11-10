@@ -10,6 +10,7 @@ import cats.data.EitherT
 import cats.data.NonEmptyList
 import cats.data.State
 import cats.syntax.either.*
+import cats.syntax.functor.*
 import cats.syntax.option.*
 import cats.syntax.order.*
 import eu.timepit.refined.*
@@ -25,6 +26,7 @@ import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepGuideState.Disabled
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Atom
+import lucuma.core.model.sequence.StepViolation
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig as F2
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
@@ -58,11 +60,12 @@ object Science:
   val AbbaCycleTitle: NonEmptyString = NonEmptyString.unsafeFrom("ABBA Cycle")
 
   case class StepDefinition(
-    a0:   ProtoStep[F2],
-    b0:   ProtoStep[F2],
-    b1:   ProtoStep[F2],
-    a1:   ProtoStep[F2],
-    cals: NonEmptyList[ProtoStep[F2]]
+    a0:      ProtoStep[F2],
+    b0:      ProtoStep[F2],
+    b1:      ProtoStep[F2],
+    a1:      ProtoStep[F2],
+    cals:    List[ProtoStep[F2]],
+    missing: List[StepViolation]
   ):
     /** ABBA science cycle. */
     def abbaCycle: NonEmptyList[ProtoStep[F2]] =
@@ -88,9 +91,9 @@ object Science:
       def expand[F[_]: Monad](
         static:   Flamingos2StaticConfig,
         expander: SmartGcalExpander[F, Flamingos2StaticConfig, F2]
-      ): EitherT[F, String, StepDefinition] =
-        EitherT(expander.expandFlatAndOrArc(static, flat, arc))
-          .map(cs => StepDefinition(a0, b0, b1, a1, cs))
+      ): F[StepDefinition] =
+        expander.expandFlatAndArc(static, flat, arc).map: (missing, cs) =>
+          StepDefinition(a0, b0, b1, a1, cs, missing)
 
     object PreDef:
 
@@ -147,7 +150,7 @@ object Science:
                  // This case should be caught when validating arguments to the mode
                  // construction / update.  Nevertheless, we'll guarantee it here.
                  case _                    => s"Exactly 4 offset positions are needed for $modeName (${config.telescopeConfigs.size} provided).".asLeft
-        d <- p.expand(static, expander)
+        d <- EitherT.liftF(p.expand(static, expander))
       yield d
 
   end StepDefinition
@@ -158,13 +161,18 @@ object Science:
     goalCycles: NonNegInt
   ) extends SequenceGenerator[F2]:
 
+    override def violations: List[StepViolation] =
+      steps.missing
+
     override def generate: Stream[Pure, Atom[F2]] =
 
-      val gcalAtom: ProtoAtom[ProtoStep[F2]] = ProtoAtom(AtomTitle.NighttimeCal.some, steps.cals)
+      // No atom at all when neither the flat nor the arc is defined.
+      val gcalAtom: Option[ProtoAtom[ProtoStep[F2]]] =
+        NonEmptyList.fromList(steps.cals).map(ProtoAtom(AtomTitle.NighttimeCal.some, _))
 
       val protoAtoms: List[ProtoAtom[ProtoStep[F2]]] =
         if goalCycles.value === 0 then Nil
-        else gcalAtom :: List.fill(goalCycles.value)(ProtoAtom(AbbaCycleTitle.some, steps.abbaCycle))
+        else gcalAtom.toList ++ List.fill(goalCycles.value)(ProtoAtom(AbbaCycleTitle.some, steps.abbaCycle))
 
       builder.buildStream(Stream.emits(protoAtoms))
 

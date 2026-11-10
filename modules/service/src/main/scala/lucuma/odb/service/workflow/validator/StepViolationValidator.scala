@@ -6,6 +6,7 @@ package validator
 
 import cats.data.NonEmptyChain
 import cats.syntax.all.*
+import lucuma.core.enums.ObservationValidationCode
 import lucuma.core.enums.SequenceType
 import lucuma.core.model.ObservationValidation
 import lucuma.core.model.sequence.SequenceDigest
@@ -32,8 +33,19 @@ object StepViolationValidator extends ObservationValidator:
     ObservationValidation(v.code, NonEmptyChain.one(message(sequenceType, v)))
 
   // Acquisition first, then science, each with errors before warnings.
-  override def apply(info: ObservationValidationInfo): ObservationValidationMap =
-    def validations(sequenceType: SequenceType, digest: SequenceDigest): ObservationValidationMap =
-      digest.stepViolations.toList.foldMap(v => ObservationValidationMap.singleton(validation(sequenceType, v)))
+  private def validations(info: ObservationValidationInfo)(include: StepViolation => Boolean): ObservationValidationMap =
+    def of(sequenceType: SequenceType, digest: SequenceDigest): ObservationValidationMap =
+      digest.stepViolations.toList.filter(include).foldMap(v => ObservationValidationMap.singleton(validation(sequenceType, v)))
     info.executionDigest.foldMap: d =>
-      validations(SequenceType.Acquisition, d.acquisition) |+| validations(SequenceType.Science, d.science)
+      of(SequenceType.Acquisition, d.acquisition) |+| of(SequenceType.Science, d.science)
+
+  override def apply(info: ObservationValidationInfo): ObservationValidationMap =
+    validations(info)(_ => true)
+
+  /**
+   * Reports only the calibrations left out of the sequence for want of a Smart
+   * GCAL definition.  This is the one step violation calibration observations
+   * are subject to.
+   */
+  val missingSmartGcal: ObservationValidator = info =>
+    validations(info)(_.code === ObservationValidationCode.MissingSmartGcal)

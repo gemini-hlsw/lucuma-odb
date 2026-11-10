@@ -47,4 +47,4 @@ object LongSlit:
     (for
        a <- EitherT.fromEither(Acquisition.instantiate(observationId, estimator, Static, namespace, config, pinnedAcquisitionType, acquisitionItc))
        s <- EitherT(science)
-    yield StreamingExecutionConfig(Static, a.generate, s.generate)).value
+    yield StreamingExecutionConfig.fromGenerators(Static, a, s)).value

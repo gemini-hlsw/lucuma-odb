@@ -43,4 +43,4 @@ object Mos:
     (for
        a <- EitherT.fromEither(Acquisition.instantiate(observationId, estimator, Static, namespace, config))
        s <- EitherT(spectroscopy.Science.instantiate(observationId, estimator, Static, namespace, expander, ObservingMode.Flamingos2MosName, config, scienceItc, calRole))
-    yield StreamingExecutionConfig(Static, a.generate, s.generate)).value
+    yield StreamingExecutionConfig.fromGenerators(Static, a, s)).value

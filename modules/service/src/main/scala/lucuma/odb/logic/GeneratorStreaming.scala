@@ -309,8 +309,9 @@ object GeneratorStreaming:
         ): F[Either[OdbError, StreamingExecutionConfig[F, S, D]]] =
           (acquisition, science) match
             case (None,    None   ) => generate
-            case (Some(a), None   ) => generate.map(_.map(_.copy(acquisition = a)))
-            case (None,    Some(s)) => generate.map(_.map(_.copy(science     = s)))
+            // A stored sequence runs no Smart GCAL lookup, so it reports nothing.
+            case (Some(a), None   ) => generate.map(_.map(_.copy(acquisition = a, acquisitionViolations = List.empty)))
+            case (None,    Some(s)) => generate.map(_.map(_.copy(science     = s, scienceViolations     = List.empty)))
             case (Some(a), Some(s)) => StreamingExecutionConfig(static, a, s).asRight[OdbError].pure[F]
 
         for
@@ -349,9 +350,9 @@ object GeneratorStreaming:
       ): F[Either[OdbError, StreamingExecutionConfig[F, instrument.S, instrument.D]]] =
         import lucuma.odb.sequence.daytimecal.DaytimeCalibration
         (for
-          cfg   <- extractMode(ObservingMode.DaytimeCalibrationName, context)(_.asDaytimeCalibration)
-          atoms <- EitherT(DaytimeCalibrationExpansion.expandAtoms(instrument.expander, instrument.static, context.oid, instrument.sets(cfg)))
-        yield DaytimeCalibration.executionConfig(instrument.estimator, instrument.static, context.namespace, atoms).covary[F]).value
+          cfg              <- extractMode(ObservingMode.DaytimeCalibrationName, context)(_.asDaytimeCalibration)
+          (missing, atoms) <- EitherT(DaytimeCalibrationExpansion.expandAtoms(instrument.expander, instrument.static, context.oid, instrument.sets(cfg)))
+        yield DaytimeCalibration.executionConfig(instrument.estimator, instrument.static, context.namespace, atoms, missing).covary[F]).value
 
       override def selectOrGenerateFlamingos2LongSlit(
         context: GeneratorContext

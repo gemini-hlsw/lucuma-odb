@@ -8,7 +8,7 @@ package mapping
 import cats.effect.Concurrent
 import cats.effect.Resource
 import cats.syntax.all.*
-import eu.timepit.refined.types.numeric.PosInt
+import eu.timepit.refined.types.numeric.NonNegInt
 import grackle.Cursor
 import grackle.Query.EffectHandler
 import grackle.Result
@@ -66,7 +66,7 @@ trait CalibrationSetMapping[F[_]: Concurrent] extends DaytimeCalibrationSetView[
   // GCAL lookup returns, resolved per observation so one lookup pass serves
   // every row of it.
   private lazy val countHandler: EffectHandler[F] =
-    keyedBatchEffectHandler[(Observation.Id, Int), Option[PosInt]](
+    keyedBatchEffectHandler[(Observation.Id, Int), Option[NonNegInt]](
       c => (c.fieldAs[Observation.Id]("observationId"), c.fieldAs[Int]("position")).tupled,
       (keys, _) =>
         services.useTransactionally:
@@ -79,7 +79,7 @@ trait CalibrationSetMapping[F[_]: Concurrent] extends DaytimeCalibrationSetView[
             .map: all =>
               // A set removed between the two reads answers null, not an error.
               val found = all.flatten.toMap
-              keys.map(k => k -> found.getOrElse(k, none[PosInt].success)).toMap,
+              keys.map(k => k -> found.getOrElse(k, none[NonNegInt].success)).toMap,
       (_, n) => n.map(_.value).asJson.success
     )
 

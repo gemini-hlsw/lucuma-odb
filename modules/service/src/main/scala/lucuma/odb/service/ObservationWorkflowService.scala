@@ -343,8 +343,9 @@ object ObservationWorkflowService {
         oids: List[Observation.Id]
       )(using NoTransaction[F], SuperUserAccess): F[Result[Map[Observation.Id, (ObservationWorkflow, Option[ObservingModeType], Option[CalibrationRole])]]] =
 
-        // The execution digests of science observations (the only ones whose
-        // exposure time violations are checked), as obscalc last stored them.
+        // The execution digests whose step violations are checked, as obscalc
+        // last stored them: science observations for all of them, calibrations
+        // for the calibrations left out for want of a Smart GCAL definition.
         // Nothing is generated here, so until obscalc catches up with an edit
         // the violations are those of the previous inputs; obscalc's workflow,
         // calculated from a fresh digest, is the guarantee.  An observation
@@ -353,10 +354,10 @@ object ObservationWorkflowService {
         def addExecutionDigests(
           infos: Map[Observation.Id, ObservationValidationInfo]
         )(using Transaction[F]): F[Map[Observation.Id, ObservationValidationInfo]] =
-          val science =
+          val checked =
             infos.values.toList.filter: i =>
-              i.calibrationRole.isEmpty && i.tpe.hasProposal && i.generatorParams.exists(_.isRight)
-          obscalcService.selectManyExecutionDigest(science.map(_.oid)).map: stored =>
+              (i.calibrationRole.isDefined || i.tpe.hasProposal) && i.generatorParams.exists(_.isRight)
+          obscalcService.selectManyExecutionDigest(checked.map(_.oid)).map: stored =>
             infos.map: (oid, info) =>
               oid -> info.copy(executionDigest = stored.get(oid).flatMap(_.value.toOption))
 

@@ -36,6 +36,7 @@ import lucuma.itc.IntegrationTime
 import lucuma.odb.data.ItcResult as Result
 import lucuma.odb.data.ItcScience.Flamingos2Imaging
 import lucuma.odb.data.OdbError
+import lucuma.odb.sequence.SmartGcalExpander.Calibration
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.TelescopeConfigGenerator
@@ -238,7 +239,7 @@ object Science:
    * The sequence of a daytime flat calibration: one smart GCAL flat per distinct
    * science filter, in the order the science sequence takes the filters.  The exposure and
    * lamps come from SmartGcal and the steps are DayCal, so they cost no program
-   * time.  A filter without a SmartGcal row fails the whole sequence.
+   * time.  A filter without a SmartGcal row is left out and reported.
    */
   private def daytimeFlat[F[_]: Monad](
     observationId: Observation.Id,
@@ -264,7 +265,7 @@ object Science:
       if filters.length > 1 then NonEmptyString.unsafeFrom(s"${DaytimeFlatTitle.value} ${filter.shortName}")
       else DaytimeFlatTitle
 
-    DaytimeSmartGcal.sequence(observationId, estimator, static, namespace, expander, filters.map(f => (title(f), flat(f))))
+    DaytimeSmartGcal.sequence(observationId, estimator, static, namespace, expander, Calibration.ImagingFlat, filters.map(f => (title(f), flat(f))))
 
   def flamingos2[F[_]: Sync](
     observationId: Observation.Id,

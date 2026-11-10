@@ -11,7 +11,9 @@ import cats.data.EitherT
 import cats.data.NonEmptyList
 import cats.data.NonEmptyVector
 import cats.data.State
+import cats.syntax.applicative.*
 import cats.syntax.either.*
+import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
@@ -38,6 +40,7 @@ import lucuma.core.math.Wavelength
 import lucuma.core.math.WavelengthDither
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Atom
+import lucuma.core.model.sequence.StepViolation
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
@@ -49,6 +52,7 @@ import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.itc.IntegrationTime
 import lucuma.odb.data.OdbError
+import lucuma.odb.sequence.SmartGcalExpander.Calibration
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.util.AtomBuilder
 import lucuma.odb.sequence.util.DaytimeSmartGcal
@@ -266,8 +270,8 @@ object Science:
         } yield ()
 
       /**
-       * Creates the BlockDefinition, assuming we find smart gcal definitions
-       * that match the `config`.
+       * Creates the step definitions.  A calibration without a smart gcal
+       * definition matching the `config` is left out and reported.
        *
        * @param expander  smart gcal expander for GMOS (north or south as
        *                  appropriate)
@@ -279,14 +283,13 @@ object Science:
        *                  flats are needed
        */
       def compute[F[_]: Monad, S](
-        oid:        Observation.Id,
         static:     S,
         expander:   SmartGcalExpander[F, S, D],
         config:     Config[G, L, U],
         expTimeμs:  PosLong,
         frameCount: PosInt,
         calRole:    Option[CalibrationRole]
-      ): F[Either[OdbError, NonEmptyList[StepDefinition[D]]]] =
+      ): F[(List[StepViolation], NonEmptyList[StepDefinition[D]])] =
 
         val λ            = config.centralWavelength
         val isTwilight   = calRole.contains(CalibrationRole.Twilight)
@@ -297,7 +300,7 @@ object Science:
         val sciClass     = calRole.sciClass
         val sciGuiding   = calRole.sciGuiding
 
-        def define(g: Goal): EitherT[F, OdbError, StepDefinition[D]] =
+        def define(g: Goal): F[(List[StepViolation], StepDefinition[D])] =
           val (smartArc, smartFlat, science) =
             eval:
               for
@@ -308,14 +311,16 @@ object Science:
                 s <- scienceStep(TelescopeConfig(Offset.Zero, sciGuiding), sciClass)
               yield (a, f, s)
 
-          val defn = for
-            fs <- if includeFlats then EitherT(expander.expandStep(static, smartFlat)).map(_.toList) else EitherT.pure(List.empty)
-            as <- if includeArcs then EitherT(expander.expandStep(static, smartArc)).map(_.toList) else EitherT.pure(List.empty)
-          yield StepDefinition(g, as, fs, science)
+          def expand(include: Boolean, step: ProtoStep[D], calibration: String): F[(List[StepViolation], List[ProtoStep[D]])] =
+            if include then expander.expandOrReport(static, step, calibration)
+            else (List.empty[StepViolation], List.empty[ProtoStep[D]]).pure[F]
 
-          defn.leftMap(s => OdbError.SequenceUnavailable(oid, s"Could not generate a sequence for $oid: $s".some))
+          for
+            (fv, fs) <- expand(includeFlats, smartFlat, Calibration.SpectroscopicFlat)
+            (av, as) <- expand(includeArcs, smartArc, Calibration.Arc)
+          yield (fv ++ av, StepDefinition(g, as, fs, science))
 
-        goals.traverse(define).value
+        goals.traverse(define).map(ds => (ds.toList.flatMap(_._1).distinct, ds.map(_._2)))
 
       /**
        * The arcs of a daytime arc calibration: one smart GCAL arc per wavelength
@@ -399,8 +404,12 @@ object Science:
     static:      S,
     atomBuilder: AtomBuilder[D],
     expMicroSec: PosLong,
-    dithers:     NonEmptyVector[Dither[D]]
+    dithers:     NonEmptyVector[Dither[D]],
+    missing:     List[StepViolation]
   ) extends SequenceGenerator[D]:
+
+    override def violations: List[StepViolation] =
+      missing
 
     val sci            = SciencePeriod.toMicroseconds
     val time           = sci min expMicroSec.value
@@ -447,7 +456,7 @@ object Science:
     ): F[Either[OdbError, SequenceGenerator[D]]] =
       // A daytime arc has no ITC: its exposures come from SmartGcal.
       if calRole.contains(CalibrationRole.DaytimeArc) then
-        DaytimeSmartGcal.sequence(oid, estimator, static, namespace, expander, stepDef.daytimeArcs(calibrationObservationConfig(config)))
+        DaytimeSmartGcal.sequence(oid, estimator, static, namespace, expander, Calibration.Arc, stepDef.daytimeArcs(calibrationObservationConfig(config)))
       else
         def sequenceUnavailable(m: String): OdbError =
           OdbError.SequenceUnavailable(oid, s"Could not generate a sequence for $oid: $m".some)
@@ -490,13 +499,14 @@ object Science:
         // Compute the generator
         val result = for
           (configʹ, (μs, n)) <- EitherT.fromEither[F](configAndTimeʹ)
-          defs               <- EitherT(stepDef.compute(oid, static, expander, configʹ, μs, n, calRole))
+          (missing, defs)    <- EitherT.liftF(stepDef.compute(static, expander, configʹ, μs, n, calRole))
         yield ScienceGenerator(
           estimator,
           static,
           AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Science),
           μs,
-          defs.map(Dither.init).toNev
+          defs.map(Dither.init).toNev,
+          missing
         )
 
         result.widen[SequenceGenerator[D]].value

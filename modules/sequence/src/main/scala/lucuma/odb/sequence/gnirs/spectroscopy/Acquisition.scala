@@ -31,6 +31,7 @@ import lucuma.core.math.Offset
 import lucuma.core.math.syntax.int.*
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Atom
+import lucuma.core.model.sequence.StepViolation
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.gnirs.GnirsAcquisitionMirrorMode
 import lucuma.core.model.sequence.gnirs.GnirsAcquisitionMode
@@ -42,6 +43,7 @@ import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
 import lucuma.odb.data.OdbError
+import lucuma.odb.sequence.SmartGcalExpander.Calibration
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.util.AtomBuilder
 import lucuma.refined.*
@@ -294,8 +296,12 @@ object Acquisition:
   private class Generator(
     builder:       AtomBuilder[GnirsDynamicConfig],
     initialAtom:   NonEmptyList[ProtoStep[GnirsDynamicConfig]],
-    repeatingAtom: NonEmptyList[ProtoStep[GnirsDynamicConfig]]
+    repeatingAtom: NonEmptyList[ProtoStep[GnirsDynamicConfig]],
+    missing:       List[StepViolation] = List.empty
   ) extends SequenceGenerator[GnirsDynamicConfig]:
+
+    override def violations: List[StepViolation] =
+      missing
 
     override val generate: Stream[Pure, Atom[GnirsDynamicConfig]] =
       (for
@@ -351,18 +357,18 @@ object Acquisition:
 
       case GnirsFpu.Spectroscopy.Ifu(ifu) =>
         // HR-IFU acquisitions lead with a smart flat that checks the alignment of the
-        // spectrograph.
-        val flats: EitherT[F, OdbError, List[ProtoStep[GnirsDynamicConfig]]] =
+        // spectrograph.  Without a definition the flat is left out and reported.
+        val flats: F[(List[StepViolation], List[ProtoStep[GnirsDynamicConfig]])] =
           ifu match
-            case GnirsFpuIfu.LowResolution  => EitherT.pure(List.empty)
+            case GnirsFpuIfu.LowResolution  =>
+              (List.empty[StepViolation], List.empty[ProtoStep[GnirsDynamicConfig]]).pure[F]
             case GnirsFpuIfu.HighResolution =>
-              EitherT(expander.expandStep(static, StepComputer.ifuAlignmentFlat(config)))
-                .bimap(sequenceError, _.toList)
+              expander.expandOrReport(static, StepComputer.ifuAlignmentFlat(config), Calibration.IfuAlignmentFlat)
 
         (for
           (t, readMode, mode, selFilter) <- EitherT.fromEither[F](checked)
-          fs                             <- flats
+          (missing, fs)                  <- EitherT.liftF(flats)
         yield
           val steps: IfuSteps = StepComputer.computeIfu(config, ifu, mode, selFilter, fs, t, readMode)
-          Generator(builder, steps.initialAtom, steps.repeatingAtom): SequenceGenerator[GnirsDynamicConfig]
+          Generator(builder, steps.initialAtom, steps.repeatingAtom, missing): SequenceGenerator[GnirsDynamicConfig]
         ).value

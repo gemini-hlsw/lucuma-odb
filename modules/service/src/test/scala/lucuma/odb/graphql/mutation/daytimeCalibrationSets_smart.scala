@@ -10,6 +10,7 @@ import cats.syntax.option.*
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.ObservationValidationCode
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.odb.data.OdbError
@@ -233,20 +234,27 @@ class daytimeCalibrationSets_smart extends ExecutionTestSupportForGmos with Dayt
       )
     yield ()
 
-  // A generation failure is reported by the execution config and the digest;
-  // the workflow does not look at it, as for every other mode.
-  test("a smart row with no mapping fails generation, naming the row"):
+  // The row is left out of the sequence and reported as a warning, which
+  // names it.
+  test("a smart row with no mapping is left out and reported, naming the row"):
     for
       pid <- createProgramAs(staff)
       oid <- createWithSets(pid, s"{ kind: SMART_FLAT, ${setup()} }, { kind: SMART_ARC, ${setup(mapped = false)} }")
-      _   <- expectOdbError(
-        user     = staff,
-        query    = executionQuery(oid),
-        expected = { case OdbError.SequenceUnavailable(_, Some(m)) if m.startsWith("Calibration set 2 (Smart Arc): missing Smart GCAL mapping") => () }
-      )
+      js  <- query(staff, executionQuery(oid))
       _   <- runObscalcUpdate(pid, oid)
       res <- query(staff, workflowQuery(oid))
-    yield assertEquals(
-      res.hcursor.downFields("observation", "workflow", "value", "state").require[String],
-      "DEFINED"
-    )
+      vs  <- queryObservationValidationsAs(staff, oid)
+    yield
+      val science = js.hcursor.downFields("executionConfig", "gmosNorth", "science")
+      assert(science.downField("nextAtom").focus.exists(!_.isNull), js.spaces2)
+      assertEquals(science.downField("possibleFuture").values.map(_.size), 0.some, js.spaces2)
+      assertEquals(
+        res.hcursor.downFields("observation", "workflow", "value", "state").require[String],
+        "DEFINED"
+      )
+      val msgs = vs.collect { case (ObservationValidationCode.MissingSmartGcal, ms) => ms }.flatten
+      assertEquals(msgs.size, 1, vs.toString)
+      assert(
+        msgs.forall(_.startsWith("Science sequence: Calibration set 2: No Smart GCAL arc is defined for this configuration: GmosNorth {")),
+        vs.toString
+      )
