@@ -142,6 +142,7 @@ trait GmosNorthFpuSyntax:
         case LongSlit_1_50 => "LONGSLIT_5"
         case LongSlit_2_00 => "LONGSLIT_6"
         case LongSlit_5_00 => "LONGSLIT_7"
+        case Pinhole       => "focus_array_new"
 
 object gmosnorthfpu extends GmosNorthFpuSyntax
 
@@ -169,6 +170,7 @@ trait GmosSouthFpuSyntax:
         case LongSlit_1_50 => "LONGSLIT_5"
         case LongSlit_2_00 => "LONGSLIT_6"
         case LongSlit_5_00 => "LONGSLIT_7"
+        case Pinhole       => "PinholeC"
       }
 
 object gmossouthfpu extends GmosSouthFpuSyntax
