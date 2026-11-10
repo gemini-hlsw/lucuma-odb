@@ -4217,8 +4217,9 @@ type Mutation {
   program.  The program must have a proposal whose status is SUBMITTED.
 
   For a category that belongs to a partner, the user must be staff or an NGO
-  user of that partner who can read the program, and the partner must either
-  have a non-zero time split in the proposal or be the PI's partner.
+  user of that partner who can read the program.  The partner must have a
+  non-zero time split in the proposal or, when the proposal's call for
+  proposals is of type FAST_TURNAROUND or POOR_WEATHER, be the PI's partner.
 
   Only staff may set feedback for the other categories, which are limited as
   follows:

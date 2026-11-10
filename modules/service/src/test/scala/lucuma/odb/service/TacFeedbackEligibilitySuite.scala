@@ -44,13 +44,23 @@ class TacFeedbackEligibilitySuite extends munit.FunSuite:
     TimeAccountingCategory.values.toList.foreach: category =>
       assert(canDelete(category, empty), category.toString)
 
-  test("a partner requires a non-zero split or a PI affiliated with it"):
+  test("a partner requires a non-zero split"):
     Partner.values.toList.foreach: p =>
       val c = p.timeAccountingCategory
       assert(!canSet(c, empty), p.toString)
       assert(canSet(c, empty.copy(splitPartners = Set(p))), p.toString)
-      assert(canSet(c, empty.copy(piPartner = p.some)), p.toString)
-      assert(!canSet(c, empty.copy(splitPartners = Partner.values.toSet - p, piPartner = Partner.values.find(_ =!= p))), p.toString)
+      assert(!canSet(c, empty.copy(splitPartners = Partner.values.toSet - p)), p.toString)
+
+  test("a partner without a split requires a Fast Turnaround or Poor Weather proposal with a PI affiliated with it"):
+    val piPartnerCalls = Set(GeminiCallForProposalsType.FastTurnaround, GeminiCallForProposalsType.PoorWeather)
+    for
+      p <- Partner.values.toList
+      t <- GeminiCallForProposalsType.values.toList.map(_.some) :+ none
+    do
+      val c   = p.timeAccountingCategory
+      val ctx = empty.copy(cfpType = t)
+      assertEquals(canSet(c, ctx.copy(piPartner = p.some)), t.exists(piPartnerCalls.contains), s"$p, $t")
+      assert(!canSet(c, ctx.copy(piPartner = Partner.values.find(_ =!= p))), s"$p, $t, another PI partner")
 
   test("CAL, ENG and CFHT can never set feedback"):
     val everything = FeedbackContext(ProposalStatus.Submitted, none, Partner.US.some, ExchangePartner.Subaru.some, Partner.values.toSet)

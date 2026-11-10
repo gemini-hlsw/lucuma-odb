@@ -211,7 +211,7 @@ class setTacFeedback extends OdbSuite with query.ObservingModeSetupOperations:
         setTacFeedbackAs(user, pid, feedback(category))
 
   def noSplitMessage(pid: Program.Id, partner: String): String =
-    s"Partner $partner has no time split in the proposal for program $pid and is not the PI's partner, so it cannot provide TAC feedback."
+    s"Partner $partner has no time split in the proposal for program $pid, nor is it the PI's partner in a Fast Turnaround or Poor Weather proposal, so it cannot provide TAC feedback."
 
   test("TAC feedback requires a non-zero time split for the partner"):
     createProgramWithProposal(List((Partner.US, 100), (Partner.CA, 0))).flatMap: pid =>
@@ -219,11 +219,22 @@ class setTacFeedback extends OdbSuite with query.ObservingModeSetupOperations:
       invalid(setTacFeedbackAs(staff, pid, feedback(TimeAccountingCategory.AR)))(noSplitMessage(pid, "AR")) *>  // no split at all
       setTacFeedbackAs(staff, pid, feedback(US)).void
 
-  test("TAC feedback without a time split is allowed for the PI's partner"):
-    // A Fast Turnaround proposal has no splits: its time comes from the PI's partner.
-    createProgramWithCall(GeminiCallForProposalsType.FastTurnaround, "fastTurnaround: {}", PartnerLink.HasGeminiPartner(Partner.CA)).flatMap: pid =>
-      setTacFeedbackAs(staff, pid, feedback(CA)) *>
-      invalid(setTacFeedbackAs(staff, pid, feedback(US)))(noSplitMessage(pid, "US"))
+  test("TAC feedback without a time split is allowed for the PI's partner in Fast Turnaround and Poor Weather proposals"):
+    // These proposals have no splits: their time comes from the PI's partner.
+    List(
+      (GeminiCallForProposalsType.FastTurnaround, "fastTurnaround: {}"),
+      (GeminiCallForProposalsType.PoorWeather,    "poorWeather: {}")
+    ).traverse_ : (callType, props) =>
+      createProgramWithCall(callType, props, PartnerLink.HasGeminiPartner(Partner.CA)).flatMap: pid =>
+        setTacFeedbackAs(staff, pid, feedback(CA)) *>
+        invalid(setTacFeedbackAs(staff, pid, feedback(US)))(noSplitMessage(pid, "US"))
+
+  test("TAC feedback without a time split is refused for the PI's partner in other proposals"):
+    // A CA PI may request all of the time from the US, leaving CA with none.
+    val props = "queue: { considerForBand3: DO_NOT_CONSIDER, partnerSplits: [{ partner: US, percent: 100 }] }"
+    createProgramWithCall(RegularSemester, props, PartnerLink.HasGeminiPartner(Partner.CA)).flatMap: pid =>
+      invalid(setTacFeedbackAs(staff, pid, feedback(CA)))(noSplitMessage(pid, "CA")) *>
+      setTacFeedbackAs(staff, pid, feedback(US)).void
 
   test("ngo can't set TAC feedback without a time split, even with an allocation"):
     // The allocation makes the program visible to the CA NGO, but CA requested no time.

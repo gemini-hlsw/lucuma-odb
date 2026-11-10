@@ -94,8 +94,9 @@ object TacFeedbackService:
    * a proposal.  Feedback may only change while the proposal is submitted.
    * Deletion needs nothing more, so that feedback which is no longer eligible
    * can be removed.  Otherwise, a partner's category requires a non-zero time
-   * split for the partner or a PI affiliated with it.  The remaining
-   * categories each have their own rule.
+   * split for the partner or, for a Fast Turnaround or Poor Weather proposal,
+   * a PI affiliated with it.  The remaining categories each have their own
+   * rule.
    *
    * @return the reason the feedback may not change, if it may not
    */
@@ -127,10 +128,14 @@ object TacFeedbackService:
     val categoryRule: Either[String, Unit] =
       category match
         case AR | BR | CA | CL | KR | UH | US =>
+          // Fast Turnaround and Poor Weather proposals have no splits: their
+          // time comes from the PI's partner.
+          val piPartnerCall: Boolean =
+            ctx.cfpType.exists(t => t === GeminiCallForProposalsType.FastTurnaround || t === GeminiCallForProposalsType.PoorWeather)
           require(
             Partner.values.find(_.timeAccountingCategory === category).exists: p =>
-              ctx.splitPartners.contains(p) || ctx.piPartner.contains(p),
-            s"Partner $name has no time split in the proposal for program $pid and is not the PI's partner, so it cannot provide TAC feedback."
+              ctx.splitPartners.contains(p) || (piPartnerCall && ctx.piPartner.contains(p)),
+            s"Partner $name has no time split in the proposal for program $pid, nor is it the PI's partner in a Fast Turnaround or Poor Weather proposal, so it cannot provide TAC feedback."
           )
         case CAL | CFHT | ENG => s"Time accounting category $name cannot provide TAC feedback.".asLeft
         case GT | LTP         => ().asRight
