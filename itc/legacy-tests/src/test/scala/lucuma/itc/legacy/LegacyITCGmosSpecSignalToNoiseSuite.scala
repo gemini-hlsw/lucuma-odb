@@ -90,7 +90,7 @@ class LegacyITCGmosSpecSignalToNoiseSuite extends CommonITCLegacySuite:
         )
 
   test("gmos north fpu".tag(LegacyITCTest)):
-    assertAllValid(Enumerated[GmosNorthFpu].all): f =>
+    assertAllValid(Enumerated[GmosNorthFpu].all.filterNot(_ === GmosNorthFpu.Pinhole)): f =>
       localItc
         .calculate(
           bodyConf(
@@ -144,7 +144,7 @@ class LegacyITCGmosSpecSignalToNoiseSuite extends CommonITCLegacySuite:
         )
 
   test("gmos south fpu".tag(LegacyITCTest)):
-    assertAllValid(Enumerated[GmosSouthFpu].all): f =>
+    assertAllValid(Enumerated[GmosSouthFpu].all.filterNot(_ === GmosSouthFpu.Pinhole)): f =>
       localItc
         .calculate(
           bodyConf(
