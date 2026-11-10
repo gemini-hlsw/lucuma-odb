@@ -17,6 +17,13 @@ class RefreshTokenSuite extends SsoSuite with Fixture {
     }
   }
 
+  test("Session token should be a random (version 4) UUID."):
+    SsoSimulator[IO].use { case (_, _, sso, _, _) =>
+      sso.run(Request(Method.POST, SsoRoot / "api" / "v1" / "auth-as-guest"))
+        .use(CookieReader[IO].getSessionToken(_))
+        .map(tok => assertEquals(tok.value.version, 4))
+    }
+
   test("SomeSite should be Strict (simulator is pretending it's using https)") {
     SsoSimulator[IO].use { case (_, _, sso, _, _) =>
       for {
