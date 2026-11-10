@@ -34,6 +34,7 @@ trait ProgramUserMapping[F[_]]
       SqlField("id", ProgramUserView.ProgramUserId, key = true),
       SqlField("programId", ProgramUserView.ProgramId, hidden = true),
       SqlField("userId", ProgramUserView.UserId, hidden = true),
+      SqlField("writerUserId", ProgramUserView.WriterUserId, hidden = true),
       SqlField("role", ProgramUserView.Role),
       SqlField("linkType", ProgramUserView.PartnerLink, hidden = true),
       SqlField("geminiPartner", ProgramUserView.GeminiPartner, hidden = true),
@@ -44,6 +45,7 @@ trait ProgramUserMapping[F[_]]
       SqlField("affiliation", ProgramUserView.Affiliation),
       SqlField("hasDataAccess", ProgramUserView.HasDataAccess),
       SqlField("classicalVisitor", ProgramUserView.ClassicalVisitor),
+      SqlField("isPartnerLead", ProgramUserView.PartnerLead),
       SqlField("displayName", ProgramUserView.DisplayName),
       SqlField("email", ProgramUserView.Email),
       CursorFieldJson("partnerLink", c =>

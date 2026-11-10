@@ -7,10 +7,8 @@ import cats.syntax.all.*
 import grackle.Result
 import lucuma.core.enums.ExchangePartner
 import lucuma.core.enums.Observatory
-import lucuma.core.enums.Partner
 import lucuma.core.enums.ScienceSubtype
 import lucuma.core.model.CallForProposals
-import lucuma.core.model.IntPercent
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.Tag
@@ -38,11 +36,11 @@ object ProposalPropertiesInput {
       else if subaru.isDefined then Observatory.Subaru
       else Observatory.Gemini
 
-    def partnerSplits: Map[Partner, IntPercent] =
+    def partnerSplits: PartnerSplits =
       gemini.map(_.partnerSplits)
         .orElse(keck.map(_.partnerSplits))
         .orElse(subaru.map(_.partnerSplits))
-        .getOrElse(Map.empty)
+        .getOrElse(PartnerSplits.Empty)
   }
 
   case class Edit(
@@ -65,7 +63,7 @@ object ProposalPropertiesInput {
       else none
 
     // The edited partner splits, drawn from whichever variant is present.
-    def partnerSplits: Nullable[Map[Partner, IntPercent]] =
+    def partnerSplits: Nullable[PartnerSplits] =
       gemini.map(_.partnerSplits)
         .orElse(keck.map(_.partnerSplits))
         .orElse(subaru.map(_.partnerSplits))

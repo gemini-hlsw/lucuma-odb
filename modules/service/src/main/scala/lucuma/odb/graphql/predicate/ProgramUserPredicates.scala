@@ -3,11 +3,14 @@
 
 package lucuma.odb.graphql.predicate
 
+import cats.syntax.option.*
 import grackle.Path
 import grackle.Predicate
+import grackle.Predicate.*
 import lucuma.core.enums.ProgramUserRole
 import lucuma.core.model.Program
 import lucuma.core.model.ProgramUser
+import lucuma.core.model.StandardRole
 import lucuma.core.model.User
 
 class ProgramUserPredicates(path: Path) {
@@ -27,5 +30,11 @@ class ProgramUserPredicates(path: Path) {
 
   def isNotPi: Predicate =
     role.neql(ProgramUserRole.Pi)
+
+  /** Program writers may edit any member; other members only their own entry. */
+  def isWritableBy(user: User): Predicate =
+    user.role match
+      case StandardRole.Ngo(_, _) => False
+      case _                      => Or(program.isWritableBy(user), Eql(userIdPath, Const(user.id.some)))
 
 }

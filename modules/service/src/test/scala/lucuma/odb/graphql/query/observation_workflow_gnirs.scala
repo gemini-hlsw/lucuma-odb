@@ -6,7 +6,6 @@ package query
 
 import cats.effect.IO
 import cats.syntax.all.*
-import io.circe.syntax.*
 import lucuma.core.enums.GnirsDecker
 import lucuma.core.enums.GnirsFilter
 import lucuma.core.enums.ObservationValidationCode
@@ -77,34 +76,7 @@ class observation_workflow_gnirs extends ExecutionTestSupportForGnirs:
     """
 
   private def validations(oid: Observation.Id): IO[List[(ObservationValidationCode, List[String])]] =
-    query(
-      pi,
-      s"""
-        query {
-          observation(observationId: ${oid.asJson}) {
-            workflow {
-              value {
-                validationErrors {
-                  code
-                  messages
-                }
-              }
-            }
-          }
-        }
-      """
-    ).map: json =>
-      json
-        .hcursor
-        .downFields("observation", "workflow", "value", "validationErrors")
-        .values
-        .toList
-        .flatten
-        .map: v =>
-          (
-            v.hcursor.downField("code").require[ObservationValidationCode],
-            v.hcursor.downField("messages").require[List[String]]
-          )
+    queryObservationValidationsAs(pi, oid)
 
   private def configurationValidations(mode: String): IO[List[(ObservationValidationCode, List[String])]] =
     for

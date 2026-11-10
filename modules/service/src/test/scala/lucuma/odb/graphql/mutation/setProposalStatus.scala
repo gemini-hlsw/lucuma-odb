@@ -1617,6 +1617,45 @@ class setProposalStatus extends OdbSuite
   }
 
 
+  // The fixture's single CA co-investigator is CA's lead by default; adding a
+  // second and discarding the choice leaves CA without one.
+  test("⨯ a partner with eligible investigators but no lead") {
+    for
+      cid <- createGeminiCallForProposalsAs(staff)
+      pid <- proposalMissing(cid)
+      _   <- addCoisAs(pi, pid, List(Partner.CA))
+      _   <- query(
+               pi,
+               s"""
+                 mutation {
+                   updateProposal(input: {
+                     programId: "$pid"
+                     SET: { gemini: { queue: { partnerSplits: [
+                       { partner: US, percent: 70 },
+                       { partner: CA, percent: 30, leadId: null }
+                     ] } } }
+                   }) {
+                     proposal { category }
+                   }
+                 }
+               """
+             )
+      _   <- expect(
+               user  = pi,
+               query = s"""
+                 mutation {
+                   setProposalStatus(input: { programId: "$pid", status: SUBMITTED }) {
+                     program { proposalStatus }
+                   }
+                 }
+               """,
+               expected = List(
+                 error.submissionError(ProposalSubmissionError.missingPartnerLead(Partner.CA), pid).message
+               ).asLeft
+             )
+    yield ()
+  }
+
   test("every rule is accounted for") {
     // Every rule in the shared enum is exercised by a test above, save the one
     // noted below.  Adding a rule in lucuma-core fails this until it is covered
@@ -1634,7 +1673,7 @@ class setProposalStatus extends OdbSuite
         InvalidPartnerSplits, MissingInvestigatorName, MissingInvestigatorEmail,
         InvalidInvestigatorEmail, MissingInvestigatorEducationalStatus,
         MissingInvestigatorAffiliation, UninvitedInvestigator,
-        UhTimeWithoutUhPi, UnmatchedPartnerTime, MissingFtMentor, MissingScienceAttachment,
+        UhTimeWithoutUhPi, UnmatchedPartnerTime, MissingPartnerLead, MissingFtMentor, MissingScienceAttachment,
         MissingTeamAttachment, NoDefinedObservations, UndefinedObservations,
         MissingDeadline, PastDeadline
       )

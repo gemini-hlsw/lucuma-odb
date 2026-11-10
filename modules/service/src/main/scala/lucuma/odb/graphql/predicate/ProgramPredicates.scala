@@ -34,8 +34,10 @@ class ProgramPredicates(path: Path) {
 
   def isWritableBy(user: User): Predicate =
     user.role match {
+      case GuestRole | StandardRole.Pi(_) =>
+        Contains(path / "users" / "writerUserId", Const(user.id.some))
       case StandardRole.Ngo(_, _) => False // NGO access is read-only
-      case _                      => isVisibleTo(user) // TODO: not true for COI_RO
+      case StandardRole.Staff(_) | StandardRole.Admin(_) | ServiceRole(_) => True
     }
 
 }

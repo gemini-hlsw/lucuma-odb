@@ -30,6 +30,7 @@ import lucuma.core.enums.Site
 import lucuma.core.enums.SubaruInstrument
 import lucuma.core.enums.TooActivation
 import lucuma.core.enums.VisitorObservingModeType
+import lucuma.core.math.Angle
 import lucuma.core.math.Coordinates
 import lucuma.core.math.Wavelength
 import lucuma.core.model.CallCoordinatesLimits
@@ -37,6 +38,7 @@ import lucuma.core.model.CallForProposals
 import lucuma.core.model.ConstraintSet
 import lucuma.core.model.IsUserDefinedTelluric
 import lucuma.core.model.Observation
+import lucuma.core.model.PosAngleConstraint
 import lucuma.core.model.Program
 import lucuma.core.model.SiteCoordinatesLimits
 import lucuma.core.model.StandardRole.*
@@ -95,7 +97,9 @@ case class ObservationValidationInfo(
   altair:                 Option[AltairConfiguration],
   executionDigest:        Option[ExecutionDigest] = None,
   hasSequenceSource:      Boolean = false, // set for daytime calibrations
-  instrument:             Option[Instrument] = None
+  instrument:             Option[Instrument] = None,
+  posAngleConstraint:     PosAngleConstraint = PosAngleConstraint.Unbounded,
+  maskPositionAngle:      Option[Angle] = None
 ) {
 
   def isDeclaredComplete: Boolean =
@@ -401,6 +405,21 @@ object ObservationValidationInfo {
         ) s ON TRUE
       """
 
+    val MaskPositionAngle: Fragment[Void] =
+      sql"""
+        LEFT JOIN LATERAL (
+          SELECT (a.c_mask_definition->'positionAngle'->>'microarcseconds')::bigint AS c_mask_position_angle
+          FROM   t_attachment a
+          WHERE  a.c_attachment_id IN (
+            SELECT c_mask_attachment_id FROM t_gmos_north_mos  WHERE c_observation_id = o.c_observation_id
+            UNION ALL
+            SELECT c_mask_attachment_id FROM t_gmos_south_mos  WHERE c_observation_id = o.c_observation_id
+            UNION ALL
+            SELECT c_mask_attachment_id FROM t_flamingos_2_mos WHERE c_observation_id = o.c_observation_id
+          )
+        ) mk ON TRUE
+      """
+
     def WithSequenceSource[A <: NonEmptyList[Observation.Id]](enc: skunk.Encoder[A]): Query[A, Observation.Id] =
       sql"""
         SELECT o.c_observation_id
@@ -472,12 +491,16 @@ object ObservationValidationInfo {
           o.c_altair_mode,
           o.c_altair_field_lens,
           o.c_altair_cass_rotator,
-          o.c_altair_nd_filter
+          o.c_altair_nd_filter,
+          o.c_pac_mode,
+          o.c_pac_angle,
+          mk.c_mask_position_angle
         FROM t_observation o
         JOIN t_program p on p.c_program_id = o.c_program_id
         LEFT JOIN t_proposal x
           ON o.c_program_id = x.c_program_id
         $AssociatedScienceObservation
+        $MaskPositionAngle
         WHERE o.c_observation_id IN ($enc)
       """
       .query(
@@ -511,16 +534,18 @@ object ObservationValidationInfo {
         altair_mode.opt                 *:
         field_lens.opt                  *:
         cass_rotator.opt                *:
-        altair_nd_filter.opt
+        altair_nd_filter.opt            *:
+        pos_angle_constraint            *:
+        angle_µas.opt
       )
       .map:
-        case (pid, tpe, oid, mode, inst, ra, dec, cal, isUserDefinedTelluric, state, ds, ps, too, sched, ceil, permitted, cfp, sci, state2, ce, iq, sb, wv, er, wl, ovcs, egp, altairMode, fieldLens, cassRotator, ndFilter) =>
+        case (pid, tpe, oid, mode, inst, ra, dec, cal, isUserDefinedTelluric, state, ds, ps, too, sched, ceil, permitted, cfp, sci, state2, ce, iq, sb, wv, er, wl, ovcs, egp, altairMode, fieldLens, cassRotator, ndFilter, pac, maskPa) =>
           val cs = ConstraintSet(iq, ce, sb, wv, er)
           // All-or-nothing (field lens aside) is a DB CHECK; the fallbacks here
           // are unreachable in practice, not a second source of truth for them.
           val altair = altairMode.map: m =>
             AltairConfiguration(m, fieldLens, cassRotator.getOrElse(CassRotator.Following), ndFilter.getOrElse(AltairNdFilter.Out))
-          ObservationValidationInfo(pid, tpe, oid, cs, wl, mode, None, (ra, dec).mapN(Coordinates.apply), cal, isUserDefinedTelluric, state, ds, ps, too, sched, ceil, permitted, cfp, sci, Nil, state2, ovcs, explicitGuideProbe = egp, altair = altair, instrument = inst)
+          ObservationValidationInfo(pid, tpe, oid, cs, wl, mode, None, (ra, dec).mapN(Coordinates.apply), cal, isUserDefinedTelluric, state, ds, ps, too, sched, ceil, permitted, cfp, sci, Nil, state2, ovcs, explicitGuideProbe = egp, altair = altair, instrument = inst, posAngleConstraint = pac, maskPositionAngle = maskPa)
 
     def ProgramAllocations[A <: NonEmptyList[Program.Id]](enc: Encoder[A]): Query[A, (Program.Id, ScienceBand)] =
       sql"""
