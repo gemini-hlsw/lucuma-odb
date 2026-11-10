@@ -45,6 +45,7 @@ import org.typelevel.log4cats.Logger
 import skunk.*
 import skunk.codec.boolean.*
 import skunk.codec.text.varchar
+import skunk.data.Completion
 import skunk.implicits.*
 
 import Services.Syntax.*
@@ -246,6 +247,7 @@ object ObservationWorkflowService {
         // observation can be suspended, but a per-observation calibration takes its
         // science observation's suspension whether or not it has started itself:
         // a telluric not yet taken must not stay Ready while its science is suspended.
+        // That suspension ends when the science observation completes.
         val suspended: Boolean =
           info.effectiveSuspended && !executionState.contains(Completed)
 
@@ -499,9 +501,13 @@ object ObservationWorkflowService {
                     session.prepareR(Statements.UpdateUserState).use: pc =>
                       pc.execute(state, oid).void
 
-                  def updateSuspended(oid: Observation.Id, suspended: Boolean): F[Unit] =
+                  // Every observation has its execution row from creation (V1227); one
+                  // that doesn't would otherwise be reported suspended while nothing changed.
+                  def updateSuspended(oid: Observation.Id, suspended: Boolean): F[Result[Unit]] =
                     session.prepareR(Statements.UpdateSuspended).use: pc =>
-                      pc.execute(suspended, oid).void
+                      pc.execute(suspended, oid).map:
+                        case Completion.Update(1) => Result.unit
+                        case c                    => Result.internalError(s"No execution row to update for $oid: $c")
 
                   def updateDeclaredState(oid: Observation.Id, state: Option[ExecutionState]): F[Unit] =
                     session.prepareR(Statements.UpdateDeclaredState).use: pc =>
@@ -540,11 +546,9 @@ object ObservationWorkflowService {
                     // resuming it.  The user state is left alone.
                     case (Ongoing, Suspended) =>
                       updateSuspended(oid, true)
-                        .as(Result.unit)
 
                     case (Suspended, Ongoing) =>
                       updateSuspended(oid, false)
-                        .as(Result.unit)
 
                     // Reinstating a declined telluric clears its override so it
                     // resumes inheriting its science observation's state.

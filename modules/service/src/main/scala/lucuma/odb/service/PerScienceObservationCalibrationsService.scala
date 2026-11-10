@@ -838,6 +838,20 @@ object PerScienceObservationCalibrationsService:
           .map(_.getOrElse(false))
 
       /**
+       * Queues for recalculation the calibrations in the group whose stored
+       * workflow is still Suspended.  They follow their science observation's
+       * suspension, which ends without any change to them when the science
+       * observation completes, so nothing else would recalculate them.
+       */
+      private def requeueSuspendedCalibrations(gid: Group.Id): F[Unit] =
+        S.session
+          .execute(Statements.selectSuspendedCalibrations)((gid, ObsExtract.PerObservationCalibrationRoles))
+          .flatMap: oids =>
+            S.session
+              .execute(Statements.invalidateObscalc)(oids)
+              .whenA(oids.nonEmpty)
+
+      /**
        * Deletes the unexecuted calibrations of a science observation, and the
        * group once empty. With `keepUserDefined` the PI's tellurics survive: an
        * inactive or unapproved science is a passing state, unlike its deletion
@@ -921,6 +935,7 @@ object PerScienceObservationCalibrationsService:
                                                       info"Observation $oid is suspended, keeping obs calibration group $gid" *>
                                                         (List.empty[Observation.Id], List.empty[Observation.Id]).pure[F],
                                                       info"Observation $oid no longer active or ongoing, cleaning up obs calibration group $gid" *>
+                                                        requeueSuspendedCalibrations(gid) *>
                                                         scienceTakesTellurics(oid).flatMap: keepUserDefined =>
                                                           cleanupOrphanedObsCalibrationGroup(pid, gid, oid, keepUserDefined)
                                                     )
@@ -931,6 +946,23 @@ object PerScienceObservationCalibrationsService:
           } yield result
 
       object Statements:
+
+        val selectSuspendedCalibrations: Query[(Group.Id, List[CalibrationRole]), Observation.Id] =
+          sql"""
+            SELECT o.c_observation_id
+            FROM   t_observation o
+            JOIN   t_obscalc c ON c.c_observation_id = o.c_observation_id
+            WHERE  o.c_group_id         = $group_id
+              AND  o.c_calibration_role = ANY($_calibration_role)
+              AND  o.c_existence        = 'present'
+              AND  c.c_workflow_state   = 'suspended'
+          """.query(observation_id)
+
+        // One call, so the rows are locked in id order as other bulk invalidations lock them.
+        val invalidateObscalc: Command[List[Observation.Id]] =
+          sql"""
+            CALL invalidate_obscalc_many(${_gid[Observation.Id]}::d_observation_id[])
+          """.command
 
         val selectScienceIsExecuting: Query[Observation.Id, Boolean] =
           sql"""

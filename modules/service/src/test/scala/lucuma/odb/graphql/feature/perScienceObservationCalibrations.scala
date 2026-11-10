@@ -2041,6 +2041,97 @@ class perScienceObservationCalibrations
       assertEquals(obsInGroup.count(_.calibrationRole.contains(CalibrationRole.Telluric)), 1)
     }
 
+  private def workflowStateOf(oid: Observation.Id): IO[ObservationWorkflowState] =
+    query(staff, s"""query { observation(observationId: "$oid") { workflow { value { state } } } }""")
+      .map(_.hcursor.downFields("observation", "workflow", "value", "state").require[ObservationWorkflowState])
+
+  private def obscalcStateOf(oid: Observation.Id): IO[String] =
+    session.use(
+      _.unique(sql"""
+        SELECT c_obscalc_state::text FROM t_obscalc WHERE c_observation_id = ${observation_id}
+      """.query(skunk.codec.all.text))(oid)
+    )
+
+  // A calibration not yet taken follows its science observation's suspension
+  // only until the science observation completes.  The calibration service then
+  // queues it for recalculation, or its stored workflow would stay Suspended.
+  test("A telluric's inherited suspension ends when its science completes"):
+    for {
+      pid         <- createProgramAs(pi)
+      tid         <- createTargetWithProfileAs(pi, pid)
+      oid         <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _           <- runObscalcUpdate(pid, oid)
+      _           <- recalculateCalibrations(pid, when, oid)
+      _           <- sleep >> resolveTelluricTargets
+      telluricOid <- calibrationObservationFor(oid, CalibrationRole.Telluric).map(_.get)
+      steps       <- scienceStepIds(serviceUser, oid)
+      vid         <- recordVisitAs(serviceUser, oid)
+      _           <- addEndStepEvent(steps.head, vid)
+      _           <- runObscalcUpdate(pid, oid)
+      _           <- setObservationWorkflowState(staff, oid, ObservationWorkflowState.Suspended)
+      _           <- runObscalcUpdate(pid, oid)
+      _           <- runObscalcUpdate(pid, telluricOid)
+      tel1        <- workflowStateOf(telluricOid)
+      _           <- steps.tail.traverse_(addEndStepEvent(_, vid))
+      _           <- runObscalcUpdate(pid, oid)
+      sci         <- workflowStateOf(oid)
+      _           <- recalculateCalibrations(pid, when, oid)
+      queued      <- obscalcStateOf(telluricOid)
+      _           <- runObscalcUpdate(pid, telluricOid)
+      tel2        <- workflowStateOf(telluricOid)
+    } yield {
+      assert(steps.size > 1, s"expected more than one science step, got ${steps.size}")
+      assertEquals(tel1, ObservationWorkflowState.Suspended)
+      assertEquals(sci, ObservationWorkflowState.Completed)
+      assertEquals(queued, "pending")
+      assertNotEquals(tel2, ObservationWorkflowState.Suspended)
+    }
+
+  // The calibrations of a suspended science observation drop out of the time
+  // estimate with it, as they follow it into the suspension.
+  test("A suspended science's calibrations leave the program time estimate"):
+    def maxSeconds(pid: Program.Id): IO[BigDecimal] =
+      query(
+        user  = pi,
+        query = s"""
+          query {
+            program(programId: "$pid") {
+              timeEstimateRange { value { maximum { total { seconds } } } }
+            }
+          }
+        """
+      ).map:
+        _.hcursor
+         .downFields("program", "timeEstimateRange", "value", "maximum", "total", "seconds")
+         .require[BigDecimal]
+
+    def recalculate(pid: Program.Id, oids: Observation.Id*): IO[Unit] =
+      oids.toList.traverse_(runObscalcUpdate(pid, _))
+
+    for {
+      pid         <- createProgramAs(pi)
+      tid         <- createTargetWithProfileAs(pi, pid)
+      oid         <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _           <- runObscalcUpdate(pid, oid)
+      _           <- recalculateCalibrations(pid, when, oid)
+      _           <- sleep >> resolveTelluricTargets
+      telluricOid <- calibrationObservationFor(oid, CalibrationRole.Telluric).map(_.get)
+      vid         <- recordVisitAs(serviceUser, oid)
+      _           <- addSequenceEventAs(serviceUser, vid, SequenceCommand.Start)
+      _           <- recalculate(pid, oid, telluricOid)
+      executing   <- maxSeconds(pid)
+      _           <- setObservationWorkflowState(staff, oid, ObservationWorkflowState.Suspended)
+      _           <- recalculate(pid, oid, telluricOid)
+      suspended   <- maxSeconds(pid)
+      _           <- setObservationWorkflowState(staff, oid, ObservationWorkflowState.Ongoing)
+      _           <- recalculate(pid, oid, telluricOid)
+      resumed     <- maxSeconds(pid)
+    } yield {
+      assert(executing > 0, s"expected a time estimate, got $executing")
+      assertEquals(suspended.signum, 0)
+      assertEquals(resumed, executing)
+    }
+
   // Once executing, a per-observation calibration still has no Ongoing <-> Suspended
   // edges of its own, even for staff.  It follows its science observation instead,
   // into a staff suspension and back out of it.
@@ -2086,12 +2177,6 @@ class perScienceObservationCalibrations
   // recalculation along with the science, or its stored workflow would stay as
   // it was.
   test("An unexecuted telluric follows a suspended science, and is Ready again on resuming"):
-    def obscalcState(oid: Observation.Id): IO[String] =
-      session.use(
-        _.unique(sql"""
-          SELECT c_obscalc_state::text FROM t_obscalc WHERE c_observation_id = ${observation_id}
-        """.query(skunk.codec.all.text))(oid)
-      )
     def workflow(oid: Observation.Id): IO[(ObservationWorkflowState, List[ObservationWorkflowState])] =
       query(staff, s"""query { observation(observationId: "$oid") { workflow { value { state validTransitions } } } }""")
         .map: json =>
@@ -2110,13 +2195,13 @@ class perScienceObservationCalibrations
       _           <- addSequenceEventAs(serviceUser, v, SequenceCommand.Start)
       _           <- runObscalcUpdate(pid, telluricOid)
       wf1         <- workflow(telluricOid)
-      q1          <- obscalcState(telluricOid)
+      q1          <- obscalcStateOf(telluricOid)
       _           <- setObservationWorkflowState(staff, oid, ObservationWorkflowState.Suspended)
-      q2          <- obscalcState(telluricOid)
+      q2          <- obscalcStateOf(telluricOid)
       _           <- runObscalcUpdate(pid, telluricOid)
       wf2         <- workflow(telluricOid)
       _           <- setObservationWorkflowState(staff, oid, ObservationWorkflowState.Ongoing)
-      q3          <- obscalcState(telluricOid)
+      q3          <- obscalcStateOf(telluricOid)
       _           <- runObscalcUpdate(pid, telluricOid)
       wf3         <- workflow(telluricOid)
       sci         <- obsUserStateTag(oid)

@@ -389,7 +389,8 @@ object ObservationValidationInfo {
 
     /**
      * Joins `s`, holding `c_observation_id`, `c_workflow_user_state` and
-     * `c_suspended`: for
+     * `c_suspended` (whether the science observation is suspended, which
+     * ends when it completes, as its own workflow ends it): for
      * an observation `o` that is a per-observation calibration (a telluric, or
      * a daytime pinhole, flat or arc), the parent observation in its group:
      * the science observation, or the spectrophotometric standard a daytime
@@ -416,7 +417,12 @@ object ObservationValidationInfo {
         LEFT JOIN LATERAL (
           SELECT sci.c_observation_id,
                  sci.c_workflow_user_state,
-                 sx.c_suspended
+                 COALESCE(sx.c_suspended, false) AND NOT EXISTS (
+                   SELECT 1
+                   FROM   v_execution_state es
+                   WHERE  es.c_observation_id  = sci.c_observation_id
+                     AND  es.c_execution_state IN ('completed', 'declared_complete')
+                 ) AS c_suspended
           FROM   t_observation sci
           LEFT JOIN t_observation_execution sx ON sx.c_observation_id = sci.c_observation_id
           WHERE  o.c_calibration_role = ANY(ARRAY[#$roles]::e_calibration_role[])

@@ -1,5 +1,5 @@
 -- Staff may suspend an executing observation: take an Ongoing observation to
--- the new Suspended workflow state, and back.
+-- the Suspended workflow state (V1397), and back.
 --
 -- WHERE THE SUSPENSION LIVES
 --
@@ -34,10 +34,6 @@
 --
 -- A per-observation calibration (a telluric, a daytime pinhole or flat) follows
 -- its science observation into the suspension, whether or not it has started.
-
--- Not used in this migration, which is one transaction: a new enum value can't
--- be used before it is committed.
-ALTER TYPE e_workflow_state ADD VALUE 'suspended' AFTER 'ongoing';
 
 ALTER TABLE t_observation_execution
   ADD COLUMN c_suspended boolean NOT NULL DEFAULT false;
@@ -90,26 +86,6 @@ CREATE TRIGGER observation_suspension_edit_trigger
   FOR EACH ROW
   WHEN (OLD.c_suspended IS DISTINCT FROM NEW.c_suspended)
   EXECUTE FUNCTION ch_observation_edit_by_observation();
-
--- For queries that leave inactive observations out by their user state, and
--- should leave suspended ones out too.  A completed observation isn't
--- suspended, whatever its flag; completion is the workflow state obscalc
--- stored.
-CREATE FUNCTION observation_is_suspended(p_observation_id d_observation_id)
-  RETURNS boolean
-  LANGUAGE sql STABLE AS $$
-  SELECT EXISTS (
-    SELECT 1
-      FROM t_observation_execution x
-      LEFT JOIN t_obscalc c ON c.c_observation_id = x.c_observation_id
-     WHERE x.c_observation_id = p_observation_id
-       AND x.c_suspended
-       AND c.c_workflow_state IS DISTINCT FROM 'completed'::e_workflow_state
-  );
-$$;
-
-COMMENT ON FUNCTION observation_is_suspended(d_observation_id) IS
-  'Whether staff have suspended the observation, and it isn''t complete.';
 
 -- Obscalc stores each workflow's transitions, and GraphQL reads those.  Every
 -- Ongoing observation calculated before now stored [Completed] alone, so staff

@@ -33,7 +33,7 @@ observation set aside before execution began.
   calibrations are excluded, because they are suspended with their science
   observation.
 - The suspension is not a user state. It is a flag of its own,
-  `c_suspended` on `t_observation_execution` (V1394), and it overrides an
+  `c_suspended` on `t_observation_execution` (V1398), and it overrides an
   `Ongoing` execution state, but not `Completed`. The user state is what the PI
   (or anyone, before execution) asked for, and execution overrides it as it
   always has: an observation set `Inactive` and executed anyway is `Ongoing`,
@@ -53,9 +53,10 @@ observation set aside before execution began.
   outside the states that permit pre-execution edits (`preExecutionSet`).
 - Program and group time estimates, group progress (a suspended, incomplete
   element doesn't count) and program-level calibration generation leave out a
-  suspended observation as they leave out an inactive one; the SQL ones use
-  `observation_is_suspended`, which ignores the flag once obscalc has stored
-  `Completed`. The proposal-side readers of the user state (the observations
+  suspended observation as they leave out an inactive one. The SQL ones read
+  the workflow state obscalc stored (`suspended`), so they leave out the
+  observation's per-observation calibrations too, and let it back in once it
+  completes. The proposal-side readers of the user state (the observations
   considered for configuration requests, the proposal summary's instruments and
   AEON required instruments) look at the PI's user state only. Time already
   charged is unaffected.
@@ -212,7 +213,9 @@ except that a per-observation calibration never gets the staff
 including when staff suspend an ongoing science observation, whether or not
 the calibration itself has started: one not yet taken is `Suspended` with its
 science, and inherits the science's user state again (`Ready`, say) once it is
-resumed. Suspending
+resumed, or once the science completes: a completed observation is no longer
+suspended, and the calibration service queues a calibration it left stored as
+`Suspended` for recalculation. Suspending
 the science deletes none of its calibrations, because its execution state
 protects them, and it keeps its calibration group even when that group is
 empty. Calibration syncing (the telluric count and the daytime calibrations)
