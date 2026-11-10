@@ -1,15 +1,15 @@
--- Staff may suspend an executing observation: set an Ongoing observation
--- Inactive, and set it back.
+-- Staff may suspend an executing observation: take an Ongoing observation to
+-- the new Suspended workflow state, and back.
 --
 -- WHERE THE SUSPENSION LIVES
 --
 -- Not in t_observation.c_workflow_user_state.  That column says what the PI (or
 -- staff, before execution) asked for, and execution has always overridden it:
 -- an observation set Inactive and then executed anyway is Ongoing.  A
--- suspension must do the opposite, overriding execution, so it can't share the
--- column without something to tell the two apart, and telling them apart would
--- mean rewriting the user state at the boundaries of execution.  Those writes
--- would come from event processing and from obscalc, which have locked
+-- suspension must do the opposite, overriding execution.  Kept in the same
+-- column, an Inactive set before execution would have to be told apart from a
+-- suspension by rewriting the user state at the boundaries of execution.  Those
+-- writes would come from event processing and from obscalc, which have locked
 -- t_obscalc by then, while every observation edit locks t_observation first
 -- and t_obscalc second: a deadlock.
 --
@@ -23,7 +23,7 @@
 --
 -- WHAT IT MEANS
 --
--- An Ongoing observation that is suspended is Inactive.  A Completed one stays
+-- An Ongoing observation that is suspended is Suspended.  A Completed one stays
 -- Completed, and an observation that isn't executing can't be suspended.  The
 -- flag is left alone when the observation completes: completion overrides it,
 -- and should the observation stop being complete it is still suspended, as
@@ -31,12 +31,19 @@
 --
 -- The PI's user state is untouched by a suspension, so a ToO observation's
 -- 'ready' survives being suspended and resumed.
+--
+-- A per-observation calibration (a telluric, a daytime pinhole or flat) follows
+-- its science observation into the suspension, whether or not it has started.
+
+-- Not used in this migration, which is one transaction: a new enum value can't
+-- be used before it is committed.
+ALTER TYPE e_workflow_state ADD VALUE 'suspended' AFTER 'ongoing';
 
 ALTER TABLE t_observation_execution
   ADD COLUMN c_suspended boolean NOT NULL DEFAULT false;
 
 COMMENT ON COLUMN t_observation_execution.c_suspended IS
-  'Set by staff to suspend an executing observation, which is then Inactive '
+  'Set by staff to suspend an executing observation, which is then Suspended '
   'until resumed (unless complete).';
 
 -- Suspending or resuming changes the workflow, which obscalc stores, and it

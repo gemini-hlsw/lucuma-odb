@@ -319,8 +319,7 @@ class programPlannedTime extends ExecutionTestSupportForGmos:
       )
 
   // Staff suspending an executing observation leaves it out as setting it
-  // inactive does, though the suspension isn't kept in its user state.  Resuming
-  // it counts it again.
+  // inactive does.  Resuming it counts it again.
   test("program level range.: executing, but suspended observation"):
     def maxSeconds(pid: Program.Id): IO[BigDecimal] =
       query(
@@ -346,7 +345,7 @@ class programPlannedTime extends ExecutionTestSupportForGmos:
       _         <- s.traverse(sid => addEndStepEvent(sid, v))
       _         <- runObscalcUpdate(p, o)
       executing <- maxSeconds(p)
-      _         <- setObservationWorkflowState(staff, o, ObservationWorkflowState.Inactive)
+      _         <- setObservationWorkflowState(staff, o, ObservationWorkflowState.Suspended)
       _         <- runObscalcUpdate(p, o)
       suspended <- maxSeconds(p)
       _         <- setObservationWorkflowState(staff, o, ObservationWorkflowState.Ongoing)

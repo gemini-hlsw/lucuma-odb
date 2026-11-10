@@ -1975,7 +1975,7 @@ class perScienceObservationCalibrations
       assertEquals(removed2.size, 0)
     }
 
-  // Staff may suspend an executing science (Ongoing -> Inactive).  Its group must
+  // Staff may suspend an executing science (Ongoing -> Suspended).  Its group must
   // survive even when empty, or resuming it would find no group to sync into and
   // its tellurics would never be generated again.
   test("Empty obs calibration group survives suspending an executing science"):
@@ -1995,7 +1995,7 @@ class perScienceObservationCalibrations
                               services.transactionally:
                                 services.observationService.deleteCalibrationObservations(NonEmptyList.one(telluricOid))
       _                  <- runObscalcUpdate(pid, oid)
-      _                  <- setObservationWorkflowState(staff, oid, ObservationWorkflowState.Inactive)
+      _                  <- setObservationWorkflowState(staff, oid, ObservationWorkflowState.Suspended)
       _                  <- runObscalcUpdate(pid, oid)
       (_, removed2)      <- recalculateCalibrations(pid, when, oid)
       groupExists2       <- queryGroupExists(groupId)
@@ -2014,10 +2014,10 @@ class perScienceObservationCalibrations
       assertEquals(obsInGroup3.count(_.calibrationRole.contains(CalibrationRole.Telluric)), 1)
     }
 
-  // Once executing, a per-observation calibration still has no Ongoing <-> Inactive
+  // Once executing, a per-observation calibration still has no Ongoing <-> Suspended
   // edges of its own, even for staff.  It follows its science observation instead,
   // into a staff suspension and back out of it.
-  test("An executing telluric is never offered Inactive, but follows a suspended science"):
+  test("An executing telluric is never offered Suspended, but follows a suspended science"):
     def workflow(oid: Observation.Id): IO[(ObservationWorkflowState, List[ObservationWorkflowState])] =
       query(staff, s"""query { observation(observationId: "$oid") { workflow { value { state validTransitions } } } }""")
         .map: json =>
@@ -2038,9 +2038,9 @@ class perScienceObservationCalibrations
       _           <- addSequenceEventAs(serviceUser, w, SequenceCommand.Start)
       _           <- runObscalcUpdate(pid, telluricOid)
       wf1         <- workflow(telluricOid)
-      _           <- interceptOdbError(setObservationWorkflowState(staff, telluricOid, ObservationWorkflowState.Inactive)):
-                       case OdbError.InvalidWorkflowTransition(_, ObservationWorkflowState.Inactive, _) => ()
-      _           <- setObservationWorkflowState(staff, oid, ObservationWorkflowState.Inactive)
+      _           <- interceptOdbError(setObservationWorkflowState(staff, telluricOid, ObservationWorkflowState.Suspended)):
+                       case OdbError.InvalidWorkflowTransition(_, ObservationWorkflowState.Suspended, _) => ()
+      _           <- setObservationWorkflowState(staff, oid, ObservationWorkflowState.Suspended)
       _           <- runObscalcUpdate(pid, telluricOid)
       wf2         <- workflow(telluricOid)
       _           <- setObservationWorkflowState(staff, oid, ObservationWorkflowState.Ongoing)
@@ -2048,7 +2048,7 @@ class perScienceObservationCalibrations
       wf3         <- workflow(telluricOid)
     } yield {
       assertEquals(wf1, (ObservationWorkflowState.Ongoing,  List(ObservationWorkflowState.Completed)))
-      assertEquals(wf2, (ObservationWorkflowState.Inactive, Nil))
+      assertEquals(wf2, (ObservationWorkflowState.Suspended, Nil))
       assertEquals(wf3, (ObservationWorkflowState.Ongoing,  List(ObservationWorkflowState.Completed)))
     }
 
@@ -2075,7 +2075,7 @@ class perScienceObservationCalibrations
       _           <- addSequenceEventAs(serviceUser, v, SequenceCommand.Start)
       _           <- runObscalcUpdate(pid, telluricOid)
       wf1         <- workflow(telluricOid)
-      _           <- setObservationWorkflowState(staff, oid, ObservationWorkflowState.Inactive)
+      _           <- setObservationWorkflowState(staff, oid, ObservationWorkflowState.Suspended)
       _           <- runObscalcUpdate(pid, telluricOid)
       wf2         <- workflow(telluricOid)
       _           <- setObservationWorkflowState(staff, oid, ObservationWorkflowState.Ongoing)
@@ -2084,7 +2084,7 @@ class perScienceObservationCalibrations
       sci         <- obsUserStateTag(oid)
     } yield {
       assertEquals(wf1, (ObservationWorkflowState.Ready,    List(ObservationWorkflowState.Inactive)))
-      assertEquals(wf2, (ObservationWorkflowState.Inactive, Nil))
+      assertEquals(wf2, (ObservationWorkflowState.Suspended, Nil))
       assertEquals(wf3, (ObservationWorkflowState.Ready,    List(ObservationWorkflowState.Inactive)))
       assertEquals(sci, Some("ready"))
     }

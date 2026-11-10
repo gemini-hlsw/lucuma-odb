@@ -829,7 +829,7 @@ object PerScienceObservationCalibrationsService:
 
       /**
        * Present and executing (Ongoing, declared or not), whatever its workflow
-       * state: staff may suspend an executing observation by setting it Inactive.
+       * state: staff may suspend an executing observation.
        */
       private def scienceIsExecuting(scienceOid: Observation.Id): F[Boolean] =
         S.session
@@ -914,11 +914,11 @@ object PerScienceObservationCalibrationsService:
                                                         dResult <- syncDaytimeCalibrations(pid, obs, gid)
                                                       yield (tResult._1 ++ dResult._1, tResult._2 ++ dResult._2))
                                                   case (Some(gid), None) =>
-                                                    // A suspended (Inactive) executing science keeps its group,
+                                                    // A suspended executing science keeps its group,
                                                     // even an empty one, so that resuming it lands back in the
                                                     // syncing case above.  Its calibrations are protected anyway.
                                                     scienceIsExecuting(oid).ifM(
-                                                      info"Observation $oid is inactive but executing, keeping obs calibration group $gid" *>
+                                                      info"Observation $oid is suspended, keeping obs calibration group $gid" *>
                                                         (List.empty[Observation.Id], List.empty[Observation.Id]).pure[F],
                                                       info"Observation $oid no longer active or ongoing, cleaning up obs calibration group $gid" *>
                                                         scienceTakesTellurics(oid).flatMap: keepUserDefined =>

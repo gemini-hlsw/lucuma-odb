@@ -262,9 +262,9 @@ class setObservationWorkflowState
            )
     yield ()
 
-  test("[Sidereal]    Ongoing    <-> Inactive, Completed (staff)"):
+  test("[Sidereal]    Ongoing    <-> Suspended, Completed (staff)"):
     createOngoingObservation.flatMap: (p, o) =>
-      testTransitionsAs(staff, p, o, Ongoing, Inactive, Completed)
+      testTransitionsAs(staff, p, o, Ongoing, Suspended, Completed)
 
   // The mutation answers with the workflow of the state it entered, not the
   // transitions of the state it left.
@@ -294,20 +294,20 @@ class setObservationWorkflowState
       )
     for
       (p, o) <- createOngoingObservation
-      _      <- set(staff, o, Inactive,  List(Ongoing))
-      _      <- set(staff, o, Ongoing,   List(Inactive, Completed))
+      _      <- set(staff, o, Suspended, List(Ongoing))
+      _      <- set(staff, o, Ongoing,   List(Suspended, Completed))
       _      <- set(pi,    o, Completed, List(Ongoing))
       _      <- set(pi,    o, Ongoing,   List(Completed))
     yield ()
 
-  test("[Sidereal]    Inactive   <-> Ongoing, once ongoing (staff only)"):
+  test("[Sidereal]    Suspended  <-> Ongoing (staff only)"):
     for
       (p, o) <- createOngoingObservation
-      _      <- setObservationWorkflowState(staff, o, Inactive)
+      _      <- setObservationWorkflowState(staff, o, Suspended)
       _      <- runObscalcUpdate(p, o)
-      _      <- assertIO(queryObservationWorkflowState(o), Inactive)
-      _      <- testTransitionsAs(pi, p, o, Inactive)
-      _      <- testTransitionsAs(staff, p, o, Inactive, Ongoing)
+      _      <- assertIO(queryObservationWorkflowState(o), Suspended)
+      _      <- testTransitionsAs(pi, p, o, Suspended)
+      _      <- testTransitionsAs(staff, p, o, Suspended, Ongoing)
     yield ()
 
   /** The stored user state, which no query exposes. */
@@ -348,7 +348,7 @@ class setObservationWorkflowState
       _ <- assertIO(storedUserState(o), "inactive".some)
       _ <- assertIO(storedSuspended(o), false)
       _ <- testTransitions(p, o, Ongoing, Completed)
-      _ <- setObservationWorkflowState(staff, o, Inactive)
+      _ <- setObservationWorkflowState(staff, o, Suspended)
       _ <- assertIO(storedSuspended(o), true)
       _ <- setObservationWorkflowState(staff, o, Ongoing)
       _ <- assertIO(storedSuspended(o), false)
@@ -359,7 +359,7 @@ class setObservationWorkflowState
 
   // A suspension survives later events (here the rest of the sequence, which an
   // observer may finish anyway).  Completion overrides it, but leaves it stored.
-  test("[Sidereal]    Inactive   ->  Completed when execution finishes"):
+  test("[Sidereal]    Suspended  ->  Completed when execution finishes"):
     for
       p <- createProgram
       t <- createTargetWithProfileAs(pi, p)
@@ -370,13 +370,13 @@ class setObservationWorkflowState
       _ <- addEndStepEvent(s.head, v)
       _ <- runObscalcUpdate(p, o)
       _ <- assertIO(queryObservationWorkflowState(o), Ongoing)
-      _ <- setObservationWorkflowState(staff, o, Inactive)
+      _ <- setObservationWorkflowState(staff, o, Suspended)
       _ <- runObscalcUpdate(p, o)
-      _ <- assertIO(queryObservationWorkflowState(o), Inactive)
+      _ <- assertIO(queryObservationWorkflowState(o), Suspended)
       _ <- assertIO(storedUserState(o), none)
       _ <- s.tail.init.traverse(sid => addEndStepEvent(sid, v))
       _ <- runObscalcUpdate(p, o)
-      _ <- assertIO(queryObservationWorkflowState(o), Inactive)
+      _ <- assertIO(queryObservationWorkflowState(o), Suspended)
       _ <- addEndStepEvent(s.last, v)
       _ <- runObscalcUpdate(p, o)
       _ <- assertIO(queryObservationWorkflowState(o), Completed)
@@ -559,7 +559,7 @@ class setObservationWorkflowState
       _   <- setObservationWorkflowState(staff, oid, Ongoing)
       _   <- runObscalcUpdateAs(serviceUser, pid, oid)
       _   <- assertIO(queryObservationWorkflowTransitionsAs(pi, oid), List(Completed))
-      _   <- assertIO(queryObservationWorkflowTransitionsAs(staff, oid), List(Inactive, Completed, Ready))
+      _   <- assertIO(queryObservationWorkflowTransitionsAs(staff, oid), List(Suspended, Completed, Ready))
     yield ()
 
   test("[Visitor]     Ongoing -> Ready (allowed for staff)"):
@@ -757,7 +757,7 @@ class setObservationWorkflowState
   // A warning must not hide the execution state: before, the live workflow ignored
   // it for any observation with a validation code, so a PI saw Defined and could
   // set an executing observation Inactive, or edit it.
-  test("[Warnings]    Ongoing   <-> Completed (pi), Inactive too (staff), still locked"):
+  test("[Warnings]    Ongoing   <-> Completed (pi), Suspended too (staff), still locked"):
     for
       (pid, oid) <- createPhaseTwoObservationWithWarnings
       v          <- recordVisitAs(serviceUser, oid)
@@ -766,7 +766,7 @@ class setObservationWorkflowState
       _          <- runObscalcUpdateAs(serviceUser, pid, oid)
       _          <- assertIO(queryObservationWorkflowState(oid), Ongoing)
       _          <- testTransitionsAs(pi, pid, oid, Ongoing, Completed)
-      _          <- testTransitionsAs(staff, pid, oid, Ongoing, Inactive, Completed)
+      _          <- testTransitionsAs(staff, pid, oid, Ongoing, Suspended, Completed)
       _          <- expectIor(
                       user     = pi,
                       query    = updateObservationsMutation(oid, """subtitle: "new value"""", "observations { id }"),

@@ -14,7 +14,7 @@ object observationWorkflowState:
       Enumerated[ObservationWorkflowState].all.toSet
 
     def preExecutionSet: Set[ObservationWorkflowState] =
-      fullSet - self.Ongoing - self.Completed
+      fullSet - self.Ongoing - self.Suspended - self.Completed
 
     def allButComplete: Set[ObservationWorkflowState] =
       fullSet - self.Completed

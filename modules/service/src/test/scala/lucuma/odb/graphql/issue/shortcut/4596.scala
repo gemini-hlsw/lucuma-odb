@@ -14,8 +14,8 @@ import io.circe.syntax.*
 import lucuma.ags.GuideStarName
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObservationWorkflowState.Completed
-import lucuma.core.enums.ObservationWorkflowState.Inactive
 import lucuma.core.enums.ObservationWorkflowState.Ongoing
+import lucuma.core.enums.ObservationWorkflowState.Suspended
 import lucuma.core.model.Attachment
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -291,24 +291,24 @@ class ShortCut_4596 extends OdbSuite
       )
 
   List(pi, staff).foreach: user =>
-    test(s"Ongoing observations set inactive should not be editable (${user.role.access})"):
+    test(s"Suspended observations should not be editable (${user.role.access})"):
       val setup: IO[(Observation.Id, Observation.Id)] =
         for
           pid <- createProgramAs(pi)
           o1  <- createExecutedObservation(pid, Ongoing)
-          _   <- setObservationWorkflowState(staff, o1, Inactive)
+          _   <- setObservationWorkflowState(staff, o1, Suspended)
           _   <- runObscalcUpdateAs(serviceUser, pid, o1)
-          _   <- assertIO(queryObservationWorkflowState(o1), Inactive)
+          _   <- assertIO(queryObservationWorkflowState(o1), Suspended)
           o2  <- createObservationAs(pi, pid)
         yield (o1, o2)
-      setup.flatMap: (inactive, undefined) =>
+      setup.flatMap: (suspended, undefined) =>
         val transitions = if user == staff then " with allowed transition to Ongoing" else ""
         tryUpdateSubtitleAs(
           user = user,
-          oids = List(inactive, undefined),
+          oids = List(suspended, undefined),
           expected = Ior.Both(
             List(
-              s"Observation $inactive is ineligible for this operation due to its workflow state (Inactive$transitions)."
+              s"Observation $suspended is ineligible for this operation due to its workflow state (Suspended$transitions)."
             ),
             json"""
             {

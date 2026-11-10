@@ -488,7 +488,7 @@ class tooTriggerWorkflow extends ExecutionTestSupportForGmos with TooTriggerSetu
       _             <- setWorkflowState(oid, ObservationWorkflowState.Ready)
       _             <- beginExecution(oid)
       s0            <- getWorkflowState(pid, oid)
-      _             <- setTooWorkflowState(staff, oid, ObservationWorkflowState.Inactive)
+      _             <- setTooWorkflowState(staff, oid, ObservationWorkflowState.Suspended)
       s1            <- getWorkflowState(pid, oid)
       ts1           <- triggers(oid)
       _             <- setTooWorkflowState(staff, oid, ObservationWorkflowState.Ongoing)
@@ -497,7 +497,7 @@ class tooTriggerWorkflow extends ExecutionTestSupportForGmos with TooTriggerSetu
       state         <- readyState(oid)
     yield
       assertEquals(s0,    ObservationWorkflowState.Ongoing)
-      assertEquals(s1,    ObservationWorkflowState.Inactive)
+      assertEquals(s1,    ObservationWorkflowState.Suspended)
       assertEquals(ts1,   List((Accepted, None)))
       assertEquals(s2,    ObservationWorkflowState.Ongoing)
       assertEquals(ts2,   List((Accepted, None)))

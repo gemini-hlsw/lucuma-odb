@@ -151,7 +151,7 @@ trait ShortCut_7658_Helpers extends OdbSuite with UpdateObservationsOps:
 
   protected val ErrorForOngoing: String = "is ineligible for this operation due to its workflow state (Ongoing with allowed transition to Completed)"
   // Staff may also suspend an ongoing observation.
-  protected val ErrorForOngoingStaff: String = "is ineligible for this operation due to its workflow state (Ongoing with allowed transition to Inactive/Completed)"
+  protected val ErrorForOngoingStaff: String = "is ineligible for this operation due to its workflow state (Ongoing with allowed transition to Suspended/Completed)"
   protected val ErrorForCompleted: String = "is ineligible for this operation due to its workflow state (Completed with allowed transition to Ongoing)"
 
   def testFailedAcquistion(user: User, oid: Observation.Id, modeField: String, error: String = ErrorForOngoing): IO[Unit] =
