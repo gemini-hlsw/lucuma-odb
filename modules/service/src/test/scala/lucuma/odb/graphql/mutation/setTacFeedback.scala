@@ -4,6 +4,7 @@
 package lucuma.odb.graphql
 package mutation
 
+import cats.data.Ior
 import cats.effect.IO
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.PosBigDecimal
@@ -18,6 +19,7 @@ import lucuma.core.enums.ProposalStatus
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.TacPartnerDecision
 import lucuma.core.enums.TimeAccountingCategory
+import lucuma.core.model.Observation
 import lucuma.core.model.PartnerLink
 import lucuma.core.model.Program
 import lucuma.core.model.Semester
@@ -229,6 +231,15 @@ class setTacFeedback extends OdbSuite with query.ObservingModeSetupOperations:
         setTacFeedbackAs(staff, pid, feedback(CA)) *>
         invalid(setTacFeedbackAs(staff, pid, feedback(US)))(noSplitMessage(pid, "US"))
 
+  test("ngo can set TAC feedback for its PI's Fast Turnaround and Poor Weather proposals"):
+    List(
+      (GeminiCallForProposalsType.FastTurnaround, "fastTurnaround: {}"),
+      (GeminiCallForProposalsType.PoorWeather,    "poorWeather: {}")
+    ).traverse_ : (callType, props) =>
+      createProgramWithCall(callType, props, PartnerLink.HasGeminiPartner(Partner.CA)).flatMap: pid =>
+        setTacFeedbackAs(ngoCa, pid, feedback(CA)) *>
+        notAuthorized(ngoUs)(setTacFeedbackAs(ngoUs, pid, feedback(US)))
+
   test("TAC feedback without a time split is refused for the PI's partner in other proposals"):
     // A CA PI may request all of the time from the US, leaving CA with none.
     val props = "queue: { considerForBand3: DO_NOT_CONSIDER, partnerSplits: [{ partner: US, percent: 100 }] }"
@@ -291,20 +302,29 @@ class setTacFeedback extends OdbSuite with query.ObservingModeSetupOperations:
       List(TimeAccountingCategory.CAL, TimeAccountingCategory.ENG, TimeAccountingCategory.CFHT).traverse_ : category =>
         invalid(setTacFeedbackAs(staff, pid, feedback(category)))(s"Time accounting category ${category.tag.toUpperCase} cannot provide TAC feedback.")
 
-  test("JP and KECK require a PI affiliated with Subaru or Keck"):
-    def notAffiliated(pid: Program.Id, category: TimeAccountingCategory, community: String): IO[Unit] =
+  test("JP and KECK require a proposal requesting time on behalf of Subaru or Keck"):
+    def notOnBehalf(pid: Program.Id, category: TimeAccountingCategory, community: String): IO[Unit] =
       invalid(setTacFeedbackAs(staff, pid, feedback(category)))(
-        s"Time accounting category ${category.tag.toUpperCase} can only provide TAC feedback for a proposal whose PI is affiliated with $community, which is not the case for program $pid."
+        s"Time accounting category ${category.tag.toUpperCase} can only provide TAC feedback for a proposal requesting time on behalf of $community, which is not the case for program $pid."
       )
 
+    def exchangeProps(partner: String): String =
+      s"queue: { considerForBand3: DO_NOT_CONSIDER, exchangePartner: $partner }"
+
     for
-      subaru <- createProgramWithCall(RegularSemester, "queue: { considerForBand3: DO_NOT_CONSIDER }", PartnerLink.HasExchangePartner(ExchangePartner.Subaru))
-      keck   <- createProgramWithCall(RegularSemester, "queue: { considerForBand3: DO_NOT_CONSIDER }", PartnerLink.HasExchangePartner(ExchangePartner.Keck))
+      subaru <- createProgramWithCall(RegularSemester, exchangeProps("SUBARU"), PartnerLink.HasExchangePartner(ExchangePartner.Subaru))
+      keck   <- createProgramWithCall(RegularSemester, exchangeProps("KECK"),   PartnerLink.HasExchangePartner(ExchangePartner.Keck))
       _      <- setTacFeedbackAs(staff, subaru, feedback(TimeAccountingCategory.JP))
-      _      <- notAffiliated(subaru, TimeAccountingCategory.KECK, "Keck")
+      _      <- notOnBehalf(subaru, TimeAccountingCategory.KECK, "Keck")
       _      <- setTacFeedbackAs(staff, keck, feedback(TimeAccountingCategory.KECK))
-      _      <- notAffiliated(keck, TimeAccountingCategory.JP, "Subaru")
+      _      <- notOnBehalf(keck, TimeAccountingCategory.JP, "Subaru")
     yield ()
+
+  test("JP requires the proposal, not just its PI, to be on behalf of Subaru"):
+    createProgramWithCall(RegularSemester, "queue: { considerForBand3: DO_NOT_CONSIDER }", PartnerLink.HasExchangePartner(ExchangePartner.Subaru)).flatMap: pid =>
+      invalid(setTacFeedbackAs(staff, pid, feedback(TimeAccountingCategory.JP)))(
+        s"Time accounting category JP can only provide TAC feedback for a proposal requesting time on behalf of Subaru, which is not the case for program $pid."
+      )
 
   test("DD, DS, LP and SV require a call for proposals of the matching type"):
     def wrongCall(pid: Program.Id, category: TimeAccountingCategory, callTitle: String): IO[Unit] =
@@ -438,6 +458,51 @@ class setTacFeedback extends OdbSuite with query.ObservingModeSetupOperations:
         assertEquals(a, List(("US", "BAND2", BigDecimal("1.000000")), ("CA", "BAND3", BigDecimal("4.000000"))))
         assertEquals(b, List(("CA", "BAND3", BigDecimal("4.000000"))))
 
+  def scienceBand(oid: Observation.Id): IO[Option[ScienceBand]] =
+    query(staff, s"""query { observation(observationId: "$oid") { scienceBand } }""").flatMap: js =>
+      js.hcursor
+        .downFields("observation", "scienceBand")
+        .as[Option[ScienceBand]]
+        .leftMap(f => new RuntimeException(f.message))
+        .liftTo[IO]
+
+  test("a recommended time in a single band gives it to observations without one"):
+    for
+      pid <- createProgramWithProposal()
+      oid <- createObservationAs(pi, pid)
+      _   <- setTacFeedbackAs(staff, pid, feedback(US))
+      b   <- scienceBand(oid)
+    yield assertEquals(b, ScienceBand.Band1.some)
+
+  test("removing a recommended time warns about observations in its band"):
+    val times = List(ScienceBand.Band1 -> BigDecimal(2), ScienceBand.Band2 -> BigDecimal(1))
+    for
+      pid <- createProgramWithProposal()
+      _   <- setTacFeedbackAs(staff, pid, feedback(US, times = times))
+      oid <- createObservationAs(pi, pid)
+      _   <- setScienceBandAs(pi, oid, ScienceBand.Band2.some)
+      _   <- expectIor(
+               user     = staff,
+               query    = s"""
+                 mutation {
+                   setTacFeedback(input: {
+                     programId: "$pid"
+                     tacFeedback: {
+                       timeAccountingCategory: US
+                       recommendedTimes: [ { band: BAND1, time: { hours: 2 } } ]
+                     }
+                   }) {
+                     tacFeedback { timeAccountingCategory }
+                   }
+                 }
+               """,
+               expected = Ior.both(
+                 List(s"The following observations now have a science band for which no time is allocated: $oid"),
+                 json"""{ "setTacFeedback": { "tacFeedback": { "timeAccountingCategory": "US" } } }"""
+               )
+             )
+    yield ()
+
   test("recommended times may not repeat a band"):
     createProgramWithProposal().flatMap: pid =>
       expectOdbError(
@@ -466,8 +531,8 @@ class setTacFeedback extends OdbSuite with query.ObservingModeSetupOperations:
         }
       )
 
-  test("recommended times may not be negative"):
-    createProgramWithProposal().flatMap: pid =>
+  test("recommended times must be positive"):
+    def refused(pid: Program.Id, hours: String)(matches: String => Boolean): IO[Unit] =
       expectOdbError(
         user     = staff,
         query    = s"""
@@ -478,7 +543,7 @@ class setTacFeedback extends OdbSuite with query.ObservingModeSetupOperations:
                 timeAccountingCategory: US
                 decision: ACCEPTED
                 ranking: 1
-                recommendedTimes: [ { band: BAND1, time: { hours: -1 } } ]
+                recommendedTimes: [ { band: BAND1, time: { hours: $hours } } ]
               }
             }) {
               tacFeedback { timeAccountingCategory }
@@ -486,9 +551,14 @@ class setTacFeedback extends OdbSuite with query.ObservingModeSetupOperations:
           }
         """,
         expected = {
-          case OdbError.InvalidArgument(Some(m)) if m.startsWith("Argument 'input.tacFeedback.recommendedTimes") => ()
+          case OdbError.InvalidArgument(Some(m)) if matches(m) => ()
         }
       )
+
+    createProgramWithProposal().flatMap: pid =>
+      refused(pid, "0")(_.contains("Recommended times must be greater than zero.")) *>
+      refused(pid, "-1")(_.startsWith("Argument 'input.tacFeedback.recommendedTimes")) *>
+      allocations(pid).map(assertEquals(_, Nil))
 
   test("explicit null recommended times are rejected"):
     createProgramWithProposal().flatMap: pid =>

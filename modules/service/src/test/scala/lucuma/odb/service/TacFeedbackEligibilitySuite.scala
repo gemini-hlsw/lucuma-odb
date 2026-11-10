@@ -73,11 +73,11 @@ class TacFeedbackEligibilitySuite extends munit.FunSuite:
     List(GT, LTP).foreach: c =>
       assert(canSet(c, empty), c.toString)
 
-  test("JP and KECK require a PI from their community"):
-    assert(canSet(JP, empty.copy(piExchangePartner = ExchangePartner.Subaru.some)))
-    assert(canSet(KECK, empty.copy(piExchangePartner = ExchangePartner.Keck.some)))
-    assert(!canSet(JP, empty.copy(piExchangePartner = ExchangePartner.Keck.some)))
-    assert(!canSet(KECK, empty.copy(piExchangePartner = ExchangePartner.Subaru.some)))
+  test("JP and KECK require a proposal on behalf of their community"):
+    assert(canSet(JP, empty.copy(exchangePartner = ExchangePartner.Subaru.some)))
+    assert(canSet(KECK, empty.copy(exchangePartner = ExchangePartner.Keck.some)))
+    assert(!canSet(JP, empty.copy(exchangePartner = ExchangePartner.Keck.some)))
+    assert(!canSet(KECK, empty.copy(exchangePartner = ExchangePartner.Subaru.some)))
     assert(!canSet(JP, empty))
     assert(!canSet(KECK, empty))
 

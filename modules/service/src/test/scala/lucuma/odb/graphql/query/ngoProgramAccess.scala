@@ -9,17 +9,22 @@ import cats.syntax.all.*
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.GeminiCallForProposalsType
 import lucuma.core.enums.Partner
+import lucuma.core.enums.ProposalStatus
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.TimeAccountingCategory
+import lucuma.core.model.PartnerLink
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.syntax.timespan.*
 import lucuma.odb.data.OdbError
 import lucuma.odb.graphql.input.AllocationInput
 
-// NGO users may read, but not edit, programs in which their partner requests
-// time (partner splits) or holds an allocation.
+// NGO users may read, but not edit, programs in which their partner holds an
+// allocation (unless the proposal was not accepted) or, while the proposal is
+// undecided, requests time (partner splits, or the PI's partner in a Fast
+// Turnaround or Poor Weather proposal).
 class ngoProgramAccess extends OdbSuite {
 
   val pi     = TestUsers.Standard.pi(nextId, nextId)
@@ -117,6 +122,63 @@ class ngoProgramAccess extends OdbSuite {
                  hasReadAccess(ngoUs, none)
                ).sequence
     yield assertEquals(rs, List(true, false, true, false, false))
+
+  // A submitted program requires a semester, which setProposalSubmittedDirectly supplies.
+  def setStatus(pid: Program.Id, status: ProposalStatus): IO[Unit] =
+    setProposalSubmittedDirectly(pid) *> setProposalStatusDirectly(pid, status)
+
+  def undecided(status: ProposalStatus): Boolean =
+    status === ProposalStatus.NotSubmitted || status === ProposalStatus.Submitted
+
+  // A proposal with a CA PI to a call of the given type.
+  def createProgramWithCaPi(callType: GeminiCallForProposalsType, callProps: String): IO[Program.Id] =
+    for
+      cid <- createGeminiCallForProposalsAs(staff, callType)
+      pid <- createProgramWithPiAffiliation(pi, PartnerLink.HasGeminiPartner(Partner.CA))
+      _   <- addProposal(pi, pid, cid.some, callProps.some)
+    yield pid
+
+  test("a partner split counts only while the proposal is undecided"):
+    ProposalStatus.values.toList.traverse_ : status =>
+      for
+        pid <- createProgramWithUsSplit
+        _   <- setStatus(pid, status)
+        _   <- expectVisibility(pid, us = undecided(status), ca = false)
+      yield ()
+
+  test("an allocation counts unless the proposal was not accepted"):
+    ProposalStatus.values.toList.traverse_ : status =>
+      for
+        pid <- createProgramWithUsAllocation
+        _   <- addProposal(pi, pid)
+        _   <- setStatus(pid, status)
+        _   <- expectVisibility(pid, us = status =!= ProposalStatus.NotAccepted, ca = false)
+      yield ()
+
+  test("the PI's partner sees an undecided Fast Turnaround or Poor Weather proposal"):
+    val calls = List(
+      (GeminiCallForProposalsType.FastTurnaround, "fastTurnaround: {}"),
+      (GeminiCallForProposalsType.PoorWeather,    "poorWeather: {}")
+    )
+    (calls, ProposalStatus.values.toList).tupled.traverse_ : (call, status) =>
+      for
+        pid <- createProgramWithCaPi(call._1, call._2)
+        _   <- setStatus(pid, status)
+        _   <- expectVisibility(pid, us = false, ca = undecided(status))
+      yield ()
+
+  test("the PI's partner does not see other proposals without a split"):
+    val props = "queue: { considerForBand3: DO_NOT_CONSIDER, partnerSplits: [{ partner: US, percent: 100 }] }"
+    createProgramWithCaPi(GeminiCallForProposalsType.RegularSemester, props).flatMap: pid =>
+      expectVisibility(pid, us = true, ca = false)
+
+  test("service-level read access follows the proposal status"):
+    for
+      ft <- createProgramWithCaPi(GeminiCallForProposalsType.FastTurnaround, "fastTurnaround: {}")
+      a  <- hasReadAccess(ngoCa, ft)
+      _  <- setStatus(ft, ProposalStatus.NotAccepted)
+      b  <- hasReadAccess(ngoCa, ft)
+    yield assertEquals((a, b), (true, false))
 
   test("a program's observations are visible to the NGO"):
     for

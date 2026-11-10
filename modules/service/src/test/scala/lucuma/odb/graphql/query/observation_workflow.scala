@@ -31,6 +31,7 @@ import lucuma.core.syntax.string.*
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.CalculatedValue
 import lucuma.core.util.CalculationState
+import lucuma.core.util.TimeSpan
 import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.graphql.mutation.UpdateObservationsOps
 import lucuma.odb.service.GuideProbeRules
@@ -624,6 +625,46 @@ class observation_workflow
         _   <- computeItcResultAs(pi, oid)
         _   <- setScienceBandAs(pi, oid, ScienceBand.Band1.some)
         _   <- setAllocationsAs(staff, pid, allocations.tail).intercept[ResponseException[Json]].void
+        _   <- runObscalcUpdateAs(serviceUser, pid, oid)
+      yield oid
+
+    setup.flatMap: oid =>
+      expect(
+        pi,
+        workflowQuery(oid),
+        expected = workflowQueryResult(
+          CalculatedValue(
+            CalculationState.Ready,
+            ObservationWorkflow(
+              ObservationWorkflowState.Undefined,
+              List(ObservationWorkflowState.Inactive),
+              List(
+                ObservationValidation.configuration(
+                  ObservationService.InvalidScienceBandMsg(ScienceBand.Band1)
+                )
+              )
+            )
+          )
+        ).asRight
+      )
+
+  test("a band allocated no time is invalid"):
+    // A 0h allocation, such as one kept only for its TAC recommended time, does
+    // not make its band available.
+    val allocations = List(
+      AllocationInput(TimeAccountingCategory.US, ScienceBand.Band1, 1.hourTimeSpan),
+      AllocationInput(TimeAccountingCategory.CA, ScienceBand.Band2, 4.hourTimeSpan)
+    )
+
+    val setup: IO[Observation.Id] =
+      for
+        pid <- createProgramAs(pi)
+        _   <- setAllocationsAs(staff, pid, allocations)
+        tid <- createTargetWithProfileAs(pi, pid)
+        oid <- createGmosSouthLongSlitObservationAs(pi, pid, List(tid))
+        _   <- computeItcResultAs(pi, oid)
+        _   <- setScienceBandAs(pi, oid, ScienceBand.Band1.some)
+        _   <- setAllocationsAs(staff, pid, allocations.head.copy(duration = TimeSpan.Zero) :: allocations.tail).intercept[ResponseException[Json]].void
         _   <- runObscalcUpdateAs(serviceUser, pid, oid)
       yield oid
 

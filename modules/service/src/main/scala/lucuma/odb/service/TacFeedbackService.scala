@@ -43,7 +43,9 @@ trait TacFeedbackService[F[_]]:
    *
    * Recommended times are kept with the program's allocations.  Setting one
    * also sets the allocated duration to the same time, and removing one
-   * removes the allocation.
+   * removes the allocation.  The observations are then brought in line with
+   * the allocations, as by `AllocationService.afterAllocationsChange`, which
+   * may produce a warning.
    *
    * @return the program id and time accounting category identifying the feedback
    */
@@ -54,7 +56,8 @@ trait TacFeedbackService[F[_]]:
   /**
    * Deletes the TAC feedback of a time accounting category for a program,
    * along with the allocations that carry its recommended times.  The program
-   * must have a submitted proposal.
+   * must have a submitted proposal.  As when setting feedback, the observations
+   * are then brought in line with the allocations.
    *
    * @return `true` if feedback was deleted, `false` if there was none
    */
@@ -78,14 +81,14 @@ object TacFeedbackService:
    * @param status            the proposal status
    * @param cfpType           the type of the proposal's call for proposals, if any
    * @param piPartner         the Gemini partner the PI is affiliated with, if any
-   * @param piExchangePartner the exchange partner the PI is affiliated with, if any
+   * @param exchangePartner   the exchange partner on whose behalf the proposal requests time, if any
    * @param splitPartners     the partners with a non-zero time split
    */
   case class FeedbackContext(
     status:            ProposalStatus,
     cfpType:           Option[GeminiCallForProposalsType],
     piPartner:         Option[Partner],
-    piExchangePartner: Option[ExchangePartner],
+    exchangePartner:   Option[ExchangePartner],
     splitPartners:     Set[Partner]
   )
 
@@ -115,8 +118,8 @@ object TacFeedbackService:
 
     def requireExchangePartner(p: ExchangePartner, community: String): Either[String, Unit] =
       require(
-        ctx.piExchangePartner.contains(p),
-        s"Time accounting category $name can only provide TAC feedback for a proposal whose PI is affiliated with $community, which is not the case for program $pid."
+        ctx.exchangePartner.contains(p),
+        s"Time accounting category $name can only provide TAC feedback for a proposal requesting time on behalf of $community, which is not the case for program $pid."
       )
 
     def requireCfpType(t: GeminiCallForProposalsType): Either[String, Unit] =
@@ -160,7 +163,12 @@ object TacFeedbackService:
         input.foldWithId(OdbError.InvalidArgument().asFailureF): (feedback, pid) =>
           checkEligibility(pid, feedback.timeAccountingCategory, forDelete = false).flatMap: r =>
             r.flatTraverse: _ =>
-              upsert(pid, feedback).map(_.as((pid, feedback.timeAccountingCategory)))
+              upsert(pid, feedback).flatMap: r =>
+                r.flatTraverse: _ =>
+                  feedback
+                    .recommendedTimes
+                    .fold(Result.unit.pure[F])(_ => Services.asSuperUser(allocationService.afterAllocationsChange(pid)))
+                    .map(_.as((pid, feedback.timeAccountingCategory)))
 
       override def deleteTacFeedback(
         input: AccessControl.CheckedWithId[TimeAccountingCategory, Program.Id]
@@ -171,11 +179,14 @@ object TacFeedbackService:
               for
                 deleted <- session.option(Statements.DeleteTacFeedback)((pid, category))
                 _       <- session.execute(Statements.DeleteRecommendedAllocations)((pid, category))
-              yield Result(deleted.isDefined)
+                r       <- Services.asSuperUser(allocationService.afterAllocationsChange(pid))
+              yield r.as(deleted.isDefined)
 
       override def deleteAllTacFeedback(pid: Program.Id)(using Transaction[F], Services.SuperUserAccess): F[Unit] =
+        // Proposal deletion has no way to report a warning about observation bands.
         session.execute(Statements.DeleteAllTacFeedback)(pid) *>
-          session.execute(Statements.DeleteAllRecommendedAllocations)(pid).void
+          session.execute(Statements.DeleteAllRecommendedAllocations)(pid) *>
+          allocationService.afterAllocationsChange(pid).void
 
       private def checkEligibility(
         pid:       Program.Id,
@@ -256,7 +267,7 @@ object TacFeedbackService:
         SELECT prog.c_proposal_status,
                cfp.c_gemini_proposal_type,
                pi.c_gemini_partner,
-               pi.c_exchange_partner,
+               prop.c_exchange_partner,
                COALESCE(
                  (SELECT ARRAY_AGG(c_partner) FROM t_partner_split WHERE c_program_id = prog.c_program_id AND c_percent > 0),
                  '{}'

@@ -2,17 +2,20 @@
 -- partner, and the recommended times live in t_allocation alongside the
 -- allocated durations.
 
--- The time recommended by the TAC for the category and band, if any.
+-- The time recommended by the TAC for the category and band, if any.  A
+-- recommendation is always for some time.
 ALTER TABLE t_allocation
   ADD COLUMN c_recommended_time interval NULL
-    CHECK (c_recommended_time IS NULL OR c_recommended_time >= interval '0');
+    CHECK (c_recommended_time IS NULL OR c_recommended_time > interval '0');
 
 -- Every partner has the same tag as its time accounting category.  A new
 -- allocation starts with the recommended time as its duration, while an
--- existing allocation keeps its duration.
+-- existing allocation keeps its duration.  A recommendation of no time carries
+-- nothing worth keeping, and is dropped.
 INSERT INTO t_allocation (c_program_id, c_ta_category, c_science_band, c_duration, c_recommended_time)
 SELECT c_program_id, c_partner, c_science_band, c_recommended_time, c_recommended_time
   FROM t_tac_recommended_time
+ WHERE c_recommended_time > interval '0'
 ON CONFLICT (c_program_id, c_ta_category, c_science_band)
   DO UPDATE SET c_recommended_time = EXCLUDED.c_recommended_time;
 

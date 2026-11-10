@@ -592,6 +592,7 @@ object ObservationValidationInfo {
           t_allocation
         WHERE
           c_program_id IN ($enc)
+          AND c_duration > INTERVAL '0'
       """.query(program_id *: science_band)
 
     // The obscalc invalidation trigger on t_cfp (V1342) fires only when one of

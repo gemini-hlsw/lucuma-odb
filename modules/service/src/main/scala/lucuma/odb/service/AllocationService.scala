@@ -34,6 +34,14 @@ trait AllocationService[F[_]] {
   def setAllocations(input: AccessControl.CheckedWithId[List[AllocationInput], Program.Id])(using Transaction[F]): F[Result[Program.Id]]
 
   /**
+   * Brings the program's observations in line with its allocations after they
+   * change.  When time is allocated in exactly one science band, observations
+   * without a band are given it.  Observations whose band no longer has time
+   * allocated produce a warning.
+   */
+  def afterAllocationsChange(pid: Program.Id)(using Transaction[F], SuperUserAccess): F[Result[Unit]]
+
+  /**
    * Validates that the given `band` may be assigned to observations in the
    * programs referenced by `pids`.
    */
@@ -60,15 +68,19 @@ object AllocationService {
 
       override def setAllocations(input: AccessControl.CheckedWithId[List[AllocationInput], Program.Id])(using Transaction[F]): F[Result[Program.Id]] =
         input.foldWithId(OdbError.InvalidArgument().asFailureF) { (allocations, pid) =>
-          val bands = allocations.map(_.scienceBand).toSet
           removeAbsentAllocations(pid, allocations) *>
           NonEmptyList.fromList(allocations).traverse_ { lst =>
             session.execute(Statements.setAllocations(lst))((pid, lst))
           }                                  *>
+          Services.asSuperUser(afterAllocationsChange(pid)).map(_.as(pid))
+        }
+
+      override def afterAllocationsChange(pid: Program.Id)(using Transaction[F], SuperUserAccess): F[Result[Unit]] =
+        selectScienceBands(pid).flatMap { bands =>
           session
             .execute(Statements.SetScienceBandWhereNull)(pid, bands.head)
             .whenA(bands.sizeIs == 1)  *>
-          validateObservations(bands, pid).map(_.as(pid))
+          validateObservations(bands, pid)
         }
 
       // Allocations missing from the new list are deleted, unless they carry
