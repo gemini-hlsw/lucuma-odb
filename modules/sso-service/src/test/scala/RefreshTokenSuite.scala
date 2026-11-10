@@ -44,6 +44,35 @@ class RefreshTokenSuite extends SsoSuite with Fixture {
     }
   }
 
+  test("Logout should invalidate the session token on the server."):
+    SsoSimulator[IO]
+      .flatMap { case (pool, _, sso, _, _) => pool.map(db => (db, sso)) }
+      .use { case (db, sso) =>
+        for {
+          tok    <- sso.run(Request(Method.POST, SsoRoot / "api" / "v1" / "auth-as-guest")).use(CookieReader[IO].getSessionToken(_))
+          before <- db.findUserFromToken(tok)
+          _      <- sso.status(Request[IO](Method.POST, SsoRoot / "api" / "v1" / "logout"))
+          after  <- db.findUserFromToken(tok)
+          // Replay the old cookie, bypassing the client's cookie jar.
+          s      <- sso.status {
+                      Request[IO](
+                        method  = Method.POST,
+                        uri     = SsoRoot / "api" / "v1" / "refresh-token",
+                        headers = Headers(Cookie(RequestCookie("lucuma-refresh-token", tok.value.toString)))
+                      )
+                    }
+        } yield {
+          assert(before.isDefined)
+          assertEq(None, after)
+          assertEq(Status.Forbidden, s)
+        }
+      }
+
+  test("Logout without a cookie should still succeed."):
+    SsoSimulator[IO].use { case (_, _, sso, _, _) =>
+      sso.status(Request[IO](Method.POST, SsoRoot / "api" / "v1" / "logout")).map(assertEq(Status.Ok, _))
+    }
+
   test("Invalid cookie should yield 403.") {
     SsoSimulator[IO].use { case (_, _, sso, _, _) =>
       sso.status {
