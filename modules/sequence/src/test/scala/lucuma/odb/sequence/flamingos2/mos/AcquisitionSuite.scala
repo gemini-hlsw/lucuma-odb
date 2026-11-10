@@ -105,17 +105,17 @@ class AcquisitionSuite extends FunSuite:
   private def titles(as: List[Atom[Flamingos2DynamicConfig]]): List[String] =
     as.map(_.description.fold("")(_.value))
 
-  test("the initial atom is mask out, sky nod, then the through-mask pair"):
+  test("the initial atom is sky then target with the mask out, and again through the mask"):
     val steps = generate().head.steps.toList
 
     assertEquals(steps.length, 4)
     assertEquals(steps.map(_.instrumentConfig.fpu), List[Flamingos2FpuMask](Flamingos2FpuMask.Imaging, Flamingos2FpuMask.Imaging, CustomMask, CustomMask))
-    assertEquals(steps.map(qArcsec), List(0.0, 10.0, 0.0, 10.0))
+    assertEquals(steps.map(qArcsec), List(10.0, 0.0, 10.0, 0.0))
     assert(steps.forall(s => qArcsec(s) == 0.0 || qArcsec(s) == 10.0))
     assertEquals(steps.map(_.telescopeConfig.offset.p.toAngle.toMicroarcseconds).toSet, Set(0L))
     assertEquals(steps.map(_.observeClass).toSet, Set(ObserveClass.Acquisition))
 
-  test("the breakpoint sits on the first mask-in step, so execution halts after step 2"):
+  test("the breakpoint sits on the first through-mask step, so execution halts after step 2"):
     val steps = generate().head.steps.toList
 
     assertEquals(steps.map(_.breakpoint), List(Breakpoint.Disabled, Breakpoint.Disabled, Breakpoint.Enabled, Breakpoint.Disabled))
@@ -138,7 +138,7 @@ class AcquisitionSuite extends FunSuite:
 
     assertEquals(steps.map(_.instrumentConfig.filter).toSet, Set(Flamingos2Filter.KShort))
 
-  test("the initial atom is followed by breakpointed Fine Adjustments pairs"):
+  test("the initial atom is followed by breakpointed Fine Adjustments images, with no sky step"):
     val atoms = generate()
 
     assertEquals(atoms.length, Acquisition.RepeatingAtomCount + 1)
@@ -146,16 +146,15 @@ class AcquisitionSuite extends FunSuite:
 
     atoms.tail.foreach: a =>
       val ss = a.steps.toList
-      assertEquals(ss.length, 2)
-      assertEquals(ss.map(_.instrumentConfig.fpu), List[Flamingos2FpuMask](CustomMask, CustomMask))
-      assertEquals(ss.map(qArcsec), List(0.0, 10.0))
-      assertEquals(ss.map(_.breakpoint), List(Breakpoint.Enabled, Breakpoint.Disabled))
+      assertEquals(ss.map(_.instrumentConfig.fpu), List[Flamingos2FpuMask](CustomMask))
+      assertEquals(ss.map(qArcsec), List(0.0))
+      assertEquals(ss.map(_.breakpoint), List(Breakpoint.Enabled))
 
-  test("a short exposure still takes both sky nods"):
+  test("a short exposure still takes both sky steps"):
     val steps = generate(config(exposureTime = 1.secondTimeSpan)).head.steps.toList
 
     assertEquals(steps.length, 4)
-    assertEquals(steps.map(qArcsec), List(0.0, 10.0, 0.0, 10.0))
+    assertEquals(steps.map(qArcsec), List(10.0, 0.0, 10.0, 0.0))
 
   test("an acquisition with no explicit type is Faint"):
     assertEquals(generate().head.steps.length, 4)
@@ -179,9 +178,9 @@ class AcquisitionSuite extends FunSuite:
       Offset(Offset.P(Angle.fromDoubleArcseconds(5.0)), Offset.Q(Angle.fromDoubleArcseconds(-3.0)))
     val atoms = generate(config(explicitMode = Flamingos2AcquisitionMode.Faint(skyOffset).some))
 
-    assertEquals(atoms.head.steps.toList.map(_.telescopeConfig.offset), List(Offset.Zero, skyOffset, Offset.Zero, skyOffset))
+    assertEquals(atoms.head.steps.toList.map(_.telescopeConfig.offset), List(skyOffset, Offset.Zero, skyOffset, Offset.Zero))
     atoms.tail.foreach: a =>
-      assertEquals(a.steps.toList.map(_.telescopeConfig.offset), List(Offset.Zero, skyOffset))
+      assertEquals(a.steps.toList.map(_.telescopeConfig.offset), List(Offset.Zero))
 
   test("the explicit mode is part of the configuration hash, an automatic one is not"):
     def hash(mode: Option[Flamingos2AcquisitionMode]): List[Byte] =

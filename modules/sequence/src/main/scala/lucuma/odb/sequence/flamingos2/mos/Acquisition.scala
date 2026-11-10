@@ -42,13 +42,13 @@ import java.util.UUID
  * The observer cannot measure the offset through the mask, so the initial atom
  * images the field with the mask out of the beam and then, after a breakpoint
  * where the measured offset is applied, repeats the pair through the mask to
- * confirm the targets land in the slitlets. In a Faint acquisition, the
- * default, each on-target step is followed by its sky step; a Bright one
- * takes no sky steps.
+ * confirm the targets land in the slitlets. A Faint acquisition, the default,
+ * needs a sky frame to subtract, taken before the on-target step with the mask
+ * out and again with it in; a Bright one takes no sky steps.
  *
  * The "Fine Adjustments" atoms that follow are a ceiling rather than a plan:
- * each carries a breakpoint, so taking another mask-in pair is always the
- * observer's explicit decision.
+ * each carries a breakpoint, so taking another through-mask image is always the
+ * observer's explicit decision. They reuse the sky frame of the initial atom.
  */
 object Acquisition:
 
@@ -63,16 +63,18 @@ object Acquisition:
     maskInSky:  Option[ProtoStep[F2]]
   ):
     /**
-     * Mask out and its sky step, then the same through the mask. The breakpoint
-     * sits on the first mask-in step: execution halts there so the observer can
-     * measure and apply the offset from the field images.
+     * The breakpoint sits on the first through-mask step: execution halts there
+     * so the observer can measure and apply the offset from the field image.
      */
     val initialAtom: NonEmptyList[ProtoStep[F2]] =
-      NonEmptyList(maskOut, maskOutSky.toList ++ List(maskIn.withBreakpoint) ++ maskInSky.toList)
+      NonEmptyList.ofInitLast(
+        maskOutSky.toList ++ List(maskOut) ++ maskInSky.map(_.withBreakpoint).toList,
+        maskInSky.fold(maskIn.withBreakpoint)(_ => maskIn)
+      )
 
-    /** An optional extra through-mask image and its sky step, gated by a breakpoint. */
+    /** An optional extra through-mask image, gated by a breakpoint. */
     val repeatingAtom: NonEmptyList[ProtoStep[F2]] =
-      NonEmptyList(maskIn.withBreakpoint, maskInSky.toList)
+      NonEmptyList.one(maskIn.withBreakpoint)
 
   private object StepComputer extends SequenceState[F2] with Flamingos2InitialDynamicConfig:
     def compute(
