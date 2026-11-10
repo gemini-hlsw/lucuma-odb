@@ -90,10 +90,20 @@ object Routes {
           }
         }
 
-      // Log out. TODO: If it's a guest user, delete that user.
-      case POST -> Root / "api" / "v1" / "logout" =>
-        // TODO: get the user so we can trace this!
-        Ok("Logged out.").flatMap(cookies.removeCookie)
+      // Log out: invalidate the server-side session, then clear the cookie.
+      // TODO: If it's a guest user, delete that user.
+      case r@(POST -> Root / "api" / "v1" / "logout") =>
+        cookies.findSessionToken(r).flatMap:
+          case None      => Ok("Logged out.").flatMap(cookies.removeCookie)
+          case Some(tok) =>
+            dbPool.use: db =>
+              for {
+                ou  <- db.findUserFromToken(tok)
+                _   <- ou.traverse_(traceUser(_))
+                _   <- db.deleteSessionToken(tok)
+                res <- Ok("Logged out.")
+                out <- cookies.removeCookie(res)
+              } yield out
 
       // Start a new session wih the same user, but a different role. On success we replace the
       // session cookie and return a new JWT.
