@@ -2052,6 +2052,43 @@ class perScienceObservationCalibrations
       assertEquals(wf3, (ObservationWorkflowState.Ongoing,  List(ObservationWorkflowState.Completed)))
     }
 
+  // A telluric not yet taken follows its science observation into a suspension
+  // too, although it isn't executing itself, and comes back Ready on resuming:
+  // the suspension never touches the science observation's Ready, which the
+  // telluric inherits.
+  test("An unexecuted telluric follows a suspended science, and is Ready again on resuming"):
+    def workflow(oid: Observation.Id): IO[(ObservationWorkflowState, List[ObservationWorkflowState])] =
+      query(staff, s"""query { observation(observationId: "$oid") { workflow { value { state validTransitions } } } }""")
+        .map: json =>
+          val c = json.hcursor.downFields("observation", "workflow", "value")
+          (c.downField("state").require[ObservationWorkflowState], c.downField("validTransitions").require[List[ObservationWorkflowState]])
+    for {
+      pid         <- createProgramAs(pi)
+      tid         <- createTargetWithProfileAs(pi, pid)
+      oid         <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _           <- runObscalcUpdate(pid, oid)
+      _           <- recalculateCalibrations(pid, when, oid)
+      _           <- sleep >> resolveTelluricTargets
+      telluricOid <- calibrationObservationFor(oid, CalibrationRole.Telluric).map(_.get)
+      _           <- forceObsUserState(oid, Some(ObservationWorkflowState.Ready))
+      v           <- recordVisitAs(serviceUser, oid)
+      _           <- addSequenceEventAs(serviceUser, v, SequenceCommand.Start)
+      _           <- runObscalcUpdate(pid, telluricOid)
+      wf1         <- workflow(telluricOid)
+      _           <- setObservationWorkflowState(staff, oid, ObservationWorkflowState.Inactive)
+      _           <- runObscalcUpdate(pid, telluricOid)
+      wf2         <- workflow(telluricOid)
+      _           <- setObservationWorkflowState(staff, oid, ObservationWorkflowState.Ongoing)
+      _           <- runObscalcUpdate(pid, telluricOid)
+      wf3         <- workflow(telluricOid)
+      sci         <- obsUserStateTag(oid)
+    } yield {
+      assertEquals(wf1, (ObservationWorkflowState.Ready,    List(ObservationWorkflowState.Inactive)))
+      assertEquals(wf2, (ObservationWorkflowState.Inactive, Nil))
+      assertEquals(wf3, (ObservationWorkflowState.Ready,    List(ObservationWorkflowState.Inactive)))
+      assertEquals(sci, Some("ready"))
+    }
+
   test("Telluric with visit is preserved when science changes to GMOS"):
     for {
       pid                <- createProgramAs(pi)

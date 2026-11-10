@@ -242,15 +242,22 @@ object ObservationWorkflowService {
                 // user state is kept, so Ready returns once they're dismissed.
                 case Defined    => Option.unless(hasWarnings)(Ready)
 
+        // A suspension holds until the observation completes.  Only an executing
+        // observation can be suspended, but a per-observation calibration takes its
+        // science observation's suspension whether or not it has started itself:
+        // a telluric not yet taken must not stay Ready while its science is suspended.
+        val suspended: Boolean =
+          info.effectiveSuspended && !executionState.contains(Completed)
+
         // Our final state is the execution state (if any), else the user state (if any), else the validation state,
-        // except that an ongoing observation that staff have suspended is inactive.  A completed one stays completed.
+        // except that a suspended observation is inactive.  A completed one stays completed.
         // The user state never overrides execution: an observation set inactive and executed anyway is ongoing.
         val state: ObservationWorkflowState =
           (executionState, userStatus(validationStatus)) match
-            case (None, None)                                 => validationStatus
-            case (None, Some(us))                             => us
-            case (Some(Ongoing), _) if info.effectiveSuspended => Inactive
-            case (Some(es), _)                                => es
+            case _ if suspended   => Inactive
+            case (None, None)     => validationStatus
+            case (None, Some(us)) => us
+            case (Some(es), _)    => es
 
         // The transitions below are the ones staff could take.  Which of them are
         // staff-only is decided in one place, StaffOnlyTransitions, applied at the
@@ -273,9 +280,9 @@ object ObservationWorkflowService {
             // A telluric may be declined (set to Inactive)
             state match
               case Inactive =>
-                // An executing telluric is inactive only while its science
-                // observation is suspended, which it follows.
-                if info.userState.contains(Inactive) && executionState.isEmpty
+                // Reinstating a declined telluric waits while its science observation
+                // is suspended, which it follows; an executing one isn't declined.
+                if info.userState.contains(Inactive) && executionState.isEmpty && !suspended
                 then List(info.associatedUserState.getOrElse(validationStatus))
                 else Nil
               case _ =>

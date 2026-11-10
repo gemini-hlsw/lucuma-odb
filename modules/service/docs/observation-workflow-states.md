@@ -206,7 +206,10 @@ offers no transitions — there is no override to clear. Both calibration carve-
 apply only while `state <= Ready`; once execution begins the generic rules resume,
 except that a per-observation calibration never gets the staff
 `Ongoing <-> Inactive` edges. It follows its science observation instead,
-including when staff set an ongoing science observation inactive. Suspending
+including when staff set an ongoing science observation inactive, whether or
+not the calibration itself has started: one not yet taken is `Inactive` while
+its science is suspended, and inherits the science's user state again (`Ready`,
+say) once it is resumed. Suspending
 the science deletes none of its calibrations, because its execution state
 protects them, and it keeps its calibration group even when that group is
 empty. Calibration syncing (the telluric count and the daytime calibrations)
