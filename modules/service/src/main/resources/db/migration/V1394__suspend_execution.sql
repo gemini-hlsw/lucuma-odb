@@ -48,10 +48,33 @@ COMMENT ON COLUMN t_observation_execution.c_suspended IS
 
 -- Suspending or resuming changes the workflow, which obscalc stores, and it
 -- changes the observation as clients see it.
+--
+-- It changes the workflow of the observation's per-observation calibrations as
+-- well (tellurics, daytime pinholes and flats), which follow it into the
+-- suspension.  Nothing else would queue them: the calibration service leaves a
+-- suspended observation's calibrations alone.  They are found as
+-- ObservationValidationInfo.Statements.AssociatedScienceObservation associates
+-- them, by group and by the roles in ObsExtract.PerObservationCalibrationRoles
+-- (keep the two in step), and invalidated in the same call as the observation so that
+-- the rows are locked in id order, as every bulk invalidation locks them.
 CREATE FUNCTION observation_suspension_invalidate()
   RETURNS trigger AS $$
+DECLARE
+  oids d_observation_id[];
 BEGIN
-  CALL invalidate_obscalc(NEW.c_observation_id);
+  SELECT array_agg(c.c_observation_id) INTO oids
+    FROM t_observation s
+    JOIN t_observation c ON c.c_group_id = s.c_group_id
+   WHERE s.c_observation_id   = NEW.c_observation_id
+     AND s.c_calibration_role IS NULL
+     AND c.c_calibration_role IN (
+           'telluric'::e_calibration_role,
+           'daytime_pinhole'::e_calibration_role,
+           'daytime_flat'::e_calibration_role
+         )
+     AND c.c_existence = 'present';
+
+  CALL invalidate_obscalc_many(array_append(oids, NEW.c_observation_id));
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;

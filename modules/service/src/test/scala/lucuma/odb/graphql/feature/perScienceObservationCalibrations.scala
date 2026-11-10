@@ -2055,8 +2055,16 @@ class perScienceObservationCalibrations
   // A telluric not yet taken follows its science observation into a suspension
   // too, although it isn't executing itself, and comes back Ready on resuming:
   // the suspension never touches the science observation's Ready, which the
-  // telluric inherits.
+  // telluric inherits.  Suspending and resuming queue the telluric for
+  // recalculation along with the science, or its stored workflow would stay as
+  // it was.
   test("An unexecuted telluric follows a suspended science, and is Ready again on resuming"):
+    def obscalcState(oid: Observation.Id): IO[String] =
+      session.use(
+        _.unique(sql"""
+          SELECT c_obscalc_state::text FROM t_obscalc WHERE c_observation_id = ${observation_id}
+        """.query(skunk.codec.all.text))(oid)
+      )
     def workflow(oid: Observation.Id): IO[(ObservationWorkflowState, List[ObservationWorkflowState])] =
       query(staff, s"""query { observation(observationId: "$oid") { workflow { value { state validTransitions } } } }""")
         .map: json =>
@@ -2075,14 +2083,20 @@ class perScienceObservationCalibrations
       _           <- addSequenceEventAs(serviceUser, v, SequenceCommand.Start)
       _           <- runObscalcUpdate(pid, telluricOid)
       wf1         <- workflow(telluricOid)
+      q1          <- obscalcState(telluricOid)
       _           <- setObservationWorkflowState(staff, oid, ObservationWorkflowState.Suspended)
+      q2          <- obscalcState(telluricOid)
       _           <- runObscalcUpdate(pid, telluricOid)
       wf2         <- workflow(telluricOid)
       _           <- setObservationWorkflowState(staff, oid, ObservationWorkflowState.Ongoing)
+      q3          <- obscalcState(telluricOid)
       _           <- runObscalcUpdate(pid, telluricOid)
       wf3         <- workflow(telluricOid)
       sci         <- obsUserStateTag(oid)
     } yield {
+      assertEquals(q1, "ready")
+      assertEquals(q2, "pending") // queued by the suspension
+      assertEquals(q3, "pending") // and by the resumption
       assertEquals(wf1, (ObservationWorkflowState.Ready,    List(ObservationWorkflowState.Inactive)))
       assertEquals(wf2, (ObservationWorkflowState.Suspended, Nil))
       assertEquals(wf3, (ObservationWorkflowState.Ready,    List(ObservationWorkflowState.Inactive)))
