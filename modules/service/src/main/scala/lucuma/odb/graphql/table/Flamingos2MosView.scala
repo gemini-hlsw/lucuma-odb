@@ -22,6 +22,9 @@ trait Flamingos2MosView[F[_]] extends BaseMapping[F]:
 
     val AcquisitionFilter: ColumnRef        = col("c_acquisition_filter", flamingos_2_filter.opt)
     val AcquisitionFilterDefault: ColumnRef = col("c_acquisition_filter_default", flamingos_2_filter)
+    val AcquisitionType: ColumnRef       = col("c_acquisition_type", flamingos_2_acquisition_type.opt)
+    val AcquisitionSkyOffsetP: ColumnRef = col("c_acquisition_sky_offset_p", angle_µas.opt)
+    val AcquisitionSkyOffsetQ: ColumnRef = col("c_acquisition_sky_offset_q", angle_µas.opt)
     val MaskAttachmentId: ColumnRef   = col("c_mask_attachment_id", attachment_id.opt)
 
     val ReadMode: ColumnRef           = col("c_read_mode", flamingos_2_read_mode.opt)

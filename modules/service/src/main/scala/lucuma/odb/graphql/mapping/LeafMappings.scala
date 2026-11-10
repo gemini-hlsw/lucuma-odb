@@ -123,6 +123,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F]:
       LeafMapping[ExecutionState](ExecutionStateType),
       LeafMapping[Existence](ExistenceType),
       LeafMapping[Extinction](ExtinctionType),
+      LeafMapping[Flamingos2AcquisitionType](Flamingos2AcquisitionTypeType),
       LeafMapping[Flamingos2CustomSlitWidth](Flamingos2CustomSlitWidthType),
       LeafMapping[Flamingos2Disperser](Flamingos2DisperserType),
       LeafMapping[Flamingos2Filter](Flamingos2FilterType),

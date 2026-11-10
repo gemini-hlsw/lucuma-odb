@@ -112,7 +112,7 @@ class MosTelluricSuite extends FunSuite:
     cfg:       longslit.Config         = config()
   ): StreamingExecutionConfig[fs2.Pure, Flamingos2StaticConfig, Flamingos2DynamicConfig] =
     longslit.LongSlit
-      .instantiate[Eval](Oid, estimator, Namespace, expander, cfg, itc(exposures), itc(exposures), calRole)
+      .instantiate[Eval](Oid, estimator, Namespace, expander, cfg, none, itc(exposures), itc(exposures), calRole)
       .value
       .fold(e => fail(s"could not generate: $e"), identity)
 

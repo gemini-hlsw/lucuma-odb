@@ -17,6 +17,9 @@ trait Flamingos2LongSlitView[F[_]] extends BaseMapping[F]:
     val Filter: ColumnRef             = col("c_filter", flamingos_2_filter)
     val AcquisitionFilter             = col("c_acquisition_filter", flamingos_2_filter.opt)
     val AcquisitionFilterDefault      = col("c_acquisition_filter_default", flamingos_2_filter)
+    val AcquisitionType: ColumnRef       = col("c_acquisition_type", flamingos_2_acquisition_type.opt)
+    val AcquisitionSkyOffsetP: ColumnRef = col("c_acquisition_sky_offset_p", angle_µas.opt)
+    val AcquisitionSkyOffsetQ: ColumnRef = col("c_acquisition_sky_offset_q", angle_µas.opt)
     val Fpu: ColumnRef                = col("c_fpu", flamingos_2_fpu)
 
     val ObservationId: ColumnRef      = col("c_observation_id", observation_id)

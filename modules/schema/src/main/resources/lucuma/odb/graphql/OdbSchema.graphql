@@ -11305,6 +11305,19 @@ type Flamingos2LongSlitAcquisition {
   """
   exposureTimeMode: ExposureTimeMode!
 
+  """
+  An explicitly specified acquisition type (if any). When null, the ITC
+  classifies the target: BRIGHT when it reaches a signal-to-noise of 10 in a
+  total exposure time of at most 2 seconds, FAINT otherwise.
+  """
+  explicitAcquisitionType: Flamingos2AcquisitionType
+
+  """
+  Where the sky frames of a FAINT acquisition are taken. Present exactly when
+  `explicitAcquisitionType` is FAINT.
+  """
+  skyOffset: Offset
+
 }
 
 """
@@ -11447,6 +11460,18 @@ input Flamingos2LongSlitAcquisitionInput {
   """
   exposureTimeMode: ExposureTimeModeInput
 
+  """
+  An explicit acquisition type to use instead of the automatic one. It may be
+  unset by assigning a null value, or ignored by skipping it altogether.
+  """
+  explicitAcquisitionType: Flamingos2AcquisitionType
+
+  """
+  Where the sky frames of a FAINT acquisition are taken. Required when
+  `explicitAcquisitionType` is FAINT and not allowed otherwise.
+  """
+  skyOffset: OffsetInput
+
 }
 
 """
@@ -11543,6 +11568,18 @@ type Flamingos2MosAcquisition {
   """
   exposureTimeMode: ExposureTimeMode!
 
+  """
+  An explicitly specified acquisition type (if any). When null, the acquisition
+  is FAINT: the brightness of the mask's acquisition stars is unknown.
+  """
+  explicitAcquisitionType: Flamingos2AcquisitionType
+
+  """
+  Where the sky frames of a FAINT acquisition are taken. Present exactly when
+  `explicitAcquisitionType` is FAINT.
+  """
+  skyOffset: Offset
+
 }
 
 """
@@ -11566,6 +11603,18 @@ input Flamingos2MosAcquisitionInput {
   default is 5 seconds with a count of 1.
   """
   exposureTimeMode: ExposureTimeModeInput
+
+  """
+  An explicit acquisition type to use instead of the automatic one. It may be
+  unset by assigning a null value, or ignored by skipping it altogether.
+  """
+  explicitAcquisitionType: Flamingos2AcquisitionType
+
+  """
+  Where the sky frames of a FAINT acquisition are taken. Required when
+  `explicitAcquisitionType` is FAINT and not allowed otherwise.
+  """
+  skyOffset: OffsetInput
 
 }
 
@@ -16924,6 +16973,15 @@ enum GnirsReadMode {
 enum GnirsWellDepth {
   SHALLOW
   DEEP
+}
+
+"""
+Flamingos 2 acquisition type. A FAINT acquisition subtracts sky frames, a BRIGHT
+one does not.
+"""
+enum Flamingos2AcquisitionType {
+  BRIGHT
+  FAINT
 }
 
 """

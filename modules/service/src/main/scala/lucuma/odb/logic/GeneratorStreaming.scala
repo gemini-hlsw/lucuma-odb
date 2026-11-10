@@ -13,6 +13,7 @@ import cats.syntax.functor.*
 import cats.syntax.option.*
 import fs2.Pure
 import fs2.Stream
+import lucuma.core.enums.Flamingos2AcquisitionType
 import lucuma.core.enums.GnirsAcquisitionType
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.SequenceType
@@ -34,6 +35,7 @@ import lucuma.core.model.sequence.igrins2.Igrins2StaticConfig as Igrins2Static
 import lucuma.itc.IntegrationTime
 import lucuma.odb.data.Itc
 import lucuma.odb.data.ItcAcquisition
+import lucuma.odb.data.ItcAcquisitionType
 import lucuma.odb.data.ItcScience
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.ObservingMode
@@ -257,14 +259,24 @@ object GeneratorStreaming:
         case ItcAcquisition.NotApplicable       =>
           OdbError.InvalidObservation(oid, s"Expecting an acquisition ITC result for this observation".some).asLeft
 
-  // The pinned GNIRS acquisition type, when the acquisition result carries one.
-  def gnirsAcqType(
+  // The acquisition type the ITC pinned, when the acquisition result carries one.
+  private def pinnedAcquisitionType(
     itc: Either[OdbError, Itc]
-  ): Option[GnirsAcquisitionType] =
+  ): Option[ItcAcquisitionType] =
     itc.toOption.flatMap:
       _.acquisition match
         case ItcAcquisition.Available(_, t) => t
         case _                              => none
+
+  def gnirsAcqType(
+    itc: Either[OdbError, Itc]
+  ): Option[GnirsAcquisitionType] =
+    pinnedAcquisitionType(itc).flatMap(_.gnirs)
+
+  def flamingos2AcqType(
+    itc: Either[OdbError, Itc]
+  ): Option[Flamingos2AcquisitionType] =
+    pinnedAcquisitionType(itc).flatMap(_.flamingos2)
 
   def instantiate[F[_]: Async: Services](
     commitHash: CommitHash,
@@ -359,7 +371,7 @@ object GeneratorStreaming:
           acq  = acquisitionTime(context.oid, context.itcRes)
           sci  = spectroscopyScienceTime(context.oid, context.itcRes)
           rol  = context.params.calibrationRole
-          gen <- EitherT(LongSlit.instantiate(context.oid, calculator.flamingos2Step, context.namespace, exp.flamingos2, cfg, acq, sci, rol))
+          gen <- EitherT(LongSlit.instantiate(context.oid, calculator.flamingos2Step, context.namespace, exp.flamingos2, cfg, flamingos2AcqType(context.itcRes), acq, sci, rol))
           res <- collapseIfNecessary(context, gen)
         yield res).value
 

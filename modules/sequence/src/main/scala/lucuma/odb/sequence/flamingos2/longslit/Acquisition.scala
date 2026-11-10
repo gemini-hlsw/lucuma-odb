@@ -9,12 +9,12 @@ import cats.Order.catsKernelOrderingForOrder
 import cats.data.NonEmptyList
 import cats.syntax.either.*
 import cats.syntax.option.*
-import cats.syntax.order.*
 import cats.syntax.traverse.*
 import eu.timepit.refined.*
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Pure
 import fs2.Stream
+import lucuma.core.enums.Flamingos2AcquisitionType
 import lucuma.core.enums.Flamingos2Disperser
 import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.Flamingos2Fpu
@@ -23,10 +23,12 @@ import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.Flamingos2ReadoutMode
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
+import lucuma.core.math.Offset
 import lucuma.core.math.Wavelength
 import lucuma.core.math.syntax.int.*
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Atom
+import lucuma.core.model.sequence.flamingos2.Flamingos2AcquisitionMode
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig as F2
 import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
@@ -48,24 +50,23 @@ object Acquisition:
 
   val RepeatingAtomCount: Int = 10
 
-  val SkySubtractionLimit: TimeSpan = 2.secondTimeSpan
-
   extension (scienceFilter: Flamingos2Filter)
     def toAcquisitionFilter: Flamingos2Filter =
       Flamingos2Filter.acquisition.toList.minBy(f => scienceFilter.wavelength.diff(f.wavelength).abs)
 
+  /** The sky steps are present only in a Faint acquisition. */
   case class Steps(
     image:    ProtoStep[F2],
-    imageQ10: ProtoStep[F2],
+    imageSky: Option[ProtoStep[F2]],
     slitP10:  ProtoStep[F2],
-    slitQ10:  ProtoStep[F2],
+    slitSky:  Option[ProtoStep[F2]],
     slit:     ProtoStep[F2]
   ):
     val initialAtom: NonEmptyList[ProtoStep[F2]] =
-      if image.value.exposure <= SkySubtractionLimit then
-        NonEmptyList.of(image, slitP10, slit.withBreakpoint)
-      else
-        NonEmptyList.of(imageQ10, image, slitP10, slitQ10, slit.withBreakpoint)
+      NonEmptyList.ofInitLast(
+        imageSky.toList ++ List(image, slitP10) ++ slitSky.toList,
+        slit.withBreakpoint
+      )
 
     val repeatingAtom: NonEmptyList[ProtoStep[F2]] =
       NonEmptyList.of(slit)
@@ -75,8 +76,12 @@ object Acquisition:
       exposureTime: TimeSpan,
       readMode:     Flamingos2ReadMode,
       acqConfig:    AcquisitionConfig,
+      mode:         Flamingos2AcquisitionMode,
       builtin:      Flamingos2Fpu
     ): Steps =
+      val skyOffset: Option[Offset] =
+        Flamingos2AcquisitionMode.skyOffset.getOption(mode)
+
       eval:
         for
           _  <- F2.exposure    := exposureTime
@@ -89,7 +94,7 @@ object Acquisition:
           _  <- F2.readoutMode := Flamingos2ReadoutMode.Science
           _  <- F2.reads       := readMode.readCount
           s0 <- scienceStep(0.arcsec,  0.arcsec, ObserveClass.Acquisition)
-          s1 <- scienceStep(0.arcsec, 10.arcsec, ObserveClass.Acquisition)
+          s1 <- skyOffset.traverse(scienceStep(_, ObserveClass.Acquisition))
 
           _  <- F2.exposure    := 10.secondTimeSpan  // Fixed
           _  <- F2.fpu         := Flamingos2FpuMask.Builtin(builtin)
@@ -97,7 +102,7 @@ object Acquisition:
           s2 <- scienceStep(10.arcsec,  0.arcsec, ObserveClass.Acquisition)
 
           _  <- F2.exposure    := exposureTime
-          s3 <- scienceStep( 0.arcsec, 10.arcsec, ObserveClass.Acquisition)
+          s3 <- skyOffset.traverse(scienceStep(_, ObserveClass.Acquisition))
 
           s4 <- scienceStep( 0.arcsec,  0.arcsec, ObserveClass.Acquisition)
         yield Steps(s0, s1, s2, s3, s4)
@@ -120,6 +125,7 @@ object Acquisition:
     static:        Flamingos2StaticConfig,
     namespace:     UUID,
     config:        Config,
+    pinnedType:    Option[Flamingos2AcquisitionType],
     time:          Either[OdbError, IntegrationTime]
   ): Either[OdbError, SequenceGenerator[F2]] =
     time
@@ -138,5 +144,11 @@ object Acquisition:
                 namespace,
                 SequenceType.Acquisition
               ),
-              StepComputer.compute(t.exposureTime, readMode, config.acquisition, config.fpu)
+              StepComputer.compute(
+                t.exposureTime,
+                readMode,
+                config.acquisition,
+                config.acquisition.resolvedMode(pinnedType, Flamingos2AcquisitionMode.defaultFor(t.exposureTime *| t.totalExposureCount.value)),
+                config.fpu
+              )
             )

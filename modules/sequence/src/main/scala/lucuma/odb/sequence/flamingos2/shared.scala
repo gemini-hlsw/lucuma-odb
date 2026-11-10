@@ -5,12 +5,21 @@ package lucuma.odb.sequence.flamingos2
 
 import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.MosPreImaging
+import lucuma.core.math.SignalToNoise
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
 
 // Definitions that are shared across F2 modes.
+/**
+ * The signal-to-noise at which a target is classified as a Bright or Faint
+ * acquisition: Bright when it is reached within
+ * `Flamingos2AcquisitionMode.BrightExposureLimit`.
+ */
+val AcquisitionClassificationSignalToNoise: SignalToNoise =
+  SignalToNoise.unsafeFromBigDecimalExact(BigDecimal(10))
+
 val MinAcquisitionExposureTime: TimeSpan = 2.secondTimeSpan
 val MaxAcquisitionExposureTime: TimeSpan = TimeSpan.Max  // TBD
 

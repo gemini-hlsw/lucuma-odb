@@ -366,17 +366,7 @@ class executionAcqFlamingos2_WithoutSkySubtraction extends ExecutionTestSupportF
                       },
                       {
                         "instrumentConfig": {
-                          "exposure": { "seconds": 6.000000 }
-                        }
-                      },
-                      {
-                        "instrumentConfig": {
                           "exposure": { "seconds": 10.000000 }
-                        }
-                      },
-                      {
-                        "instrumentConfig": {
-                          "exposure": { "seconds": 6.000000 }
                         }
                       },
                       {

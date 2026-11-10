@@ -5,6 +5,7 @@ package lucuma.odb.util
 
 import cats.syntax.either.*
 import cats.syntax.functor.*
+import lucuma.core.enums.Flamingos2AcquisitionType
 import lucuma.core.enums.Flamingos2CustomSlitWidth
 import lucuma.core.enums.Flamingos2Decker
 import lucuma.core.enums.Flamingos2Disperser
@@ -60,6 +61,9 @@ trait Flamingos2Codecs:
 
   val flamingos_2_readout_mode: Codec[Flamingos2ReadoutMode] =
     enumerated(Type.varchar)
+
+  val flamingos_2_acquisition_type: Codec[Flamingos2AcquisitionType] =
+    enumerated(Type("e_flamingos_2_acquisition_type"))
 
   val flamingos_2_reads: Codec[Flamingos2Reads] =
     enumerated(Type.varchar)

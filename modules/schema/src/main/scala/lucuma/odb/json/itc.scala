@@ -15,6 +15,7 @@ import io.circe.refined.*
 import io.circe.syntax.*
 import lucuma.core.data.Zipper
 import lucuma.core.data.ZipperCodec
+import lucuma.core.enums.Flamingos2AcquisitionType
 import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.GmosNorthFilter
@@ -34,6 +35,7 @@ import lucuma.itc.ItcResultReadMode
 import lucuma.itc.SignalToNoiseAt
 import lucuma.odb.data.Itc
 import lucuma.odb.data.ItcAcquisition
+import lucuma.odb.data.ItcAcquisitionType
 import lucuma.odb.data.ItcPeakPixel
 import lucuma.odb.data.ItcResult
 import lucuma.odb.data.ItcScience
@@ -103,14 +105,19 @@ trait ItcCodec:
         "peakPixel"          -> a.peakPixel.asJson
       )
 
-  // GnirsAcquisitionType is a plain Enumerated; encode by tag.  Round-trips
+  // The acquisition types are plain Enumerateds; encode by tag.  Round-trips
   // within this codec only (the value is stored in the acquisition jsonb blob).
-  private given Encoder[GnirsAcquisitionType] =
-    Encoder[String].contramap(Enumerated[GnirsAcquisitionType].tag)
+  private def tagEncoder[A: Enumerated]: Encoder[A] =
+    Encoder[String].contramap(Enumerated[A].tag)
 
-  private given Decoder[GnirsAcquisitionType] =
+  private def tagDecoder[A: Enumerated](name: String): Decoder[A] =
     Decoder[String].emap: s =>
-      Enumerated[GnirsAcquisitionType].fromTag(s).toRight(s"Invalid GnirsAcquisitionType: $s")
+      Enumerated[A].fromTag(s).toRight(s"Invalid $name: $s")
+
+  private given Encoder[GnirsAcquisitionType]      = tagEncoder
+  private given Decoder[GnirsAcquisitionType]      = tagDecoder("GnirsAcquisitionType")
+  private given Encoder[Flamingos2AcquisitionType] = tagEncoder
+  private given Decoder[Flamingos2AcquisitionType] = tagDecoder("Flamingos2AcquisitionType")
 
   // Only the Available case is stored as JSON (in c_acquisition_results); the
   // NotApplicable and Failed cases are represented by the c_acquisition_* columns
@@ -118,16 +125,23 @@ trait ItcCodec:
   given Decoder[ItcAcquisition.Available] =
     Decoder.instance: c =>
       for
-        times   <- c.downField("times").as[Zipper[ItcResult]]
-        acqType <- c.downField("gnirsAcqType").as[Option[GnirsAcquisitionType]]
-      yield ItcAcquisition.Available(times, acqType)
+        times      <- c.downField("times").as[Zipper[ItcResult]]
+        gnirs      <- c.downField("gnirsAcqType").as[Option[GnirsAcquisitionType]]
+        flamingos2 <- c.downField("flamingos2AcqType").as[Option[Flamingos2AcquisitionType]]
+      yield ItcAcquisition.Available(
+        times,
+        gnirs.map(ItcAcquisitionType.Gnirs(_)).orElse(flamingos2.map(ItcAcquisitionType.Flamingos2(_)))
+      )
 
   given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[ItcAcquisition.Available] =
     Encoder.instance: a =>
       Json.obj(
         "times" -> a.times.asJson
-      // Emitted only when set (only GNIRS pins an acquisition type).
-      ).deepMerge(a.gnirsAcqType.fold(Json.obj())(t => Json.obj("gnirsAcqType" -> t.asJson)))
+      // Emitted only when set (only GNIRS and Flamingos 2 pin an acquisition type).
+      ).deepMerge:
+        a.acquisitionType.fold(Json.obj()):
+          case ItcAcquisitionType.Gnirs(t)      => Json.obj("gnirsAcqType" -> t.asJson)
+          case ItcAcquisitionType.Flamingos2(t) => Json.obj("flamingos2AcqType" -> t.asJson)
 
   /**
    * The wire shape shared by every keyed science result set: a JSON array of

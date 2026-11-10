@@ -10,6 +10,7 @@ import eu.timepit.refined.types.numeric.PosInt
 import grackle.Result
 import grackle.ResultT
 import lucuma.core.enums.AttachmentType
+import lucuma.core.enums.Flamingos2AcquisitionType
 import lucuma.core.enums.Flamingos2CustomSlitWidth
 import lucuma.core.enums.Flamingos2Decker
 import lucuma.core.enums.Flamingos2Disperser
@@ -19,6 +20,7 @@ import lucuma.core.enums.Flamingos2ReadoutMode
 import lucuma.core.enums.Flamingos2Reads
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.SlitOffsetMode
+import lucuma.core.math.Angle
 import lucuma.core.math.Wavelength
 import lucuma.core.model.Attachment
 import lucuma.core.model.Defined
@@ -34,7 +36,6 @@ import lucuma.odb.format.telescopeConfigs.*
 import lucuma.odb.graphql.input.Flamingos2MosInput
 import lucuma.odb.sequence.flamingos2.longslit.DefaultFlamingos2ReadoutMode
 import lucuma.odb.sequence.flamingos2.mos.Config
-import lucuma.odb.sequence.flamingos2.spectroscopy.AcquisitionConfig
 import lucuma.odb.sequence.flamingos2.spectroscopy.Config.Common
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Flamingos2Codecs.*
@@ -81,18 +82,12 @@ object Flamingos2MosService:
 
     new Flamingos2MosService[F]:
 
-      val acquisition: Decoder[AcquisitionConfig] =
-        (exposure_time_mode *:
-         flamingos_2_filter *:
-         flamingos_2_filter.opt
-        ).to[AcquisitionConfig]
-
       val f2Mos: Decoder[Config] =
         (flamingos_2_disperser        *:
          flamingos_2_filter           *:
          flamingos_2_fpu_mask_custom  *:
          exposure_time_mode           *:
-         acquisition                  *:
+         Flamingos2AcquisitionStatements.acquisition_config *:
          flamingos_2_read_mode.opt    *:
          flamingos_2_reads.opt        *:
          flamingos_2_decker.opt       *:
@@ -204,6 +199,9 @@ object Flamingos2MosService:
           acq.c_exposure_count,
           m.c_acquisition_filter_default,
           m.c_acquisition_filter,
+          m.c_acquisition_type,
+          m.c_acquisition_sky_offset_p,
+          m.c_acquisition_sky_offset_q,
           m.c_read_mode,
           m.c_reads,
           m.c_decker,
@@ -234,6 +232,9 @@ object Flamingos2MosService:
       Flamingos2CustomSlitWidth,
       Option[Attachment.Id],
       Option[Flamingos2Filter],
+      Option[Flamingos2AcquisitionType],
+      Option[Angle],
+      Option[Angle],
       Option[Flamingos2ReadMode],
       Option[Flamingos2Reads],
       Option[Flamingos2Decker],
@@ -255,6 +256,9 @@ object Flamingos2MosService:
           c_mask_attachment_id,
           c_mask_attachment_type,
           c_acquisition_filter,
+          c_acquisition_type,
+          c_acquisition_sky_offset_p,
+          c_acquisition_sky_offset_q,
           c_read_mode,
           c_reads,
           c_decker,
@@ -275,6 +279,9 @@ object Flamingos2MosService:
           ${attachment_id.opt},
           ${attachment_type.opt},
           ${flamingos_2_filter.opt},
+          ${flamingos_2_acquisition_type.opt},
+          ${angle_µas.opt},
+          ${angle_µas.opt},
           ${flamingos_2_read_mode.opt},
           ${flamingos_2_reads.opt},
           ${flamingos_2_decker.opt},
@@ -287,8 +294,8 @@ object Flamingos2MosService:
           $flamingos_2_custom_slit_width
         FROM t_observation
         WHERE c_observation_id = $observation_id
-       """.contramap { (o, d, f, sw, a, af, rm, rs, dk, ro, som, tc, tt, id, if_, isw) => (
-         o, d, f, sw, a, a.as(AttachmentType.MosMask), af, rm, rs, dk, ro, som, tc, tt, id, if_, isw, o
+       """.contramap { (o, d, f, sw, a, af, at, sp, sq, rm, rs, dk, ro, som, tc, tt, id, if_, isw) => (
+         o, d, f, sw, a, a.as(AttachmentType.MosMask), af, at, sp, sq, rm, rs, dk, ro, som, tc, tt, id, if_, isw, o
        )}
 
     def insertFlamingos2Mos(
@@ -302,6 +309,9 @@ object Flamingos2MosService:
         input.customMask.slitWidth,
         maskAttachmentId(input.customMask),
         input.acquisition.flatMap(_.filter.toOption),
+        input.acquisition.flatMap(_.explicitAcquisitionType.toOption),
+        input.acquisition.flatMap(_.skyOffset).map(_.p.toAngle),
+        input.acquisition.flatMap(_.skyOffset).map(_.q.toAngle),
         input.explicitReadMode,
         input.explicitReads,
         input.explicitDecker,
@@ -365,7 +375,10 @@ object Flamingos2MosService:
           common.explicitSlitOffsetMode.toOptionOption.map(upSlitMode),
           common.formattedTelescopeConfigs.toOptionOption.map(upTelescopeCfgs),
           common.telluricType.map(upTelluricType)
-        ).flatten ++ input.customMask.toList.flatMap(customMaskUpdates)
+        ).flatten ++
+          input.customMask.toList.flatMap(customMaskUpdates) ++
+          common.acquisition.toList.flatMap: acquisition =>
+            Flamingos2AcquisitionStatements.updates(acquisition.explicitAcquisitionType, acquisition.skyOffset)
 
       NonEmptyList.fromList(ups)
 
@@ -393,6 +406,9 @@ object Flamingos2MosService:
         c_mask_attachment_id,
         c_mask_attachment_type,
         c_acquisition_filter,
+        c_acquisition_type,
+        c_acquisition_sky_offset_p,
+        c_acquisition_sky_offset_q,
         c_read_mode,
         c_reads,
         c_decker,
@@ -416,6 +432,9 @@ object Flamingos2MosService:
         c_mask_attachment_id,
         c_mask_attachment_type,
         c_acquisition_filter,
+        c_acquisition_type,
+        c_acquisition_sky_offset_p,
+        c_acquisition_sky_offset_q,
         c_read_mode,
         c_reads,
         c_decker,

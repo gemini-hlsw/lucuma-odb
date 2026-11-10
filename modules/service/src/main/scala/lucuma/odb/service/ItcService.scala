@@ -43,6 +43,7 @@ import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
+import lucuma.core.model.sequence.flamingos2.Flamingos2AcquisitionMode
 import lucuma.core.model.sequence.gnirs.GnirsAcquisitionMode
 import lucuma.core.util.TimeSpan
 import lucuma.itc.AltairParameters
@@ -61,6 +62,7 @@ import lucuma.itc.client.SpectroscopyParameters
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.data.Itc
 import lucuma.odb.data.ItcAcquisition
+import lucuma.odb.data.ItcAcquisitionType
 import lucuma.odb.data.ItcPeakPixel
 import lucuma.odb.data.ItcResult
 import lucuma.odb.data.ItcScience
@@ -586,15 +588,15 @@ object ItcService {
       // According to the spec we default if the target is too bright
       // https://app.shortcut.com/lucuma/story/1999/determine-exposure-time-for-acquisition-images
       //
-      // The returned acquisition type is set only on the GNIRS two-pass path (see
-      // below); it pins the mode the sequence uses.
+      // The returned acquisition type is set only on the two-pass path of GNIRS and
+      // Flamingos 2 (see below); it pins the mode the sequence uses.
       private def safeAcquisitionCall(
         oid:               Observation.Id,
         input:             ImagingInput,
         targets:           NonEmptyList[ItcInput.TargetDefinition],
         autoClassify:      Boolean,
         autoSignalToNoise: Boolean
-      ): EitherT[F, OdbError, (Zipper[ItcResult], Option[GnirsAcquisitionType])] =
+      ): EitherT[F, OdbError, (Zipper[ItcResult], Option[ItcAcquisitionType])] =
         def go(imInput: ImagingInput, min: TimeSpan, max: TimeSpan): EitherT[F, OdbError, Zipper[ItcResult]] =
           // A target too bright for any exposure is imaged at the minimum, with the read
           // mode that exposure calls for.
@@ -632,13 +634,62 @@ object ItcService {
                 case t =>
                   OdbError.RemoteServiceCallError(s"Error calling ITC service: ${t.getMessage}".some).asLeft.pure
 
-        def noType(z: EitherT[F, OdbError, Zipper[ItcResult]]): EitherT[F, OdbError, (Zipper[ItcResult], Option[GnirsAcquisitionType])] =
-          z.map((_, Option.empty[GnirsAcquisitionType]))
+        def noType(z: EitherT[F, OdbError, Zipper[ItcResult]]): EitherT[F, OdbError, (Zipper[ItcResult], Option[ItcAcquisitionType])] =
+          z.map((_, Option.empty[ItcAcquisitionType]))
+
+        def withMode(mode: InstrumentMode): ImagingInput =
+          ImagingInput.parameters.andThen(ImagingParameters.mode).replace(mode)(input)
+
+        // The classification must not depend on the acquisition ETM, so it always runs
+        // at the classification S/N — the acquisition ETM's own wavelength (`etm.at`,
+        // present on both S/N and time-and-count modes) locates it.
+        def classificationEtm(signalToNoise: SignalToNoise, etm: ExposureTimeMode): ExposureTimeMode =
+          ExposureTimeMode.SignalToNoiseMode(signalToNoise, etm.at)
+
+        // Two-pass: classify the target from a fixed brightness measurement first, then
+        // compute the real exposure with the input the classification calls for. The
+        // second call is skipped only when it would be identical to the first.
+        // Time-and-count always needs it (the first ran at the classification S/N, not
+        // the requested time/count).
+        def twoPass[A](
+          min:                 TimeSpan,
+          max:                 TimeSpan,
+          classificationInput: ImagingInput,
+          classify:            IntegrationTime => A,
+          realInput:           A => ImagingInput
+        ): EitherT[F, OdbError, (Zipper[ItcResult], A)] =
+          for
+            z1                    <- go(classificationInput, min, max)
+            acqType: A             = classify(z1.focus.value)
+            second:  ImagingInput  = realInput(acqType)
+            z2                    <- if second === classificationInput then EitherT.pure[F, OdbError](z1)
+                                     else go(second, min, max)
+          yield (z2, acqType)
 
         input.mode match
           case InstrumentMode.GmosNorthImaging(_, _, _, _) |
                InstrumentMode.GmosSouthImaging(_, _, _, _) =>
             noType(go(input, gmos.MinAcquisitionExposureTime, gmos.MaxAcquisitionExposureTime))
+          case InstrumentMode.Flamingos2Imaging(etm, filter, _, port) if autoClassify =>
+            // Bright or Faint is a matter of how long the target takes to reach the
+            // classification S/N, over all the exposures that takes, whatever
+            // exposure the acquisition then uses. The
+            // filter and port are the acquisition's own; the read mode is the one a
+            // signal-to-noise acquisition is requested with.
+            twoPass(
+              flamingos2.MinAcquisitionExposureTime,
+              flamingos2.MaxAcquisitionExposureTime,
+              withMode:
+                InstrumentMode.Flamingos2Imaging(
+                  classificationEtm(flamingos2.AcquisitionClassificationSignalToNoise, etm),
+                  filter,
+                  Flamingos2ReadMode.Bright,
+                  port
+                )
+              ,
+              t => Flamingos2AcquisitionMode.defaultFor(t.exposureTime *| t.totalExposureCount.value).acquisitionType,
+              _ => input
+            ).map((z, t) => (z, ItcAcquisitionType.Flamingos2(t).some))
           case InstrumentMode.Flamingos2Imaging(_, _, _, _) =>
             noType(go(input, flamingos2.MinAcquisitionExposureTime, flamingos2.MaxAcquisitionExposureTime))
           case InstrumentMode.GnirsImaging(etm, filter, camera, readMode, wellDepth, coadds, port, altair) =>
@@ -646,46 +697,36 @@ object ItcService {
             val max: TimeSpan = gnirs.MaxAcquisitionExposureTime
             etm match
               case _ if autoClassify || autoSignalToNoise =>
-                // Two-pass. The acquisition mode (Very Bright / Bright / Faint) is a
-                // function of exposure time, but the exposure time depends on the filter
-                // (Very Bright images in H2) which depends on the mode — and, in S/N mode,
-                // a low requested S/N would shorten the exposure and misclassify a Bright
-                // target as Very Bright. So classify from a fixed brightness measurement
-                // (broadband filter, classification S/N) first, then compute the real
-                // exposure at the resolved ETM in the mode-appropriate filter. The
-                // classification must not depend on the acquisition ETM, so it always
-                // runs at the classification S/N — the acquisition ETM's own wavelength
-                // (`etm.at`, present on both S/N and time-and-count modes) locates it.
+                // The acquisition mode (Very Bright / Bright / Faint) is a function of
+                // exposure time, but the exposure time depends on the filter (Very
+                // Bright images in H2) which depends on the mode — and, in S/N mode, a
+                // low requested S/N would shorten the exposure and misclassify a Bright
+                // target as Very Bright. So classify in the broadband filter first, then
+                // compute the real exposure at the resolved ETM in the mode-appropriate
+                // filter.
                 def gnirsInput(f: GnirsFilter, e: ExposureTimeMode): ImagingInput =
-                  ImagingInput.parameters
-                    .andThen(ImagingParameters.mode)
-                    .replace(InstrumentMode.GnirsImaging(e, f, camera, readMode, wellDepth, coadds, port, altair))(input)
+                  withMode(InstrumentMode.GnirsImaging(e, f, camera, readMode, wellDepth, coadds, port, altair))
 
-                val classifySN:  SignalToNoise    = gnirs.AcquisitionClassificationSignalToNoise
-                val classifyEtm: ExposureTimeMode = ExposureTimeMode.SignalToNoiseMode(classifySN, etm.at)
-                for
-                  z1                                <- go(gnirsInput(filter, classifyEtm), min, max)
-                  t1:      IntegrationTime           = z1.focus.value
-                  acqType: GnirsAcquisitionType      = GnirsAcquisitionMode.defaultFor(t1.exposureTime, t1.totalExposureCount).acquisitionType
-                  // Very Bright images through the acquisition filter in H2; the other
-                  // classifications keep the broadband filter (already `filter`). Only
-                  // when the filter is itself automatic — an explicitly chosen filter is
-                  // never overridden, even though we still classify for the S/N.
-                  f2:      GnirsFilter               = if autoClassify && acqType === GnirsAcquisitionType.VeryBright then GnirsFilter.H2 else filter
-                  // When the S/N is derived, the second pass runs at the S/N the
-                  // classification calls for rather than at the placeholder carried in
-                  // the input (see AcquisitionConfig.itcExposureTimeMode).
-                  etm2:    ExposureTimeMode          = if autoSignalToNoise then ExposureTimeMode.SignalToNoiseMode(gnirs.acquisitionSignalToNoise(acqType), etm.at)
-                                                       else etm
-                  // Skip the second call only when it would be identical to the first:
-                  // same filter and the same S/N request. A derived Faint lands exactly
-                  // there, since Faint's S/N *is* the classification S/N. Time-and-count
-                  // always needs the second call (the first ran at the classification
-                  // S/N, not the requested time/count).
-                  skip:    Boolean                   = f2 === filter && etm2 === classifyEtm
-                  z2                                <- if skip then EitherT.pure[F, OdbError](z1)
-                                                       else go(gnirsInput(f2, etm2), min, max)
-                yield (z2, acqType.some)
+                twoPass(
+                  min,
+                  max,
+                  gnirsInput(filter, classificationEtm(gnirs.AcquisitionClassificationSignalToNoise, etm)),
+                  t => GnirsAcquisitionMode.defaultFor(t.exposureTime, t.totalExposureCount).acquisitionType,
+                  acqType =>
+                    // Very Bright images through the acquisition filter in H2; the other
+                    // classifications keep the broadband filter (already `filter`). Only
+                    // when the filter is itself automatic — an explicitly chosen filter is
+                    // never overridden, even though we still classify for the S/N.
+                    val f2:   GnirsFilter      = if autoClassify && acqType === GnirsAcquisitionType.VeryBright then GnirsFilter.H2 else filter
+                    // When the S/N is derived, the second pass runs at the S/N the
+                    // classification calls for rather than at the placeholder carried in
+                    // the input (see AcquisitionConfig.itcExposureTimeMode). A derived
+                    // Faint needs no second pass, since Faint's S/N *is* the
+                    // classification S/N.
+                    val etm2: ExposureTimeMode = if autoSignalToNoise then ExposureTimeMode.SignalToNoiseMode(gnirs.acquisitionSignalToNoise(acqType), etm.at)
+                                                 else etm
+                    gnirsInput(f2, etm2)
+                ).map((z, t) => (z, ItcAcquisitionType.Gnirs(t).some))
               case _ =>
                 noType(go(input, min, max))
           case m                                                      =>
@@ -921,14 +962,14 @@ object ItcService {
             case Some(input) =>
               for
                 sci <- science
-                acq <- acquisitionResult(oid, input, im.acquisitionTargets, im.gnirsAcqAutoClassify, im.gnirsAcqAutoSignalToNoise)
+                acq <- acquisitionResult(oid, input, im.acquisitionTargets, im.acqAutoClassify, im.gnirsAcqAutoSignalToNoise)
               yield sci.copy(acquisition = acq)
 
         def spectroscopy(sp: ItcInput.Spectroscopy): EitherT[F, OdbError, Itc] =
           for
             cr  <- callSpectroscopy(sp.scienceInput)
             sci <- EitherT.fromEither(toTargetResults(sp.targets, NonEmptyList.one(cr), sp.signalToNoiseTargetId).map(_.head))
-            acq <- acquisitionResult(oid, sp.acquisitionInput, sp.acquisitionTargets, sp.gnirsAcqAutoClassify, sp.gnirsAcqAutoSignalToNoise)
+            acq <- acquisitionResult(oid, sp.acquisitionInput, sp.acquisitionTargets, sp.acqAutoClassify, sp.gnirsAcqAutoSignalToNoise)
           yield Itc(acq, ItcScience.Spectroscopy(sci))
 
         // GNIRS spectroscopy: one science call per central wavelength, plus the
@@ -944,7 +985,7 @@ object ItcService {
                      Keyed.GnirsSpectroscopy,
                      client.spectroscopy(_, useCache = false)
                    )
-            acq <- acquisitionResult(oid, sp.acquisitionInput, sp.acquisitionTargets, sp.gnirsAcqAutoClassify, sp.gnirsAcqAutoSignalToNoise)
+            acq <- acquisitionResult(oid, sp.acquisitionInput, sp.acquisitionTargets, sp.acqAutoClassify, sp.gnirsAcqAutoSignalToNoise)
           yield Itc(acq, sci)
 
         // Modes with no acquisition sequence: the science call is the whole result.
@@ -1017,7 +1058,7 @@ object ItcService {
 
         val acqType: Option[GnirsAcquisitionType] =
           acquisition match
-            case ItcAcquisition.Available(_, t) => t
+            case ItcAcquisition.Available(_, t) => t.flatMap(_.gnirs)
             case _                              => none
 
         acqType
@@ -1055,13 +1096,13 @@ object ItcService {
           case ItcInputDerivation.Ready(input)  =>
             input match
               case sp @ ItcInput.Spectroscopy(science = _)       =>
-                safeAcquisitionCall(oid, sp.acquisitionInput, sp.acquisitionTargets, sp.gnirsAcqAutoClassify, sp.gnirsAcqAutoSignalToNoise)
+                safeAcquisitionCall(oid, sp.acquisitionInput, sp.acquisitionTargets, sp.acqAutoClassify, sp.gnirsAcqAutoSignalToNoise)
                   .map((z, t) => ItcAcquisition.Available(z, t): ItcAcquisition)
 
               // GNIRS spectroscopy has a single acquisition pass regardless of how
               // many central wavelengths the science side has.
               case sp @ ItcInput.GnirsSpectroscopy(science = _)  =>
-                safeAcquisitionCall(oid, sp.acquisitionInput, sp.acquisitionTargets, sp.gnirsAcqAutoClassify, sp.gnirsAcqAutoSignalToNoise)
+                safeAcquisitionCall(oid, sp.acquisitionInput, sp.acquisitionTargets, sp.acqAutoClassify, sp.gnirsAcqAutoSignalToNoise)
                   .map((z, t) => ItcAcquisition.Available(z, t): ItcAcquisition)
 
               // GNIRS imaging has an acquisition sequence; other imaging modes don't
@@ -1070,7 +1111,7 @@ object ItcService {
                 im.acquisitionInput match
                   case None        => NotApplicable
                   case Some(input) =>
-                    safeAcquisitionCall(oid, input, im.acquisitionTargets, im.gnirsAcqAutoClassify, im.gnirsAcqAutoSignalToNoise)
+                    safeAcquisitionCall(oid, input, im.acquisitionTargets, im.acqAutoClassify, im.gnirsAcqAutoSignalToNoise)
                       .map((z, t) => ItcAcquisition.Available(z, t): ItcAcquisition)
 
               // GHOST and IGRINS-2 spectroscopy have no acquisition sequence.
