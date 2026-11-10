@@ -2014,6 +2014,33 @@ class perScienceObservationCalibrations
       assertEquals(obsInGroup3.count(_.calibrationRole.contains(CalibrationRole.Telluric)), 1)
     }
 
+  // The check that keeps a suspended science's group must not trip over an
+  // asterism of several targets, which some views fan out into a row each.
+  test("A suspended science with two targets keeps its calibrations"):
+    for {
+      pid          <- createProgramAs(pi)
+      tid1         <- createTargetWithProfileAs(pi, pid)
+      tid2         <- createTargetWithProfileAs(pi, pid)
+      oid          <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid1, tid2))
+      _            <- runObscalcUpdate(pid, oid)
+      (added1, _)  <- recalculateCalibrations(pid, when, oid)
+      _            <- sleep >> resolveTelluricTargets
+      groupId      <- queryObservation(oid).map(_.groupId.get)
+      vid          <- recordVisitAs(serviceUser, oid)
+      _            <- addSequenceEventAs(serviceUser, vid, SequenceCommand.Start)
+      _            <- runObscalcUpdate(pid, oid)
+      _            <- setObservationWorkflowState(staff, oid, ObservationWorkflowState.Suspended)
+      _            <- runObscalcUpdate(pid, oid)
+      (_, removed) <- recalculateCalibrations(pid, when, oid)
+      groupExists  <- queryGroupExists(groupId)
+      obsInGroup   <- queryObservationsInGroup(groupId)
+    } yield {
+      assertEquals(added1.size, 1)
+      assertEquals(removed, Nil)
+      assert(groupExists)
+      assertEquals(obsInGroup.count(_.calibrationRole.contains(CalibrationRole.Telluric)), 1)
+    }
+
   // Once executing, a per-observation calibration still has no Ongoing <-> Suspended
   // edges of its own, even for staff.  It follows its science observation instead,
   // into a staff suspension and back out of it.

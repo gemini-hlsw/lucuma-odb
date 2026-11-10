@@ -935,9 +935,9 @@ object PerScienceObservationCalibrationsService:
         val selectScienceIsExecuting: Query[Observation.Id, Boolean] =
           sql"""
             SELECT o.c_existence = 'present'
-               AND gp.c_execution_state IN ('ongoing', 'declared_ongoing')
+               AND es.c_execution_state IN ('ongoing', 'declared_ongoing')
             FROM   t_observation o
-            JOIN   v_generator_params gp ON gp.c_observation_id = o.c_observation_id
+            JOIN   v_execution_state es ON es.c_observation_id = o.c_observation_id
             WHERE  o.c_observation_id = $observation_id
           """.query(bool)
 
