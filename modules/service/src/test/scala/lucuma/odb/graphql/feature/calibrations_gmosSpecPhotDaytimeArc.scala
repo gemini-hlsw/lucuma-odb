@@ -11,9 +11,13 @@ import io.circe.Decoder
 import io.circe.Json
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ObservationWorkflowState
+import lucuma.core.enums.ScienceBand
+import lucuma.core.enums.TimeAccountingCategory
+import lucuma.core.syntax.timespan.*
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
 import lucuma.odb.service.PerProgramPerConfigCalibrationsService
 
@@ -256,3 +260,30 @@ class calibrations_gmosSpecPhotDaytimeArc
       assertEquals(arcs, Nil, "an executed standard gets no daytime arc")
       assertEquals(specs.size, 2, "the executed standard is replaced by a fresh one")
       assert(newArc.forall(_.isDefined), "the fresh standard gets its own arc")
+
+  // Two allocated bands, so setAllocations leaves the observations' bands alone.
+  test("daytime arc follows the standard's band"):
+    val allocations = List(
+      AllocationInput(TimeAccountingCategory.US, ScienceBand.Band1, 1.hourTimeSpan),
+      AllocationInput(TimeAccountingCategory.US, ScienceBand.Band2, 2.hourTimeSpan)
+    )
+    for
+      pid    <- createProgramAs(pi)
+      _      <- setAllocationsAs(staff, pid, allocations)
+      tid    <- createTargetWithProfileAs(pi, pid)
+      oid    <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      _      <- setScienceBandAs(pi, oid, ScienceBand.Band2.some)
+      _      <- runObscalcUpdate(pid, oid)
+      _      <- recalculateCalibrations(pid, when, oid)
+      spec   <- queryCalibrationsWithRole(pid, CalibrationRole.SpectroPhotometric).map(_.head)
+      arc    <- calibrationObservationFor(spec, CalibrationRole.DaytimeArc).map(_.get)
+      before <- queryScienceBand(arc)
+      _      <- setScienceBandAs(pi, oid, ScienceBand.Band1.some)
+      _      <- runObscalcUpdate(pid, oid)
+      _      <- recalculateCalibrations(pid, when, oid)
+      specB  <- queryScienceBand(spec)
+      arcB   <- queryScienceBand(arc)
+    yield
+      assertEquals(before, ScienceBand.Band2.some)
+      assertEquals(specB, ScienceBand.Band1.some)
+      assertEquals(arcB, ScienceBand.Band1.some)

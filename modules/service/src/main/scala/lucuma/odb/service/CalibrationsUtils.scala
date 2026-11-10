@@ -290,10 +290,10 @@ trait WorkflowStateQueries[F[_]: {Concurrent, Services, Tracer as T}] {
       haveVisits(filtered.map(oid)).map: visited =>
         filtered.filterNot(a => visited.contains(oid(a)))
 
-  // Like `excludeFromDeletion`, but also checks the parent science observation's
+  // Like `excludeFromDeletion`, but also checks the parent observation's
   // execution state.  Applies to any calibration in a per-observation calibration
-  // group (tellurics and daytime pinhole flats): if the science obs has started
-  // or finished executing, its calibrations are kept.
+  // group: if its parent, a science observation or a spectrophotometric standard,
+  // has started or finished executing, its calibrations are kept.
   def excludeObsCalibrationsFromDeletion[A](obs: List[A], oid: A => Observation.Id): F[List[A]] =
     if obs.isEmpty then List.empty[A].pure
     else T.span("exclude-obs-calibrations-from-deletion").surround:

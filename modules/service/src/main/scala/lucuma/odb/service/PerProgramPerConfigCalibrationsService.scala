@@ -272,11 +272,11 @@ object PerProgramPerConfigCalibrationsService:
         )
 
       // The arc carries a copy of its standard's observing mode, exposure time
-      // modes included, and the standard's band and constraints.  An existing
-      // arc already has the standard's mode type, as a standard's never changes.
-      private def syncArcConfiguration(sp: SpecPhot, arcOid: Observation.Id, isNew: Boolean)(using Transaction[F]): F[Unit] =
+      // modes included, and the standard's band and constraints.
+      private def syncArcConfiguration(sp: SpecPhot, arcOid: Observation.Id)(using Transaction[F]): F[Unit] =
         syncObservationConfiguration(sp.oid, arcOid) *>
-          replaceObservingMode(sp.oid, sp.modeType, arcOid, if isNew then none else sp.modeType)
+          selectObservingModeTypes(List(arcOid)).flatMap: modes =>
+            replaceObservingMode(sp.oid, sp.modeType, arcOid, modes.get(arcOid).flatten)
 
       // Every unexecuted standard gets its group, nested in the Calibrations
       // group, and one daytime arc kept in step with it unless the arc has
@@ -288,11 +288,11 @@ object PerProgramPerConfigCalibrationsService:
             res <- sp.arc match
                      case None      =>
                        insertDaytimeCalibration(pid, gid, CalibrationRole.DaytimeArc)
-                         .flatTap(syncArcConfiguration(sp, _, isNew = true))
+                         .flatTap(syncArcConfiguration(sp, _))
                          .map(_.some)
                      case Some(arc) =>
                        excludeOngoingAndCompleted(List(arc), identity)
-                         .flatMap(_.traverse_(syncArcConfiguration(sp, _, isNew = false)))
+                         .flatMap(_.traverse_(syncArcConfiguration(sp, _)))
                          .as(none[Observation.Id])
           yield res
 
@@ -469,11 +469,12 @@ object PerProgramPerConfigCalibrationsService:
           // Generate new calibrations for each unique configuration
           addedOids      <- generateGMOSLSCalibrations(pid, propsByRole, configsPerRole, gnTgt, gsTgt)
           _              <- (info"Program $pid added calibrations $addedOids").whenA(addedOids.nonEmpty)
-          // Each standard keeps a daytime arc in a group of its own
-          orphanedArcs   <- cleanupOrphanedSpecPhotGroups(pid)
-          addedArcs      <- syncDaytimeArcs(pid)
           calibUpdates   <- prepareCalibrationUpdates(gmosCalibs, removedOids, propsByRole)
           _              <- updatePropsAt(calibUpdates)
+          // Each standard keeps a daytime arc in a group of its own, synced
+          // once the standard's band is final
+          orphanedArcs   <- cleanupOrphanedSpecPhotGroups(pid)
+          addedArcs      <- syncDaytimeArcs(pid)
           // Delete the calibration group if empty
           _              <- deleteEmptyCalibrationGroup(pid)
         } yield (addedOids ++ addedArcs, removedOids ++ orphanedArcs)

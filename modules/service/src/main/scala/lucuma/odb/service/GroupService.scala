@@ -291,10 +291,15 @@ object GroupService {
             session.prepareR(af.fragment.query(group_id *: void)).use(pq => pq.stream(af.argument, 512).map(_._1).compile.toList)
 
       def updateGroups(SET: GroupPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F]): F[Result[List[Group.Id]]] =
-        // Only per-observation calibration system groups can move
+        // Only per-observation calibration system groups can move, and not
+        // those nested in a system group, such as a standard's daytime arc group
         val movePredicate = user.role.access match
           case Access.Service => AppliedFragment.empty
-          case _              => sql" AND (c_system = FALSE OR c_calibration_roles && $_calibration_role)"(ObsExtract.PerObservationCalibrationRoles)
+          case _              =>
+            sql""" AND (c_system = FALSE OR (
+                    c_calibration_roles && $_calibration_role
+                    AND (c_parent_id IS NULL OR c_parent_id <> ALL (SELECT p.c_group_id FROM t_group p WHERE p.c_system))
+                  ))"""(ObsExtract.PerObservationCalibrationRoles)
         val accessPredicate = user.role.access match
           case Access.Service => void""
           case _              => void" AND c_system = FALSE"

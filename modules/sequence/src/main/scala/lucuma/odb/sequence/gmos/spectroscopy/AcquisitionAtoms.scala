@@ -88,7 +88,7 @@ object AcquisitionAtoms:
    * @param oid          observation id, for error messages
    * @param time         ITC integration time (or an error); the exposure time
    *                     used by `computeSteps` is read from it
-   * @param calRole      calibration role; Twilight yields an empty sequence
+   * @param calRole      calibration role; Twilight and daytime calibrations yield an empty sequence
    * @param atomBuilder  atom builder for the acquisition sequence type
    * @param modeName     observing mode name, for the error message
    * @param computeSteps mode-specific step computation given the exposure time
