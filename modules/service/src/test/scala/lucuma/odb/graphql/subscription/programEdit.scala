@@ -570,20 +570,21 @@ class programEdit extends OdbSuite with SubscriptionUtils {
     def band1(hours: Int): Option[List[TacRecommendedTimeInput]] =
       List(TacRecommendedTimeInput(ScienceBand.Band1, TimeSpan.fromHours(hours).get)).some
 
+    val US        = lucuma.core.enums.TimeAccountingCategory.US
     val create    = TacFeedbackInput(
-      Partner.US,
+      US,
       TacPartnerDecision.Accepted.some,
       PosBigDecimal.unsafeFrom(BigDecimal(1)).some,
       band1(2),
       Nullable.NonNull(NonEmptyString.unsafeFrom("Good."))
     )
-    val reject    = TacFeedbackInput(Partner.US, TacPartnerDecision.Rejected.some, none, none, Nullable.Absent)
-    val noop      = TacFeedbackInput(Partner.US, none, none, none, Nullable.Absent)
-    val sameTimes = TacFeedbackInput(Partner.US, none, none, band1(2), Nullable.Absent)
-    val newTimes  = TacFeedbackInput(Partner.US, none, none, band1(3), Nullable.Absent)
+    val reject    = TacFeedbackInput(US, TacPartnerDecision.Rejected.some, none, none, Nullable.Absent)
+    val noop      = TacFeedbackInput(US, none, none, none, Nullable.Absent)
+    val sameTimes = TacFeedbackInput(US, none, none, band1(2), Nullable.Absent)
+    val newTimes  = TacFeedbackInput(US, none, none, band1(3), Nullable.Absent)
 
     def event(decision: String, hours: String) =
-      json"""{ "programEdit": { "editType": "UPDATED", "value": { "tacFeedback": [ { "partner": "US", "decision": $decision, "recommendedTimes": [ { "band": "BAND1", "time": { "hours": ${BigDecimal(hours)} } } ] } ] } } }"""
+      json"""{ "programEdit": { "editType": "UPDATED", "value": { "tacFeedback": [ { "timeAccountingCategory": "US", "decision": $decision, "recommendedTimes": [ { "band": "BAND1", "time": { "hours": ${BigDecimal(hours)} } } ] } ] } } }"""
 
     val deleted =
       json"""{ "programEdit": { "editType": "UPDATED", "value": { "tacFeedback": [] } } }"""
@@ -594,6 +595,7 @@ class programEdit extends OdbSuite with SubscriptionUtils {
       p <- createProgram(pi, "foo")
       _ <- addProposal(pi, p)
       _ <- addPartnerSplits(pi, p, partnerSplits = List((Partner.US, 100)))
+      _ <- setProposalSubmittedDirectly(p)
       _ <- subscriptionExpect(
              user = pi,
              query =
@@ -603,7 +605,7 @@ class programEdit extends OdbSuite with SubscriptionUtils {
                      editType
                      value {
                        tacFeedback {
-                         partner
+                         timeAccountingCategory
                          decision
                          recommendedTimes { band time { hours } }
                        }
@@ -625,9 +627,9 @@ class programEdit extends OdbSuite with SubscriptionUtils {
                    _ <- IO.sleep(1.second)
                    _ <- setTacFeedbackAs(service, p, newTimes)
                    _ <- IO.sleep(1.second)
-                   _ <- deleteTacFeedbackAs(service, p, Partner.US)
+                   _ <- deleteTacFeedbackAs(service, p, US)
                    _ <- IO.sleep(1.second)
-                   _ <- deleteTacFeedbackAs(service, p, Partner.US)
+                   _ <- deleteTacFeedbackAs(service, p, US)
                    _ <- IO.sleep(1.second)
                  } yield ()
                ),

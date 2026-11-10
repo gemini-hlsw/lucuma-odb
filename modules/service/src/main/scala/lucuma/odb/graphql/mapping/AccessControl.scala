@@ -18,8 +18,8 @@ import grackle.Type
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObservingModeType
-import lucuma.core.enums.Partner
 import lucuma.core.enums.SequenceType
+import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.model.Access
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationReference
@@ -704,27 +704,29 @@ trait AccessControl[F[_]] extends Predicates[F] {
         .value
 
   /**
-   * Staff (or better) may set TAC feedback for any partner.  NGO users may only
-   * set feedback for their own partner, and only for programs they can read.
+   * Staff (or better) may set TAC feedback for any time accounting category.
+   * NGO users may only set feedback for their own partner's category, and only
+   * for programs they can read.  Whether the category may provide feedback for
+   * the proposal at all is checked by `TacFeedbackService`.
    */
   def selectForUpdate(
     input: SetTacFeedbackInput
   )(using Services[F], Transaction[F]): F[Result[AccessControl.CheckedWithId[TacFeedbackInput, Program.Id]]] =
-    selectForTacFeedback(input.programId, input.proposalReference, input.programReference, input.tacFeedback.partner, input.tacFeedback)
+    selectForTacFeedback(input.programId, input.proposalReference, input.programReference, input.tacFeedback.timeAccountingCategory, input.tacFeedback)
 
   /**
    * TAC feedback deletion has the same restrictions as setting it.
    */
   def selectForUpdate(
     input: DeleteTacFeedbackInput
-  )(using Services[F], Transaction[F]): F[Result[AccessControl.CheckedWithId[Partner, Program.Id]]] =
-    selectForTacFeedback(input.programId, input.proposalReference, input.programReference, input.partner, input.partner)
+  )(using Services[F], Transaction[F]): F[Result[AccessControl.CheckedWithId[TimeAccountingCategory, Program.Id]]] =
+    selectForTacFeedback(input.programId, input.proposalReference, input.programReference, input.timeAccountingCategory, input.timeAccountingCategory)
 
   private def selectForTacFeedback[A](
     programId:         Option[Program.Id],
     proposalReference: Option[ProposalReference],
     programReference:  Option[ProgramReference],
-    feedbackPartner:   Partner,
+    category:          TimeAccountingCategory,
     a:                 A
   )(using Services[F], Transaction[F]): F[Result[AccessControl.CheckedWithId[A, Program.Id]]] =
     requireNgoAccess:
@@ -739,7 +741,8 @@ trait AccessControl[F[_]] extends Predicates[F] {
 
       user.role match
         case StandardRole.Ngo(_, partner) =>
-          if partner =!= feedbackPartner then notAuthorized.pure[F]
+          // This also refuses every category that belongs to no partner.
+          if partner.timeAccountingCategory =!= category then notAuthorized.pure[F]
           else
             // Report reference resolution problems as NotAuthorized so that an
             // NGO learns nothing about programs it cannot read.

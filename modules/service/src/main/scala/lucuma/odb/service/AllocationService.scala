@@ -8,6 +8,7 @@ import cats.effect.MonadCancelThrow
 import cats.syntax.all.*
 import grackle.Result
 import lucuma.core.enums.ScienceBand
+import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.syntax.string.*
@@ -60,7 +61,7 @@ object AllocationService {
       override def setAllocations(input: AccessControl.CheckedWithId[List[AllocationInput], Program.Id])(using Transaction[F]): F[Result[Program.Id]] =
         input.foldWithId(OdbError.InvalidArgument().asFailureF) { (allocations, pid) =>
           val bands = allocations.map(_.scienceBand).toSet
-          deleteAllocations(pid) *>
+          removeAbsentAllocations(pid, allocations) *>
           NonEmptyList.fromList(allocations).traverse_ { lst =>
             session.execute(Statements.setAllocations(lst))((pid, lst))
           }                                  *>
@@ -70,9 +71,14 @@ object AllocationService {
           validateObservations(bands, pid).map(_.as(pid))
         }
 
+      // Allocations missing from the new list are deleted, unless they carry
+      // a TAC recommended time.  Those are kept, with no time allocated, so
+      // that the recommendation survives.
       @annotation.nowarn("msg=unused implicit parameter")
-      private def deleteAllocations(pid: Program.Id)(using Transaction[F]): F[Unit] =
-        session.execute(Statements.DeleteAllocations)(pid).void
+      private def removeAbsentAllocations(pid: Program.Id, allocations: List[AllocationInput])(using Transaction[F]): F[Unit] =
+        val keys = allocations.map(a => (a.category, a.scienceBand))
+        session.executeCommand(Statements.deleteAbsentAllocations(pid, keys)) *>
+          session.executeCommand(Statements.zeroAbsentRecommendedAllocations(pid, keys)).void
 
       // If any observations have already been assigned bands which are not in
       // the given SetAllocationsInput, then generate a warning result listing
@@ -112,20 +118,33 @@ object AllocationService {
           AND c_program_id IN (${program_id.values.list(pids.size)})
       """.query(program_id).contramap { (band, nel) => (band, nel.toList) }
 
+    // Sets the allocations, keeping any recommended times and leaving rows
+    // whose duration is unchanged alone.
     def setAllocations(allocations: NonEmptyList[AllocationInput]): Command[(Program.Id, allocations.type)] =
       sql"""
-        INSERT INTO t_allocation (c_program_id, c_ta_category, c_science_band, c_duration)
+        INSERT INTO t_allocation AS t (c_program_id, c_ta_category, c_science_band, c_duration)
         VALUES ${(program_id *: time_accounting_category *: science_band *: time_span).values.list(allocations.size)}
+        ON CONFLICT (c_program_id, c_ta_category, c_science_band) DO UPDATE SET
+          c_duration = EXCLUDED.c_duration
+        WHERE t.c_duration IS DISTINCT FROM EXCLUDED.c_duration
       """.command
          .contramap {
            (pid, allocs) => allocs.toList.map { a => (pid, a.category, a.scienceBand, a.duration) }
          }
 
-    val DeleteAllocations: Command[Program.Id] =
-      sql"""
-        DELETE FROM t_allocation
-        WHERE t_allocation.c_program_id = $program_id
-      """.command
+    // Matches the program's allocations for any category and band not in `keys`.
+    private def absentAllocations(pid: Program.Id, keys: List[(TimeAccountingCategory, ScienceBand)]): AppliedFragment =
+      sql"c_program_id = $program_id"(pid) |+|
+        NonEmptyList.fromList(keys).foldMap { nel =>
+          sql" AND (c_ta_category, c_science_band) NOT IN (${(time_accounting_category *: science_band).values.list(nel.size)})"(nel.toList)
+        }
+
+    def deleteAbsentAllocations(pid: Program.Id, keys: List[(TimeAccountingCategory, ScienceBand)]): AppliedFragment =
+      void"DELETE FROM t_allocation WHERE c_recommended_time IS NULL AND " |+| absentAllocations(pid, keys)
+
+    def zeroAbsentRecommendedAllocations(pid: Program.Id, keys: List[(TimeAccountingCategory, ScienceBand)]): AppliedFragment =
+      void"UPDATE t_allocation SET c_duration = interval '0' WHERE c_recommended_time IS NOT NULL AND c_duration <> interval '0' AND " |+|
+        absentAllocations(pid, keys)
 
     val ObservationsWithNonNullBand: Query[Program.Id, Observation.Id] =
       sql"""

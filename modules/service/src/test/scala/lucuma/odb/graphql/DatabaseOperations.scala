@@ -2425,7 +2425,7 @@ trait DatabaseOperations { this: OdbSuite =>
   /** GraphQL input object text for a `TacFeedbackInput`, omitting unspecified fields. */
   def tacFeedbackInputString(f: TacFeedbackInput): String =
     List(
-      s"partner: ${f.partner.tag.toScreamingSnakeCase}".some,
+      s"timeAccountingCategory: ${f.timeAccountingCategory.tag.toScreamingSnakeCase}".some,
       f.decision.map(d => s"decision: ${d.tag.toScreamingSnakeCase}"),
       f.ranking.map(r => s"ranking: \"${r.value}\""),
       f.recommendedTimes.map: ts =>
@@ -2448,7 +2448,7 @@ trait DatabaseOperations { this: OdbSuite =>
             tacFeedback: ${tacFeedbackInputString(feedback)}
           }) {
             tacFeedback {
-              partner
+              timeAccountingCategory
               decision
               ranking
               recommendedTimes { band time { hours } }
@@ -2460,17 +2460,17 @@ trait DatabaseOperations { this: OdbSuite =>
     )
 
   def deleteTacFeedbackAs(
-    user:    User,
-    pid:     Program.Id,
-    partner: Partner
+    user:     User,
+    pid:      Program.Id,
+    category: TimeAccountingCategory
   ): IO[Boolean] =
     query(
       user = user,
       query = s"""
         mutation {
           deleteTacFeedback(input: {
-            programId: ${pid.asJson}
-            partner:   ${partner.tag.toScreamingSnakeCase}
+            programId:              ${pid.asJson}
+            timeAccountingCategory: ${category.tag.toScreamingSnakeCase}
           }) {
             result
           }
@@ -3362,6 +3362,22 @@ trait DatabaseOperations { this: OdbSuite =>
           SELECT insert_invitation($program_user_id, $user_id, $program_id, $email_address, NULL)
         """.query(text)
       )((puid, u.id, pid, EmailAddress.unsafeFrom("coi@dobbs.com"))).void
+
+  /**
+   * Marks the proposal submitted directly, bypassing the API's submit rules,
+   * after giving the program a semester (2025A) if it has none, as a submitted
+   * program requires.
+   */
+  def setProposalSubmittedDirectly(pid: Program.Id): IO[Unit] =
+    withFreshSession: s =>
+      s.execute(
+        sql"""
+          update t_program
+             set c_semester        = coalesce(c_semester, '2025A'),
+                 c_proposal_status = 'submitted'
+           where c_program_id = $program_id
+        """.command
+      )(pid).void
 
   /**
    * Sets the proposal status directly, bypassing the API's submit rules.  Runs

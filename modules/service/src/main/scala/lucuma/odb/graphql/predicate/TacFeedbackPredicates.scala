@@ -4,9 +4,9 @@
 package lucuma.odb.graphql.predicate
 
 import grackle.Path
-import lucuma.core.enums.Partner
+import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.model.Program
 
 class TacFeedbackPredicates(path: Path):
   lazy val programId = LeafPredicates[Program.Id](path / "programId")
-  lazy val partner   = LeafPredicates[Partner](path / "partner")
+  lazy val category  = LeafPredicates[TimeAccountingCategory](path / "category")

@@ -4213,16 +4213,32 @@ type Mutation {
   setAllocations(input: SetAllocationsInput!): SetAllocationsResult!
 
   """
-  Sets, or updates, a partner's TAC feedback for a program.  Feedback may only
-  be provided by partners with a non-zero time split in the proposal.  NGO users
-  may only set feedback for their own partner, and only for programs they can
-  read.
+  Sets, or updates, the TAC feedback of a time accounting category for a
+  program.  The program must have a proposal whose status is SUBMITTED.
+
+  For a category that belongs to a partner, the user must be staff or an NGO
+  user of that partner who can read the program, and the partner must either
+  have a non-zero time split in the proposal or be the PI's partner.
+
+  Only staff may set feedback for the other categories, which are limited as
+  follows:
+
+  * CAL, ENG and CFHT never have TAC feedback.
+  * GT and LTP may provide feedback for any proposal.
+  * JP and KECK may provide feedback when the PI is affiliated with Subaru or
+    Keck, respectively.
+  * DD, DS, LP and SV may provide feedback when the proposal's call for
+    proposals is of type DIRECTORS_TIME, DEMO_SCIENCE, LARGE_PROGRAM or
+    SYSTEM_VERIFICATION, respectively.
   """
   setTacFeedback(input: SetTacFeedbackInput!): TacFeedbackResult!
 
   """
-  Deletes a partner's TAC feedback for a program.  NGO users may only delete
-  feedback for their own partner, and only for programs they can read.
+  Deletes the TAC feedback of a time accounting category for a program, along
+  with the allocations that carry its recommended times.  The program must have
+  a proposal whose status is SUBMITTED.  For a category that belongs to a
+  partner, the user must be staff or an NGO user of that partner who can read
+  the program.  Only staff may delete feedback for the other categories.
   """
   deleteTacFeedback(input: DeleteTacFeedbackInput!): DeleteTacFeedbackResult!
 
@@ -6604,8 +6620,8 @@ type SetAllocationsResult {
 }
 
 """
-Sets or updates the TAC feedback of a single partner for a program, which must
-have a proposal in which the partner has a non-zero time split. One of
+Sets or updates the TAC feedback of a single time accounting category for a
+program, subject to the rules described on the `setTacFeedback` mutation. One of
 programId, programReference or proposalReference is required. (If two or more are provided, they must refer to the same program.)
 """
 input SetTacFeedbackInput {
@@ -19161,7 +19177,8 @@ type Program {
   allocations: [Allocation!]!
 
   """
-  TAC feedback from each partner that has provided it, ordered by partner.
+  TAC feedback for each time accounting category that has provided it, ordered
+  by time accounting category.
   """
   tacFeedback: [TacFeedback!]!
 
@@ -22239,37 +22256,38 @@ enum TacCategory {
 }
 
 """
-A partner's TAC (Time Allocation Committee) feedback for a program.
+The TAC (Time Allocation Committee) feedback of a time accounting category for
+a program.
 """
 type TacFeedback {
-  "The partner whose TAC provided the feedback."
-  partner: Partner!
+  "The time accounting category whose TAC provided the feedback."
+  timeAccountingCategory: TimeAccountingCategory!
 
-  "The partner TAC's decision."
+  "The TAC's decision."
   decision: TacPartnerDecision!
 
-  "The partner TAC's ranking of the proposal."
+  "The TAC's ranking of the proposal."
   ranking: PosBigDecimal!
 
   """
-  The time recommended by the partner TAC, at most one entry per science band,
-  sorted by band.  Empty if the partner TAC recommends no time.
+  The time recommended by the TAC, at most one entry per science band, sorted
+  by band.  Empty if the TAC recommends no time.
   """
   recommendedTimes: [TacRecommendedTime!]!
 
-  "The partner TAC's comments, if any."
+  "The TAC's comments, if any."
   comments: NonEmptyString
 }
 
 """
-A partner's TAC feedback input.  When the partner has no feedback yet for the
-program, the decision and ranking are required.  Otherwise, omitted fields keep
-their existing values.  The decision, ranking and recommended times may not be
-set to null.  Comments are optional, and setting them to null removes any
-existing comments.
+The TAC feedback input of a time accounting category.  When the category has no
+feedback yet for the program, the decision and ranking are required.
+Otherwise, omitted fields keep their existing values.  The decision, ranking
+and recommended times may not be set to null.  Comments are optional, and
+setting them to null removes any existing comments.
 """
 input TacFeedbackInput {
-  partner: Partner!
+  timeAccountingCategory: TimeAccountingCategory!
   decision: TacPartnerDecision
   ranking: PosBigDecimal
 
@@ -22278,6 +22296,11 @@ input TacFeedbackInput {
   once.  When supplied, the list (even an empty one) replaces all existing
   recommended times.  When omitted, existing recommended times are kept, or
   none are recorded for new feedback.
+
+  Each recommended time is stored with the program's allocation for the
+  category and band.  Setting a recommended time also sets the allocated
+  duration to the same time, and removing a recommended time removes the
+  allocation.
   """
   recommendedTimes: [TacRecommendedTimeInput!]
 
@@ -22285,17 +22308,17 @@ input TacFeedbackInput {
 }
 
 """
-Deletes the TAC feedback of a single partner for a program. One of programId,
-programReference or proposalReference is required. (If two or more are
-provided, they must refer to the same program.)
+Deletes the TAC feedback of a single time accounting category for a program.
+One of programId, programReference or proposalReference is required. (If two
+or more are provided, they must refer to the same program.)
 """
 input DeleteTacFeedbackInput {
   programId: ProgramId
   proposalReference: ProposalReferenceLabel
   programReference: ProgramReferenceLabel
 
-  "The partner whose TAC feedback should be deleted."
-  partner: Partner!
+  "The time accounting category whose TAC feedback should be deleted."
+  timeAccountingCategory: TimeAccountingCategory!
 }
 
 "The result of deleting TAC feedback."
@@ -22313,7 +22336,7 @@ type TacFeedbackResult {
 }
 
 """
-A partner TAC's decision on a proposal.
+A TAC's decision on a proposal.
 """
 enum TacPartnerDecision {
   """
@@ -22328,7 +22351,7 @@ enum TacPartnerDecision {
 }
 
 """
-The time recommended by a partner TAC for a science band.
+The time recommended by a TAC for a science band.
 """
 type TacRecommendedTime {
   "The science band for which the time is recommended."
@@ -22339,7 +22362,7 @@ type TacRecommendedTime {
 }
 
 """
-The time recommended by a partner TAC for a science band.
+The time recommended by a TAC for a science band.
 """
 input TacRecommendedTimeInput {
   "The science band for which the time is recommended."

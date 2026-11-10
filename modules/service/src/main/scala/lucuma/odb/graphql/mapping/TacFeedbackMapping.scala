@@ -17,12 +17,12 @@ trait TacFeedbackMapping[F[_]] extends TacFeedbackTable[F]:
   lazy val TacFeedbackMapping =
     ObjectMapping(TacFeedbackType)(
       SqlField("programId", TacFeedbackTable.ProgramId, key = true, hidden = true),
-      SqlField("partner",   TacFeedbackTable.Partner,   key = true),
+      SqlField("timeAccountingCategory", TacFeedbackTable.Category, key = true),
       SqlField("decision",  TacFeedbackTable.Decision),
       SqlField("ranking",   TacFeedbackTable.Ranking),
       SqlObject("recommendedTimes", Join(List(
         TacFeedbackTable.ProgramId -> TacRecommendedTimeTable.ProgramId,
-        TacFeedbackTable.Partner   -> TacRecommendedTimeTable.Partner
+        TacFeedbackTable.Category  -> TacRecommendedTimeTable.Category
       ))),
       SqlField("comments",  TacFeedbackTable.Comments)
     )
@@ -30,7 +30,7 @@ trait TacFeedbackMapping[F[_]] extends TacFeedbackTable[F]:
   lazy val TacRecommendedTimeMapping =
     ObjectMapping(TacRecommendedTimeType)(
       SqlField("programId", TacRecommendedTimeTable.ProgramId,   key = true, hidden = true),
-      SqlField("partner",   TacRecommendedTimeTable.Partner,     key = true, hidden = true),
+      SqlField("category",  TacRecommendedTimeTable.Category,    key = true, hidden = true),
       SqlField("band",      TacRecommendedTimeTable.ScienceBand, key = true),
       SqlObject("time")
     )
