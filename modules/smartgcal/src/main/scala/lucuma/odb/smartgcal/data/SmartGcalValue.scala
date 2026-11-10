@@ -4,6 +4,7 @@
 package lucuma.odb.smartgcal.data
 
 import cats.Eq
+import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.GcalBaselineType
 import lucuma.core.model.sequence.StepConfig.Gcal
@@ -14,7 +15,7 @@ import monocle.Lens
 case class SmartGcalValue[A](
   gcalConfig:       Gcal,
   baselineType:     GcalBaselineType,
-  stepCount:        PosInt,
+  stepCount:        NonNegInt,
   instrumentConfig: A
 )
 
@@ -26,7 +27,7 @@ object SmartGcalValue {
   def baselineType[A]: Lens[SmartGcalValue[A], GcalBaselineType] =
     Focus[SmartGcalValue[A]](_.baselineType)
 
-  def stepCount[A]: Lens[SmartGcalValue[A], PosInt] =
+  def stepCount[A]: Lens[SmartGcalValue[A], NonNegInt] =
     Focus[SmartGcalValue[A]](_.stepCount)
 
   def instrumentConfig[A]: Lens[SmartGcalValue[A], A] =

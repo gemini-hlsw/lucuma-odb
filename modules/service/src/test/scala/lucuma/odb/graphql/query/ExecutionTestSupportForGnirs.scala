@@ -7,6 +7,7 @@ import cats.data.NonEmptySet
 import cats.effect.IO
 import cats.syntax.foldable.*
 import cats.syntax.option.*
+import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.numeric.PosLong
 import io.circe.Json
@@ -99,7 +100,7 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
         GcalShutter.Open
       ),
       GcalBaselineType.Night,
-      PosInt.unsafeFrom(10),
+      NonNegInt.unsafeFrom(10),
       LegacyInstrumentConfig(TimeSpan.unsafeFromMicroseconds(300_000L), PosInt.unsafeFrom(2))
     )
 
@@ -129,7 +130,7 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
         GcalShutter.Open
       ),
       GcalBaselineType.Night,
-      PosInt.unsafeFrom(1),
+      NonNegInt.unsafeFrom(1),
       // Distinct from the science coadds (1) so tests verify the calibration
       // uses its own coadds rather than inheriting the science step's.
       LegacyInstrumentConfig(TimeSpan.unsafeFromMicroseconds(20_000_000L), PosInt.unsafeFrom(2))
@@ -144,7 +145,7 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
         GcalShutter.Closed
       ),
       GcalBaselineType.Night,
-      PosInt.unsafeFrom(1),
+      NonNegInt.unsafeFrom(1),
       LegacyInstrumentConfig(TimeSpan.unsafeFromMicroseconds(10_000_000L), PosInt.unsafeFrom(3))
     )
 
@@ -177,7 +178,7 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
         shutter
       ),
       GcalBaselineType.Night,
-      PosInt.unsafeFrom(GnirsImagingFlatCount),
+      NonNegInt.unsafeFrom(GnirsImagingFlatCount),
       LegacyInstrumentConfig(exposure, PosInt.unsafeFrom(1))
     )
 

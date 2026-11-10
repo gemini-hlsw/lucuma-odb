@@ -5,6 +5,7 @@ package lucuma.odb.smartgcal.parsers
 
 import cats.data.NonEmptyList
 import cats.syntax.option.*
+import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.GcalBaselineType
 import lucuma.core.enums.GcalContinuum
@@ -49,7 +50,7 @@ final class GnirsParsersSuite extends munit.FunSuite:
     val expectedValue = SmartGcalValue(
       Gcal(Gcal.Lamp.fromContinuum(GcalContinuum.IrGreyBodyHigh), GcalFilter.Nd40, GcalDiffuser.Ir, GcalShutter.Open),
       GcalBaselineType.Night,
-      PosInt.unsafeFrom(8),
+      NonNegInt.unsafeFrom(8),
       LegacyInstrumentConfig(TimeSpan.unsafeFromMicroseconds(1_500_000L), PosInt.unsafeFrom(1))
     )
 

@@ -9,6 +9,7 @@ import cats.data.State
 import cats.effect.IO
 import cats.syntax.either.*
 import cats.syntax.option.*
+import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.numeric.PosLong
 import io.circe.Json
@@ -82,7 +83,7 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
               GcalShutter.Open
             ),
             GcalBaselineType.Night,
-            PosInt.unsafeFrom(1),
+            NonNegInt.unsafeFrom(1),
             LegacyInstrumentConfig(
               TimeSpan.unsafeFromMicroseconds(1_000_000L)
             )
@@ -97,7 +98,7 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
               GcalShutter.Closed
             ),
             GcalBaselineType.Day,
-            PosInt.unsafeFrom(1),
+            NonNegInt.unsafeFrom(1),
             LegacyInstrumentConfig(
               TimeSpan.unsafeFromMicroseconds(1_000_000L)
             )
@@ -232,7 +233,7 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
               _ <- Gmos.TableRow.grating         := disperser
               _ <- Gmos.TableRow.wavelengthRange := range
               _ <- Gmos.TableRow.exposureTime    := TimeSpan.unsafeFromMicroseconds(expTimeSec * 1_000_000L)
-              _ <- Gmos.TableRow.stepCount       := PosInt.unsafeFrom(count)
+              _ <- Gmos.TableRow.stepCount       := NonNegInt.unsafeFrom(count)
             } yield ()
 
           insert(id, update.runS(tableRow).value)
@@ -252,7 +253,7 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
               _ <- Flamingos2.TableRow.line            := PosLong.unsafeFrom(stepOrder)
               _ <- Flamingos2.TableRow.disperser       := tableRow.key.disperser
               _ <- Flamingos2.TableRow.exposureTime    := TimeSpan.unsafeFromMicroseconds(expTimeSec * 1_000_000L)
-              _ <- Flamingos2.TableRow.stepCount       := PosInt.unsafeFrom(count)
+              _ <- Flamingos2.TableRow.stepCount       := NonNegInt.unsafeFrom(count)
             } yield ()
 
           Services.asSuperUser:
@@ -272,7 +273,7 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
             for {
               _ <- Igrins2.TableRow.line         := PosLong.unsafeFrom(stepOrder)
               _ <- Igrins2.TableRow.exposureTime := TimeSpan.unsafeFromMicroseconds(expTimeSec * 1_000_000L)
-              _ <- Igrins2.TableRow.stepCount    := PosInt.unsafeFrom(count)
+              _ <- Igrins2.TableRow.stepCount    := NonNegInt.unsafeFrom(count)
             } yield ()
 
           Services.asSuperUser:

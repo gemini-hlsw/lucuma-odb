@@ -4,7 +4,7 @@
 package lucuma.odb.smartgcal.data
 
 import cats.data.NonEmptyList
-import eu.timepit.refined.types.numeric.PosInt
+import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.PosLong
 import fs2.Pipe
 import fs2.Stream
@@ -41,7 +41,7 @@ object Igrins2:
         .andThen(SmartGcalValue.instrumentConfig)
         .andThen(LegacyInstrumentConfig.exposureTime)
 
-    def stepCount: Lens[TableRow, PosInt] =
+    def stepCount: Lens[TableRow, NonNegInt] =
       TableRow.value
         .andThen(SmartGcalValue.stepCount)
 

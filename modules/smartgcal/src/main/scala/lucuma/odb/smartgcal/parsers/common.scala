@@ -3,10 +3,12 @@
 
 package lucuma.odb.smartgcal.parsers
 
+import cats.parse.Numbers
 import cats.parse.Parser
 import cats.parse.Parser0
 import cats.parse.Rfc5234.alpha
 import cats.syntax.apply.*
+import eu.timepit.refined.types.numeric.NonNegInt
 import lucuma.core.math.BoundedInterval
 import lucuma.core.math.Wavelength
 import lucuma.core.parser.MiscParsers.comma
@@ -33,6 +35,12 @@ trait CommonParsers {
 
   def skipColumns(n: Int): Parser[Unit] =
     List.fill(n)(skipColumn).reduce(_ *> _)
+
+  // "Calibration Observe": zero marks a setup known to have no calibration.
+  val observeCount: Parser[NonNegInt] =
+    Numbers.digits
+      .mapFilter(s => allCatch.opt(s.toInt).flatMap(NonNegInt.unapply))
+      .withContext("observe count")
 
   val instant: Parser[Instant] =
     val dtf = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss zz", US)

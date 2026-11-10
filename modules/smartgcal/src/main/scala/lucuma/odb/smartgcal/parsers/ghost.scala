@@ -39,7 +39,7 @@ trait GhostParsers:
 
   val value: Parser[SmartGcalValue[GhostUpdate]] =
     (
-      (posInt       <* columnSep) ~  // observe count (step count)
+      (observeCount <* columnSep) ~  // observe count (step count)
       (stepConfig   <* columnSep) ~
       (seconds      <* columnSep) ~  // red exposure time
       (posInt       <* columnSep) ~  // red exposure count

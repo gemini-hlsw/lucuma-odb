@@ -6,7 +6,7 @@ package feature
 
 import cats.effect.IO
 import cats.syntax.all.*
-import eu.timepit.refined.types.numeric.PosInt
+import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.PosLong
 import io.circe.Decoder
 import io.circe.Json
@@ -56,7 +56,7 @@ class calibrations_f2ImagingDaytimeFlat
         shutter
       ),
       GcalBaselineType.Day,
-      PosInt.unsafeFrom(1),
+      NonNegInt.unsafeFrom(1),
       LegacyInstrumentConfig(TimeSpan.unsafeFromMicroseconds(3_000_000L))
     )
 

@@ -5,6 +5,7 @@ package lucuma.odb.service
 
 import cats.data.NonEmptySet
 import cats.effect.IO
+import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.numeric.PosLong
 import lucuma.core.enums.GcalArc
@@ -42,7 +43,7 @@ class SmartGcalServiceSuite_Ghost extends ExecutionTestSupportForGhost:
         GcalShutter.Closed
       ),
       baselineType     = GcalBaselineType.Night,
-      stepCount        = PosInt.unsafeFrom(1),
+      stepCount        = NonNegInt.unsafeFrom(1),
       instrumentConfig = Ghost.GhostUpdate(
         10.secondTimeSpan,
         PosInt.unsafeFrom(10),
