@@ -22,6 +22,7 @@ import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.ProtoStep
+import lucuma.odb.sequence.isDayCalibration
 import lucuma.odb.sequence.util.AtomBuilder
 
 /**
@@ -87,7 +88,7 @@ object AcquisitionAtoms:
    * @param oid          observation id, for error messages
    * @param time         ITC integration time (or an error); the exposure time
    *                     used by `computeSteps` is read from it
-   * @param calRole      calibration role; Twilight yields an empty sequence
+   * @param calRole      calibration role; Twilight and daytime calibrations yield an empty sequence
    * @param atomBuilder  atom builder for the acquisition sequence type
    * @param modeName     observing mode name, for the error message
    * @param computeSteps mode-specific step computation given the exposure time
@@ -102,18 +103,18 @@ object AcquisitionAtoms:
     computeSteps: TimeSpan => AcquisitionSteps[D],
     repeatCount:  Int
   ): Either[OdbError, SequenceGenerator[D]] =
-    calRole match
-      case Some(CalibrationRole.Twilight) =>
-        SequenceGenerator.empty[D].asRight
-      case _                              =>
-        time
-          .filterOrElse(
-            _.exposureTime.toNonNegMicroseconds.value > 0,
-            OdbError.SequenceUnavailable(oid, s"Could not generate a sequence for $oid: $modeName acquisition requires a positive exposure time.".some)
-          )
-          .map: t =>
-            new SequenceGenerator[D]:
-              override val generate: Stream[Pure, Atom[D]] =
-                stream(atomBuilder, computeSteps(t.exposureTime), repeatCount)
+    // A twilight and a daytime calibration have no target to acquire.
+    if calRole.contains(CalibrationRole.Twilight) || calRole.isDayCalibration then
+      SequenceGenerator.empty[D].asRight
+    else
+      time
+        .filterOrElse(
+          _.exposureTime.toNonNegMicroseconds.value > 0,
+          OdbError.SequenceUnavailable(oid, s"Could not generate a sequence for $oid: $modeName acquisition requires a positive exposure time.".some)
+        )
+        .map: t =>
+          new SequenceGenerator[D]:
+            override val generate: Stream[Pure, Atom[D]] =
+              stream(atomBuilder, computeSteps(t.exposureTime), repeatCount)
 
 end AcquisitionAtoms

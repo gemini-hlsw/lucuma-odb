@@ -30,6 +30,7 @@ import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
+import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepGuideState
 import lucuma.core.math.Offset
@@ -50,6 +51,8 @@ import lucuma.itc.IntegrationTime
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.util.AtomBuilder
+import lucuma.odb.sequence.util.DaytimeSmartGcal
+import lucuma.refined.*
 import monocle.Lens
 
 import java.util.UUID
@@ -96,6 +99,8 @@ object Science:
    */
   val TwilightExposureTime: TimeSpan =
     30.secondTimeSpan
+
+  val DaytimeArcTitle: NonEmptyString = "Daytime Arc".refined
 
   extension (t: Timestamp)
     def plusCalValidityPeriod: Timestamp =
@@ -312,6 +317,27 @@ object Science:
 
         goals.traverse(define).value
 
+      /**
+       * The arcs of a daytime arc calibration: one smart GCAL arc per wavelength
+       * dither, at that dither's wavelength.
+       */
+      def daytimeArcs(config: Config[G, L, U]): NonEmptyList[(NonEmptyString, ProtoStep[D])] =
+        val λ       = config.centralWavelength
+        val dithers = NonEmptyList.fromList(config.wavelengthDithers).getOrElse(NonEmptyList.one(WavelengthDither.Zero))
+
+        def title(Δλ: WavelengthDither): NonEmptyString =
+          if dithers.length > 1 then NonEmptyString.unsafeFrom(s"${DaytimeArcTitle.value} ${Δλ.toNanometers.value} nm")
+          else DaytimeArcTitle
+
+        dithers.map: Δλ =>
+          val arc = eval:
+            for
+              _ <- setup(config, TimeSpan.Zero)
+              _ <- optics.wavelength := λ.offset(Δλ).getOrElse(λ)
+              a <- arcStep(TelescopeConfig(Offset.Zero, StepGuideState.Disabled), ObserveClass.DayCal)
+            yield a
+          (title(Δλ), arc)
+
     end Computer
 
     object North extends GmosNorthSequenceState
@@ -419,58 +445,61 @@ object Science:
       time:      Either[OdbError, IntegrationTime],
       calRole:   Option[CalibrationRole]
     ): F[Either[OdbError, SequenceGenerator[D]]] =
+      // A daytime arc has no ITC: its exposures come from SmartGcal.
+      if calRole.contains(CalibrationRole.DaytimeArc) then
+        DaytimeSmartGcal.sequence(oid, estimator, static, namespace, expander, stepDef.daytimeArcs(calibrationObservationConfig(config)))
+      else
+        def sequenceUnavailable(m: String): OdbError =
+          OdbError.SequenceUnavailable(oid, s"Could not generate a sequence for $oid: $m".some)
 
-      def sequenceUnavailable(m: String): OdbError =
-        OdbError.SequenceUnavailable(oid, s"Could not generate a sequence for $oid: $m".some)
+        def extractTime: Either[OdbError, (PosLong, PosInt)] =
+          time.flatMap: t =>
+            PosLong
+              .from(t.exposureTime.toNonNegMicroseconds.value)
+              .bimap(
+                _  => sequenceUnavailable(s"$modeName science requires a positive exposure time."),
+                μs => (μs, t.frameCount)
+              )
 
-      def extractTime: Either[OdbError, (PosLong, PosInt)] =
-        time.flatMap: t =>
-          PosLong
-            .from(t.exposureTime.toNonNegMicroseconds.value)
-            .bimap(
-              _  => sequenceUnavailable(s"$modeName science requires a positive exposure time."),
-              μs => (μs, t.frameCount)
-            )
+        // Adjust the config and integration time according to the calibration role.
+        val configAndTime = calRole match
+          case None                                     =>
+            extractTime.tupleLeft(config)
 
-      // Adjust the config and integration time according to the calibration role.
-      val configAndTime = calRole match
-        case None                                     =>
-          extractTime.tupleLeft(config)
+          case Some(CalibrationRole.SpectroPhotometric) =>
+            val configʹ = calibrationObservationConfig(config)
+            extractTime.map: (μs, _) =>
+              (configʹ, (μs, PosInt.unsafeFrom(configʹ.wavelengthDithers.length.max(1))))
 
-        case Some(CalibrationRole.SpectroPhotometric) =>
-          val configʹ = calibrationObservationConfig(config)
-          extractTime.map: (μs, _) =>
-            (configʹ, (μs, PosInt.unsafeFrom(configʹ.wavelengthDithers.length.max(1))))
+          case Some(CalibrationRole.Twilight)           =>
+            val configʹ = calibrationObservationConfig(config)
+            val μs      = PosLong.unsafeFrom(TwilightExposureTime.toMicroseconds)
+            val n       = PosInt.unsafeFrom(configʹ.wavelengthDithers.length.max(1))
+            (configʹ, (μs, n)).asRight[OdbError]
 
-        case Some(CalibrationRole.Twilight)           =>
-          val configʹ = calibrationObservationConfig(config)
-          val μs      = PosLong.unsafeFrom(TwilightExposureTime.toMicroseconds)
-          val n       = PosInt.unsafeFrom(configʹ.wavelengthDithers.length.max(1))
-          (configʹ, (μs, n)).asRight[OdbError]
+          case Some(c)                                  =>
+            sequenceUnavailable(s"$modeName ${c.tag} not implemented").asLeft
 
-        case Some(c)                                  =>
-          sequenceUnavailable(s"$modeName ${c.tag} not implemented").asLeft
+        // If exposure time is longer than the science period, there will never be
+        // time enough to do any science steps.
+        val configAndTimeʹ = configAndTime.filterOrElse(
+          _._2._1.value <= SciencePeriod.toMicroseconds,
+          sequenceUnavailable(s"Exposure times over ${SciencePeriod.toMinutes} minutes are not supported.")
+        )
 
-      // If exposure time is longer than the science period, there will never be
-      // time enough to do any science steps.
-      val configAndTimeʹ = configAndTime.filterOrElse(
-        _._2._1.value <= SciencePeriod.toMicroseconds,
-        sequenceUnavailable(s"Exposure times over ${SciencePeriod.toMinutes} minutes are not supported.")
-      )
+        // Compute the generator
+        val result = for
+          (configʹ, (μs, n)) <- EitherT.fromEither[F](configAndTimeʹ)
+          defs               <- EitherT(stepDef.compute(oid, static, expander, configʹ, μs, n, calRole))
+        yield ScienceGenerator(
+          estimator,
+          static,
+          AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Science),
+          μs,
+          defs.map(Dither.init).toNev
+        )
 
-      // Compute the generator
-      val result = for
-        (configʹ, (μs, n)) <- EitherT.fromEither[F](configAndTimeʹ)
-        defs               <- EitherT(stepDef.compute(oid, static, expander, configʹ, μs, n, calRole))
-      yield ScienceGenerator(
-        estimator,
-        static,
-        AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Science),
-        μs,
-        defs.map(Dither.init).toNev
-      )
-
-      result.widen[SequenceGenerator[D]].value
+        result.widen[SequenceGenerator[D]].value
     end instantiate
 
   end ScienceGenerator

@@ -1127,6 +1127,20 @@ class updateGroups extends OdbSuite {
       es  <- groupElementsAs(pi, pid, Some(g1))
     } yield assertEquals(es, List(Left(g2)))
 
+  test("cannot move a per-observation calibration system group out of a system group"):
+    for {
+      pid <- createProgramAs(pi)
+      g1  <- createGroupAs(pi, pid)
+      g2  <- createGroupAs(pi, pid)
+      g3  <- createGroupAs(pi, pid, Some(g2))
+      _   <- updateGroupSystem(g2, true)
+      _   <- updateGroupSystem(g3, true)
+      _   <- setGroupCalibrationRoles(g3, List(CalibrationRole.DaytimeArc))
+      // Moving a calibration group nested in a system group is a no-op
+      _   <- moveGroupsAs(pi, List(g3), Some(g1), None)
+      es  <- groupElementsAs(pi, pid, Some(g1))
+    } yield assertEquals(es, Nil)
+
   test("cannot move non-calibration system group"):
     for {
       pid <- createProgramAs(pi)

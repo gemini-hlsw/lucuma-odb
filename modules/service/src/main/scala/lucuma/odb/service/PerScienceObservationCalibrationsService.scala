@@ -11,11 +11,9 @@ import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.enums.CalibrationRole
-import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.TelluricSlot
-import lucuma.core.math.Angle
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
@@ -34,7 +32,6 @@ import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.data.GroupTree
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.PosAngleConstraintMode
-import lucuma.odb.graphql.input.GroupPropertiesInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
 import lucuma.odb.graphql.input.PosAngleConstraintInput
 import lucuma.odb.graphql.input.TargetEnvironmentInput
@@ -52,7 +49,6 @@ import org.typelevel.log4cats.syntax.*
 import org.typelevel.otel4s.Attribute
 import org.typelevel.otel4s.trace.Tracer
 import skunk.*
-import skunk.AppliedFragment
 import skunk.Query
 import skunk.Transaction
 import skunk.codec.boolean.bool
@@ -113,7 +109,7 @@ object PerScienceObservationCalibrationsService:
     else required.filterNot(filled.contains)
 
   def instantiate[F[_]: {Concurrent as F, Tracer as T, Logger, Services as S}]: PerScienceObservationCalibrationsService[F] =
-    new PerScienceObservationCalibrationsService[F] with CalibrationObservations with WorkflowStateQueries[F]:
+    new PerScienceObservationCalibrationsService[F] with CalibrationObservations with ObsCalibrationOperations with WorkflowStateQueries[F]:
 
       private def groupNameForObservation(
         config: CalibrationConfigSubset,
@@ -143,39 +139,22 @@ object PerScienceObservationCalibrationsService:
         Option.unless(isFlamingos2Imaging(config))(CalibrationRole.Telluric).toList ++
           GeneratedDayCals.filter(_.wantedBy(config)).map(_.calibrationRole)
 
-      private def newObsCalibrationGroup(
+      private def newScienceCalibrationGroup(
         pid:           Program.Id,
         config:        CalibrationConfigSubset,
         oid:           Observation.Id,
         parentGroupId: Option[Group.Id],
         parentIndex:   Option[NonNegShort]
       )(using Transaction[F]): F[Group.Id] =
-        groupService.createGroup(
-          Services.asSuperUser:
-            AccessControl.unchecked(
-              GroupService.NewGroup(
-                SET = GroupPropertiesInput.Create(
-                  name = groupNameForObservation(config, oid).some,
-                  description = none,
-                  minimumRequired = none,
-                  ordered = false,
-                  minimumInterval = none,
-                  maximumInterval = TimeSpan.Zero.some,
-                  sameNight = false,
-                  minimumObservationsPerNight = none,
-                  maximumObservationsPerNight = none,
-                  parentGroupId = parentGroupId,
-                  parentGroupIndex = parentIndex,
-                  existence = Existence.Present
-                ),
-                initialContents = List(Right(oid))
-              ),
-              pid,
-              program_id
-            ),
-          system = true,
-          calibrationRoles = obsCalibrationGroupRoles(config)
-        ).orError
+        newObsCalibrationGroup(
+          pid,
+          groupNameForObservation(config, oid),
+          parentGroupId,
+          parentIndex,
+          TimeSpan.Zero.some,
+          obsCalibrationGroupRoles(config),
+          oid
+        )
 
       // The obsDuration (typically the next visit) decides the telluric count.
       private def telluricDuration(
@@ -337,18 +316,12 @@ object PerScienceObservationCalibrationsService:
         sourceOid: Observation.Id,
         targetOid: Observation.Id
       )(using Transaction[F], SuperUserAccess): F[Unit] =
-        val modeQuery = Statements.selectObservingModeTypes(NonEmptyList.one(sourceOid))
         for
-          mode   <- session
-                      .prepareR(modeQuery.fragment.query(observation_id *: observing_mode_type.opt))
-                      .use(_.unique(modeQuery.argument))
-                      .map(_._2)
+          mode   <- selectObservingModeTypes(List(sourceOid)).map(_.get(sourceOid).flatten)
           altair <- selectAltair(sourceOid)
-          _      <- session.executeCommand(Statements.syncObservationConfiguration(sourceOid, targetOid))
+          _      <- syncObservationConfiguration(sourceOid, targetOid)
           _      <- session.execute(Statements.updateAltair)(altair, targetOid)
-          _      <- mode.traverse_ : m =>
-                      session.execute(Statements.updateObservingModeType)(m.some, m.instrumentOption, targetOid) *>
-                        observingModeServices.clone(m, sourceOid, targetOid)
+          _      <- replaceObservingMode(sourceOid, mode, targetOid, none)
           _      <- asterismService.cloneAsterism(sourceOid, targetOid)
         yield ()
 
@@ -361,7 +334,7 @@ object PerScienceObservationCalibrationsService:
         T.span("read-obs-calibration-group", Attribute.from(ProgramIdKey, pid)).surround:
           findSystemGroupForObservation(tree, obs.id)
             .fold(
-              newObsCalibrationGroup(
+              newScienceCalibrationGroup(
                 pid,
                 obs.data,
                 obs.id,
@@ -474,40 +447,6 @@ object PerScienceObservationCalibrationsService:
           .prepareR(Statements.selectDayCalObservations)
           .use(_.stream((gid, DayCalRoles), 10).compile.toList)
 
-      private def insertDaytimeObservation(
-        pid:             Program.Id,
-        gid:             Group.Id,
-        calibrationRole: CalibrationRole
-      )(using Transaction[F], SuperUserAccess): F[Observation.Id] =
-        // A daytime flat is an internal GCAL calibration: no target, a fixed
-        // position angle, and no science requirements (the exposure comes from
-        // SmartGcal).
-        val obsInput = ObservationPropertiesInput.Create(
-          subtitle            = none,
-          scienceBand         = none,
-          posAngleConstraint  = PosAngleConstraintInput(
-                                  mode  = PosAngleConstraintMode.Fixed.some,
-                                  angle = Angle.Angle0.some
-                                ).some,
-          targetEnvironment   = none,
-          constraintSet       = none,
-          scheduling          = none,
-          attachments         = none,
-          scienceRequirements = none,
-          observingMode       = none,
-          existence           = Existence.Present.some,
-          group               = gid.some,
-          groupIndex          = none,
-          observerNotes       = none,
-          priority            = none,
-          qaStateOverride     = none
-        )
-        observationService
-          .createObservation(
-            AccessControl.unchecked(obsInput, pid, program_id),
-            calibrationRole = calibrationRole.some
-          ).orError
-
       // Creates the calibration when the science needs one and there is none,
       // resyncs it when there is, and deletes it when the science no longer
       // needs it, unless it or its science has executed.
@@ -523,7 +462,7 @@ object PerScienceObservationCalibrationsService:
             (needed, existing) match
               case (true, Nil) =>
                 for
-                  oid <- insertDaytimeObservation(pid, gid, calibrationRole)
+                  oid <- insertDaytimeCalibration(pid, gid, calibrationRole)
                   _   <- syncConfiguration(pid, obs.id, oid, calibrationRole)
                 yield (List(oid), List.empty[Observation.Id])
               case (true, es)  =>
@@ -753,26 +692,6 @@ object PerScienceObservationCalibrationsService:
         calibrationRole: CalibrationRole
       )(using Transaction[F], SuperUserAccess): F[Unit] =
 
-        def readObservingModes: F[List[(Observation.Id, Option[ObservingModeType])]] =
-          val af = Statements.selectObservingModeTypes(NonEmptyList.of(sourceOid, targetOid))
-          S.session
-            .prepareR(af.fragment.query(observation_id *: observing_mode_type.opt))
-            .use(_.stream(af.argument, 2).compile.toList)
-
-        def extractModes(
-          modes: List[(Observation.Id, Option[ObservingModeType])]
-        ): F[(Option[ObservingModeType], Option[ObservingModeType])] =
-          modes match
-            case (sid, sourceMode) :: (tid, targetMode) :: Nil if (sid === sourceOid && tid === targetOid) =>
-              (sourceMode, targetMode).pure[F]
-            case (tid, targetMode) :: (sid, sourceMode) :: Nil if (sid === sourceOid && tid === targetOid) =>
-              (sourceMode, targetMode).pure[F]
-            case _ =>
-              F.raiseError(new RuntimeException("Cannot read obs modes for source and target"))
-
-        def syncObservationProperties: F[Unit] =
-          S.session.executeCommand(Statements.syncObservationConfiguration(sourceOid, targetOid)).void
-
         // A daytime calibration is taken with the dome closed, so it never
         // observes behind Altair; a telluric standard does, on its own star.
         def syncAltair: F[Unit] =
@@ -791,37 +710,29 @@ object PerScienceObservationCalibrationsService:
             case ObservingModeType.Flamingos2Mos => ObservingModeType.Flamingos2LongSlit
             case other                           => other
 
-        def deleteOldTargetMode(tm: Option[ObservingModeType]): F[Unit] =
-          tm.traverse(mode => observingModeServices.delete(mode, List(targetOid))).void
-
-        def deleteAllExposureTimeModes(sm: Option[ObservingModeType]): F[Unit] =
-          sm.traverse(_ => S.exposureTimeModeService.deleteMany(
-            List(targetOid),
-            ExposureTimeModeRole.Requirement,
-            ExposureTimeModeRole.Acquisition,
-            ExposureTimeModeRole.Science
-          )).void
-
-        def updateTargetModeType(sm: Option[ObservingModeType]): F[Unit] =
-          telluricModeFor(sm).traverse(mode =>
-            S.session.execute(Statements.updateObservingModeType)(mode.some, mode.instrumentOption, targetOid)
-          ).void
-
-        // MOS has no same-mode clone to make: the long slit row is derived from it,
-        // carrying the equivalent builtin FPU.  Its exposure time modes still come
-        // across, as they would from any other mode.
-        def deriveMosTelluricMode: F[Unit] =
-          for
-            cfg <- flamingos2MosService.select(List(sourceOid)).map(_.get(sourceOid))
-            _   <- S.exposureTimeModeService.clone(sourceOid, targetOid).void
-            _   <- cfg.traverse_(c => flamingos2LongSlitService.insertMosTelluric(sourceOid, targetOid, c.equivalentFpu))
-          yield ()
-
-        def cloneSourceMode(sm: Option[ObservingModeType]): F[Unit] =
-          sm.traverse_ : mode =>
-            mode match
-              case ObservingModeType.Flamingos2Mos => deriveMosTelluricMode
-              case _                               => observingModeServices.clone(mode, sourceOid, targetOid)
+        // A Flamingos 2 MOS telluric is observed through the builtin long slit that
+        // matches the mask's slitlets, never through the mask: its long slit row is
+        // derived from the mask, carrying the equivalent builtin FPU, while its
+        // exposure time modes come across as from any other mode.
+        def replaceMode(sm: Option[ObservingModeType], tm: Option[ObservingModeType]): F[Unit] =
+          sm match
+            case Some(ObservingModeType.Flamingos2Mos) =>
+              val ls = ObservingModeType.Flamingos2LongSlit
+              for
+                _   <- tm.traverse_(observingModeServices.delete(_, List(targetOid)))
+                _   <- S.exposureTimeModeService.deleteMany(
+                         List(targetOid),
+                         ExposureTimeModeRole.Requirement,
+                         ExposureTimeModeRole.Acquisition,
+                         ExposureTimeModeRole.Science
+                       )
+                _   <- S.session.execute(ObsCalibrationOperations.Statements.UpdateObservingModeType)(ls.some, ls.instrumentOption, targetOid)
+                cfg <- flamingos2MosService.select(List(sourceOid)).map(_.get(sourceOid))
+                _   <- S.exposureTimeModeService.clone(sourceOid, targetOid).void
+                _   <- cfg.traverse_(c => flamingos2LongSlitService.insertMosTelluric(sourceOid, targetOid, c.equivalentFpu))
+              yield ()
+            case _ =>
+              replaceObservingMode(sourceOid, sm, targetOid, tm)
 
         // Reset any mode-specific overrides the cloned obs should not keep from the
         // science: the offsets and, for a GNIRS telluric, the explicit read mode.
@@ -866,15 +777,13 @@ object PerScienceObservationCalibrationsService:
               F.unit
 
         for {
-          modes     <- readObservingModes
-          (sm, tm)  <- extractModes(modes)
-          _         <- syncObservationProperties
+          modes     <- selectObservingModeTypes(List(sourceOid, targetOid))
+          sm         = modes.get(sourceOid).flatten
+          tm         = modes.get(targetOid).flatten
+          _         <- syncObservationConfiguration(sourceOid, targetOid)
           _         <- syncAltair
           overrides <- readOverrides(sm, tm)
-          _         <- deleteOldTargetMode(tm)
-          _         <- deleteAllExposureTimeModes(sm)
-          _         <- updateTargetModeType(sm)
-          _         <- cloneSourceMode(sm)
+          _         <- replaceMode(sm, tm)
           _         <- resetTelluricConfig(sm)
           _         <- collapseTelluricWavelengths(sm)
           _         <- createTelluricExposureTimeMode(telluricModeFor(sm), pid, sourceOid, targetOid, calibrationRole)
@@ -1084,23 +993,6 @@ object PerScienceObservationCalibrationsService:
             ORDER BY c_group_index
           """.query(observation_id)
 
-        def selectObservingModeTypes(
-          oids: NonEmptyList[Observation.Id]
-        ): AppliedFragment =
-          void"""
-            SELECT c_observation_id, c_observing_mode_type
-            FROM   t_observation
-            WHERE  c_observation_id IN (
-          """ |+| oids.map(sql"$observation_id").intercalate(void", ") |+| void")"
-
-        val updateObservingModeType: Command[(Option[ObservingModeType], Option[Instrument], Observation.Id)] =
-          sql"""
-            UPDATE t_observation
-            SET    c_observing_mode_type = ${observing_mode_type.opt},
-                   c_instrument          = ${instrument.opt}
-            WHERE c_observation_id = $observation_id
-          """.command
-
         val selectAltair: Query[Observation.Id, Option[AltairConfiguration]] =
           sql"""
             SELECT c_altair_mode, c_altair_field_lens, c_altair_cass_rotator, c_altair_nd_filter
@@ -1168,34 +1060,3 @@ object PerScienceObservationCalibrationsService:
             FROM   t_group
             WHERE  c_group_id = $group_id
           """.query(group_id.opt *: int2_nonneg)
-
-        def syncObservationConfiguration(
-          sourceOid: Observation.Id,
-          targetOid: Observation.Id
-        ): AppliedFragment =
-          sql"""
-            UPDATE t_observation target
-            SET
-              c_science_band             = source.c_science_band,
-              c_cloud_extinction         = source.c_cloud_extinction,
-              c_image_quality            = source.c_image_quality,
-              c_sky_background           = source.c_sky_background,
-              c_water_vapor              = source.c_water_vapor,
-              c_air_mass_min             = source.c_air_mass_min,
-              c_air_mass_max             = source.c_air_mass_max,
-              c_hour_angle_min           = source.c_hour_angle_min,
-              c_hour_angle_max           = source.c_hour_angle_max,
-              c_spec_wavelength          = source.c_spec_wavelength,
-              c_spec_resolution          = source.c_spec_resolution,
-              c_spec_wavelength_coverage = source.c_spec_wavelength_coverage,
-              c_spec_focal_plane         = source.c_spec_focal_plane,
-              c_spec_focal_plane_angle   = source.c_spec_focal_plane_angle,
-              c_spec_capability          = source.c_spec_capability,
-              c_img_minimum_fov          = source.c_img_minimum_fov,
-              c_img_narrow_filters       = source.c_img_narrow_filters,
-              c_img_broad_filters        = source.c_img_broad_filters,
-              c_img_combined_filters     = source.c_img_combined_filters
-            FROM t_observation source
-            WHERE source.c_observation_id = $observation_id
-              AND target.c_observation_id = $observation_id
-          """.apply(sourceOid, targetOid)

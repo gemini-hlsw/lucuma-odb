@@ -286,6 +286,10 @@ _Avoid_: day cal (alone, the step-level class), day baseline (one Smart kind of 
 A system-generated calibration observation taken for one Flamingos-2 imaging science observation: it carries the science observation's Flamingos-2 imaging mode, kept in step by the ODB, and the `DAYTIME_FLAT` calibration role, and lives in the science observation's per-observation calibration group beside any Tellurics. Its sequence is one Smart GCAL daytime flat per distinct science filter, generated like a Daytime Pinhole; it has no target and uses no ITC. Not a Daytime Calibration (staff hand-made, its own mode).
 _Avoid_: imaging flat (the step kind, not the observation), smart flat (a row kind), daytime calibration (the staff-made observation).
 
+**Daytime Arc**:
+A system-generated calibration observation taken for one GMOS spectrophotometric standard (long slit or IFU): it carries the standard's GMOS mode, kept in step by the ODB, and the `DAYTIME_ARC` calibration role. It is the standard's only arc; the standard's own sequence takes flats but no night arc. The standard and its arc share a system group nested in the program's Calibrations group, created with the standard, never for a standard that has started executing, and removed with it unless either has a visit. Its sequence is one Smart GCAL arc per wavelength dither of the standard, in the standard's order; it has no target and uses no ITC. Not a Daytime Calibration (staff hand-made, its own mode).
+_Avoid_: specphot arc (names the parent, not the kind), smart arc (a row kind), night arc (the arc a science sequence takes beside its flats).
+
 **Daytime Calibration Mode**:
 A single observing mode holding the Gemini facility instrument of a Daytime Calibration and the ordered list of its Daytime Calibration Sets. Staff-only. The sequence it generates follows the usual Materialized Sequence rule: generated until the first visit or a hand edit, stored and editable afterwards.
 _Avoid_: daytime mode (ambiguous with the time of day), instrument-only mode, one mode per instrument (the instrument is a parameter, not a kind).

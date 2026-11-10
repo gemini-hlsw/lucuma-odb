@@ -143,7 +143,7 @@ class observation_workflow_tellurics
       CalculatedValue(CalculationState.Ready, ObservationWorkflow(state, transitions, Nil))
     )
 
-  // A per-observation calibration (telluric, daytime pinhole or flat) inherits its
+  // A per-observation calibration (telluric, daytime pinhole, flat or arc) inherits its
   // science observation's workflow state. A daytime pinhole or flat has no transitions
   // of its own; a telluric may additionally be declined.
   private def workflowFollowsScience(role: CalibrationRole): IO[Unit] =
@@ -244,6 +244,9 @@ class observation_workflow_tellurics
 
   test("daytime flat workflow follows science up to ready"):
     workflowFollowsScience(CalibrationRole.DaytimeFlat)
+
+  test("daytime arc workflow follows its parent up to ready"):
+    workflowFollowsScience(CalibrationRole.DaytimeArc)
 
   // Inheritance comes from a science observation that is present: once the
   // science observation is deleted, the telluric no longer follows it.

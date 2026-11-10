@@ -43,6 +43,7 @@ import lucuma.odb.graphql.query.ExecutionQuerySetupOperations
 import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
 import lucuma.odb.graphql.subscription.SubscriptionUtils
 import lucuma.odb.json.wavelength.decoder.given
+import lucuma.odb.service.ObsExtract
 import lucuma.odb.service.PerProgramPerConfigCalibrationsService
 import lucuma.odb.service.Services
 import lucuma.odb.service.SpecPhotoCalibrations
@@ -153,24 +154,30 @@ class perProgramPerConfigCalibrations
     observingMode: Option[ObservingMode]
   ) derives Decoder
 
+  // The per-program calibrations only: a standard's daytime arc is covered by
+  // calibrations_gmosSpecPhotDaytimeArc.
+  private def perProgram(role: Option[CalibrationRole]): Boolean =
+    role.exists(ObsExtract.PerProgramPerConfigCalibrationTypes.contains)
+
   extension (obs: List[CalibObs])
     def countCalibrations: Int = obs.count:
-      case CalibObs(_, _, Some(_), _, _, _, _) => true
-      case _                               => false
+      case CalibObs(_, _, role, _, _, _, _) => perProgram(role)
 
     def countCalibrationsWithCE(ce: CloudExtinction.Preset): Int = obs.count:
-      case CalibObs(_, _, Some(_), _, Some(CalibCE(a)), _, _) => a === ce
+      case CalibObs(_, _, role, _, Some(CalibCE(a)), _, _) => perProgram(role) && a === ce
       case _                                               => false
 
     def countCalibrationsWithTE: Int = obs.count:
-      case CalibObs(_, _, Some(_), Some(_), _, _, _) => true
-      case _                                     => false
+      case CalibObs(_, _, role, Some(_), _, _, _) => perProgram(role)
+      case _                                      => false
 
     def callibrationIds: List[Observation.Id] = obs.collect:
-      case CalibObs(cid, _, Some(_), _, _, _, _) => cid
+      case CalibObs(cid, _, role, _, _, _, _) if perProgram(role) => cid
 
+    // A twilight sits in the Calibrations group itself; a standard sits in a
+    // group of its own nested in it.
     def groupIds: List[Group.Id] = obs.collect:
-      case CalibObs(_, Some(gid), _, _, _, _, _) => gid
+      case CalibObs(_, Some(gid), Some(CalibrationRole.Twilight), _, _, _, _) => gid
 
   extension (elements: List[Either[Group.Id, Observation.Id]])
     def observationIds: List[Observation.Id] = elements.collect:
@@ -211,7 +218,7 @@ class perProgramPerConfigCalibrations
       c.hcursor.downFields("observations", "matches").as[List[CalibBand]]
         .leftMap(f => new RuntimeException(f.message))
         .liftTo[IO]
-    }.map(_.collect { case CalibBand(Some(r), b) => (r, b) }.sortBy(_._1.tag).map(_._2))
+    }.map(_.collect { case CalibBand(Some(r), b) if perProgram(r.some) => (r, b) }.sortBy(_._1.tag).map(_._2))
 
   private val EtmFields: String =
     "signalToNoise { at { nanometers } } timeAndCount { time { seconds } count at { nanometers } }"
@@ -879,7 +886,8 @@ class perProgramPerConfigCalibrations
     )
 
   test("subscription events created when calibrations are calculated") {
-    val expectedTargets = List("Feige  34", "Twilight")
+    // The standard, the twilight and the standard's daytime arc, in creation order
+    val expectedTargets = List("Feige  34", "Twilight", "Untargeted")
 
     for {
       pid  <- createProgram(pi, "foo")
@@ -951,8 +959,6 @@ class perProgramPerConfigCalibrations
               // This should delete two
       _       <- deleteObservation(pi, oid2)
       a       <- Ref.of[IO, List[Observation.Id]](Nil) // Removed observation
-      // The third twilight
-      rd      = ad.get(2).get
       _       <- subscriptionExpectFT(
                     user      = pi,
                     query     = deletedSubscription(pid),
@@ -961,44 +967,46 @@ class perProgramPerConfigCalibrations
                         (_, cids1) <- recalculateCalibrations(pid, when, oid1)
                         (_, cids2) <- recalculateCalibrations(pid, when, oid2)
                       } yield cids1 ++ cids2).flatMap(a.set)),
-                    expectedF = (
-                      a.get.map(_.map: cid =>
+                    // Each removed calibration is updated then hard deleted, and the
+                    // surviving standard's daytime arc is re-synced from it on each
+                    // of the two passes.
+                    expectedF = (a.get, queryObservations(pid)).mapN: (removed, obs) =>
+                      def updated(cid: Observation.Id, title: String): Json =
                         json"""
                           {
                             "observationEdit" : {
                               "observationId" : $cid,
                               "editType" : "UPDATED",
-                              "value" : null
+                              "value" : {
+                                "id" : $cid,
+                                "title": $title
+                              }
                             }
                           }
                         """
-                      ).map {
-                        // A twligiht observation is updated, we'll hardcode this
-                        case List(a, b) => a :: json"""{
-                                                        "observationEdit" : {
-                                                          "observationId" : $rd,
-                                                          "editType" : "UPDATED",
-                                                          "value" : {
-                                                            "id" : $rd,
-                                                            "title": "Twilight"
-                                                          }
-                                                        }
-                                                      }
-                                                    """ :: b :: Nil
-                        case l => l
-                      },
-                      a.get.map(_.map: cid =>
-                        json"""
-                          {
-                            "observationEdit" : {
-                              "observationId" : $cid,
-                              "editType" : "HARD_DELETE",
-                              "value" : null
+                      val arcs = obs.collect { case CalibObs(cid, _, Some(CalibrationRole.DaytimeArc), _, _, _, _) => cid }
+                      removed.flatMap: cid =>
+                        List(
+                          json"""
+                            {
+                              "observationEdit" : {
+                                "observationId" : $cid,
+                                "editType" : "UPDATED",
+                                "value" : null
+                              }
                             }
-                          }
-                        """
-                      )
-                    ).mapN(_ ::: _),
+                          """,
+                          json"""
+                            {
+                              "observationEdit" : {
+                                "observationId" : $cid,
+                                "editType" : "HARD_DELETE",
+                                "value" : null
+                              }
+                            }
+                          """
+                        )
+                      ++ arcs.flatMap(cid => List(updated(cid, "Untargeted"), updated(cid, "Untargeted"))),
                     transform = _.sortBy(u =>
                       val oe = u.hcursor.downField("observationEdit")
                       val id = oe.downField("observationId").as[Observation.Id].toOption.map(_.value.value)

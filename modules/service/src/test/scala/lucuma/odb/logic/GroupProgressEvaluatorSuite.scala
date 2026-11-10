@@ -778,6 +778,24 @@ class GroupProgressEvaluatorSuite extends FunSuite:
       )
     )
 
+  // A spectrophotometric standard's group: the standard `n` completed at `t`
+  // and its daytime arc `n + 1` completed at `arc`, if it has been.
+  def specPhotCalibrationGroup(g: Long, n: Long, t: Timestamp, arc: Option[Timestamp] = None): Node =
+    branch(
+      g,
+      List(
+        leaf(n, ExecutionState.Completed, Some(t), start = Some(t), role = Some(CalibrationRole.SpectroPhotometric)),
+        leaf(
+          n + 1,
+          arc.fold(ExecutionState.NotStarted)(_ => ExecutionState.Completed),
+          arc,
+          start   = arc,
+          role    = Some(CalibrationRole.DaytimeArc),
+          science = Some(n)
+        )
+      )
+    )
+
   // 15:00 HST on 16 October, the afternoon after t0's night: the next night.
   val nextAfternoon: Timestamp = ts("2026-10-17T01:00:00Z")
 
@@ -797,6 +815,18 @@ class GroupProgressEvaluatorSuite extends FunSuite:
     val sub = f2ImagingCalibrationGroup(2, 2, t0, flat = Some(nextAfternoon))
     val g   = branch(1, List(done(1, t0 +| hours(1)), sub), minN = Some(2))
     assertEquals(eval(g, now = nextAfternoon +| hours(1)), complete(2, 2))
+
+  test("a daytime arc taken the next afternoon leaves its group on the standard's night"):
+    val sub = specPhotCalibrationGroup(2, 2, t0, arc = Some(nextAfternoon))
+    val g   = branch(1, List(done(1, t0 +| hours(1)), sub), minN = Some(2))
+    assertEquals(eval(g, now = nextAfternoon +| hours(1)), complete(2, 2))
+
+  test("a daytime arc still to do doesn't hold up the standard's group"):
+    val sub = specPhotCalibrationGroup(2, 2, t0)
+    val g   = branch(1, List(done(1, t0 +| hours(1)), sub), minN = Some(2))
+    val all = evalAll(g, now = night0End +| hours(1))
+    assertEquals(all(gid(2)), complete(1, 1))
+    assertEquals(all(gid(1)), complete(2, 2))
 
   test("a daytime flat still to do doesn't hold up its group"):
     val sub = f2ImagingCalibrationGroup(2, 2, t0)

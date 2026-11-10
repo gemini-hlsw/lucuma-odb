@@ -129,14 +129,13 @@ Two rules apply to **every** calibration role, whatever its kind:
   accepted proposal included. There is no separate calibration program to
   exempt it.
 
-Beyond that the generated roles split into two groups. `DaytimeArc` is not
-generated yet and `DaytimeCalibration` observations are created by staff, so
-neither appears here:
+Beyond that the generated roles split into two groups. `DaytimeCalibration`
+observations are created by staff, so they do not appear here:
 
 | Role | Group | Lifecycle |
 |---|---|---|
 | `Photometric`, `SpectroPhotometric`, `Twilight` | program-level | the generic lifecycle above, entered at `Undefined` until a band is inherited |
-| `Telluric`, `DaytimePinhole`, `DaytimeFlat` | per-observation | inherits its science observation's user state; see below |
+| `Telluric`, `DaytimePinhole`, `DaytimeFlat`, `DaytimeArc` | per-observation | inherits its parent observation's user state; see below |
 
 ### Program-level calibrations
 
@@ -155,9 +154,10 @@ on `Ready <-> Ongoing`.
 ### Per-observation calibrations
 
 Tellurics, daytime pinholes and daytime flats are auto-created alongside their science
-observation and normally have **no** transitions of their own — they inherit the
-science observation's user state. SC-8458 carves out one exception, for tellurics
-only (see `../../../docs/adr/0008-telluric-decline-override.md`).
+observation, and a daytime arc alongside its GMOS spectrophotometric standard, in a
+group of its own nested in the program's Calibrations group. None normally has
+transitions of its own — each inherits the user state of the parent observation in
+its group. SC-8458 carves out one exception, for tellurics only.
 
 A telluric that is `Inactive` only because its science observation is inactive
 offers no transitions — there is no override to clear. Both calibration carve-outs
