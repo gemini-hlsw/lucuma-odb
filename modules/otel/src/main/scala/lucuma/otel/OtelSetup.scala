@@ -71,7 +71,11 @@ object OtelSetup:
               "otel.exporter.otlp.protocol" -> "http/protobuf",
               "otel.exporter.otlp.endpoint" -> cfg.endpoint,
               "otel.exporter.otlp.headers"  -> s"Authorization=Basic ${cfg.key}",
-              "otel.exporter.otlp.timeout"  -> "30000"
+              "otel.exporter.otlp.timeout"  -> "30000",
+              // Grackle SQL in `db.query.text` can be tens of KB. Uncompressed and unbounded, a batch
+              // of spans exceeds the request body limit of the OTLP endpoint (HTTP 413).
+              "otel.exporter.otlp.compression"    -> "gzip",
+              "otel.attribute.value.length.limit" -> "16384"
             ).asJava
         .flatTap: otel =>
           Resource.fromAutoCloseable(
