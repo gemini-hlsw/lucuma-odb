@@ -3,26 +3,51 @@
 
 package lucuma.odb.graphql
 
+import cats.data.NonEmptySet
 import cats.effect.IO
 import cats.syntax.all.*
+import eu.timepit.refined.types.numeric.NonNegInt
+import eu.timepit.refined.types.numeric.PosLong
 import io.circe.Decoder
 import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.enums.ConfigurationRequestStatus
+import lucuma.core.enums.GcalArc
+import lucuma.core.enums.GcalBaselineType
+import lucuma.core.enums.GcalContinuum
+import lucuma.core.enums.GcalDiffuser
+import lucuma.core.enums.GcalFilter
+import lucuma.core.enums.GcalShutter
+import lucuma.core.enums.GmosAmpGain
+import lucuma.core.enums.GmosGratingOrder
+import lucuma.core.enums.GmosNorthFilter
+import lucuma.core.enums.GmosNorthFpu
+import lucuma.core.enums.GmosNorthGrating
+import lucuma.core.enums.GmosXBinning
+import lucuma.core.enums.GmosYBinning
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.SchedulingMode
 import lucuma.core.enums.TimingWindowInclusion
 import lucuma.core.enums.TooActivation
+import lucuma.core.math.BoundedInterval
+import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
+import lucuma.core.model.sequence.StepConfig.Gcal
 import lucuma.core.syntax.string.*
+import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.odb.TestCoordinates.coords
 import lucuma.odb.data.TooTrigger
 import lucuma.odb.data.TooTriggerStatus
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
+import lucuma.odb.service.Services
+import lucuma.odb.smartgcal.data.Gmos
+import lucuma.odb.smartgcal.data.SmartGcalValue
+import lucuma.odb.smartgcal.data.SmartGcalValue.LegacyInstrumentConfig
+import skunk.Session
 
 /**
  * Builds an observation that can actually be triggered -- that is, one whose
@@ -31,7 +56,42 @@ import lucuma.odb.graphql.query.ObservingModeSetupOperations
  * observation has to be genuinely valid (real target, observing mode, ITC
  * results, approved configuration) and its proposal has to be accepted.
  */
-trait TooTriggerSetupOperations extends ObservingModeSetupOperations { this: OdbSuite =>
+trait TooTriggerSetupOperations extends OdbSuite with ObservingModeSetupOperations {
+
+  // Without these the sequence leaves out its flat and arc and warns, and an
+  // undismissed warning blocks `Ready`.
+  override def dbInitialization: Option[Session[IO] => IO[Unit]] = Some { s =>
+    val key: Gmos.TableKey[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu] =
+      Gmos.TableKey(
+        Gmos.GratingConfigKey(
+          GmosNorthGrating.R831_G5302,
+          GmosGratingOrder.One,
+          BoundedInterval.unsafeOpenUpper(Wavelength.Min, Wavelength.Max)
+        ).some,
+        GmosNorthFilter.RPrime.some,
+        GmosNorthFpu.LongSlit_0_50.some,
+        GmosXBinning.One,
+        GmosYBinning.Two,
+        GmosAmpGain.Low
+      )
+
+    def value(lamp: Gcal.Lamp, filter: GcalFilter, diffuser: GcalDiffuser, shutter: GcalShutter, baseline: GcalBaselineType): SmartGcalValue.Legacy =
+      SmartGcalValue(
+        Gcal(lamp, filter, diffuser, shutter),
+        baseline,
+        NonNegInt.unsafeFrom(1),
+        LegacyInstrumentConfig(TimeSpan.unsafeFromMicroseconds(1_000_000L))
+      )
+
+    val flat = value(Gcal.Lamp.fromContinuum(GcalContinuum.QuartzHalogen5W), GcalFilter.Gmos, GcalDiffuser.Ir, GcalShutter.Open, GcalBaselineType.Night)
+    val arc  = value(Gcal.Lamp.fromArcs(NonEmptySet.one(GcalArc.CuArArc)), GcalFilter.None, GcalDiffuser.Visible, GcalShutter.Closed, GcalBaselineType.Day)
+
+    servicesFor(tooObscalcUser).map(_(s)).use: services =>
+      services.transactionally:
+        List(flat, arc).zipWithIndex.traverse_ : (v, i) =>
+          Services.asSuperUser:
+            services.smartGcalService.insertGmosNorth(i, Gmos.TableRow(PosLong.unsafeFrom(1), key, v))
+  }
 
   /** The service user used to drive obscalc; not a GraphQL caller. */
   val tooObscalcUser = TestUsers.service(97)
