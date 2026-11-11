@@ -34,6 +34,7 @@ import org.typelevel.otel4s.metrics.MeterProvider
 import org.typelevel.otel4s.trace.Tracer
 import org.typelevel.otel4s.trace.TracerProvider
 import resource.model.config.*
+import resource.server.StartupDiagnostics
 import resource.server.graphql.ResourceMapping
 import skunk.*
 
@@ -49,6 +50,7 @@ object ResourceMain extends IOApp.Simple {
 
       _ <- resetDatabase(conf.database.jdbcUrl, conf.database).toResource
       _ <- migrateDatabase(conf.database.jdbcUrl, conf.database).toResource
+      _ <- runStartupDiagnostics(conf.database).toResource
 
       given OtelServices[F] <- OtelSetup.resource(
                                  "lucuma-resource",
@@ -118,16 +120,31 @@ object ResourceMain extends IOApp.Simple {
   def databasePool[F[_]: {Temporal, TracerProvider, MeterProvider, Console, Network}](
     config: DatabaseConfiguration
   ): Resource[F, Resource[F, Session[F]]] =
+    sessionBuilder(config).pooled(config.maxConnections)
+
+  private def sessionBuilder[F[_]: {Temporal, TracerProvider, MeterProvider, Console, Network}](
+    config: DatabaseConfiguration
+  ): Session.Builder[F] =
     Session
       .Builder[F]
       .withHost(config.host)
       .withPort(config.port)
       .withUserAndPassword(config.user, config.password)
       .withDatabase(config.database)
+      // .withDebug(true)
       .withSSL(SSL.Trusted.withFallback(true))
       .withTypingStrategy(TypingStrategy.SearchPath)
-      // .withDebug(true)
-      .pooled(config.maxConnections)
+
+  /**
+   * Compares every Resource Postgres enum with its Scala enum and fails if any differs or if a
+   * Postgres enum has no check. It runs before telemetry is set up, so its session is not traced.
+   */
+  def runStartupDiagnostics[F[_]: {Temporal, Console, Network, Logger}](
+    config: DatabaseConfiguration
+  ): F[Unit] =
+    given TracerProvider[F] = TracerProvider.noop
+    given MeterProvider[F]  = MeterProvider.noop
+    sessionBuilder(config).single.use(StartupDiagnostics(_).runAllDiagnostics(fatal = true))
 
   private def printBanner[F[_]: {Logger as L}](conf: ResourceConfiguration): F[Unit] = {
     val runtime    = Runtime.getRuntime
