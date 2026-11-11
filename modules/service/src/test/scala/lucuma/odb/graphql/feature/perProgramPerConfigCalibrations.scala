@@ -1171,11 +1171,12 @@ class perProgramPerConfigCalibrations
       (added3, _)     <- recalculateCalibrations(pid, when, oid)
       ob3             <- queryObservations(pid)
     } yield {
+      // added and removed count the standards' daytime arcs as well, which
+      // countCalibrations leaves out.
       assert(ob1.countCalibrations > 0, "expected calibrations for the science observation")
-      assertEquals(added1.size, ob1.countCalibrations)
       assertEquals(removed2.toSet, added1.toSet)
       assertEquals(ob2.countCalibrations, 0)
-      assertEquals(added3.size, ob1.countCalibrations)
+      assertEquals(added3.size, added1.size)
       assertEquals(ob3.countCalibrations, ob1.countCalibrations)
     }
 

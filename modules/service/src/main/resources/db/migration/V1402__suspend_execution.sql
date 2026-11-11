@@ -32,8 +32,10 @@
 -- The PI's user state is untouched by a suspension, so a ToO observation's
 -- 'ready' survives being suspended and resumed.
 --
--- A per-observation calibration (a telluric, a daytime pinhole or flat) follows
--- its science observation into the suspension, whether or not it has started.
+-- A per-observation calibration (a telluric, a daytime pinhole, flat or arc)
+-- follows its parent observation into the suspension, whether or not it has
+-- started.  The parent is the science observation, or for a daytime arc the
+-- spectrophotometric standard.
 
 ALTER TABLE t_observation_execution
   ADD COLUMN c_suspended boolean NOT NULL DEFAULT false;
@@ -46,7 +48,7 @@ COMMENT ON COLUMN t_observation_execution.c_suspended IS
 -- changes the observation as clients see it.
 --
 -- It changes the workflow of the observation's per-observation calibrations as
--- well (tellurics, daytime pinholes and flats), which follow it into the
+-- well (tellurics, daytime pinholes, flats and arcs), which follow it into the
 -- suspension.  Nothing else would queue them: the calibration service leaves a
 -- suspended observation's calibrations alone.  They are found as
 -- ObservationValidationInfo.Statements.AssociatedScienceObservation associates
@@ -62,11 +64,12 @@ BEGIN
     FROM t_observation s
     JOIN t_observation c ON c.c_group_id = s.c_group_id
    WHERE s.c_observation_id   = NEW.c_observation_id
-     AND s.c_calibration_role IS NULL
+     AND (s.c_calibration_role IS NULL OR s.c_calibration_role = 'spectrophotometric'::e_calibration_role)
      AND c.c_calibration_role IN (
            'telluric'::e_calibration_role,
            'daytime_pinhole'::e_calibration_role,
-           'daytime_flat'::e_calibration_role
+           'daytime_flat'::e_calibration_role,
+           'daytime_arc'::e_calibration_role
          )
      AND c.c_existence = 'present';
 

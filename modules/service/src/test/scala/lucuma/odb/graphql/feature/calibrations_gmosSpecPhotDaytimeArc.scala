@@ -12,6 +12,7 @@ import io.circe.Json
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ScienceBand
+import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
@@ -20,6 +21,8 @@ import lucuma.core.syntax.timespan.*
 import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
 import lucuma.odb.service.PerProgramPerConfigCalibrationsService
+import lucuma.odb.util.Codecs.observation_id
+import skunk.syntax.all.*
 
 import java.time.Instant
 import java.time.LocalDateTime
@@ -208,6 +211,38 @@ class calibrations_gmosSpecPhotDaytimeArc
       assertEquals(before, ObservationWorkflowState.Defined)
       assertEquals(specState, ObservationWorkflowState.Inactive)
       assertEquals(after, ObservationWorkflowState.Inactive)
+
+  private def obscalcStateOf(oid: Observation.Id): IO[String] =
+    session.use(
+      _.unique(sql"""
+        SELECT c_obscalc_state::text FROM t_obscalc WHERE c_observation_id = ${observation_id}
+      """.query(skunk.codec.all.text))(oid)
+    )
+
+  // A daytime arc follows its standard into a suspension, as a telluric follows
+  // its science observation, and is queued for recalculation with it.
+  test("daytime arc follows a suspended standard"):
+    for
+      (pid, _, spec, arc) <- setup
+      vid                 <- recordVisitAs(serviceUser, spec)
+      _                   <- addSequenceEventAs(serviceUser, vid, SequenceCommand.Start)
+      _                   <- runObscalcUpdate(pid, spec)
+      _                   <- runObscalcUpdate(pid, arc)
+      before              <- queryWorkflowState(arc)
+      _                   <- setObservationWorkflowState(staff, spec, ObservationWorkflowState.Suspended)
+      queued1             <- obscalcStateOf(arc)
+      _                   <- runObscalcUpdate(pid, arc)
+      during              <- queryWorkflowState(arc)
+      _                   <- setObservationWorkflowState(staff, spec, ObservationWorkflowState.Ongoing)
+      queued2             <- obscalcStateOf(arc)
+      _                   <- runObscalcUpdate(pid, arc)
+      after               <- queryWorkflowState(arc)
+    yield
+      assertNotEquals(before, ObservationWorkflowState.Suspended)
+      assertEquals(queued1, "pending")
+      assertEquals(during, ObservationWorkflowState.Suspended)
+      assertEquals(queued2, "pending")
+      assertEquals(after, before)
 
   test("daytime arc and group are removed with the standard when the science is deleted"):
     for
