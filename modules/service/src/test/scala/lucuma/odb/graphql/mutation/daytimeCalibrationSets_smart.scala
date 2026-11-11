@@ -255,6 +255,6 @@ class daytimeCalibrationSets_smart extends ExecutionTestSupportForGmos with Dayt
       val msgs = vs.collect { case (ObservationValidationCode.MissingSmartGcal, ms) => ms }.flatten
       assertEquals(msgs.size, 1, vs.toString)
       assert(
-        msgs.forall(_.startsWith("Science sequence: Calibration set 2: No Smart GCAL arc is defined for this configuration: GmosNorth {")),
+        msgs.forall(_.startsWith("Calibration set 2: No Smart GCAL arc is defined for this configuration: GmosNorth {")),
         vs.toString
       )

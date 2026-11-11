@@ -92,4 +92,4 @@ object DaytimeCalibrationExpansion:
   ): F[List[Option[NonNegInt]]] =
     instrument match
       case Some(di) => setCounts(di.expander, di.static, oid, di.sets(cfg))
-      case None     => cfg.sets.map(_.explicitCount.map(n => NonNegInt.unsafeFrom(n.value))).pure[F]
+      case None     => cfg.sets.map(_.explicitCount.flatMap(n => NonNegInt.from(n.value).toOption)).pure[F]

@@ -12,6 +12,7 @@ import lucuma.core.model.ObservationValidation
 import lucuma.core.model.sequence.SequenceDigest
 import lucuma.core.model.sequence.StepViolation
 import lucuma.odb.data.ObservationValidationMap
+import lucuma.odb.sequence.isDayCalibration
 
 /**
  * Reports the problems found in the steps of the sequence (see `StepCheck`),
@@ -33,15 +34,21 @@ object StepViolationValidator extends ObservationValidator:
     ObservationValidation(v.code, NonEmptyChain.one(message(sequenceType, v)))
 
   // Acquisition first, then science, each with errors before warnings.
-  private def validations(info: ObservationValidationInfo)(include: StepViolation => Boolean): ObservationValidationMap =
-    def of(sequenceType: SequenceType, digest: SequenceDigest): ObservationValidationMap =
-      digest.stepViolations.toList.filter(include).foldMap(v => ObservationValidationMap.singleton(validation(sequenceType, v)))
+  private def validations(
+    info: ObservationValidationInfo
+  )(of: (SequenceType, StepViolation) => Option[ObservationValidation]): ObservationValidationMap =
+    def in(sequenceType: SequenceType, digest: SequenceDigest): ObservationValidationMap =
+      digest.stepViolations.toList.flatMap(of(sequenceType, _)).foldMap(ObservationValidationMap.singleton)
     info.executionDigest.foldMap: d =>
-      of(SequenceType.Acquisition, d.acquisition) |+| of(SequenceType.Science, d.science)
+      in(SequenceType.Acquisition, d.acquisition) |+| in(SequenceType.Science, d.science)
 
   override def apply(info: ObservationValidationInfo): ObservationValidationMap =
-    validations(info)(_ => true)
+    validations(info)((t, v) => validation(t, v).some)
 
   /** The one step violation calibration observations are subject to. */
   val missingSmartGcal: ObservationValidator = info =>
-    validations(info)(_.code === ObservationValidationCode.MissingSmartGcal)
+    validations(info): (t, v) =>
+      Option.when(v.code === ObservationValidationCode.MissingSmartGcal):
+        // A daytime calibration has no acquisition, so naming the sequence adds nothing.
+        if info.calibrationRole.isDayCalibration then ObservationValidation(v.code, NonEmptyChain.one(v.message))
+        else validation(t, v)
