@@ -9,7 +9,7 @@ ThisBuild / resolvers +=
 // Please keep in alphabetical order
 val awsJavaSdkVersion            = "1.12.797"
 val boopickleVersion             = "1.5.0"
-val bouncycastleVersion          = "1.86"
+val bouncycastleVersion          = "1.87"
 val catsEffectVersion            = "3.7.1"
 val catsParseVersion             = "1.1.0"
 val catsScalacheckVersion        = "0.5.0"
