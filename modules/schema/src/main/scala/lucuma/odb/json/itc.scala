@@ -28,7 +28,6 @@ import lucuma.core.math.SingleSN
 import lucuma.core.math.TotalSN
 import lucuma.core.math.Wavelength
 import lucuma.core.model.Target
-import lucuma.core.util.Enumerated
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
 import lucuma.itc.ItcResultReadMode
@@ -104,20 +103,6 @@ trait ItcCodec:
         "signalToNoiseAt"    -> a.signalToNoise.asJson,
         "peakPixel"          -> a.peakPixel.asJson
       )
-
-  // The acquisition types are plain Enumerateds; encode by tag.  Round-trips
-  // within this codec only (the value is stored in the acquisition jsonb blob).
-  private def tagEncoder[A: Enumerated]: Encoder[A] =
-    Encoder[String].contramap(Enumerated[A].tag)
-
-  private def tagDecoder[A: Enumerated](name: String): Decoder[A] =
-    Decoder[String].emap: s =>
-      Enumerated[A].fromTag(s).toRight(s"Invalid $name: $s")
-
-  private given Encoder[GnirsAcquisitionType]      = tagEncoder
-  private given Decoder[GnirsAcquisitionType]      = tagDecoder("GnirsAcquisitionType")
-  private given Encoder[Flamingos2AcquisitionType] = tagEncoder
-  private given Decoder[Flamingos2AcquisitionType] = tagDecoder("Flamingos2AcquisitionType")
 
   // Only the Available case is stored as JSON (in c_acquisition_results); the
   // NotApplicable and Failed cases are represented by the c_acquisition_* columns
