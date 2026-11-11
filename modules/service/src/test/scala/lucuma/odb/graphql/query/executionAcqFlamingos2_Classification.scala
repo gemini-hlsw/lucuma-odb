@@ -122,7 +122,7 @@ class executionAcqFlamingos2_Classification extends ExecutionTestSupportForFlami
 
   test("MOS: a target the ITC finds bright is still acquired as Faint"):
     setup(mos("explicitFilter: H")).flatMap: oid =>
-      expectSteps(oid, step(5, 0), step(5, 10), step(5, 0), step(5, 10))
+      expectSteps(oid, step(5, 10), step(5, 0), step(5, 10), step(5, 0))
 
   test("MOS: an explicit BRIGHT takes no sky steps"):
     setup(mos("explicitAcquisitionType: BRIGHT")).flatMap: oid =>
