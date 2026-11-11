@@ -57,8 +57,7 @@ object MosTelluric:
 
   case class StepDefinition(
     science: NonEmptyList[ProtoStep[F2]],
-    cals:    List[ProtoStep[F2]],
-    missing: List[StepViolation]
+    cals:    List[ProtoStep[F2]]
   ):
     def cycleCount(t: IntegrationTime): Either[String, NonNegInt] =
       calculateCycleCount[F2](s => s.telescopeConfig.guiding.isGuided, science.toList, t)
@@ -106,18 +105,15 @@ object MosTelluric:
     science:  NonEmptyList[ProtoStep[F2]],
     flat:     ProtoStep[F2],
     arc:      ProtoStep[F2]
-  ): F[StepDefinition] =
+  ): F[(List[StepViolation], StepDefinition)] =
     expander.expandFlatAndArc(static, flat, arc).map: (missing, cs) =>
-      StepDefinition(science, cs, missing)
+      (missing, StepDefinition(science, cs))
 
   private case class Generator(
     steps:      StepDefinition,
     builder:    AtomBuilder[F2],
     goalCycles: NonNegInt
   ) extends SequenceGenerator[F2]:
-
-    override def violations: List[StepViolation] =
-      steps.missing
 
     override def generate: Stream[Pure, Atom[F2]] =
       builder.buildStream:
@@ -144,6 +140,6 @@ object MosTelluric:
                       )
        r         <- EitherT.fromEither[F](itcReadMode(t).leftMap(definitionError(observationId, _)))
        (ss, f, a) = StepComputer.compute(config, t, r, calRole)
-       d         <- EitherT.liftF(expand(static, expander, ss, f, a))
+       (m, d)    <- EitherT.liftF(expand(static, expander, ss, f, a))
        c         <- EitherT.fromEither[F](d.cycleCount(t).leftMap(definitionError(observationId, _)))
-     yield Generator(d, AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Science), c): SequenceGenerator[F2]).value
+     yield Generator(d, AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Science), c).reporting(m)).value

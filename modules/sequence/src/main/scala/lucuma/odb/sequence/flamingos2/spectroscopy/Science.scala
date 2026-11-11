@@ -60,12 +60,11 @@ object Science:
   val AbbaCycleTitle: NonEmptyString = NonEmptyString.unsafeFrom("ABBA Cycle")
 
   case class StepDefinition(
-    a0:      ProtoStep[F2],
-    b0:      ProtoStep[F2],
-    b1:      ProtoStep[F2],
-    a1:      ProtoStep[F2],
-    cals:    List[ProtoStep[F2]],
-    missing: List[StepViolation]
+    a0:   ProtoStep[F2],
+    b0:   ProtoStep[F2],
+    b1:   ProtoStep[F2],
+    a1:   ProtoStep[F2],
+    cals: List[ProtoStep[F2]]
   ):
     /** ABBA science cycle. */
     def abbaCycle: NonEmptyList[ProtoStep[F2]] =
@@ -91,9 +90,9 @@ object Science:
       def expand[F[_]: Monad](
         static:   Flamingos2StaticConfig,
         expander: SmartGcalExpander[F, Flamingos2StaticConfig, F2]
-      ): F[StepDefinition] =
+      ): F[(List[StepViolation], StepDefinition)] =
         expander.expandFlatAndArc(static, flat, arc).map: (missing, cs) =>
-          StepDefinition(a0, b0, b1, a1, cs, missing)
+          (missing, StepDefinition(a0, b0, b1, a1, cs))
 
     object PreDef:
 
@@ -141,7 +140,7 @@ object Science:
       static:    Flamingos2StaticConfig,
       expander:  SmartGcalExpander[F, Flamingos2StaticConfig, F2],
       calRole:   Option[CalibrationRole]
-    ): EitherT[F, String, StepDefinition] =
+    ): EitherT[F, String, (List[StepViolation], StepDefinition)] =
       for
         r <- EitherT.fromEither[F](itcReadMode(time))
         p <- EitherT.fromEither:
@@ -160,9 +159,6 @@ object Science:
     builder:    AtomBuilder[F2],
     goalCycles: NonNegInt
   ) extends SequenceGenerator[F2]:
-
-    override def violations: List[StepViolation] =
-      steps.missing
 
     override def generate: Stream[Pure, Atom[F2]] =
 
@@ -197,13 +193,13 @@ object Science:
         time.filterOrElse(_.exposureTime.toNonNegMicroseconds.value > 0, zeroExposureTime(observationId, modeName))
 
     val gen = for
-      t <- posTime
-      s <- StepDefinition.compute(modeName, config, t, static, expander, calRole).leftMap(m => definitionError(observationId, m))
-      c <- EitherT.fromEither(s.cycleCount(t).leftMap(m => definitionError(observationId, m)))
+      t      <- posTime
+      (v, s) <- StepDefinition.compute(modeName, config, t, static, expander, calRole).leftMap(m => definitionError(observationId, m))
+      c      <- EitherT.fromEither(s.cycleCount(t).leftMap(m => definitionError(observationId, m)))
     yield Generator(
       s,
       AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Science),
       c
-    ): SequenceGenerator[F2]
+    ).reporting(v)
 
     gen.value
