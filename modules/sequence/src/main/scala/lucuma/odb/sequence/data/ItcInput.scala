@@ -121,7 +121,7 @@ object ItcInput:
    * ImagingParameters).
 
    * GNIRS imaging has an acquisition sequence sized by its own ITC pass; other
-   * imaging modes have none.  When `gnirsAcqAutoClassify` is set, the ITC resolves
+   * imaging modes have none.  When `acqAutoClassify` is set, the ITC resolves
    * the acquisition brightness type via a classification pass before the real
    * exposure-time pass.  See the two-pass acquisition ITC in ItcService.
    *
@@ -134,7 +134,7 @@ object ItcInput:
     targets: NonEmptyList[TargetDefinition],
     signalToNoiseTargetId: Option[Target.Id],
     acquisition:          Option[ImagingParameters] = None,
-    gnirsAcqAutoClassify: Boolean                   = false,
+    acqAutoClassify: Boolean                   = false,
     gnirsAcqAutoSignalToNoise: Boolean              = false
   ) extends ItcInput derives Eq:
 
@@ -157,7 +157,7 @@ object ItcInput:
         bld.addAll(hashTargets(a.targets))
         bld.addAll(a.signalToNoiseTargetId.hashBytes)
         bld.addAll(a.acquisition.hashBytes)
-        bld.addAll(a.gnirsAcqAutoClassify.hashBytes)
+        bld.addAll(a.acqAutoClassify.hashBytes)
         bld.addAll(a.gnirsAcqAutoSignalToNoise.hashBytes)
         bld.result()
 
@@ -165,10 +165,10 @@ object ItcInput:
    * Spectroscopy inputs include imaging parameters (for acquisition),
    * the main spectrocopy input, and an optional blind offset target.
    * 
-   * When `gnirsAcqAutoClassify` is set (in the case we are in GNIRS S/N mode
-   * with acquisition mode and filter both auto), the ITC resolves the
-   * acquisition mode via a brightness classification pass before the real
-   * exposure-time pass. See the two-pass acquisition ITC in ItcService.
+   * When `acqAutoClassify` is set (Flamingos 2 long slit with an automatic acquisition
+   * type), the ITC resolves the acquisition type via a brightness classification
+   * pass before the real exposure-time pass. See the two-pass acquisition ITC in
+   * ItcService.
    *
    * `gnirsAcqAutoSignalToNoise` is set when the acquisition signal-to-noise is
    * itself derived from that classification, in which case the second pass runs at
@@ -180,7 +180,7 @@ object ItcInput:
     targets:     NonEmptyList[TargetDefinition],
     blindOffset: Option[TargetDefinition],
     signalToNoiseTargetId: Option[Target.Id],
-    gnirsAcqAutoClassify: Boolean = false,
+    acqAutoClassify: Boolean = false,
     gnirsAcqAutoSignalToNoise: Boolean = false
   ) extends ItcInput derives Eq:
 
@@ -201,7 +201,7 @@ object ItcInput:
           a.science.hashBytes,
           hashTargets(a.blindOffset.fold(a.targets)(_ :: a.targets)),
           a.signalToNoiseTargetId.hashBytes,
-          a.gnirsAcqAutoClassify.hashBytes,
+          a.acqAutoClassify.hashBytes,
           a.gnirsAcqAutoSignalToNoise.hashBytes
         )
 
@@ -220,7 +220,7 @@ object ItcInput:
     targets:               NonEmptyList[TargetDefinition],
     blindOffset:           Option[TargetDefinition],
     signalToNoiseTargetId: Option[Target.Id],
-    gnirsAcqAutoClassify:  Boolean = false,
+    acqAutoClassify:  Boolean = false,
     gnirsAcqAutoSignalToNoise: Boolean = false
   ) extends ItcInput derives Eq:
 
@@ -244,7 +244,7 @@ object ItcInput:
           bld.addAll(params.hashBytes)
         bld.addAll(hashTargets(a.blindOffset.fold(a.targets)(_ :: a.targets)))
         bld.addAll(a.signalToNoiseTargetId.hashBytes)
-        bld.addAll(a.gnirsAcqAutoClassify.hashBytes)
+        bld.addAll(a.acqAutoClassify.hashBytes)
         bld.addAll(a.gnirsAcqAutoSignalToNoise.hashBytes)
         bld.result()
 

@@ -18,10 +18,12 @@ import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.Flamingos2ReadoutMode
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
+import lucuma.core.math.Offset
 import lucuma.core.math.syntax.int.*
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Atom
+import lucuma.core.model.sequence.flamingos2.Flamingos2AcquisitionMode
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig as F2
 import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
@@ -40,8 +42,9 @@ import java.util.UUID
  * The observer cannot measure the offset through the mask, so the initial atom
  * images the field with the mask out of the beam and then, after a breakpoint
  * where the measured offset is applied, repeats the pair through the mask to
- * confirm the targets land in the slitlets.  Each pair is an on-target step and
- * its sky nod.
+ * confirm the targets land in the slitlets. In a Faint acquisition, the
+ * default, each on-target step is followed by its sky step; a Bright one
+ * takes no sky steps.
  *
  * The "Fine Adjustments" atoms that follow are a ceiling rather than a plan:
  * each carries a breakpoint, so taking another mask-in pair is always the
@@ -52,30 +55,35 @@ object Acquisition:
   /** Number of optional "Fine Adjustments" atoms generated after the initial atom. */
   val RepeatingAtomCount: Int = 10
 
+  /** The sky steps are present only in a Faint acquisition. */
   case class Steps(
-    maskOut:   ProtoStep[F2],
-    maskOutQ:  ProtoStep[F2],
-    maskIn:    ProtoStep[F2],
-    maskInQ:   ProtoStep[F2]
+    maskOut:    ProtoStep[F2],
+    maskOutSky: Option[ProtoStep[F2]],
+    maskIn:     ProtoStep[F2],
+    maskInSky:  Option[ProtoStep[F2]]
   ):
     /**
-     * Mask out, its sky nod, then the through-mask pair.  The breakpoint sits on
-     * the first mask-in step: execution halts there so the observer can measure
-     * and apply the offset from the two field images.
+     * Mask out and its sky step, then the same through the mask. The breakpoint
+     * sits on the first mask-in step: execution halts there so the observer can
+     * measure and apply the offset from the field images.
      */
     val initialAtom: NonEmptyList[ProtoStep[F2]] =
-      NonEmptyList.of(maskOut, maskOutQ, maskIn.withBreakpoint, maskInQ)
+      NonEmptyList(maskOut, maskOutSky.toList ++ List(maskIn.withBreakpoint) ++ maskInSky.toList)
 
-    /** An optional extra through-mask pair, gated by a breakpoint. */
+    /** An optional extra through-mask image and its sky step, gated by a breakpoint. */
     val repeatingAtom: NonEmptyList[ProtoStep[F2]] =
-      NonEmptyList.of(maskIn.withBreakpoint, maskInQ)
+      NonEmptyList(maskIn.withBreakpoint, maskInSky.toList)
 
   private object StepComputer extends SequenceState[F2] with Flamingos2InitialDynamicConfig:
     def compute(
       exposureTime: TimeSpan,
       acqConfig:    AcquisitionConfig,
+      mode:         Flamingos2AcquisitionMode,
       customMask:   Flamingos2FpuMask.Custom
     ): Steps =
+      val skyOffset: Option[Offset] =
+        Flamingos2AcquisitionMode.skyOffset.getOption(mode)
+
       eval:
         for
           _  <- F2.exposure    := exposureTime
@@ -89,15 +97,15 @@ object Acquisition:
           // The mask is out of the beam: this is plain imaging of the field.
           _  <- F2.fpu         := Flamingos2FpuMask.Imaging
           _  <- F2.decker      := Flamingos2FpuMask.Imaging.defaultDecker
-          s0 <- scienceStep(0.arcsec,  0.arcsec, ObserveClass.Acquisition)
-          s1 <- scienceStep(0.arcsec, 10.arcsec, ObserveClass.Acquisition)
+          s0 <- scienceStep(0.arcsec, 0.arcsec, ObserveClass.Acquisition)
+          s1 <- skyOffset.traverse(scienceStep(_, ObserveClass.Acquisition))
 
           // Through the mask, which the science steps carry whether or not its
           // attachment exists yet.
           _  <- F2.fpu         := customMask
           _  <- F2.decker      := customMask.defaultDecker
-          s2 <- scienceStep(0.arcsec,  0.arcsec, ObserveClass.Acquisition)
-          s3 <- scienceStep(0.arcsec, 10.arcsec, ObserveClass.Acquisition)
+          s2 <- scienceStep(0.arcsec, 0.arcsec, ObserveClass.Acquisition)
+          s3 <- skyOffset.traverse(scienceStep(_, ObserveClass.Acquisition))
         yield Steps(s0, s1, s2, s3)
 
   private class Generator(
@@ -141,5 +149,12 @@ object Acquisition:
             namespace,
             SequenceType.Acquisition
           ),
-          StepComputer.compute(t, config.acquisition, config.customMask)
+          StepComputer.compute(
+            t,
+            config.acquisition,
+            // The brightness of the mask's acquisition stars is unknown, so the sky
+            // steps are taken unless the user asks for a Bright acquisition.
+            config.acquisition.explicitMode.getOrElse(Flamingos2AcquisitionMode.Faint.Default),
+            config.customMask
+          )
         )

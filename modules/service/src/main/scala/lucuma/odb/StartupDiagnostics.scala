@@ -11,6 +11,7 @@ import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.util.Enumerated
 import lucuma.odb.service.ObservationWorkflowService
 import lucuma.odb.util.Codecs.*
+import lucuma.odb.util.Flamingos2Codecs.flamingos_2_acquisition_type
 import lucuma.odb.util.GhostCodecs.ghost_ifu_mapping_type
 import lucuma.odb.util.GmosCodecs.*
 import lucuma.odb.util.GnirsCodecs.*
@@ -70,6 +71,7 @@ object StartupDiagnostics:
           checkPostgresEnum(existence),
           checkPostgresEnum(exposure_time_mode_role),
           checkPostgresEnum(exposure_time_mode_type),
+          checkPostgresEnum(flamingos_2_acquisition_type),
           checkPostgresEnum(gcal_baseline),
           checkPostgresEnum(gcal_lamp_type),
           checkPostgresEnum(gemini_proposal_type),

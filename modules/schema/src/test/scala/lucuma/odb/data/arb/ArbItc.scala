@@ -9,6 +9,7 @@ import eu.timepit.refined.scalacheck.all.*
 import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.data.Zipper
 import lucuma.core.data.arb.ArbZipper
+import lucuma.core.enums.Flamingos2AcquisitionType
 import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.GmosNorthFilter
@@ -207,16 +208,27 @@ trait ArbItc:
       case a: ItcScience.GhostIfu          => Right(Right(Right(Right(Right(Left(a))))))
       case a: ItcScience.Flamingos2Imaging => Right(Right(Right(Right(Right(Right(a))))))
 
+  given Arbitrary[ItcAcquisitionType] =
+    Arbitrary:
+      Gen.oneOf(
+        arbitrary[GnirsAcquisitionType].map(ItcAcquisitionType.Gnirs(_)),
+        arbitrary[Flamingos2AcquisitionType].map(ItcAcquisitionType.Flamingos2(_))
+      )
+
+  given Cogen[ItcAcquisitionType] =
+    Cogen[(Option[GnirsAcquisitionType], Option[Flamingos2AcquisitionType])].contramap: a =>
+      (a.gnirs, a.flamingos2)
+
   given Arbitrary[ItcAcquisition.Available] =
     Arbitrary:
       for
         z <- arbitrary[Zipper[ItcResult]]
-        t <- arbitrary[Option[GnirsAcquisitionType]]
+        t <- arbitrary[Option[ItcAcquisitionType]]
       yield ItcAcquisition.Available(z, t)
 
   given Cogen[ItcAcquisition.Available] =
-    Cogen[(Zipper[ItcResult], Option[GnirsAcquisitionType])].contramap: a =>
-      (a.times, a.gnirsAcqType)
+    Cogen[(Zipper[ItcResult], Option[ItcAcquisitionType])].contramap: a =>
+      (a.times, a.acquisitionType)
 
   given Arbitrary[ItcAcquisition] =
     Arbitrary:
