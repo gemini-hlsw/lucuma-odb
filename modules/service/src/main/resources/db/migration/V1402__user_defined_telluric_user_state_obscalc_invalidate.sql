@@ -5,18 +5,25 @@
 -- observation's obscalc settles. A user-defined telluric is never resynced, so
 -- nothing recalculated it and it stayed Defined after its science observation
 -- became Ready.
+--
+-- A telluric that is being or has been executed is skipped, here and in the
+-- refresh below: its workflow state is its execution state, whatever the user
+-- state it would inherit.
+
 CREATE FUNCTION user_defined_telluric_user_state_obscalc_invalidate()
   RETURNS TRIGGER AS $$
 DECLARE
   obs_ids d_observation_id[];
 BEGIN
   IF NEW.c_group_id IS NOT NULL AND NEW.c_calibration_role IS NULL THEN
-    SELECT array_agg(c_observation_id) INTO obs_ids
-      FROM t_observation
-     WHERE c_group_id        = NEW.c_group_id
-       AND c_observation_id <> NEW.c_observation_id
-       AND c_existence       = 'present'
-       AND c_is_user_defined_telluric;
+    SELECT array_agg(o.c_observation_id) INTO obs_ids
+      FROM t_observation o
+      LEFT JOIN t_obscalc c ON c.c_observation_id = o.c_observation_id
+     WHERE o.c_group_id        = NEW.c_group_id
+       AND o.c_observation_id <> NEW.c_observation_id
+       AND o.c_existence       = 'present'
+       AND o.c_is_user_defined_telluric
+       AND COALESCE(c.c_sci_execution_state IN ('not_defined', 'not_started'), true);
 
     IF obs_ids IS NOT NULL THEN
       CALL invalidate_obscalc_many(obs_ids);
@@ -37,10 +44,12 @@ DO $$
 DECLARE
   obs_ids d_observation_id[];
 BEGIN
-  SELECT array_agg(c_observation_id) INTO obs_ids
-    FROM t_observation
-   WHERE c_is_user_defined_telluric
-     AND c_existence = 'present';
+  SELECT array_agg(o.c_observation_id) INTO obs_ids
+    FROM t_observation o
+    LEFT JOIN t_obscalc c ON c.c_observation_id = o.c_observation_id
+   WHERE o.c_is_user_defined_telluric
+     AND o.c_existence = 'present'
+     AND COALESCE(c.c_sci_execution_state IN ('not_defined', 'not_started'), true);
 
   IF obs_ids IS NOT NULL THEN
     CALL invalidate_obscalc_many(obs_ids);
