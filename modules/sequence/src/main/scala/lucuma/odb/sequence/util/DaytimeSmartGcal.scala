@@ -6,6 +6,8 @@ package util
 
 import cats.Monad
 import cats.data.NonEmptyList
+import cats.syntax.bifunctor.*
+import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
 import eu.timepit.refined.types.string.NonEmptyString
@@ -14,8 +16,8 @@ import fs2.Stream
 import lucuma.core.enums.SequenceType
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Atom
-import lucuma.core.model.sequence.StepViolation
 import lucuma.odb.data.OdbError
+import lucuma.odb.sequence.SmartGcalExpander.Calibration
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
 
@@ -35,24 +37,19 @@ object DaytimeSmartGcal:
     static:        S,
     namespace:     UUID,
     expander:      SmartGcalExpander[F, S, D],
-    calibration:   String,
+    calibration:   Calibration,
     atoms:         NonEmptyList[(NonEmptyString, ProtoStep[D])]
   ): F[Either[OdbError, SequenceGenerator[D]]] =
-    atoms
-      .traverse: (title, step) =>
-        expander.expandOrReport(static, step, calibration).map: (missing, steps) =>
-          (missing, NonEmptyList.fromList(steps).map(ProtoAtom(title.some, _)))
-      .map: rs =>
-        val missing    = rs.toList.flatMap(_._1).distinct
-        val protoAtoms = rs.toList.flatMap(_._2)
-        Either.cond(
-          protoAtoms.nonEmpty,
-          new SequenceGenerator[D]:
-            private val builder = AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Science)
-            override def violations: List[StepViolation] =
-              missing
-            def generate: Stream[Pure, Atom[D]] =
-              builder.buildStream(Stream.emits(protoAtoms))
-          ,
-          definitionError(observationId, missing.headOption.fold(SmartGcalExpander.NoSteps)(_.message))
+    atoms.toList
+      .foldMapM: (title, step) =>
+        expander.expandAtom(static, ProtoAtom(title.some, NonEmptyList.one(step)), calibration).map(_.map(_.toList))
+      .map: (missing, protoAtoms) =>
+        SmartGcalExpander.remaining(missing, protoAtoms).bimap(
+          definitionError(observationId, _),
+          (missing, protoAtoms) =>
+            val builder = AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Science)
+            val generator = new SequenceGenerator[D]:
+              def generate: Stream[Pure, Atom[D]] =
+                builder.buildStream(Stream.emits(protoAtoms))
+            generator.reporting(missing)
         )

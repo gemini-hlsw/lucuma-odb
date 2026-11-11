@@ -166,7 +166,6 @@ object Science:
 
     override def generate: Stream[Pure, Atom[F2]] =
 
-      // No atom at all when neither the flat nor the arc is defined.
       val gcalAtom: Option[ProtoAtom[ProtoStep[F2]]] =
         NonEmptyList.fromList(steps.cals).map(ProtoAtom(AtomTitle.NighttimeCal.some, _))
 

@@ -70,10 +70,7 @@ object Science:
 
   private object SeqState extends gnirs.GnirsSequenceState
 
-  /**
-   * `cals` holds the flat, the arc or both; empty for telluric sequences and
-   * when neither is defined.  `missing` reports the ones left out.
-   */
+  /** `cals` holds the flat, the arc or both; empty for telluric sequences. */
   case class StepDefinition(
     wavelength:   CentralWavelengthConfig,
     scienceSteps: NonEmptyList[ProtoStep[GnirsDynamicConfig]],
@@ -225,7 +222,7 @@ object Science:
       science ++ closing.toList
 
     override def violations: List[StepViolation] =
-      blocks.toVector.flatMap(_.steps.missing).distinct.toList
+      blocks.toVector.flatMap(_.steps.missing).toList
 
     // Atom ids come from the atom's index within a single builder, so every
     // segment must feed the same `buildStream`.

@@ -92,20 +92,16 @@ object DaytimeCalibration:
           .instantiate(estimator, static, namespace, SequenceType.Science)
           .buildStream(Stream.emits(atoms))
 
-  /**
-   * The execution config of already expanded atoms: no smart steps remain.
-   * `missing` reports the calibrations the expansion left out.
-   */
+  /** The execution config of already expanded atoms: no smart steps remain. */
   def executionConfig[S, D](
     estimator: StepTimeEstimateCalculator[S, D],
     static:    S,
     namespace: UUID,
     atoms:     List[ProtoAtom[ProtoStep[D]]],
-    missing:   List[StepViolation] = List.empty
+    missing:   List[StepViolation]
   ): StreamingExecutionConfig[Pure, S, D] =
-    StreamingExecutionConfig(
+    StreamingExecutionConfig.fromGenerators(
       static,
-      SequenceGenerator.empty.generate,
-      generator(estimator, static, namespace, atoms).generate,
-      scienceViolations = missing
+      SequenceGenerator.empty,
+      generator(estimator, static, namespace, atoms).reporting(missing)
     )

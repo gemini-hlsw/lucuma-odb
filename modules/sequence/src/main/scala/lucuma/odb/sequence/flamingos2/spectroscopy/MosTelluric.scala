@@ -119,7 +119,6 @@ object MosTelluric:
     override def violations: List[StepViolation] =
       steps.missing
 
-    // No calibration atom at all when neither the flat nor the arc is defined.
     override def generate: Stream[Pure, Atom[F2]] =
       builder.buildStream:
         Stream.emits:

@@ -20,9 +20,7 @@ import lucuma.odb.sequence.SequenceGenerator
  * a concrete list of steps.  The StreamingExecutionConfig provides a `Stream`
  * of steps of a generic type because there are multiple uses for a sequence.
  * For example to calculate the sequence digest we never need to hold the whole
- * sequence in memory but instead can fold over the stream.  Each sequence
- * comes with the violations its generator reports (see `SequenceGenerator`);
- * a stored sequence has none.
+ * sequence in memory but instead can fold over the stream.
  *
  * @tparam S static execution config
  * @tparam A step type

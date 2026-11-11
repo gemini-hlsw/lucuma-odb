@@ -79,11 +79,9 @@ trait SmartGcalService[F[_]]:
    * @param ghost Ghost search information
    * @param sgt SmartGcal type of interest
    *
-   * @return none when no row matches; otherwise a list of tuples, each
-   *         corresponding to a calibration step (empty when only rows with a
-   *         zero step count match); each tuple contains an update to the
-   *         dynamic config to apply (e.g., to set its exposure time) and the
-   *         GCAL unit configuration to use
+   * @return none when no row matches; otherwise one tuple per calibration
+   *         step, holding an update to the dynamic config (e.g., to set its
+   *         exposure time) and the GCAL unit configuration to use
    */
   def selectGhost(
     ghost: GhostSearchKey,
@@ -97,11 +95,9 @@ trait SmartGcalService[F[_]]:
    * @param gn  GMOS North search information
    * @param sgt SmartGcal type of interest
    *
-   * @return none when no row matches; otherwise a list of tuples, each
-   *         corresponding to a calibration step (empty when only rows with a
-   *         zero step count match); each tuple contains an update to the
-   *         dynamic config to apply (e.g., to set its exposure time) and the
-   *         GCAL unit configuration to use
+   * @return none when no row matches; otherwise one tuple per calibration
+   *         step, holding an update to the dynamic config (e.g., to set its
+   *         exposure time) and the GCAL unit configuration to use
    */
   def selectGmosNorth(
     gn:  GmosNorthSearchKey,
@@ -115,11 +111,9 @@ trait SmartGcalService[F[_]]:
    * @param gn  GMOS South search information
    * @param sgt SmartGcal type of interest
    *
-   * @return none when no row matches; otherwise a list of tuples, each
-   *         corresponding to a calibration step (empty when only rows with a
-   *         zero step count match); each tuple contains an update to the
-   *         dynamic config to apply (e.g., to set its exposure time) and the
-   *         GCAL unit configuration to use
+   * @return none when no row matches; otherwise one tuple per calibration
+   *         step, holding an update to the dynamic config (e.g., to set its
+   *         exposure time) and the GCAL unit configuration to use
    */
   def selectGmosSouth(
     gn:  GmosSouthSearchKey,
@@ -133,11 +127,9 @@ trait SmartGcalService[F[_]]:
    * @param f2  Flamingos 2 search information
    * @param sgt SmartGcal type of interest
    *
-   * @return none when no row matches; otherwise a list of tuples, each
-   *         corresponding to a calibration step (empty when only rows with a
-   *         zero step count match); each tuple contains an update to the
-   *         dynamic config to apply (e.g., to set its exposure time) and the
-   *         GCAL unit configuration to use
+   * @return none when no row matches; otherwise one tuple per calibration
+   *         step, holding an update to the dynamic config (e.g., to set its
+   *         exposure time) and the GCAL unit configuration to use
    */
   def selectFlamingos2(
     f2:  Flamingos2SearchKey,
@@ -156,11 +148,9 @@ trait SmartGcalService[F[_]]:
    * @param key GNIRS search information
    * @param sgt SmartGcal type of interest
    *
-   * @return none when no row matches; otherwise a list of tuples, each
-   *         corresponding to a calibration step (empty when only rows with a
-   *         zero step count match); each tuple contains an update to the
-   *         dynamic config to apply (e.g., to set its exposure time) and the
-   *         GCAL unit configuration to use
+   * @return none when no row matches; otherwise one tuple per calibration
+   *         step, holding an update to the dynamic config (e.g., to set its
+   *         exposure time) and the GCAL unit configuration to use
    */
   def selectGnirs(
     key: GnirsSearchKey,
@@ -257,8 +247,7 @@ object SmartGcalService:
                 List.fill(count.value)(f(exposureTime) -> gcal)
               }
 
-      // None when no row matched; rows with a zero step count (No-Calibration
-      // Rows) match but add no steps.
+      // A No-Calibration Row matches but adds no steps.
       private def matched[A, B](rows: List[A])(steps: => List[B]): Option[List[B]] =
         Option.when(rows.nonEmpty)(steps)
 

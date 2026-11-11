@@ -42,10 +42,6 @@ object StepViolationValidator extends ObservationValidator:
   override def apply(info: ObservationValidationInfo): ObservationValidationMap =
     validations(info)(_ => true)
 
-  /**
-   * Reports only the calibrations left out of the sequence for want of a Smart
-   * GCAL definition.  This is the one step violation calibration observations
-   * are subject to.
-   */
+  /** The one step violation calibration observations are subject to. */
   val missingSmartGcal: ObservationValidator = info =>
     validations(info)(_.code === ObservationValidationCode.MissingSmartGcal)

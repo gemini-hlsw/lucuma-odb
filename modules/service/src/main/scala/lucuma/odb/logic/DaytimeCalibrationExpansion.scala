@@ -5,16 +5,13 @@ package lucuma.odb.logic
 
 import cats.Monad
 import cats.data.EitherT
-import cats.data.NonEmptyList
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegInt
-import lucuma.core.enums.CalibrationSetType
-import lucuma.core.enums.ObservationValidationCode
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.StepViolation
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.SmartGcalExpander
-import lucuma.odb.sequence.SmartGcalExpander.Missing
+import lucuma.odb.sequence.SmartGcalExpander.Calibration
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.daytimecal.CalibrationSet
@@ -40,20 +37,6 @@ object DaytimeCalibrationExpansion:
     atom:    Option[ProtoAtom[ProtoStep[D]]]
   )
 
-  private def calibration(kind: CalibrationSetType): String =
-    kind match
-      case CalibrationSetType.SmartFlat   => "flat"
-      case CalibrationSetType.SmartArc    => "arc"
-      case CalibrationSetType.DayBaseline => "day baseline"
-      case k                              => k.name.toLowerCase
-
-  // Numbered from one, as the user sees the rows.
-  private def violation(index: Int, kind: CalibrationSetType, missing: Missing): StepViolation =
-    StepViolation(
-      ObservationValidationCode.MissingSmartGcal,
-      s"Calibration set ${index + 1}: ${Missing.message(calibration(kind), missing.detail)}"
-    )
-
   /** One set's atom with its smart step resolved; an error names the set. */
   def expandSet[F[_]: Monad, S, D](
     expander: SmartGcalExpander[F, S, D],
@@ -62,15 +45,10 @@ object DaytimeCalibrationExpansion:
     index:    Int,
     set:      CalibrationSet[D]
   ): F[Either[OdbError, Expansion[D]]] =
-    DaytimeCalibration.protoAtom(oid, index, set) match
-      case Right(atom) if set.kind.isSmart =>
-        atom.steps.toList.traverse(expander.expandStep(static, _)).map: rs =>
-          Expansion(
-            rs.collect { case Left(m) => violation(index, set.kind, m) },
-            NonEmptyList.fromList(rs.flatMap(_.toOption.orEmpty)).map(ProtoAtom(atom.description, _))
-          ).asRight
-      case other                           =>
-        other.map(a => Expansion(List.empty, a.some)).pure[F]
+    DaytimeCalibration.protoAtom(oid, index, set).traverse: atom =>
+      expander.expandAtom(static, atom, Calibration.DaytimeSet(set.kind)).map: (missing, expanded) =>
+        // Numbered from one, as the user sees the rows.
+        Expansion(missing.map(v => v.copy(message = s"Calibration set ${index + 1}: ${v.message}")), expanded)
 
   /**
    * The atoms of every set, with the calibrations left out.  Sets that leave
@@ -87,11 +65,8 @@ object DaytimeCalibrationExpansion:
       .subflatMap: es =>
         val missing = es.flatMap(_.missing)
         val atoms   = es.flatMap(_.atom)
-        Either.cond(
-          atoms.nonEmpty || sets.isEmpty,
-          (missing, atoms),
-          OdbError.SequenceUnavailable(oid, missing.headOption.fold(SmartGcalExpander.NoSteps)(_.message).some)
-        )
+        if sets.isEmpty then (missing, atoms).asRight
+        else SmartGcalExpander.remaining(missing, atoms).leftMap(m => OdbError.SequenceUnavailable(oid, m.some))
       .value
 
   /**

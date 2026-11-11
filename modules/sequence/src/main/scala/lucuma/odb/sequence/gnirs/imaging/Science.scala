@@ -224,7 +224,7 @@ object Science:
             ProtoSequences.smartFlat(config, filter, zipper.focus._2, readModes(filter).get)
           expander.expandOrReport(static, flat, Calibration.ImagingFlat).map: (missing, steps) =>
             (missing, NonEmptyList.fromList(steps).tupleLeft(filter).toList)
-        .map(rs => (rs.flatMap(_._1).distinct, rs.flatMap(_._2).toMap))
+        .map(rs => (rs.flatMap(_._1), rs.flatMap(_._2).toMap))
 
     def instantiate[F[_]: Sync](
       observationId: Observation.Id,
@@ -289,7 +289,7 @@ object Science:
               ProtoSequences.grouped(config, nem, readModes, flats, o, s, exposuresPerOffset)
 
         expandFlats(expander, static, config, nem, readModes).flatMap: (missing, flats) =>
-          protoAtoms(flats).map(ImagingSequence.makeGenerator(estimator, static, namespace, _, missing))
+          protoAtoms(flats).map(ImagingSequence.makeGenerator(estimator, static, namespace, _).reporting(missing))
 
   def gnirs[F[_]: Sync](
     observationId: Observation.Id,

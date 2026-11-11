@@ -29,6 +29,15 @@ trait SequenceGenerator[D]:
 
 object SequenceGenerator:
 
+  extension [D](self: SequenceGenerator[D])
+    /** The same sequence, reporting `missing` as well. */
+    def reporting(missing: List[StepViolation]): SequenceGenerator[D] =
+      new SequenceGenerator[D]:
+        override def generate: Stream[Pure, Atom[D]] =
+          self.generate
+        override def violations: List[StepViolation] =
+          self.violations ++ missing
+
   /** A degenerate implementation that produces no atoms. */
   def empty[D]: SequenceGenerator[D] =
     new SequenceGenerator[D]:

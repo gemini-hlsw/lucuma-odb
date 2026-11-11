@@ -343,9 +343,8 @@ object ObservationWorkflowService {
         oids: List[Observation.Id]
       )(using NoTransaction[F], SuperUserAccess): F[Result[Map[Observation.Id, (ObservationWorkflow, Option[ObservingModeType], Option[CalibrationRole])]]] =
 
-        // The execution digests whose step violations are checked, as obscalc
-        // last stored them: science observations for all of them, calibrations
-        // for the calibrations left out for want of a Smart GCAL definition.
+        // The execution digests whose step violations are checked (science
+        // and calibration observations), as obscalc last stored them.
         // Nothing is generated here, so until obscalc catches up with an edit
         // the violations are those of the previous inputs; obscalc's workflow,
         // calculated from a fresh digest, is the guarantee.  An observation

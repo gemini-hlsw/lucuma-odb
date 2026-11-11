@@ -11,7 +11,6 @@ import cats.data.EitherT
 import cats.data.NonEmptyList
 import cats.data.NonEmptyVector
 import cats.data.State
-import cats.syntax.applicative.*
 import cats.syntax.either.*
 import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
@@ -311,16 +310,16 @@ object Science:
                 s <- scienceStep(TelescopeConfig(Offset.Zero, sciGuiding), sciClass)
               yield (a, f, s)
 
-          def expand(include: Boolean, step: ProtoStep[D], calibration: String): F[(List[StepViolation], List[ProtoStep[D]])] =
+          def expand(include: Boolean, step: ProtoStep[D], calibration: Calibration): F[(List[StepViolation], List[ProtoStep[D]])] =
             if include then expander.expandOrReport(static, step, calibration)
-            else (List.empty[StepViolation], List.empty[ProtoStep[D]]).pure[F]
+            else Monad[F].pure((Nil, Nil))
 
           for
             (fv, fs) <- expand(includeFlats, smartFlat, Calibration.SpectroscopicFlat)
             (av, as) <- expand(includeArcs, smartArc, Calibration.Arc)
           yield (fv ++ av, StepDefinition(g, as, fs, science))
 
-        goals.traverse(define).map(ds => (ds.toList.flatMap(_._1).distinct, ds.map(_._2)))
+        goals.traverse(define).map(ds => (ds.foldMap(_._1), ds.map(_._2)))
 
       /**
        * The arcs of a daytime arc calibration: one smart GCAL arc per wavelength
@@ -404,12 +403,8 @@ object Science:
     static:      S,
     atomBuilder: AtomBuilder[D],
     expMicroSec: PosLong,
-    dithers:     NonEmptyVector[Dither[D]],
-    missing:     List[StepViolation]
+    dithers:     NonEmptyVector[Dither[D]]
   ) extends SequenceGenerator[D]:
-
-    override def violations: List[StepViolation] =
-      missing
 
     val sci            = SciencePeriod.toMicroseconds
     val time           = sci min expMicroSec.value
@@ -505,11 +500,10 @@ object Science:
           static,
           AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Science),
           μs,
-          defs.map(Dither.init).toNev,
-          missing
-        )
+          defs.map(Dither.init).toNev
+        ).reporting(missing)
 
-        result.widen[SequenceGenerator[D]].value
+        result.value
     end instantiate
 
   end ScienceGenerator

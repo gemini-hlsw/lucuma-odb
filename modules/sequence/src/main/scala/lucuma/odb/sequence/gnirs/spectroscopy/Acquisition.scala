@@ -296,12 +296,8 @@ object Acquisition:
   private class Generator(
     builder:       AtomBuilder[GnirsDynamicConfig],
     initialAtom:   NonEmptyList[ProtoStep[GnirsDynamicConfig]],
-    repeatingAtom: NonEmptyList[ProtoStep[GnirsDynamicConfig]],
-    missing:       List[StepViolation] = List.empty
+    repeatingAtom: NonEmptyList[ProtoStep[GnirsDynamicConfig]]
   ) extends SequenceGenerator[GnirsDynamicConfig]:
-
-    override def violations: List[StepViolation] =
-      missing
 
     override val generate: Stream[Pure, Atom[GnirsDynamicConfig]] =
       (for
@@ -360,8 +356,7 @@ object Acquisition:
         // spectrograph.  Without a definition the flat is left out and reported.
         val flats: F[(List[StepViolation], List[ProtoStep[GnirsDynamicConfig]])] =
           ifu match
-            case GnirsFpuIfu.LowResolution  =>
-              (List.empty[StepViolation], List.empty[ProtoStep[GnirsDynamicConfig]]).pure[F]
+            case GnirsFpuIfu.LowResolution  => Monad[F].pure((Nil, Nil))
             case GnirsFpuIfu.HighResolution =>
               expander.expandOrReport(static, StepComputer.ifuAlignmentFlat(config), Calibration.IfuAlignmentFlat)
 
@@ -370,5 +365,5 @@ object Acquisition:
           (missing, fs)                  <- EitherT.liftF(flats)
         yield
           val steps: IfuSteps = StepComputer.computeIfu(config, ifu, mode, selFilter, fs, t, readMode)
-          Generator(builder, steps.initialAtom, steps.repeatingAtom, missing): SequenceGenerator[GnirsDynamicConfig]
+          Generator(builder, steps.initialAtom, steps.repeatingAtom).reporting(missing)
         ).value

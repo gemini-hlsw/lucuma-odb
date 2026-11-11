@@ -6,15 +6,20 @@ package lucuma.odb.sequence
 import cats.Applicative
 import cats.Functor
 import cats.Monad
+import cats.data.NonEmptyList
 import cats.syntax.applicative.*
+import cats.syntax.apply.*
 import cats.syntax.either.*
-import cats.syntax.flatMap.*
+import cats.syntax.foldable.*
 import cats.syntax.functor.*
+import cats.syntax.semigroup.*
+import lucuma.core.enums.CalibrationSetType
 import lucuma.core.enums.ObservationValidationCode
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SmartGcalType
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepViolation
+import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
 
 /**
@@ -30,6 +35,7 @@ import lucuma.odb.sequence.data.ProtoStep
  */
 trait SmartGcalExpander[F[_], S, D]:
 
+  import SmartGcalExpander.Calibration
   import SmartGcalExpander.Missing
 
   /**
@@ -43,35 +49,55 @@ trait SmartGcalExpander[F[_], S, D]:
     step:   ProtoStep[D]
   ): F[Either[Missing, List[ProtoStep[D]]]]
 
-  /**
-   * Expands a single step, leaving a missing calibration out of the sequence
-   * and reporting it instead.
-   *
-   * @param calibration what is being looked up, as the report names it
-   */
+  /** Expands a single step, leaving out and reporting a missing calibration. */
   def expandOrReport(
     static:      S,
     step:        ProtoStep[D],
-    calibration: String
+    calibration: Calibration
   )(using Functor[F]): F[(List[StepViolation], List[ProtoStep[D]])] =
     expandStep(static, step).map:
       _.fold(m => (List(m.violation(calibration)), List.empty), steps => (List.empty, steps))
 
-  /**
-   * Expands a spectroscopic (flat, arc) pair, flat first.  Each is looked up
-   * on its own: whichever is missing is left out and reported.
-   */
+  /** Expands a (flat, arc) pair, flat first, each looked up on its own. */
   def expandFlatAndArc(
     static: S,
     flat:   ProtoStep[D],
     arc:    ProtoStep[D]
   )(using Monad[F]): F[(List[StepViolation], List[ProtoStep[D]])] =
-    for
-      (fv, fs) <- expandOrReport(static, flat, SmartGcalExpander.Calibration.SpectroscopicFlat)
-      (av, as) <- expandOrReport(static, arc, SmartGcalExpander.Calibration.Arc)
-    yield (fv ++ av, fs ++ as)
+    (
+      expandOrReport(static, flat, Calibration.SpectroscopicFlat),
+      expandOrReport(static, arc, Calibration.Arc)
+    ).mapN(_ |+| _)
+
+  /** Expands the steps of an atom; no atom is left when none of them remains. */
+  def expandAtom(
+    static:      S,
+    atom:        ProtoAtom[ProtoStep[D]],
+    calibration: Calibration
+  )(using Monad[F]): F[(List[StepViolation], Option[ProtoAtom[ProtoStep[D]]])] =
+    atom.steps.toList.foldMapM(expandOrReport(static, _, calibration)).map: (missing, steps) =>
+      (missing, NonEmptyList.fromList(steps).map(ProtoAtom(atom.description, _)))
 
 object SmartGcalExpander:
+
+  /** The calibrations a sequence looks up, as their reports name them. */
+  enum Calibration:
+    case ImagingFlat
+    case SpectroscopicFlat
+    case Arc
+    case IfuAlignmentFlat
+    case DaytimeSet(kind: CalibrationSetType)
+
+    def name: String =
+      this match
+        case ImagingFlat                                => "imaging flat"
+        case SpectroscopicFlat                          => "spectroscopic flat"
+        case Arc                                        => "arc"
+        case IfuAlignmentFlat                           => "IFU alignment flat"
+        case DaytimeSet(CalibrationSetType.SmartFlat)   => "flat"
+        case DaytimeSet(CalibrationSetType.SmartArc)    => "arc"
+        case DaytimeSet(CalibrationSetType.DayBaseline) => "day baseline"
+        case DaytimeSet(kind)                           => kind.name.toLowerCase
 
   /** Why a smart gcal step has no expansion. */
   enum Missing:
@@ -82,34 +108,27 @@ object SmartGcalExpander:
     /** The configuration has no lookup key, for the reason given. */
     case NoKey(reason: String)
 
-    def detail: String =
-      this match
-        case NoMapping(key) => key
-        case NoKey(reason)  => reason
-
     def message: String =
       this match
         case NoMapping(key) => s"missing Smart GCAL mapping: $key"
         case NoKey(reason)  => reason
 
-    def violation(calibration: String): StepViolation =
-      StepViolation(ObservationValidationCode.MissingSmartGcal, Missing.message(calibration, detail))
-
-  object Missing:
-
-    def message(calibration: String, detail: String): String =
-      s"No Smart GCAL $calibration is defined for this configuration: $detail"
+    def violation(calibration: Calibration): StepViolation =
+      val detail = this match
+        case NoMapping(key) => key
+        case NoKey(reason)  => reason
+      StepViolation(
+        ObservationValidationCode.MissingSmartGcal,
+        s"No Smart GCAL ${calibration.name} is defined for this configuration: $detail"
+      )
 
   /** The complaint when a lookup that must yield steps defines none. */
   val NoSteps: String =
     "Smart GCAL defines no calibration steps for this configuration"
 
-  /** The calibrations a sequence looks up, as their reports name them. */
-  object Calibration:
-    val ImagingFlat: String       = "imaging flat"
-    val SpectroscopicFlat: String = "spectroscopic flat"
-    val Arc: String               = "arc"
-    val IfuAlignmentFlat: String  = "IFU alignment flat"
+  /** The atoms a sequence is left with, or the reason it has none. */
+  def remaining[A](missing: List[StepViolation], atoms: List[A]): Either[String, (List[StepViolation], List[A])] =
+    Either.cond(atoms.nonEmpty, (missing, atoms), missing.headOption.fold(NoSteps)(_.message))
 
   /** A simple implementation for testing. */
   def pure[F[_], S, D](
