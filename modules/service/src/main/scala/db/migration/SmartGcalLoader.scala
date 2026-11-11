@@ -33,6 +33,14 @@ class SmartGcalLoader[A](
   val encoder: Encoder[A]
 ) {
 
+  private def rejectNoCalibrationConflict(bc: BaseConnection): IO[Unit] =
+    bc.ioQueryOption(temp.selectNoCalibrationConflict)(rs => (rs.getString(1), rs.getLong(2), rs.getLong(3)))
+      .flatMap:
+        _.traverse_ : (lamp, zero, other) =>
+          IO.raiseError(new RuntimeException(
+            s"Smart GCAL ${temp.inst.longName}: $lamp line $zero has a Calibration Observe of 0, but $lamp line $other matches the same configuration. A configuration with no calibration must have no other line."
+          ))
+
   def load(bc: BaseConnection, files: NonEmptyList[(String, IO[InputStream])]): IO[Unit] = {
 
     // An input stream that reads a configuration file, parses it, then blows it
@@ -56,6 +64,7 @@ class SmartGcalLoader[A](
       // Create and load the temp table
       _ <- bc.ioUpdate(temp.create)
       _ <- bc.ioCopyIn(temp.copyFromStdin, r)
+      _ <- rejectNoCalibrationConflict(bc)
 
       // Prepare and clean the instrument table
       _ <- bc.ioUpdate(inst.truncate)

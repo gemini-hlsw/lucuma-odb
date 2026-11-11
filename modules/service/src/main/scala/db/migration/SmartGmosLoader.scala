@@ -69,7 +69,7 @@ object SmartGmosLoader {
       Col.fkey("c_fpu", s"t_gmos_${site}_fpu").index,
       Col.fkey("c_x_binning", "t_gmos_binning"),
       Col.fkey("c_y_binning", "t_gmos_binning"),
-      Col("c_wavelength_range", "d_wavelength_pm_range"),
+      Col("c_wavelength_range", SmartGcalTable.WavelengthRangeType),
       Col.fkey("c_disperser_order", "t_gmos_disperser_order"),
       Col.fkey("c_amp_gain", "t_gmos_amp_gain"),
     )

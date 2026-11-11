@@ -57,7 +57,7 @@ object SmartGnirsLoader:
       Col("c_pixel_scale", "varchar"),
       Col.fkey("c_disperser", "t_gnirs_grating").index,
       Col.fkey("c_cross_dispersed", "t_gnirs_prism").index,
-      Col("c_wavelength_range", "d_wavelength_pm_range"),
+      Col("c_wavelength_range", SmartGcalTable.WavelengthRangeType),
       Col.fkey("c_fpu_slit", "t_gnirs_fpu_slit").index,
       Col("c_fpu_other", "e_gnirs_fpu_other").index,
       Col("c_fpu_ifu", "e_gnirs_fpu_ifu").index,
