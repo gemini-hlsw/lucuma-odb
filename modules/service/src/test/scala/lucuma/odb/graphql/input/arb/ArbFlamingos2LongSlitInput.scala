@@ -4,6 +4,7 @@
 package lucuma.odb.graphql.input
 package arb
 
+import lucuma.core.enums.Flamingos2AcquisitionType
 import lucuma.core.enums.Flamingos2Decker
 import lucuma.core.enums.Flamingos2Disperser
 import lucuma.core.enums.Flamingos2Filter
@@ -11,6 +12,8 @@ import lucuma.core.enums.Flamingos2Fpu
 import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.Flamingos2ReadoutMode
 import lucuma.core.enums.Flamingos2Reads
+import lucuma.core.math.Offset
+import lucuma.core.math.arb.ArbOffset.given
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.SlitTelescopeConfigs
 import lucuma.core.model.TelluricType
@@ -30,7 +33,9 @@ trait ArbFlamingos2LongSlitInput:
       for
         f <- arbitrary[Nullable[Flamingos2Filter]]
         e <- arbitrary[Option[ExposureTimeMode]]
-      yield Flamingos2LongSlitInput.Acquisition(f, e)
+        t <- arbitrary[Nullable[Flamingos2AcquisitionType]]
+        o <- arbitrary[Offset]
+      yield Flamingos2LongSlitInput.Acquisition(f, e, t, Option.when(t.toOption.contains(Flamingos2AcquisitionType.Faint))(o))
 
   given Arbitrary[Flamingos2LongSlitInput.Create] =
     Arbitrary:

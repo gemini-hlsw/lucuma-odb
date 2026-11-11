@@ -24,6 +24,7 @@ import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepEstimate
 import lucuma.core.model.sequence.TelescopeConfig
+import lucuma.core.model.sequence.flamingos2.Flamingos2AcquisitionMode
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
@@ -73,14 +74,15 @@ class AcquisitionSuite extends FunSuite:
     ExposureTimeMode.TimeAndCountMode(time, 1.refined, Wavelength.fromIntNanometers(2000).get)
 
   private def config(
-    explicitFilter: Option[Flamingos2Filter] = none,
-    exposureTime:   TimeSpan                 = ExposureTime
+    explicitFilter: Option[Flamingos2Filter]          = none,
+    exposureTime:   TimeSpan                          = ExposureTime,
+    explicitMode:   Option[Flamingos2AcquisitionMode] = none
   ): Config =
     Config(
       Disperser,
       Filter,
       CustomMask,
-      AcquisitionConfig(acqEtm(exposureTime), AcqFilter, explicitFilter),
+      AcquisitionConfig(acqEtm(exposureTime), AcqFilter, explicitFilter, explicitMode),
       common
     ).fold(m => fail(s"could not build the MOS config: $m"), identity)
 
@@ -154,6 +156,46 @@ class AcquisitionSuite extends FunSuite:
 
     assertEquals(steps.length, 4)
     assertEquals(steps.map(qArcsec), List(0.0, 10.0, 0.0, 10.0))
+
+  test("an acquisition with no explicit type is Faint"):
+    assertEquals(generate().head.steps.length, 4)
+
+  test("an explicit Bright acquisition takes no sky steps"):
+    val atoms = generate(config(explicitMode = Flamingos2AcquisitionMode.Bright.some))
+    val steps = atoms.head.steps.toList
+
+    assertEquals(steps.map(_.instrumentConfig.fpu), List[Flamingos2FpuMask](Flamingos2FpuMask.Imaging, CustomMask))
+    assertEquals(steps.map(_.telescopeConfig.offset), List(Offset.Zero, Offset.Zero))
+    assertEquals(steps.map(_.breakpoint), List(Breakpoint.Disabled, Breakpoint.Enabled))
+
+    atoms.tail.foreach: a =>
+      val ss = a.steps.toList
+      assertEquals(ss.map(_.instrumentConfig.fpu), List[Flamingos2FpuMask](CustomMask))
+      assertEquals(ss.map(_.telescopeConfig.offset), List(Offset.Zero))
+      assertEquals(ss.map(_.breakpoint), List(Breakpoint.Enabled))
+
+  test("an explicit Faint acquisition takes its sky steps at its sky offset"):
+    val skyOffset: Offset =
+      Offset(Offset.P(Angle.fromDoubleArcseconds(5.0)), Offset.Q(Angle.fromDoubleArcseconds(-3.0)))
+    val atoms = generate(config(explicitMode = Flamingos2AcquisitionMode.Faint(skyOffset).some))
+
+    assertEquals(atoms.head.steps.toList.map(_.telescopeConfig.offset), List(Offset.Zero, skyOffset, Offset.Zero, skyOffset))
+    atoms.tail.foreach: a =>
+      assertEquals(a.steps.toList.map(_.telescopeConfig.offset), List(Offset.Zero, skyOffset))
+
+  test("the explicit mode is part of the configuration hash, an automatic one is not"):
+    def hash(mode: Option[Flamingos2AcquisitionMode]): List[Byte] =
+      config(explicitMode = mode).acquisition.hashBytes.toList
+
+    val automatic: List[Byte] = AcquisitionConfig(acqEtm(ExposureTime), AcqFilter, none).hashBytes.toList
+
+    assertEquals(hash(none), automatic)
+    assertNotEquals(hash(Flamingos2AcquisitionMode.Bright.some), automatic)
+    assertNotEquals(hash(Flamingos2AcquisitionMode.Faint.Default.some), hash(Flamingos2AcquisitionMode.Bright.some))
+    assertNotEquals(
+      hash(Flamingos2AcquisitionMode.Faint(Offset.Zero).some),
+      hash(Flamingos2AcquisitionMode.Faint.Default.some)
+    )
 
   test("a zero exposure time is an error"):
     assert(

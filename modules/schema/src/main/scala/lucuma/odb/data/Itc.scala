@@ -12,6 +12,7 @@ import cats.syntax.all.*
 import eu.timepit.refined.cats.given
 import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.data.Zipper
+import lucuma.core.enums.Flamingos2AcquisitionType
 import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosSouthFilter
@@ -72,11 +73,10 @@ object ItcResult:
  *
  * An acquisition result has a single shape regardless of instrument
  * (acquisition is always imaging through a filter): a set of per-target
- * integration times.  GNIRS is particular in that the acquisition type (Very
- * Bright / Bright / Faint) is classified in the ITC layer via a two-pass
- * calculation and pinned here, so the sequence generator does not re-derive
- * (and possibly misclassify) it.  See the two-pass acquisition ITC in
- * ItcService.
+ * integration times.  For GNIRS and Flamingos 2 the acquisition type is
+ * classified in the ITC layer via a two-pass calculation and pinned here, so the
+ * sequence generator does not re-derive (and possibly misclassify) it.  See the
+ * two-pass acquisition ITC in ItcService.
  *
  * The three cases map one-to-one onto the two `c_acquisition_*` columns of
  * `t_itc_result`: NotApplicable = both null, Failed = c_acquisition_error,
@@ -85,11 +85,29 @@ object ItcResult:
 enum ItcAcquisition derives Eq:
   case NotApplicable
   case Failed(message: String)
-  case Available(times: Zipper[ItcResult], gnirsAcqType: Option[GnirsAcquisitionType])
+  case Available(times: Zipper[ItcResult], acquisitionType: Option[ItcAcquisitionType])
 
 object ItcAcquisition:
   given Eq[Available] =
-    Eq.by(a => (a.times, a.gnirsAcqType))
+    Eq.by(a => (a.times, a.acquisitionType))
+
+/**
+ * The acquisition type the ITC classified the target as, for the instruments
+ * whose acquisition sequence depends on one.
+ */
+enum ItcAcquisitionType derives Eq:
+  case Gnirs(acquisitionType: GnirsAcquisitionType)
+  case Flamingos2(acquisitionType: Flamingos2AcquisitionType)
+
+  def gnirs: Option[GnirsAcquisitionType] =
+    this match
+      case Gnirs(t)      => Some(t)
+      case Flamingos2(_) => None
+
+  def flamingos2: Option[Flamingos2AcquisitionType] =
+    this match
+      case Gnirs(_)      => None
+      case Flamingos2(t) => Some(t)
 
 /**
  * Science ITC results.  Because the results differ depending upon whether it is

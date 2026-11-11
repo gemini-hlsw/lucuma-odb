@@ -141,7 +141,7 @@ class MosLongSlitSequencesSuite extends FunSuite:
     gen.value.fold(e => fail(s"could not generate: $e"), _.science.toList)
 
   private def generateLongSlit(cycles: Int): List[Atom[Flamingos2DynamicConfig]] =
-    science(longslit.LongSlit.instantiate[Eval](Oid, estimator, Namespace, expander, longSlit, itc(cycles), itc(cycles), none))
+    science(longslit.LongSlit.instantiate[Eval](Oid, estimator, Namespace, expander, longSlit, none, itc(cycles), itc(cycles), none))
 
   private def generateMos(cycles: Int): List[Atom[Flamingos2DynamicConfig]] =
     science(mos.Mos.instantiate[Eval](Oid, estimator, Namespace, expander, mosConfig, itc(cycles), none))

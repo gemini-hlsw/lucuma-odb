@@ -169,6 +169,7 @@ trait BaseMapping[F[_]]
   lazy val ExtinctionType                          = schema.ref("Extinction")
   lazy val FastTurnaroundType                      = schema.ref("FastTurnaround")
   lazy val FieldLensType                           = schema.ref("FieldLens")
+  lazy val Flamingos2AcquisitionTypeType           = schema.ref("Flamingos2AcquisitionType")
   lazy val Flamingos2CustomSlitWidthType           = schema.ref("Flamingos2CustomSlitWidth")
   lazy val Flamingos2DeckerType                    = schema.ref("Flamingos2Decker")
   lazy val Flamingos2DisperserType                 = schema.ref("Flamingos2Disperser")

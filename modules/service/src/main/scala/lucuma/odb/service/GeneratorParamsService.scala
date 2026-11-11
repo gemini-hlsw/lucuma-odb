@@ -317,7 +317,7 @@ object GeneratorParamsService {
           obsMode:              ObservingMode,
           acqMode:              InstrumentMode,
           sciMode:              InstrumentMode,
-          gnirsAcqAutoClassify: Boolean = false
+          acqAutoClassify: Boolean = false
         ): GeneratorParams =
 
           val consInput   = obsParams.constraints.toInput
@@ -335,7 +335,7 @@ object GeneratorParamsService {
                 regularTargetInputs,
                 blindOffsetTargetInput,
                 obsParams.signalToNoiseTargetId,
-                gnirsAcqAutoClassify
+                acqAutoClassify
               )
             }
             .leftMap(MissingParamSet.fromParams)
@@ -371,7 +371,7 @@ object GeneratorParamsService {
           obsMode:                   ObservingMode,
           acqMode:                   InstrumentMode,
           sciModes:                  NonEmptyList[InstrumentMode],
-          gnirsAcqAutoClassify:      Boolean,
+          acqAutoClassify:      Boolean,
           gnirsAcqAutoSignalToNoise: Boolean
         ): GeneratorParams =
 
@@ -390,7 +390,7 @@ object GeneratorParamsService {
                 regularTargetInputs,
                 blindOffsetTargetInput,
                 obsParams.signalToNoiseTargetId,
-                gnirsAcqAutoClassify,
+                acqAutoClassify,
                 gnirsAcqAutoSignalToNoise
               )
             }
@@ -474,7 +474,8 @@ object GeneratorParamsService {
                 f2.acquisition.filter,
                 flamingos2AcquisitionReadMode(f2.acquisition.exposureTimeMode)
               ),
-              sciMode = sciMode
+              sciMode = sciMode,
+              acqAutoClassify = f2.acquisition.explicitMode.isEmpty
             ).asRight
 
           case f2m: flamingos2.mos.Config =>
@@ -573,7 +574,7 @@ object GeneratorParamsService {
               obsParams
                 .targets
                 .traverse(itcTargetParams)
-                .map(ItcInput.Imaging(inputs, _, obsParams.signalToNoiseTargetId, acquisition.some, gnirsAcqAutoClassify = acqAutoClassify, gnirsAcqAutoSignalToNoise = acqAutoSignalToNoise))
+                .map(ItcInput.Imaging(inputs, _, obsParams.signalToNoiseTargetId, acquisition.some, acqAutoClassify = acqAutoClassify, gnirsAcqAutoSignalToNoise = acqAutoSignalToNoise))
                 .leftMap(MissingParamSet.fromParams)
                 .toEither
 
@@ -797,7 +798,7 @@ object GeneratorParamsService {
                 coadds           = gn.acquisition.coadds
               ),
               sciModes = sciModes,
-              gnirsAcqAutoClassify = acqAutoClassify,
+              acqAutoClassify = acqAutoClassify,
               gnirsAcqAutoSignalToNoise = acqAutoSignalToNoise
             ).asRight
 

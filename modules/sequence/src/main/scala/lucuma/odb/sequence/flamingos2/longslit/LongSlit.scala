@@ -9,6 +9,7 @@ import cats.Monad
 import cats.data.EitherT
 import fs2.Pure
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.Flamingos2AcquisitionType
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig as F2Dynamic
@@ -27,6 +28,7 @@ object LongSlit:
     namespace:      UUID,
     expander:       SmartGcalExpander[F, F2Static, F2Dynamic],
     config:         Config,
+    pinnedAcquisitionType: Option[Flamingos2AcquisitionType],
     acquisitionItc: Either[OdbError, IntegrationTime],
     scienceItc:     Either[OdbError, IntegrationTime],
     calRole:        Option[CalibrationRole]
@@ -43,6 +45,6 @@ object LongSlit:
         spectroscopy.Science.instantiate(observationId, estimator, Static, namespace, expander, ObservingMode.Flamingos2LongSlitName, config, scienceItc, calRole)
 
     (for
-       a <- EitherT.fromEither(Acquisition.instantiate(observationId, estimator, Static, namespace, config, acquisitionItc))
+       a <- EitherT.fromEither(Acquisition.instantiate(observationId, estimator, Static, namespace, config, pinnedAcquisitionType, acquisitionItc))
        s <- EitherT(science)
     yield StreamingExecutionConfig(Static, a.generate, s.generate)).value

@@ -13,6 +13,7 @@ import cats.syntax.partialOrder.*
 import cats.syntax.traverse.*
 import grackle.Result
 import grackle.syntax.*
+import lucuma.core.enums.Flamingos2AcquisitionType
 import lucuma.core.enums.Flamingos2CustomSlitWidth
 import lucuma.core.enums.Flamingos2Decker
 import lucuma.core.enums.Flamingos2Disperser
@@ -21,6 +22,7 @@ import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.Flamingos2ReadoutMode
 import lucuma.core.enums.Flamingos2Reads
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.math.Offset
 import lucuma.core.model.Access
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.SlitTelescopeConfigs
@@ -48,6 +50,8 @@ object Flamingos2MosInput:
     else
       Result(m)
 
+  // The acquisition is made on the mask's acquisition stars, whose brightness is
+  // unknown here, so there is nothing for the ITC to solve a signal-to-noise for.
   private def requireTimeAndCount(etm: ExposureTimeMode): Result[ExposureTimeMode] =
     etm match
       case ExposureTimeMode.TimeAndCountMode(_, _, _) => Result(etm)
@@ -55,11 +59,13 @@ object Flamingos2MosInput:
         OdbError.InvalidArgument("A Flamingos 2 MOS acquisition exposure time mode must be Time & Count.".some).asFailure
 
   case class Acquisition(
-    filter:           Nullable[Flamingos2Filter],
-    exposureTimeMode: Option[ExposureTimeMode]
+    filter:                  Nullable[Flamingos2Filter],
+    exposureTimeMode:        Option[ExposureTimeMode],
+    explicitAcquisitionType: Nullable[Flamingos2AcquisitionType] = Nullable.Absent,
+    skyOffset:               Option[Offset]                      = None
   ) derives Eq:
     def updatesAcquisition: Boolean =
-      filter.isDefined || exposureTimeMode.isDefined
+      filter.isDefined || exposureTimeMode.isDefined || explicitAcquisitionType.isDefined
 
   object Acquisition:
 
@@ -67,15 +73,22 @@ object Flamingos2MosInput:
       ObjectFieldsBinding.rmap:
         case List(
           Flamingos2FilterBinding.Nullable("explicitFilter", rFilter),
-          ExposureTimeModeInput.Binding.Option("exposureTimeMode", rExposureTime)
+          ExposureTimeModeInput.Binding.Option("exposureTimeMode", rExposureTime),
+          Flamingos2AcquisitionTypeBinding.Nullable("explicitAcquisitionType", rAcquisitionType),
+          OffsetInput.Binding.Option("skyOffset", rSkyOffset)
         ) => (
           rFilter.flatMap: n =>
             n.traverse: f =>
               if Flamingos2Filter.acquisition.exists(_ === f) then f.success
               else OdbError.InvalidArgument(s"'explicitFilter' must contain one of: ${Flamingos2Filter.acquisition.map(_.tag.toScreamingSnakeCase).mkString_(", ")}".some).asFailure
           ,
-          rExposureTime.flatMap(_.traverse(requireTimeAndCount))
-        ).parMapN(apply)
+          rExposureTime.flatMap(_.traverse(requireTimeAndCount)),
+          rAcquisitionType,
+          rSkyOffset
+        ).parFlatMapN: (filter, exposureTimeMode, acquisitionType, skyOffset) =>
+          Flamingos2SpectroscopyInput
+            .validateSkyOffset(acquisitionType, skyOffset)
+            .map(_ => Acquisition(filter, exposureTimeMode, acquisitionType, skyOffset))
 
   final case class Create(
     disperser:                Flamingos2Disperser,

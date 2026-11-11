@@ -17,7 +17,6 @@ import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.format.telescopeConfigs.*
 import lucuma.odb.graphql.input.Flamingos2LongSlitInput
 import lucuma.odb.sequence.flamingos2.longslit.Config
-import lucuma.odb.sequence.flamingos2.spectroscopy.AcquisitionConfig
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Flamingos2Codecs.*
 import skunk.*
@@ -66,18 +65,12 @@ object Flamingos2LongSlitService:
 
     new Flamingos2LongSlitService[F] {
 
-      val acquisition: Decoder[AcquisitionConfig] =
-        (exposure_time_mode *:
-         flamingos_2_filter *:
-         flamingos_2_filter.opt
-        ).to[AcquisitionConfig]
-
       val f2LS: Decoder[Config] =
         (flamingos_2_disperser        *:
          flamingos_2_filter           *:
          flamingos_2_fpu              *:
          exposure_time_mode           *:
-         acquisition                  *:
+         Flamingos2AcquisitionStatements.acquisition_config *:
          flamingos_2_read_mode.opt    *:
          flamingos_2_reads.opt        *:
          flamingos_2_decker.opt       *:
@@ -188,6 +181,9 @@ object Flamingos2LongSlitService:
           acq.c_exposure_count,
           ls.c_acquisition_filter_default,
           ls.c_acquisition_filter,
+          ls.c_acquisition_type,
+          ls.c_acquisition_sky_offset_p,
+          ls.c_acquisition_sky_offset_q,
           ls.c_read_mode,
           ls.c_reads,
           ls.c_decker,
@@ -220,6 +216,9 @@ object Flamingos2LongSlitService:
           c_filter,
           c_fpu,
           c_acquisition_filter,
+          c_acquisition_type,
+          c_acquisition_sky_offset_p,
+          c_acquisition_sky_offset_q,
           c_read_mode,
           C_reads,
           c_decker,
@@ -238,6 +237,9 @@ object Flamingos2LongSlitService:
           $flamingos_2_filter,
           $flamingos_2_fpu,
           ${flamingos_2_filter.opt},
+          ${flamingos_2_acquisition_type.opt},
+          ${angle_µas.opt},
+          ${angle_µas.opt},
           ${flamingos_2_read_mode.opt},
           ${flamingos_2_reads.opt},
           ${flamingos_2_decker.opt},
@@ -256,6 +258,9 @@ object Flamingos2LongSlitService:
           in.filter,
           in.fpu,
           in.acquisition.flatMap(_.filter.toOption),
+          in.acquisition.flatMap(_.explicitAcquisitionType.toOption),
+          in.acquisition.flatMap(_.skyOffset).map(_.p.toAngle),
+          in.acquisition.flatMap(_.skyOffset).map(_.q.toAngle),
           in.explicitReadMode,
           in.explicitReads,
           in.explicitDecker,
@@ -303,7 +308,9 @@ object Flamingos2LongSlitService:
           input.explicitSlitOffsetMode.toOptionOption.map(upSlitMode),
           input.formattedTelescopeConfigs.toOptionOption.map(upTelescopeCfgs),
           input.telluricType.map(tt => upTelluricType(Some(tt)))
-        ).flatten
+        ).flatten ++
+          input.acquisition.toList.flatMap: acquisition =>
+            Flamingos2AcquisitionStatements.updates(acquisition.explicitAcquisitionType, acquisition.skyOffset)
 
       NonEmptyList.fromList(ups)
     }
@@ -329,6 +336,9 @@ object Flamingos2LongSlitService:
         c_disperser,
         c_filter,
         c_acquisition_filter,
+        c_acquisition_type,
+        c_acquisition_sky_offset_p,
+        c_acquisition_sky_offset_q,
         c_fpu,
         c_read_mode,
         c_reads,
@@ -350,6 +360,9 @@ object Flamingos2LongSlitService:
         c_disperser,
         c_filter,
         c_acquisition_filter,
+        c_acquisition_type,
+        c_acquisition_sky_offset_p,
+        c_acquisition_sky_offset_q,
         c_fpu,
         c_read_mode,
         c_reads,

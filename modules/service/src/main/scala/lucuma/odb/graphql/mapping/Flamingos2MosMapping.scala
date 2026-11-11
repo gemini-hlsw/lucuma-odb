@@ -4,18 +4,23 @@
 package lucuma.odb.graphql
 package mapping
 
+import cats.syntax.apply.*
 import grackle.Query.Binding
 import grackle.Query.Filter
 import grackle.Query.Unique
 import grackle.QueryCompiler.Elab
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
+import io.circe.syntax.*
 import lucuma.core.enums.Flamingos2Decker
 import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.Flamingos2ReadoutMode
+import lucuma.core.math.Angle
+import lucuma.core.math.Offset
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.*
+import lucuma.odb.json.offset.query.given
 
 trait Flamingos2MosMapping[F[_]]
   extends Flamingos2MosView[F]
@@ -32,7 +37,21 @@ trait Flamingos2MosMapping[F[_]]
       SqlField("defaultFilter",  Flamingos2MosView.AcquisitionFilterDefault),
       SqlField("explicitFilter", Flamingos2MosView.AcquisitionFilter),
 
-      SqlObject("exposureTimeMode", Join(Flamingos2MosView.ObservationId, ExposureTimeModeView.ObservationId))
+      SqlObject("exposureTimeMode", Join(Flamingos2MosView.ObservationId, ExposureTimeModeView.ObservationId)),
+
+      SqlField("explicitAcquisitionType", Flamingos2MosView.AcquisitionType),
+
+      SqlField("skyOffsetPRaw", Flamingos2MosView.AcquisitionSkyOffsetP, hidden = true),
+      SqlField("skyOffsetQRaw", Flamingos2MosView.AcquisitionSkyOffsetQ, hidden = true),
+
+      CursorFieldJson("skyOffset",
+        cursor =>
+          for
+            p <- cursor.field("skyOffsetPRaw", None).flatMap(_.as[Option[Angle]])
+            q <- cursor.field("skyOffsetQRaw", None).flatMap(_.as[Option[Angle]])
+          yield (p, q).mapN((pa, qa) => Offset(Offset.P(pa), Offset.Q(qa))).asJson,
+        List("skyOffsetPRaw", "skyOffsetQRaw")
+      )
     )
 
   lazy val Flamingos2MosCustomMaskMapping: ObjectMapping =

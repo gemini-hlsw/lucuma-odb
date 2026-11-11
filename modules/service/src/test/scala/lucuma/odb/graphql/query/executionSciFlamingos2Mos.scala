@@ -198,48 +198,93 @@ class executionSciFlamingos2Mos extends ExecutionTestSupportForFlamingos2 with U
       // Only 2 of the 4 steps are guided, so 2 cycles are needed for the ITC's 4 exposures.
       expectScience(oid, gcalAtom(cycle.head), List(scienceAtom(cycle*), scienceAtom(cycle*)))
 
-  test("acquisition: mask out at q=0 and q=10, breakpoint, then the through-mask pair"):
-    setupWith(SparseFieldMode).flatMap: oid =>
-      expect(
-        user     = pi,
-        query    = mosAcquisitionQuery(oid),
-        expected =
-          json"""
-            {
-              "executionConfig": {
-                "flamingos2": {
-                  "acquisition": {
-                    "nextAtom": {
-                      "description": "Initial Acquisition",
-                      "observeClass": "ACQUISITION",
-                      "steps": [
-                        ${flamingos2ExpectedAcq(MosAcqImage, AcqExposureTime, 0,  0)},
-                        ${flamingos2ExpectedAcq(MosAcqImage, AcqExposureTime, 0, 10)},
-                        ${flamingos2ExpectedAcq(MosAcqMask,  AcqExposureTime, 0,  0, Breakpoint.Enabled)},
-                        ${flamingos2ExpectedAcq(MosAcqMask,  AcqExposureTime, 0, 10)}
-                      ]
-                    },
-                    "possibleFuture": ${
-                      List
-                        .fill(RepeatingAtomCount):
-                          json"""
-                            {
-                              "description": "Fine Adjustments",
-                              "observeClass": "ACQUISITION",
-                              "steps": [
-                                ${flamingos2ExpectedAcq(MosAcqMask, AcqExposureTime, 0, 0, Breakpoint.Enabled)},
-                                ${flamingos2ExpectedAcq(MosAcqMask, AcqExposureTime, 0, 10)}
-                              ]
-                            }
-                          """
-                        .asJson
-                    },
-                    "hasMore": false
-                  }
+  private def expectAcquisition(oid: Observation.Id, initialSteps: List[Json], fineAdjustmentSteps: List[Json]): IO[Unit] =
+    val fineAdjustments: Json =
+      json"""
+        {
+          "description": "Fine Adjustments",
+          "observeClass": "ACQUISITION",
+          "steps": $fineAdjustmentSteps
+        }
+      """
+    expect(
+      user     = pi,
+      query    = mosAcquisitionQuery(oid),
+      expected =
+        json"""
+          {
+            "executionConfig": {
+              "flamingos2": {
+                "acquisition": {
+                  "nextAtom": {
+                    "description": "Initial Acquisition",
+                    "observeClass": "ACQUISITION",
+                    "steps": $initialSteps
+                  },
+                  "possibleFuture": ${List.fill(RepeatingAtomCount)(fineAdjustments)},
+                  "hasMore": false
                 }
               }
             }
-          """.asRight
+          }
+        """.asRight
+    )
+
+  private def modeWithAcquisition(acquisition: String): String =
+    s"""
+      flamingos2Mos: {
+        disperser: R1200_JH
+        filter: JH
+        customMask: { slitWidth: CUSTOM_WIDTH_1_PIX }
+        acquisition: { $acquisition }
+      }
+    """
+
+  test("acquisition: mask out at q=0 and q=10, breakpoint, then the through-mask pair"):
+    setupWith(SparseFieldMode).flatMap: oid =>
+      expectAcquisition(
+        oid,
+        List(
+          flamingos2ExpectedAcq(MosAcqImage, AcqExposureTime, 0,  0),
+          flamingos2ExpectedAcq(MosAcqImage, AcqExposureTime, 0, 10),
+          flamingos2ExpectedAcq(MosAcqMask,  AcqExposureTime, 0,  0, Breakpoint.Enabled),
+          flamingos2ExpectedAcq(MosAcqMask,  AcqExposureTime, 0, 10)
+        ),
+        List(
+          flamingos2ExpectedAcq(MosAcqMask, AcqExposureTime, 0,  0, Breakpoint.Enabled),
+          flamingos2ExpectedAcq(MosAcqMask, AcqExposureTime, 0, 10)
+        )
+      )
+
+  test("an explicit BRIGHT acquisition takes no sky steps"):
+    setupWith(modeWithAcquisition("explicitAcquisitionType: BRIGHT")).flatMap: oid =>
+      expectAcquisition(
+        oid,
+        List(
+          flamingos2ExpectedAcq(MosAcqImage, AcqExposureTime, 0, 0),
+          flamingos2ExpectedAcq(MosAcqMask,  AcqExposureTime, 0, 0, Breakpoint.Enabled)
+        ),
+        List(
+          flamingos2ExpectedAcq(MosAcqMask, AcqExposureTime, 0, 0, Breakpoint.Enabled)
+        )
+      )
+
+  test("an explicit FAINT acquisition takes its sky steps at its sky offset"):
+    val faint: String =
+      "explicitAcquisitionType: FAINT, skyOffset: { p: { arcseconds: 5 }, q: { arcseconds: 0 } }"
+    setupWith(modeWithAcquisition(faint)).flatMap: oid =>
+      expectAcquisition(
+        oid,
+        List(
+          flamingos2ExpectedAcq(MosAcqImage, AcqExposureTime, 0, 0),
+          flamingos2ExpectedAcq(MosAcqImage, AcqExposureTime, 5, 0),
+          flamingos2ExpectedAcq(MosAcqMask,  AcqExposureTime, 0, 0, Breakpoint.Enabled),
+          flamingos2ExpectedAcq(MosAcqMask,  AcqExposureTime, 5, 0)
+        ),
+        List(
+          flamingos2ExpectedAcq(MosAcqMask, AcqExposureTime, 0, 0, Breakpoint.Enabled),
+          flamingos2ExpectedAcq(MosAcqMask, AcqExposureTime, 5, 0)
+        )
       )
 
   private def setupTimes(pid: Program.Id, oid: Observation.Id): IO[(TimeSpan, TimeSpan)] =
