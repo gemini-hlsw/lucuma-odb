@@ -240,19 +240,18 @@ class executionSciFlamingos2Mos extends ExecutionTestSupportForFlamingos2 with U
       }
     """
 
-  test("acquisition: mask out at q=0 and q=10, breakpoint, then the through-mask pair"):
+  test("acquisition: sky then target with the mask out, breakpoint, then the same through the mask"):
     setupWith(SparseFieldMode).flatMap: oid =>
       expectAcquisition(
         oid,
         List(
-          flamingos2ExpectedAcq(MosAcqImage, AcqExposureTime, 0,  0),
           flamingos2ExpectedAcq(MosAcqImage, AcqExposureTime, 0, 10),
-          flamingos2ExpectedAcq(MosAcqMask,  AcqExposureTime, 0,  0, Breakpoint.Enabled),
-          flamingos2ExpectedAcq(MosAcqMask,  AcqExposureTime, 0, 10)
+          flamingos2ExpectedAcq(MosAcqImage, AcqExposureTime, 0,  0),
+          flamingos2ExpectedAcq(MosAcqMask,  AcqExposureTime, 0, 10, Breakpoint.Enabled),
+          flamingos2ExpectedAcq(MosAcqMask,  AcqExposureTime, 0,  0)
         ),
         List(
-          flamingos2ExpectedAcq(MosAcqMask, AcqExposureTime, 0,  0, Breakpoint.Enabled),
-          flamingos2ExpectedAcq(MosAcqMask, AcqExposureTime, 0, 10)
+          flamingos2ExpectedAcq(MosAcqMask, AcqExposureTime, 0, 0, Breakpoint.Enabled)
         )
       )
 
@@ -276,14 +275,13 @@ class executionSciFlamingos2Mos extends ExecutionTestSupportForFlamingos2 with U
       expectAcquisition(
         oid,
         List(
-          flamingos2ExpectedAcq(MosAcqImage, AcqExposureTime, 0, 0),
           flamingos2ExpectedAcq(MosAcqImage, AcqExposureTime, 5, 0),
-          flamingos2ExpectedAcq(MosAcqMask,  AcqExposureTime, 0, 0, Breakpoint.Enabled),
-          flamingos2ExpectedAcq(MosAcqMask,  AcqExposureTime, 5, 0)
+          flamingos2ExpectedAcq(MosAcqImage, AcqExposureTime, 0, 0),
+          flamingos2ExpectedAcq(MosAcqMask,  AcqExposureTime, 5, 0, Breakpoint.Enabled),
+          flamingos2ExpectedAcq(MosAcqMask,  AcqExposureTime, 0, 0)
         ),
         List(
-          flamingos2ExpectedAcq(MosAcqMask, AcqExposureTime, 0, 0, Breakpoint.Enabled),
-          flamingos2ExpectedAcq(MosAcqMask, AcqExposureTime, 5, 0)
+          flamingos2ExpectedAcq(MosAcqMask, AcqExposureTime, 0, 0, Breakpoint.Enabled)
         )
       )
 

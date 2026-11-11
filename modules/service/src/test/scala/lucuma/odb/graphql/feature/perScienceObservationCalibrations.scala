@@ -4296,6 +4296,34 @@ class perScienceObservationCalibrations
       assertEquals(telluric, Nil)
       assertEquals(state, ObservationWorkflowState.Defined)
 
+  test("a user-defined telluric becomes Ready with its science observation"):
+    for
+      pid      <- createProgramWithUsPi(pi)
+      cid      <- createGeminiCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A"))
+      _        <- addDemoScienceProposal(pi, pid, cid)
+      tid      <- createTargetWithProfileAs(pi, pid)
+      oid      <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _        <- setUserDefinedTellurics(oid, 1)
+      _        <- runObscalcUpdate(pid, oid)
+      _        <- recalculateCalibrations(pid, when, oid)
+      tel      <- groupTellurics(oid).map(_.head)
+      standard <- createTargetWithProfileAs(pi, pid)
+      _        <- editAsterismAs(pi, tel, List(standard), Nil)
+      _        <- setProposalStatusDirectly(pid, ProposalStatus.Submitted)
+      _        <- setProposalStatusDirectly(pid, ProposalStatus.Accepted)
+      _        <- runObscalcUpdate(pid, oid)
+      _        <- runObscalcUpdate(pid, tel)
+      before   <- queryObservationWorkflowState(pi, tel)
+      _        <- forceObsUserState(oid, Some(ObservationWorkflowState.Ready))
+      // Only what the state change itself queued is recalculated.
+      _        <- runProgramObscalc(pid)
+      messages <- queryValidationMessages(tel)
+      after    <- queryObservationWorkflowState(pi, tel)
+    yield
+      assertEquals(before, ObservationWorkflowState.Defined)
+      assertEquals(messages, Nil)
+      assertEquals(after, ObservationWorkflowState.Ready)
+
   test("a user-defined telluric accepts PI edits"):
     for
       pid      <- createProgramAs(pi)
