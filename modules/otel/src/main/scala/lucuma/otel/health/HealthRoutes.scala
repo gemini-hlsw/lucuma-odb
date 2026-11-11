@@ -13,8 +13,10 @@ import io.circe.Json
 import org.http4s.HttpRoutes
 import org.http4s.Response
 import org.http4s.Status
+import org.http4s.Uri
 import org.http4s.circe.*
 import org.http4s.dsl.Http4sDsl
+import org.http4s.syntax.all.*
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration.*
@@ -43,6 +45,9 @@ object HealthRoutes:
       case Fail => Json.fromString("fail")
 
   private final case class Readiness(status: Status, body: Json)
+
+  /** The paths that these routes serve. HTTP instrumentation does not record them. */
+  val Paths: Set[Uri.Path] = Set(path"/health", path"/health/ready")
 
   def apply[F[_]: Async: Parallel: Logger](
     commit: String,

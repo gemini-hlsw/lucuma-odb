@@ -86,7 +86,7 @@ ThisBuild / libraryDependencySchemes ++= Seq(
 ThisBuild / libraryDependencySchemes +=
   "edu.gemini" %% "clue-model" % VersionScheme.Always
 
-ThisBuild / tlBaseVersion      := "0.109"
+ThisBuild / tlBaseVersion      := "0.110"
 ThisBuild / scalaVersion       := "3.9.0"
 ThisBuild / crossScalaVersions := Seq("3.9.0")
 ThisBuild / scalacOptions     ++= Seq("-Xmax-inlines", "50") // Hash derivation fails with default of 32
@@ -633,7 +633,7 @@ lazy val ssoService = project
       "org.typelevel"       %% "log4cats-slf4j"                        % log4catsVersion,
       "ch.qos.logback"       % "logback-classic"                       % logbackVersion,
       "io.circe"            %% "circe-generic"                         % circeVersion,
-      "org.http4s"          %% "http4s-otel4s-middleware-trace-server" % http4sOtel4sVersion,
+      "org.http4s"          %% "http4s-otel4s-middleware-server"       % http4sOtel4sVersion,
       "edu.gemini"          %% "lucuma-graphql-routes"                 % lucumaGraphQLRoutesVersion,
 
       "io.circe"            %% "circe-literal"                   % circeVersion               % Test,
@@ -775,9 +775,7 @@ lazy val itcService = project
       "org.typelevel"        %% "grackle-generic"                       % grackleVersion,
       "org.typelevel"        %% "grackle-circe"                         % grackleVersion,
       "edu.gemini"           %% "lucuma-graphql-routes"                 % lucumaGraphQLRoutesVersion,
-      "org.http4s"           %% "http4s-otel4s-middleware-trace-server" % http4sOtel4sVersion,
-      "org.http4s"           %% "http4s-otel4s-middleware-trace-client" % http4sOtel4sVersion,
-      "org.http4s"           %% "http4s-otel4s-middleware-metrics"      % http4sOtel4sVersion,
+      "org.http4s"           %% "http4s-otel4s-middleware-server"       % http4sOtel4sVersion,
       "co.fs2"               %% "fs2-core"                              % fs2Version,
       "edu.gemini"           %% "lucuma-core"                           % lucumaCoreVersion,
       "org.typelevel"        %% "cats-core"                             % catsVersion,
@@ -938,7 +936,6 @@ lazy val common = project
       "edu.gemini"    %% "lucuma-graphql-routes"                 % lucumaGraphQLRoutesVersion,
       "org.http4s"    %% "http4s-client"                         % http4sVersion,
       "org.http4s"    %% "http4s-core"                           % http4sVersion,
-      "org.http4s"    %% "http4s-otel4s-middleware-trace-client" % http4sOtel4sVersion,
       "org.http4s"    %% "http4s-server"                         % http4sVersion,
       "org.typelevel" %% "grackle-core"                          % grackleVersion,
       "org.typelevel" %% "cats-core"                             % catsVersion,
@@ -1072,6 +1069,8 @@ lazy val otel = project
       "is.cir"                           %% "ciris"                                     % cirisVersion,
       "org.typelevel"                    %% "otel4s-oteljava"                           % otel4sVersion,
       "org.typelevel"                    %% "otel4s-instrumentation-metrics"            % otel4sVersion,
+      "org.http4s"                       %% "http4s-otel4s-middleware-server"           % http4sOtel4sVersion,
+      "org.http4s"                       %% "http4s-otel4s-middleware-client"           % http4sOtel4sVersion,
       "io.opentelemetry"                  % "opentelemetry-exporter-otlp"               % openTelemetryVersion,
       "io.opentelemetry.instrumentation"  % "opentelemetry-runtime-telemetry"           % openTelemetryInstrVersion,
       "org.typelevel"                    %% "log4cats-core"                             % log4catsVersion,
@@ -1081,7 +1080,8 @@ lazy val otel = project
       "org.tpolecat"                     %% "skunk-core"                                % skunkVersion,
       "io.circe"                         %% "circe-core"                                % circeVersion,
       "org.typelevel"                    %% "log4cats-noop"                             % log4catsVersion % Test,
-      "org.typelevel"                    %% "munit-cats-effect"                         % munitCatsEffectVersion % Test
+      "org.typelevel"                    %% "munit-cats-effect"                         % munitCatsEffectVersion % Test,
+      "io.opentelemetry"                  % "opentelemetry-sdk-testing"                 % openTelemetryVersion % Test
     )
   )
 
@@ -1161,9 +1161,8 @@ lazy val service = project
       "org.http4s"                       %% "http4s-blaze-server"                        % http4sBlazeVersion,
       "org.http4s"                       %% "http4s-ember-client"                        % http4sVersion,
       "org.postgresql"                    % "postgresql"                                 % postgresVersion,
-      "org.http4s"                       %% "http4s-otel4s-middleware-trace-server"      % http4sOtel4sVersion,
-      "org.http4s"                       %% "http4s-otel4s-middleware-trace-client"      % http4sOtel4sVersion,
-      "org.http4s"                       %% "http4s-otel4s-middleware-metrics"           % http4sOtel4sVersion,
+      "org.http4s"                       %% "http4s-otel4s-middleware-server"            % http4sOtel4sVersion,
+      "org.http4s"                       %% "http4s-otel4s-middleware-client"            % http4sOtel4sVersion,
       "org.tpolecat"                     %% "skunk-core"                                 % skunkVersion,
       "org.tpolecat"                     %% "skunk-circe"                                % skunkVersion,
       "com.lihaoyi"                      %% "pprint"                                     % pprintVersion,
@@ -1353,8 +1352,7 @@ lazy val resourceService = project
       "org.http4s"    %% "http4s-dsl"                            % http4sVersion,
       "org.http4s"    %% "http4s-ember-client"                   % http4sVersion,
       "org.http4s"    %% "http4s-ember-server"                   % http4sVersion,
-      "org.http4s"    %% "http4s-otel4s-middleware-metrics"      % http4sOtel4sVersion,
-      "org.http4s"    %% "http4s-otel4s-middleware-trace-server" % http4sOtel4sVersion,
+      "org.http4s"    %% "http4s-otel4s-middleware-server"       % http4sOtel4sVersion,
       "org.postgresql" % "postgresql"                            % postgresVersion,
       "org.tpolecat"  %% "skunk-circe"                           % skunkVersion,
       "org.tpolecat"  %% "skunk-core"                            % skunkVersion,

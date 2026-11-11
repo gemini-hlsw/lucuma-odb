@@ -3,10 +3,12 @@
 
 package lucuma.otel
 
+import cats.Apply
 import cats.effect.*
 import cats.effect.unsafe.IORuntime
 import cats.syntax.all.*
 import io.opentelemetry.instrumentation.runtimetelemetry.RuntimeTelemetry
+import org.typelevel.otel4s.context.ContextManager
 import org.typelevel.otel4s.context.LocalProvider
 import org.typelevel.otel4s.instrumentation.ce.IORuntimeMetrics
 import org.typelevel.otel4s.metrics.Meter
@@ -22,8 +24,31 @@ case class OtelServices[F[_]](
   meter:          Meter[F],
   tracer:         Tracer[F],
   meterProvider:  MeterProvider[F],
-  tracerProvider: TracerProvider[F]
+  tracerProvider: TracerProvider[F],
+  contextManager: ContextManager[F]
 )
+
+/**
+ * With `import lucuma.otel.OtelServices.given`, one `given OtelServices[F] = otel` provides every
+ * telemetry instance. A `for` comprehension cannot hold an `import otel.given`.
+ */
+object OtelServices:
+
+  given meter[F[_]](using o: OtelServices[F]): Meter[F]                   = o.meter
+  given tracer[F[_]](using o: OtelServices[F]): Tracer[F]                 = o.tracer
+  given meterProvider[F[_]](using o: OtelServices[F]): MeterProvider[F]   = o.meterProvider
+  given tracerProvider[F[_]](using o: OtelServices[F]): TracerProvider[F] = o.tracerProvider
+  given contextManager[F[_]](using o: OtelServices[F]): ContextManager[F] = o.contextManager
+
+  def fromOtelJava[F[_]: Apply](serviceName: String, otel: OtelJava[F]): F[OtelServices[F]] =
+    (otel.tracerProvider.get(serviceName), otel.meterProvider.get(serviceName)).mapN: (tracer, meter) =>
+      OtelServices(
+        tracer         = tracer,
+        meter          = meter,
+        meterProvider  = otel.meterProvider,
+        tracerProvider = otel.tracerProvider,
+        contextManager = otel.contextManager
+      )
 
 object OtelSetup:
 
@@ -55,18 +80,11 @@ object OtelSetup:
         .flatTap: otel =>
           given MeterProvider[F] = otel.meterProvider
           IORuntimeMetrics.register[F](IORuntime.global.metrics, IORuntimeMetrics.Config.default)
-        .evalMap: otel =>
-          (otel.tracerProvider.get(serviceName), otel.meterProvider.get(serviceName)).mapN: (tracer, meter) =>
-            OtelServices(
-              tracer = tracer,
-              meter = meter,
-              meterProvider = otel.meterProvider,
-              tracerProvider = otel.tracerProvider
-            )
+        .evalMap(OtelServices.fromOtelJava(serviceName, _))
       case None =>
-        Resource.pure(OtelServices(
-          tracer = Tracer.noop,
-          meter = Meter.noop,
-          meterProvider = MeterProvider.noop,
-          tracerProvider = TracerProvider.noop
-        ))
+        Resource.eval(noop[F](serviceName))
+
+  /** No-op telemetry, with a context manager for the HTTP middleware. */
+  def noop[F[_]: Async: LiftIO](serviceName: String): F[OtelServices[F]] =
+    given LocalProvider[F, Context] = LocalProvider.fromLiftIO[F, Context]
+    OtelJava.noop[F].flatMap(OtelServices.fromOtelJava(serviceName, _))

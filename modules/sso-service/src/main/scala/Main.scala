@@ -18,6 +18,7 @@ import lucuma.common.middleware.LoggingMiddleware
 import lucuma.core.model.StandardRole
 import lucuma.core.util.Gid
 import lucuma.otel.OtelServices
+import lucuma.otel.OtelServices.given
 import lucuma.otel.OtelSetup
 import lucuma.otel.health.HealthCheck
 import lucuma.otel.health.HealthRoutes
@@ -37,6 +38,7 @@ import org.http4s.server.*
 import org.http4s.server.websocket.WebSocketBuilder2
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
+import org.typelevel.otel4s.context.ContextManager
 import org.typelevel.otel4s.metrics.MeterProvider
 import org.typelevel.otel4s.trace.Tracer
 import org.typelevel.otel4s.trace.TracerProvider
@@ -188,8 +190,8 @@ object FMain extends AnsiColor {
       .map: client =>
         OrcidService(config.orcidHost, config.clientId, config.clientSecret, client)
 
-  /** A resource that yields our HttpRoutes, wrapped in accessory middleware. */
-  def routesResource[F[_]: Async: Parallel: Tracer: TracerProvider: Logger: Network: Console](config: Config): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
+  /** A resource that yields our HTTP app, wrapped in accessory middleware and instrumentation. */
+  def routesResource[F[_]: Async: Parallel: Tracer: TracerProvider: MeterProvider: ContextManager: Logger: Network: Console](config: Config): Resource[F, WebSocketBuilder2[F] => HttpApp[F]] =
     for {
       pool        <- databasePoolResource[F](config.database)
       orcid       <- orcidServiceResource(config.orcid, config.environment)
@@ -197,12 +199,13 @@ object FMain extends AnsiColor {
       dbPool       = pool.map(Database.fromSession(_))
       serviceUser <- Resource.eval(dbPool.use(_.getSsoServiceUser))
       service     <- GraphQLRoutes.service(pool)
-      middleware  <- Resource.eval(ServerMiddleware[F](config))
+      middleware   = ServerMiddleware[F](config)
+      instrument  <- Resource.eval(ServerMiddleware.instrumentation[F])
       health      <- Resource.eval(HealthRoutes[F](
                        BuildInfo.gitHeadCommit.getOrElse("unknown"),
                        healthChecks(singleSession(config.database), httpClient, config.orcid)
                      ))
-    } yield wsb => health <+> middleware {
+    } yield wsb => instrument((health <+> middleware {
       val localClient = LocalSsoClient(config.ssoJwtReader, dbPool)
       val odb = OdbClient[F](httpClient, config.ssoJwtWriter, config.odbRootUri, serviceUser)
       Routes[F](
@@ -216,7 +219,7 @@ object FMain extends AnsiColor {
         cookieDomain = config.cookieDomain,
       ) <+>
       GraphQLRoutes(localClient, service, wsb)
-    }
+    }).orNotFound)
 
   /** Postgres is required to serve; ORCID only blocks new logins. The session is untraced and not pooled. */
   def healthChecks[F[_]: Concurrent](
@@ -305,10 +308,8 @@ object FMain extends AnsiColor {
       _                        <- Resource.eval(banner[IO](c))
       _                        <- Applicative[Resource[IO, *]].whenA(reset.isRequested)(Resource.eval(resetDatabase[IO](c.database)))
       _                        <- Applicative[Resource[IO, *]].unlessA(skipMigration.isRequested)(Resource.eval(migrateDatabase[IO](c.database)))
-      ot                       <- otelResource[IO](c)
-      given Tracer[IO]         = ot.tracer
-      given TracerProvider[IO] = ot.tracerProvider
-      ap                       <- routesResource[IO](c).map(_.map(_.orNotFound))
+      given OtelServices[IO]   <- otelResource[IO](c)
+      ap                       <- routesResource[IO](c)
       _                        <- serverResource(c.httpPort, ap)
     yield ExitCode.Success
 
