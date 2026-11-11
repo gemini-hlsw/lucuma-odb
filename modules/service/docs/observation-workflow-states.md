@@ -33,7 +33,7 @@ observation set aside before execution began.
   calibrations are excluded, because they are suspended with their science
   observation.
 - The suspension is not a user state. It is a flag of its own,
-  `c_suspended` on `t_observation_execution` (V1402), and it overrides an
+  `c_suspended` on `t_observation_execution` (V1404), and it overrides an
   `Ongoing` execution state, but not `Completed`. The user state is what the PI
   (or anyone, before execution) asked for, and execution overrides it as it
   always has: an observation set `Inactive` and executed anyway is `Ongoing`,
