@@ -6,22 +6,18 @@ package lucuma.odb
 import cats.data.NonEmptyList
 import cats.data.StateT
 import cats.effect.Concurrent
-import cats.syntax.all.*
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.util.Enumerated
+import lucuma.odb.StartupChecks.*
 import lucuma.odb.service.ObservationWorkflowService
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Flamingos2Codecs.flamingos_2_acquisition_type
 import lucuma.odb.util.GhostCodecs.ghost_ifu_mapping_type
 import lucuma.odb.util.GmosCodecs.*
 import lucuma.odb.util.GnirsCodecs.*
-import org.tpolecat.typename.TypeName
 import org.typelevel.log4cats.Logger
-import skunk.Codec
 import skunk.Session
-import skunk.codec.text.varchar
 import skunk.data.Type
-import skunk.syntax.all.*
 
 trait StartupDiagnostics[F[_]]:
 
@@ -30,19 +26,13 @@ trait StartupDiagnostics[F[_]]:
 
 object StartupDiagnostics:
 
-  case class DiagState(
-    types: List[Type],
-    errors: List[String]
-  ):
-    def updated(newTypes: List[Type], newErrors: List[String]) = DiagState(types ++ newTypes, errors ++ newErrors)
-    def updated(newErrors: List[String]) = DiagState(types, errors ++ newErrors)
-    def updated(newType: Type) = DiagState(newType :: types, errors)
-
   def apply[F[_]: Concurrent: Logger](db: Session[F]): StartupDiagnostics[F] =
 
     new StartupDiagnostics[F]:
 
-      val allDiagnostics: List[StateT[F, DiagState, Unit]] =
+      given Session[F] = db
+
+      val allDiagnostics: List[Check[F]] =
         List(
 
           // Postgres Enums
@@ -215,58 +205,4 @@ object StartupDiagnostics:
         )
 
       def runAllDiagnostics(fatal: Boolean): F[Unit] =
-        Logger[F].info("Running startup diagnostics.") >>
-          allDiagnostics.sequence.runS(DiagState(Nil, Nil)).map(_.errors).flatMap: errors =>
-          errors.traverse_(Logger[F].error(_)) >>
-            Logger[F].info("Startup diagnostics passed.").whenA(errors.isEmpty) >>
-            Logger[F].error("Startup diagnostics failed.").whenA(errors.nonEmpty) >>
-            Concurrent[F].raiseError(new Error(s"Startup diagnostics failed. Exiting.")).whenA(fatal && errors.nonEmpty)
-
-      def assertUnusedPostgresEnum(tpe: Type): StateT[F, DiagState, Unit] =
-        StateT.modify(_.updated(tpe))
-
-      def checkPostgresEnum[E: Enumerated](codec: Codec[E]): StateT[F, DiagState, Unit] =
-        StateT.modifyF: ds =>
-          db.stream(sql"SELECT unnest(enum_range(NULL::#${codec.types.head.name})::_varchar) as value".query(varchar))(skunk.Void, 104)
-            .compile
-            .toList
-            .map(align(codec, "the database schema"))
-            .map(ds.updated(codec.types, _))
-
-      def checkPostgresLookupTable[E: Enumerated: TypeName](codec: Codec[E], tableName: String): StateT[F, DiagState, Unit] =
-        StateT.modifyF: ds =>
-          db.stream(sql"SELECT c_tag FROM #$tableName".query(varchar))(skunk.Void, 104)
-            .compile
-            .toList
-            .map(align(codec, s"lookup table $tableName"))
-            .map(ds.updated(codec.types, _))
-
-      def checkEnumCoverage: StateT[F, DiagState, Unit] =
-        StateT.modifyF: ds =>
-          db.stream(sql"SELECT typname::varchar FROM pg_type WHERE typtype = 'e'".query(varchar))(skunk.Void, 104)
-            .compile
-            .toList
-            .map: es =>
-              val seen = ds.types.map(_.name).toSet
-              val errors = es.filterNot(seen).map(s => s"Postgres enum $s has not been checked.")
-              ds.updated(errors)
-
-      /**
-       * In the case of `Site` and maybe other places the Scala side tag isn't the same as the database side tag, and this
-       * is mediated through the codec. So what we do is construct the element from its Scala tag and serialize it to get
-       * its database tag.
-       */
-      def databaseTag[A](codec: Codec[A])(tag: String)(using e: Enumerated[A]): String =
-        e.fromTag(tag).flatMap(codec.encode(_).headOption.flatten).fold(tag)(_.value)
-
-      def align[A](codec: Codec[A], where: String)(found: List[String])(using e: Enumerated[A], tn: TypeName[A]): List[String] =
-        val expected = e.all.map(e.tag).map(databaseTag(codec)).toSet
-        val actual   = found.toSet
-        (expected ++ actual)
-          .toList
-          .sorted
-          .flatMap: tag =>
-            (expected(tag), actual(tag)) match
-              case (true, false)  => List(s"${tn.value}: expected tag \"$tag\" was not found in $where.")
-              case (false, true)  => List(s"${tn.value}: unexpected tag \"$tag\" was found in $where.")
-              case _ => Nil
+        runChecks(allDiagnostics, fatal)
