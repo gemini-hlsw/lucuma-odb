@@ -1,5 +1,5 @@
 -- Staff may suspend an executing observation: take an Ongoing observation to
--- the Suspended workflow state (V1397), and back.
+-- the Suspended workflow state (V1401), and back.
 --
 -- WHERE THE SUSPENSION LIVES
 --
