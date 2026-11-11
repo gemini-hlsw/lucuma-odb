@@ -6,6 +6,7 @@ package lucuma.odb.smartgcal.parsers
 import cats.data.NonEmptySet
 import cats.syntax.either.*
 import cats.syntax.show.*
+import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.GcalArc
 import lucuma.core.enums.GcalBaselineType
@@ -35,7 +36,7 @@ final class GcalParsersSuite extends munit.FunSuite {
           GcalShutter.Closed
         ),
         GcalBaselineType.Night,
-        PosInt.unsafeFrom(2),
+        NonNegInt.unsafeFrom(2),
         LegacyInstrumentConfig(
           TimeSpan.unsafeFromMicroseconds(4_000_000L),
           PosInt.unsafeFrom(1)
@@ -57,13 +58,22 @@ final class GcalParsersSuite extends munit.FunSuite {
           GcalShutter.Open
         ),
         GcalBaselineType.Day,
-        PosInt.unsafeFrom(2),
+        NonNegInt.unsafeFrom(2),
         LegacyInstrumentConfig(
           TimeSpan.unsafeFromMicroseconds(4_300_000L),
           PosInt.unsafeFrom(1)
         )
       )
     ))
+  }
+
+  test("no-calibration row: an observe count of zero") {
+    val definition = "0,None,Visible,Quartz Halogen,Closed,4,1,Night"
+
+    assertEquals(
+      legacyValue.parseAll(definition).map(_.stepCount.value),
+      Right(0)
+    )
   }
 
   test("simple failure") {

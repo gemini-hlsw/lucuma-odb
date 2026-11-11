@@ -112,7 +112,7 @@ trait GnirsParsers:
       (gcal.shutter       <* columnSep) ~
       (gcal.filter        <* columnSep) ~
       (gcal.diffuser      <* columnSep) ~
-      (posInt             <* columnSep) ~
+      (observeCount       <* columnSep) ~
       (posSecondsTimeSpan <* columnSep) ~
       (posInt             <* columnSep) ~
       baselineTypeOrDay

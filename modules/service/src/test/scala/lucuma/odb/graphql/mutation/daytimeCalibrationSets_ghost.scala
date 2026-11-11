@@ -8,6 +8,7 @@ import cats.data.NonEmptySet
 import cats.effect.IO
 import cats.syntax.either.*
 import cats.syntax.foldable.*
+import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.numeric.PosLong
 import io.circe.Json
@@ -53,7 +54,7 @@ class daytimeCalibrationSets_ghost extends OdbSuite with DatabaseOperations with
   private def smartRow(gcal: Gcal, baseline: GcalBaselineType, count: Int, red: Long, blue: Long): Ghost.TableRow =
     Ghost.TableRow(
       smartKey,
-      SmartGcalValue(gcal, baseline, PosInt.unsafeFrom(count), Ghost.GhostUpdate(seconds(red), PosInt.unsafeFrom(3), seconds(blue), PosInt.unsafeFrom(4)))
+      SmartGcalValue(gcal, baseline, NonNegInt.unsafeFrom(count), Ghost.GhostUpdate(seconds(red), PosInt.unsafeFrom(3), seconds(blue), PosInt.unsafeFrom(4)))
     )
 
   private val smartRows: List[Ghost.TableRow] =

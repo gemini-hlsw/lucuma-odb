@@ -9,6 +9,7 @@ import org.postgresql.copy.CopyManager
 import org.postgresql.core.BaseConnection
 
 import java.io.InputStream
+import java.sql.ResultSet
 
 extension (bc: BaseConnection) {
 
@@ -20,5 +21,11 @@ extension (bc: BaseConnection) {
 
   def ioUpdate(sql: String): IO[Unit] =
     IO.blocking(bc.execSQLUpdate(sql))
+
+  def ioQueryOption[A](sql: String)(f: ResultSet => A): IO[Option[A]] =
+    IO.blocking:
+      val rs = bc.execSQLQuery(sql)
+      try Option.when(rs.next())(f(rs))
+      finally rs.close()
 
 }

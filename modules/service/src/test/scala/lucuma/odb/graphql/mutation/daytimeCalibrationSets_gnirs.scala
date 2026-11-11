@@ -9,6 +9,7 @@ import cats.effect.IO
 import cats.syntax.either.*
 import cats.syntax.foldable.*
 import cats.syntax.option.*
+import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.numeric.PosLong
 import io.circe.Json
@@ -68,7 +69,7 @@ class daytimeCalibrationSets_gnirs extends OdbSuite with DatabaseOperations with
     Gnirs.TableRow(
       PosLong.unsafeFrom(1),
       smartKey,
-      SmartGcalValue(gcal, baseline, PosInt.unsafeFrom(count), LegacyInstrumentConfig(TimeSpan.unsafeFromMicroseconds(seconds * 1_000_000L), PosInt.unsafeFrom(1)))
+      SmartGcalValue(gcal, baseline, NonNegInt.unsafeFrom(count), LegacyInstrumentConfig(TimeSpan.unsafeFromMicroseconds(seconds * 1_000_000L), PosInt.unsafeFrom(1)))
     )
 
   private val smartRows: List[Gnirs.TableRow] =

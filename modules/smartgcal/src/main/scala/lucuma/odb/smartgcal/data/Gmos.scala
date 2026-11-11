@@ -6,7 +6,7 @@ package lucuma.odb.smartgcal.data
 import cats.Eq
 import cats.data.NonEmptyList
 import cats.syntax.option.*
-import eu.timepit.refined.types.numeric.PosInt
+import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.PosLong
 import fs2.Pipe
 import fs2.Stream
@@ -222,7 +222,7 @@ object Gmos {
         .andThen(SmartGcalValue.instrumentConfig)
         .andThen(LegacyInstrumentConfig.exposureTime)
 
-    def stepCount[G, L, U]: Lens[TableRow[G, L, U], PosInt] =
+    def stepCount[G, L, U]: Lens[TableRow[G, L, U], NonNegInt] =
       TableRow.value
         .andThen(SmartGcalValue.stepCount)
 

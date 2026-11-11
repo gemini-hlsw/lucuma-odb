@@ -29,7 +29,7 @@ trait SmartGcalFileParsers {
    */
   val legacyValue: Parser[Legacy] =
     (
-      (posInt             <* columnSep) ~  // count
+      (observeCount       <* columnSep) ~  // count
       (gcal.stepConfig    <* columnSep) ~
       (posSecondsTimeSpan <* columnSep) ~ // exposure time
       (posInt             <* columnSep) ~ // coadds

@@ -46,7 +46,7 @@ object SmartIgrins2Loader:
     )
 
   // We can't use forInstrument as igrins2 has no search columns
-  val tmp  = SmartGcalTable.Temp(Igrins2, allCols)
+  val tmp  = SmartGcalTable.Temp(Igrins2, allCols, Nil)
   val inst = SmartGcalTable.Inst(Igrins2, instCols)
 
   object Ig2 extends SmartGcalLoader(

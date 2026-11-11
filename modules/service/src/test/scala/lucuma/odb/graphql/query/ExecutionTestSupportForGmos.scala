@@ -6,6 +6,7 @@ package lucuma.odb.graphql.query
 import cats.data.NonEmptySet
 import cats.effect.IO
 import cats.syntax.all.*
+import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.numeric.PosLong
 import io.circe.Json
@@ -192,7 +193,7 @@ trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
         GcalShutter.Open
       ),
       GcalBaselineType.Night,
-      PosInt.unsafeFrom(1),
+      NonNegInt.unsafeFrom(1),
       LegacyInstrumentConfig(
         TimeSpan.unsafeFromMicroseconds(1_000_000L)
       )
@@ -207,7 +208,7 @@ trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
         GcalShutter.Closed
       ),
       GcalBaselineType.Day,
-      PosInt.unsafeFrom(1),
+      NonNegInt.unsafeFrom(1),
       LegacyInstrumentConfig(
         TimeSpan.unsafeFromMicroseconds(1_000_000L)
       )

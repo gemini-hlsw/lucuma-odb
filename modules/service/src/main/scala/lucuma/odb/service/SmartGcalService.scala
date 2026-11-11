@@ -8,6 +8,7 @@ import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
+import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.numeric.PosLong
 import lucuma.core.enums.Flamingos2Disperser
@@ -237,7 +238,7 @@ object SmartGcalService:
         f: TimeSpan => D => D
       ): F[List[(D => D, Gcal)]] =
         session
-          .prepareR(af.fragment.query(step_config_gcal ~ int4_pos ~ time_span))
+          .prepareR(af.fragment.query(step_config_gcal ~ int4_nonneg ~ time_span))
           .use(_.stream(af.argument, chunkSize = 16).compile.to(List))
           .map {
             _.flatMap { case ((gcal, count), exposureTime) =>
@@ -268,7 +269,7 @@ object SmartGcalService:
       )(using GuestAccess): F[List[(Gnirs => Gnirs, Gcal)]] =
         val af: AppliedFragment = Statements.selectGnirs(key, sgt)
         session
-          .prepareR(af.fragment.query(step_config_gcal ~ int4_pos ~ time_span ~ int4_pos))
+          .prepareR(af.fragment.query(step_config_gcal ~ int4_nonneg ~ time_span ~ int4_pos))
           .use(_.stream(af.argument, chunkSize = 16).compile.to(List))
           .map:
             _.flatMap:
@@ -510,7 +511,7 @@ object SmartGcalService:
         int4_pos
       ).to[GhostUpdate]
 
-    def selectGhost(sgt: SmartGcalType): Query[GhostSearchKey, (Gcal, PosInt, GhostUpdate)] =
+    def selectGhost(sgt: SmartGcalType): Query[GhostSearchKey, (Gcal, NonNegInt, GhostUpdate)] =
       sql"""
         SELECT
           #${gcalColumns("g")},
@@ -526,7 +527,7 @@ object SmartGcalService:
           AND s.c_blue_binning    = $ghost_binning
           AND #${whereSmartGcalType(sgt).fragment.sql}
         ORDER BY s.c_step_order
-      """.query(step_config_gcal *: int4_pos *: ghost_config).contramap: k =>
+      """.query(step_config_gcal *: int4_nonneg *: ghost_config).contramap: k =>
         (k.resolutionMode, k.redBinning, k.blueBinning)
 
 
@@ -587,7 +588,7 @@ object SmartGcalService:
       Instrument ,
         Int      ,
         Gcal     ,
-        PosInt   ,
+        NonNegInt,
         GcalBaselineType
     )] =
       sql"""
@@ -608,7 +609,7 @@ object SmartGcalService:
           $instrument,
           $int4,
           $step_config_gcal,
-          $int4_pos,
+          $int4_nonneg,
           $gcal_baseline
       """
 

@@ -8,7 +8,7 @@ import cats.data.NonEmptySet
 import cats.effect.IO
 import cats.syntax.either.*
 import cats.syntax.foldable.*
-import eu.timepit.refined.types.numeric.PosInt
+import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.PosLong
 import io.circe.Json
 import io.circe.literal.*
@@ -45,7 +45,7 @@ class daytimeCalibrationSets_igrins2 extends OdbSuite with DatabaseOperations wi
     Igrins2.TableRow(
       PosLong.unsafeFrom(1),
       Igrins2.TableKey,
-      SmartGcalValue(gcal, baseline, PosInt.unsafeFrom(count), LegacyInstrumentConfig(TimeSpan.unsafeFromMicroseconds(seconds * 1_000_000L)))
+      SmartGcalValue(gcal, baseline, NonNegInt.unsafeFrom(count), LegacyInstrumentConfig(TimeSpan.unsafeFromMicroseconds(seconds * 1_000_000L)))
     )
 
   private val smartRows: List[Igrins2.TableRow] =

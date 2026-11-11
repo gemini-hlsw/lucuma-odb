@@ -5,7 +5,7 @@ package lucuma.odb.service
 
 import cats.effect.IO
 import cats.syntax.option.*
-import eu.timepit.refined.types.numeric.PosInt
+import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.PosLong
 import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.Flamingos2Fpu
@@ -54,7 +54,7 @@ class SmartGcalServiceSuite_NullKeys extends OdbSuite:
         GcalShutter.Open
       ),
       GcalBaselineType.Night,
-      PosInt.unsafeFrom(1),
+      NonNegInt.unsafeFrom(1),
       LegacyInstrumentConfig(exposure)
     )
 

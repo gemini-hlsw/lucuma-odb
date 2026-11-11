@@ -85,13 +85,15 @@ object SmartGcalTable {
 
   }
 
+  val WavelengthRangeType: String = "d_wavelength_pm_range"
+
   val InstrumentCol: Col = Col.fkey("c_instrument", "t_instrument")
   val GcalIdCol: Col     = Col("c_gcal_id", "serial")
 
   def valueEncoder[A](using e: Encoder[A]): Encoder[SmartGcalValue[A]] =
     (
       step_config_gcal *:
-      int4_pos         *:
+      int4_nonneg      *:
       gcal_baseline    *:
       e
     ).contramap[SmartGcalValue[A]] { v => (
@@ -131,7 +133,7 @@ object SmartGcalTable {
 
   }
 
-  case class Temp(inst: Instrument, cols: NonEmptyList[Col]) extends SmartGcalTable {
+  case class Temp(inst: Instrument, cols: NonEmptyList[Col], keyCols: List[Col]) extends SmartGcalTable {
 
     def name: String =
       s"t_temp_smart_${inst.tag.toSnakeCase}"
@@ -148,6 +150,28 @@ object SmartGcalTable {
 
     def copyFromStdin: String =
       s"COPY $name ( $colNames ) FROM STDIN WITH ( DELIMITER '|', NULL 'NULL' )"
+
+    // Finds a line with a step count of zero whose key and lamp type also
+    // match another line.  The lookup would add the two, ignoring the zero.
+    def selectNoCalibrationConflict: String = {
+      val sameKey = keyCols.map: c =>
+        if c.dataType == WavelengthRangeType then
+          s"(z.${c.name} && o.${c.name} OR (z.${c.name} IS NULL AND o.${c.name} IS NULL))"
+        else
+          s"z.${c.name} IS NOT DISTINCT FROM o.${c.name}"
+      val sameLamp = "(z.c_gcal_continuum IS NULL) = (o.c_gcal_continuum IS NULL)"
+      s"""
+         |SELECT CASE WHEN z.c_gcal_continuum IS NULL THEN 'arc' ELSE 'flat' END,
+         |       z.c_step_order,
+         |       o.c_step_order
+         |  FROM $name z
+         |  JOIN $name o
+         |    ON ${(s"z.c_step_order <> o.c_step_order" :: sameLamp :: sameKey).mkString("\n   AND ")}
+         | WHERE z.c_gcal_step_count = 0
+         | ORDER BY 1, 2, 3
+         | LIMIT 1
+         |""".stripMargin
+    }
 
   }
 
@@ -193,7 +217,7 @@ object SmartGcalTable {
     keyCols:   NonEmptyList[Col],
     valueCols: NonEmptyList[Col]
   ): (Temp, Inst) = (
-    Temp(inst, (orderCol :: keyCols) ::: (Gcal.cols ::: valueCols)),
+    Temp(inst, (orderCol :: keyCols) ::: (Gcal.cols ::: valueCols), keyCols.toList),
     Inst(inst, orderCol :: keyCols ::: valueCols)
   )
 

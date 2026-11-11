@@ -7,7 +7,7 @@ package mutation
 import cats.data.NonEmptySet
 import cats.effect.IO
 import cats.syntax.all.*
-import eu.timepit.refined.types.numeric.PosInt
+import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.PosLong
 import io.circe.Json
 import io.circe.literal.*
@@ -117,7 +117,7 @@ class recordVisit extends OdbSuite with query.GenerationTestSupport with Executi
         GcalShutter.Open
       ),
       GcalBaselineType.Night,
-      PosInt.unsafeFrom(1),
+      NonNegInt.unsafeFrom(1),
       LegacyInstrumentConfig(
         TimeSpan.unsafeFromMicroseconds(1_000_000L)
       )
@@ -132,7 +132,7 @@ class recordVisit extends OdbSuite with query.GenerationTestSupport with Executi
         GcalShutter.Closed
       ),
       GcalBaselineType.Day,
-      PosInt.unsafeFrom(1),
+      NonNegInt.unsafeFrom(1),
       LegacyInstrumentConfig(
         TimeSpan.unsafeFromMicroseconds(1_000_000L)
       )

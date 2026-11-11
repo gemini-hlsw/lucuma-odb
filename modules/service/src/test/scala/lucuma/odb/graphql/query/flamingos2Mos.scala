@@ -8,7 +8,7 @@ import cats.data.NonEmptySet
 import cats.effect.IO
 import cats.effect.Resource
 import cats.syntax.all.*
-import eu.timepit.refined.types.numeric.PosInt
+import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.PosLong
 import fs2.Stream
 import fs2.text.utf8
@@ -76,7 +76,7 @@ class flamingos2Mos extends OdbSuite with ObservingModeSetupOperations:
       SmartGcalValue(
         Gcal(lamp, filter, GcalDiffuser.Ir, shutter),
         GcalBaselineType.Night,
-        PosInt.unsafeFrom(1),
+        NonNegInt.unsafeFrom(1),
         LegacyInstrumentConfig(TimeSpan.unsafeFromMicroseconds(15_000_000L))
       )
 
