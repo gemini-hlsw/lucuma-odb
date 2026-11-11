@@ -105,3 +105,66 @@ BEGIN
   CALL invalidate_obscalc_many(ongoing);
 END;
 $$;
+
+-- Two trigger functions test c_workflow_state against literal state names, and
+-- each lists 'ongoing' among the states it leaves alone (see V1289).  A
+-- suspended observation has started executing just as an ongoing one has, so
+-- 'suspended' joins 'ongoing' in both.
+--
+-- cascade_telluric_invalidation() (V1289): without this, an obscalc write for a
+-- suspended observation would re-request its telluric target, which must not
+-- move once execution has started.
+CREATE OR REPLACE FUNCTION cascade_telluric_invalidation()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.c_last_update IS DISTINCT FROM OLD.c_last_update
+     AND NEW.c_workflow_state NOT IN ('inactive', 'undefined', 'unapproved', 'ongoing', 'suspended', 'completed')
+     AND NOT EXISTS (
+       SELECT 1 FROM t_observation
+       WHERE c_observation_id = NEW.c_observation_id
+         AND c_calibration_role IS NOT NULL
+     ) THEN
+    CALL invalidate_telluric_resolution(NEW.c_observation_id);
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- itc_version_update() (V1300): an ITC version bump leaves executing
+-- observations' obscalc alone, and a suspended observation is still executing.
+CREATE OR REPLACE FUNCTION itc_version_update()
+  RETURNS trigger AS $$
+BEGIN
+  NEW.c_last_update = NOW();
+  IF (OLD.c_version IS DISTINCT FROM NEW.c_version OR OLD.c_data IS DISTINCT FROM NEW.c_data) THEN
+
+    WITH deleted AS (
+      DELETE FROM t_itc_result
+       WHERE NOT c_is_frozen
+      RETURNING c_program_id, c_observation_id
+    )
+    UPDATE t_obscalc o SET
+      c_last_invalidation = NOW(),
+      c_failure_count     = 0,
+      c_retry_at          = NULL,
+      c_obscalc_state     = 'pending'
+    FROM deleted d
+    WHERE o.c_program_id     = d.c_program_id
+      AND o.c_observation_id = d.c_observation_id
+      AND o.c_obscalc_state IN ('ready', 'retry')
+      AND o.c_workflow_state NOT IN ('inactive', 'ongoing', 'suspended', 'completed');
+
+    -- Observations that recorded an ITC error in their workflow but had no
+    -- cached row of their own to delete (kept from V1208).
+    UPDATE t_obscalc SET
+      c_last_invalidation = NOW(),
+      c_failure_count     = 0,
+      c_retry_at          = NULL,
+      c_obscalc_state     = 'pending'
+    WHERE c_obscalc_state IN ('ready', 'retry')
+      AND c_workflow_state NOT IN ('inactive', 'ongoing', 'suspended', 'completed')
+      AND c_workflow_validations @> '[{"code": "ITC_ERROR"}]'::jsonb;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
