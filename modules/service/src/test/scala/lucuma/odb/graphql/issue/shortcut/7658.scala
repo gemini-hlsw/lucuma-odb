@@ -150,6 +150,8 @@ trait ShortCut_7658_Helpers extends OdbSuite with UpdateObservationsOps:
     expectedObservingMode(modeField.expectedObservingMode(ExpectedAcquisition))
 
   protected val ErrorForOngoing: String = "is ineligible for this operation due to its workflow state (Ongoing with allowed transition to Completed)"
+  // Staff may also suspend an ongoing observation.
+  protected val ErrorForOngoingStaff: String = "is ineligible for this operation due to its workflow state (Ongoing with allowed transition to Suspended/Completed)"
   protected val ErrorForCompleted: String = "is ineligible for this operation due to its workflow state (Completed with allowed transition to Ongoing)"
 
   def testFailedAcquistion(user: User, oid: Observation.Id, modeField: String, error: String = ErrorForOngoing): IO[Unit] =
@@ -201,7 +203,7 @@ class ShortCut_7658_Flamingos2 extends ExecutionTestSupportForFlamingos2 with Sh
 
   test("flamingos2: staff cannot update non-acquisition for ongoing observation"):
     createOngoingFlamingos2Observation.flatMap: oid =>
-      testFailedNonAcquistion(staff, oid, "flamingos2LongSlit")
+      testFailedNonAcquistion(staff, oid, "flamingos2LongSlit", ErrorForOngoingStaff)
 
 class ShortCut_7658_Gmos extends ExecutionTestSupportForGmos with ShortCut_7658_Helpers:
   test("gmosNorth: pi cannot update acquisition for ongoing observation"):
@@ -225,7 +227,7 @@ class ShortCut_7658_Gmos extends ExecutionTestSupportForGmos with ShortCut_7658_
 
   test("gmosNorth: staff cannot update non-acquisition for ongoing observation"):
     createOngoingGmosNorthObservation.flatMap: oid =>
-      testFailedNonAcquistion(staff, oid, "gmosNorthLongSlit")
+      testFailedNonAcquistion(staff, oid, "gmosNorthLongSlit", ErrorForOngoingStaff)
 
   test("gmosSouth: pi cannot update acquisition for ongoing observation"):
     createOngoingGmosSouthObservation.flatMap: oid =>
@@ -248,7 +250,7 @@ class ShortCut_7658_Gmos extends ExecutionTestSupportForGmos with ShortCut_7658_
 
   test("gmosSouth: staff cannot update non-acquisition for ongoing observation"):
     createOngoingGmosSouthObservation.flatMap: oid =>
-      testFailedNonAcquistion(staff, oid, "gmosSouthLongSlit")
+      testFailedNonAcquistion(staff, oid, "gmosSouthLongSlit", ErrorForOngoingStaff)
 
 
 // GNIRS has no mode-level exposure time mode and its acquisition input is
@@ -334,7 +336,7 @@ class ShortCut_7658_Gnirs extends ExecutionTestSupportForGnirs with ShortCut_765
 
   test("gnirs: staff cannot update non-acquisition for ongoing observation"):
     createOngoingGnirsLongSlitObservation.flatMap: oid =>
-      testFailed(staff, oid, NonAcquisitionUpdate)
+      testFailed(staff, oid, NonAcquisitionUpdate, ErrorForOngoingStaff)
 
 class ShortCut_7658_GmosIfu extends ExecutionTestSupportForGmos with ShortCut_7658_Helpers:
   test("gmosNorthIfu: pi cannot update acquisition for ongoing observation"):
@@ -358,7 +360,7 @@ class ShortCut_7658_GmosIfu extends ExecutionTestSupportForGmos with ShortCut_76
 
   test("gmosNorthIfu: staff cannot update non-acquisition for ongoing observation"):
     createOngoingGmosNorthIfuObservation.flatMap: oid =>
-      testFailedNonAcquistion(staff, oid, "gmosNorthIfu")
+      testFailedNonAcquistion(staff, oid, "gmosNorthIfu", ErrorForOngoingStaff)
 
   test("gmosSouthIfu: pi cannot update acquisition for ongoing observation"):
     createOngoingGmosSouthIfuObservation.flatMap: oid =>
@@ -370,7 +372,7 @@ class ShortCut_7658_GmosIfu extends ExecutionTestSupportForGmos with ShortCut_76
 
   test("gmosSouthIfu: staff cannot update non-acquisition for ongoing observation"):
     createOngoingGmosSouthIfuObservation.flatMap: oid =>
-      testFailedNonAcquistion(staff, oid, "gmosSouthIfu")
+      testFailedNonAcquistion(staff, oid, "gmosSouthIfu", ErrorForOngoingStaff)
 
 // A MOS acquisition exposure time mode must be time and count, so it gets its
 // own update strings.
@@ -479,7 +481,7 @@ class ShortCut_7658_GmosMos extends ExecutionTestSupportForGmos with ShortCut_76
 
   test("gmosNorthMos: staff cannot update non-acquisition for ongoing observation"):
     createOngoingGmosNorthMosObservation.flatMap: oid =>
-      testFailed(staff, oid, nonAcquisitionUpdate("gmosNorthMos"))
+      testFailed(staff, oid, nonAcquisitionUpdate("gmosNorthMos"), ErrorForOngoingStaff)
 
   test("gmosSouthMos: pi cannot update acquisition for ongoing observation"):
     createOngoingGmosSouthMosObservation.flatMap: oid =>
@@ -497,7 +499,7 @@ class ShortCut_7658_GmosMos extends ExecutionTestSupportForGmos with ShortCut_76
 
   test("gmosSouthMos: staff cannot update non-acquisition for ongoing observation"):
     createOngoingGmosSouthMosObservation.flatMap: oid =>
-      testFailed(staff, oid, nonAcquisitionUpdate("gmosSouthMos"))
+      testFailed(staff, oid, nonAcquisitionUpdate("gmosSouthMos"), ErrorForOngoingStaff)
 
 class ShortCut_7658_GnirsImaging extends ExecutionTestSupportForGnirs with ShortCut_7658_Helpers:
 
@@ -580,4 +582,4 @@ class ShortCut_7658_GnirsImaging extends ExecutionTestSupportForGnirs with Short
 
   test("gnirsImaging: staff cannot update non-acquisition for ongoing observation"):
     createOngoingGnirsImagingObservation.flatMap: oid =>
-      testFailed(staff, oid, NonAcquisitionUpdate)
+      testFailed(staff, oid, NonAcquisitionUpdate, ErrorForOngoingStaff)

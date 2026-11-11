@@ -318,6 +318,44 @@ class programPlannedTime extends ExecutionTestSupportForGmos:
         )
       )
 
+  // Staff suspending an executing observation leaves it out as setting it
+  // inactive does.  Resuming it counts it again.
+  test("program level range.: executing, but suspended observation"):
+    def maxSeconds(pid: Program.Id): IO[BigDecimal] =
+      query(
+        user  = user,
+        query = s"""
+          query {
+            program(programId: "$pid") {
+              timeEstimateRange { value { maximum { total { seconds } } } }
+            }
+          }
+        """
+      ).map:
+        _.hcursor
+         .downFields("program", "timeEstimateRange", "value", "maximum", "total", "seconds")
+         .require[BigDecimal]
+
+    for
+      p         <- createProgram
+      t         <- createTargetWithProfileAs(user, p)
+      o         <- createGmosNorthLongSlitObservationAs(user, p, List(t))
+      v         <- recordVisitAs(serviceUser, o)
+      s         <- firstScienceAtomStepIds(serviceUser, o)
+      _         <- s.traverse(sid => addEndStepEvent(sid, v))
+      _         <- runObscalcUpdate(p, o)
+      executing <- maxSeconds(p)
+      _         <- setObservationWorkflowState(staff, o, ObservationWorkflowState.Suspended)
+      _         <- runObscalcUpdate(p, o)
+      suspended <- maxSeconds(p)
+      _         <- setObservationWorkflowState(staff, o, ObservationWorkflowState.Ongoing)
+      _         <- runObscalcUpdate(p, o)
+      resumed   <- maxSeconds(p)
+    yield
+      assert(executing > 0, s"expected a time estimate, got $executing")
+      assertEquals(suspended.signum, 0)
+      assertEquals(resumed, executing)
+
   test("program level range.: two complete observations"):
     val setup: IO[Program.Id] =
       for

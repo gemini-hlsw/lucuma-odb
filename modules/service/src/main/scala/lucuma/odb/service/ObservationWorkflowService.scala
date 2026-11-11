@@ -45,6 +45,7 @@ import org.typelevel.log4cats.Logger
 import skunk.*
 import skunk.codec.boolean.*
 import skunk.codec.text.varchar
+import skunk.data.Completion
 import skunk.implicits.*
 
 import Services.Syntax.*
@@ -126,6 +127,28 @@ object ObservationWorkflowService {
 
   extension (ws: ObservationWorkflowState) def isUserState: Boolean =
     ws.asUserState.isDefined
+
+  /**
+   * Transitions that only staff may take, from whatever observation offers them:
+   * a visitor observation's Ready <-> Ongoing, and Ongoing <-> Suspended.  This is
+   * the only staff gate on transitions: the live workflow applies it through
+   * visibleTransitions, and so does a read of the stored one.
+   */
+  val StaffOnlyTransitions: Set[(ObservationWorkflowState, ObservationWorkflowState)] =
+    Set(Ready -> Ongoing, Ongoing -> Ready, Ongoing -> Suspended, Suspended -> Ongoing)
+
+  /**
+   * Of the transitions staff could take from `state`, the ones `user` may take.
+   * The live workflow is filtered with it as it is computed, and the stored one
+   * (computed by obscalc as the service user) when it is read.
+   */
+  def visibleTransitions(
+    user:        User,
+    state:       ObservationWorkflowState,
+    transitions: List[ObservationWorkflowState]
+  ): List[ObservationWorkflowState] =
+    if user.role.access >= Access.Staff then transitions
+    else transitions.filterNot(t => StaffOnlyTransitions.contains(state -> t))
 
   extension (es: CoreExecutionState) def workflowExecutionState: Option[ExecutionState] =
     es match
@@ -220,15 +243,39 @@ object ObservationWorkflowService {
                 // user state is kept, so Ready returns once they're dismissed.
                 case Defined    => Option.unless(hasWarnings)(Ready)
 
+        // A suspension holds until the observation completes.  Only an executing
+        // observation can be suspended, but a per-observation calibration takes its
+        // science observation's suspension whether or not it has started itself:
+        // a telluric not yet taken must not stay Ready while its science is suspended.
+        // That suspension ends when the science observation completes.
+        val suspended: Boolean =
+          info.effectiveSuspended && !executionState.contains(Completed)
+
         // Our final state is the execution state (if any), else the user state (if any), else the validation state,
+        // except that a suspended observation is suspended.  A completed one stays completed.
+        // The user state never overrides execution: an observation set inactive and executed anyway is ongoing.
         val state: ObservationWorkflowState =
           (executionState, userStatus(validationStatus)) match
+            case _ if suspended   => Suspended
             case (None, None)     => validationStatus
             case (None, Some(us)) => us
             case (Some(es), _)    => es
 
+        // The transitions below are the ones staff could take.  Which of them are
+        // staff-only is decided in one place, StaffOnlyTransitions, applied at the
+        // end exactly as the stored workflow (computed for staff) is filtered when
+        // read: the conditions here describe the observation, never the user.
+        val isPerObsCalibration: Boolean =
+          info.calibrationRole.exists(ObsExtract.PerObservationCalibrationRoles.contains)
+
+        // Ready <-> Ongoing by hand, for visitor instruments.
         val canUpdateExecutionState: Boolean =
-          info.isVisitor && user.role.access >= Access.Staff
+          info.isVisitor
+
+        // An ongoing observation may be suspended, and resumed.  Not a per-observation
+        // calibration though: those follow their science observation.
+        val canSuspendExecution: Boolean =
+          !isPerObsCalibration
 
         val allowedTransitions: List[ObservationWorkflowState] =
           if info.calibrationRole.contains(CalibrationRole.Telluric) && state <= Ready then
@@ -240,7 +287,7 @@ object ObservationWorkflowService {
                 else Nil
               case _ =>
                 List(Inactive)
-          else if (info.calibrationRole.exists(ObsExtract.PerObservationCalibrationRoles.contains) && state <= Ready) then Nil
+          else if isPerObsCalibration && state <= Ready then Nil
           else state match
             case Inactive   => List(executionState.getOrElse(validationStatus))
             case Undefined  => List(Inactive)
@@ -264,10 +311,11 @@ object ObservationWorkflowService {
                 )(Ready)
 
             case Ready      => List(Inactive, validationStatus) ++ Option.when(canUpdateExecutionState)(Ongoing)
-            case Ongoing    => List(Completed) ++ Option.when(canUpdateExecutionState)(Ready)
+            case Ongoing    => Option.when(canSuspendExecution)(Suspended).toList ++ List(Completed) ++ Option.when(canUpdateExecutionState)(Ready)
+            case Suspended  => Option.when(canSuspendExecution)(Ongoing).toList
             case Completed  => if info.isDeclaredComplete then List(Ongoing) else Nil
 
-        (state, allowedTransitions)
+        (state, visibleTransitions(user, state, allowedTransitions))
 
       private def computeWorkflows(
         infos: Map[Observation.Id, ObservationValidationInfo],
@@ -377,8 +425,11 @@ object ObservationWorkflowService {
 
         (for
           (infos, errs, itcRes) <- selectWarm
-          errorFree              = infos.view.filterKeys(oid => errs.get(oid).forall(_.isEmpty)).toMap
-          execs                  = executionStates(errorFree)
+          // Every observation's execution state, whatever its validations, as
+          // getCalculatedWorkflow does.  An executing observation with a warning
+          // (or an error) is still executing: it must not look editable, or offer
+          // the transitions of an observation that hasn't started.
+          execs                  = executionStates(infos)
           workflows              = computeWorkflows(infos, errs, execs)
           withModes =
             workflows.map:
@@ -443,12 +494,20 @@ object ObservationWorkflowService {
           case ((mode, calibrationRole, w, state), oid) =>
             (
               if w.state === state then ResultT.success(w)
-              else ResultT:
-                services.transactionally:
+              else
+                val write: F[Result[Unit]] = services.transactionally:
 
                   def updateUserState(oid: Observation.Id, state: Option[UserState]): F[Unit] =
                     session.prepareR(Statements.UpdateUserState).use: pc =>
                       pc.execute(state, oid).void
+
+                  // Every observation has its execution row from creation (V1227); one
+                  // that doesn't would otherwise be reported suspended while nothing changed.
+                  def updateSuspended(oid: Observation.Id, suspended: Boolean): F[Result[Unit]] =
+                    session.prepareR(Statements.UpdateSuspended).use: pc =>
+                      pc.execute(suspended, oid).map:
+                        case Completion.Update(1) => Result.unit
+                        case c                    => Result.internalError(s"No execution row to update for $oid: $c")
 
                   def updateDeclaredState(oid: Observation.Id, state: Option[ExecutionState]): F[Unit] =
                     session.prepareR(Statements.UpdateDeclaredState).use: pc =>
@@ -463,39 +522,52 @@ object ObservationWorkflowService {
                     case (Ready, Ongoing) =>
                       updateUserState(oid, None) >>
                       updateDeclaredState(oid, Some(Ongoing))
-                        .as(Result(w.copy(state = state)))
+                        .as(Result.unit)
 
                     // Only for visitors
                     case (Ongoing, Ready)     =>
                       updateUserState(oid, Some(Ready)) >>
                       updateDeclaredState(oid, None)
-                        .as(Result(w.copy(state = state)))
+                        .as(Result.unit)
 
                     // Everyone, but logic differs for visitors
                     case (Completed, Ongoing) =>
                       val ds: Option[ExecutionState] =
                         if mode.exists(_.isVisitorMode) then Some(Ongoing) else None
                       updateDeclaredState(oid, ds)
-                        .as(Result(w.copy(state = state)))
+                        .as(Result.unit)
 
                     // Same for everyone
                     case (Ongoing, Completed) =>
                       updateDeclaredState(oid, Some(Completed))
-                        .as(Result(w.copy(state = state)))
+                        .as(Result.unit)
+
+                    // Only for staff: suspending an executing observation, and
+                    // resuming it.  The user state is left alone.
+                    case (Ongoing, Suspended) =>
+                      updateSuspended(oid, true)
+
+                    case (Suspended, Ongoing) =>
+                      updateSuspended(oid, false)
 
                     // Reinstating a declined telluric clears its override so it
                     // resumes inheriting its science observation's state.
                     case (Inactive, Ready) if calibrationRole.contains(CalibrationRole.Telluric) =>
                       updateUserState(oid, None)
-                        .as(Result(w.copy(state = state)))
+                        .as(Result.unit)
 
                     // Same for everyone; note that this needs to be the last case
                     case (a, b) if a.isUserState || b.isUserState =>
                       updateUserState(oid, b.asUserState)
-                        .as(Result(w.copy(state = state)))
+                        .as(Result.unit)
 
                     case _ =>
-                      Result.internalError(s"Transition from ${w.state} to $state was not expected.").pure[F]
+                      Result.internalError[Unit](s"Transition from ${w.state} to $state was not expected.").pure[F]
+                ResultT(write).flatMap: _ =>
+                  // The workflow of the new state, computed for the caller as the
+                  // access check computed the old one: transitions and validations
+                  // both follow the state.
+                  ResultT(asSuperUser(getWorkflow(oid)))
 
             ).value
 
@@ -665,6 +737,13 @@ object ObservationWorkflowService {
       sql"""
         UPDATE t_observation
         SET c_workflow_user_state = ${user_state.opt}
+        WHERE c_observation_id = $observation_id
+      """.command
+
+    val UpdateSuspended: Command[(Boolean, Observation.Id)] =
+      sql"""
+        UPDATE t_observation_execution
+        SET c_suspended = $bool
         WHERE c_observation_id = $observation_id
       """.command
 

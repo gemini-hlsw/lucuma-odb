@@ -21,6 +21,7 @@ import lucuma.core.enums.GmosRoi
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ScienceBand
+import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.Site
 import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.math.Coordinates
@@ -1144,6 +1145,39 @@ class perProgramPerConfigCalibrations
       val cCount = ob.countCalibrations
       assertEquals(cCount, 2)
       assertEquals(oids.size, 2)
+    }
+
+  // Program-level calibrations follow the science observations that need them.
+  // Suspending the only executing science observation leaves the calibrations
+  // it alone needed, not yet taken, unneeded, so they are removed; resuming it
+  // brings them back.
+  test("Suspending an executing science removes its calibrations, resuming restores them"):
+    for {
+      pid             <- createProgramAs(pi)
+      tid             <- createTargetAs(pi, pid, "One")
+      oid             <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
+      _               <- prepareObservation(pi, pid, oid, tid)
+      (added1, _)     <- recalculateCalibrations(pid, when, oid)
+      ob1             <- queryObservations(pid)
+      vid             <- recordVisitAs(serviceUser, oid)
+      _               <- addSequenceEventAs(serviceUser, vid, SequenceCommand.Start)
+      _               <- runObscalcUpdate(pid, oid)
+      _               <- setObservationWorkflowState(staff, oid, ObservationWorkflowState.Suspended)
+      _               <- runObscalcUpdate(pid, oid)
+      (_, removed2)   <- recalculateCalibrations(pid, when, oid)
+      ob2             <- queryObservations(pid)
+      _               <- setObservationWorkflowState(staff, oid, ObservationWorkflowState.Ongoing)
+      _               <- runObscalcUpdate(pid, oid)
+      (added3, _)     <- recalculateCalibrations(pid, when, oid)
+      ob3             <- queryObservations(pid)
+    } yield {
+      // added and removed count the standards' daytime arcs as well, which
+      // countCalibrations leaves out.
+      assert(ob1.countCalibrations > 0, "expected calibrations for the science observation")
+      assertEquals(removed2.toSet, added1.toSet)
+      assertEquals(ob2.countCalibrations, 0)
+      assertEquals(added3.size, added1.size)
+      assertEquals(ob3.countCalibrations, ob1.countCalibrations)
     }
 
   def updateCentralWavelength(oid: Observation.Id, centralWavelength: Wavelength): IO[Unit] =
