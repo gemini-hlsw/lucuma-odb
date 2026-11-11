@@ -20,7 +20,6 @@ import lucuma.catalog.clients.SimbadClient
 import lucuma.catalog.goa.GoaClient
 import lucuma.catalog.simbad.SEDDataLoader
 import lucuma.catalog.telluric.TelluricTargetsClient
-import lucuma.common.middleware.TracingMiddleware
 import lucuma.core.data.EmailAddress
 import lucuma.core.enums.ExchangePartner
 import lucuma.core.enums.GeminiCallForProposalsType
@@ -33,6 +32,7 @@ import lucuma.itc.client.ItcClient
 import lucuma.odb.graphql.topic.OdbTopic
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.PdfSummaryJobDaemon
+import lucuma.otel.HttpInstrumentation
 import lucuma.otel.OtelConfig
 import lucuma.sso.client.SsoClient
 import lucuma.sso.client.SsoJwtReader
@@ -42,11 +42,11 @@ import org.http4s.Uri
 import org.http4s.client.Client
 import org.http4s.client.middleware.GZip
 import org.http4s.ember.client.EmberClientBuilder
-import org.http4s.otel4s.middleware.trace.client.ClientMiddleware
-import org.http4s.otel4s.middleware.trace.client.ClientSpanDataProvider
 import org.http4s.syntax.all.*
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.LoggerFactory
+import org.typelevel.otel4s.context.ContextManager
+import org.typelevel.otel4s.metrics.MeterProvider
 import org.typelevel.otel4s.trace.Tracer
 import org.typelevel.otel4s.trace.TracerProvider
 
@@ -89,32 +89,24 @@ case class Config(
       .withIdleConnectionTime(httpClient.effectiveIdleConnectionTime)
       .build
 
-  private def otelHttpClient[F[_]: Async: Network: TracerProvider]: Resource[F, Client[F]] =
-    for {
-      client         <- httpClientResource[F]
-      otelMiddleware <-
-        Resource.eval(
-          ClientMiddleware
-            .builder(ClientSpanDataProvider.openTelemetry(TracingMiddleware.redactor))
-            .build
-        )
-    } yield otelMiddleware(client)
+  private def otelHttpClient[F[_]: Async: Network: TracerProvider: MeterProvider: ContextManager]: Resource[F, Client[F]] =
+    (httpClientResource[F], Resource.eval(HttpInstrumentation.client[F])).mapN((client, instrument) => instrument(client))
 
-  def horizonsClientResource[F[_]: Async: Network: Logger: TracerProvider]: Resource[F, HorizonsClient[F]] =
+  def horizonsClientResource[F[_]: Async: Network: Logger: TracerProvider: MeterProvider: ContextManager]: Resource[F, HorizonsClient[F]] =
     otelHttpClient.map(HorizonsClient.apply(_, 5, 1.second))
 
   // ITC client resource
-  def itcClient[F[_]: Async: Network: Logger: TracerProvider: Compression]: Resource[F, ItcClient[F]] =
+  def itcClient[F[_]: Async: Network: Logger: TracerProvider: MeterProvider: ContextManager: Compression]: Resource[F, ItcClient[F]] =
     otelHttpClient[F].evalMap: httpClient =>
       ItcClient.create(itc.root, GZip()(httpClient))
 
   // Gaia client resource
-  def gaiaClient[F[_]: Async: Compression: Network: Tracer: LoggerFactory: TracerProvider]: Resource[F, GaiaClient[F]] =
+  def gaiaClient[F[_]: Async: Compression: Network: Tracer: LoggerFactory: TracerProvider: MeterProvider: ContextManager]: Resource[F, GaiaClient[F]] =
     otelHttpClient[F].map: httpClient =>
       GaiaClient.build[F](GZip()(httpClient), adapters = GaiaClient.DefaultAdapters)
 
   // Telluric client resource
-  def telluricClient[F[_]: Async: Network: LoggerFactory: Tracer: TracerProvider]
+  def telluricClient[F[_]: Async: Network: LoggerFactory: Tracer: TracerProvider: MeterProvider: ContextManager]
     : Resource[F, TelluricTargetsClient[F]] =
     for {
       httpClient  <- otelHttpClient[F]
@@ -124,11 +116,11 @@ case class Config(
     } yield result
 
   // Gemini Observatory Archive client resource, used by the archive duplication search.
-  def goaClient[F[_]: Async: Network: TracerProvider]: Resource[F, GoaClient[F]] =
+  def goaClient[F[_]: Async: Network: TracerProvider: MeterProvider: ContextManager]: Resource[F, GoaClient[F]] =
     otelHttpClient[F].map(GoaClient.build[F](_))
 
   // SSO Client resource (has to be a resource because it owns an HTTP client).
-  def ssoClient[F[_]: Async: Network: Logger: TracerProvider]: Resource[F, SsoClient[F, User]] =
+  def ssoClient[F[_]: Async: Network: Logger: TracerProvider: MeterProvider: ContextManager]: Resource[F, SsoClient[F, User]] =
     otelHttpClient[F].evalMap: httpClient =>
       SsoClient.initial(
         serviceJwt = serviceJwt,

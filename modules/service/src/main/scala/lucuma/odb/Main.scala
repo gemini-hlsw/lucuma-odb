@@ -37,6 +37,8 @@ import lucuma.odb.service.ItcService
 import lucuma.odb.service.S3FileService
 import lucuma.odb.service.UserService
 import lucuma.odb.util.OdbTelemetry
+import lucuma.otel.OtelServices
+import lucuma.otel.OtelServices.given
 import lucuma.otel.health.DbConnections
 import lucuma.otel.health.HealthCheck
 import lucuma.otel.health.HealthRoutes
@@ -52,7 +54,7 @@ import org.http4s.server.websocket.WebSocketBuilder2
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.LoggerFactory
 import org.typelevel.log4cats.slf4j.Slf4jFactory
-import org.typelevel.otel4s.metrics.Meter
+import org.typelevel.otel4s.context.ContextManager
 import org.typelevel.otel4s.metrics.MeterProvider
 import org.typelevel.otel4s.trace.Tracer
 import org.typelevel.otel4s.trace.TracerProvider
@@ -203,10 +205,10 @@ object FMain extends MainParams {
       .withHttpWebSocketApp(app)
       .resource
 
-  /** A resource that yields our HttpRoutes, wrapped in accessory middleware. */
-  def routesResource[F[_]: Compression: Async: Parallel: Tracer: TracerProvider: MeterProvider: Logger: LoggerFactory: Network: Console: SecureRandom](
+  /** A resource that yields our HTTP app, wrapped in accessory middleware and instrumentation. */
+  def routesResource[F[_]: Compression: Async: Parallel: Tracer: TracerProvider: MeterProvider: ContextManager: Logger: LoggerFactory: Network: Console: SecureRandom](
     config: Config
-  ): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
+  ): Resource[F, WebSocketBuilder2[F] => HttpApp[F]] =
     routesResource(
       config.database,
       config.aws,
@@ -229,8 +231,8 @@ object FMain extends MainParams {
       validateMapping = true
     )
 
-  /** A resource that yields our HttpRoutes, wrapped in accessory middleware. */
-  def routesResource[F[_]: Async: Parallel: Tracer: TracerProvider: MeterProvider: Logger: LoggerFactory: Network: Console: SecureRandom](
+  /** A resource that yields our HTTP app, wrapped in accessory middleware and instrumentation. */
+  def routesResource[F[_]: Async: Parallel: Tracer: TracerProvider: MeterProvider: ContextManager: Logger: LoggerFactory: Network: Console: SecureRandom](
     databaseConfig:       Config.Database,
     awsConfig:            Config.Aws,
     emailConfig:          Config.Email,
@@ -250,7 +252,7 @@ object FMain extends MainParams {
     horizonsClientResource: Resource[F, HorizonsClient[F]],
     goaClientResource:      Resource[F, GoaClient[F]],
     validateMapping:        Boolean
-  ): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
+  ): Resource[F, WebSocketBuilder2[F] => HttpApp[F]] =
     for {
       pool              <- databasePoolResource[F](databaseConfig)
       itcClient         <- itcClientResource
@@ -262,6 +264,7 @@ object FMain extends MainParams {
       goaClient         <- goaClientResource
       userSvc            = UserService.fromPool(pool)
       middleware        <- ServerMiddleware(corsOverHttps, domain, ssoClient, userSvc)
+      instrumentation   <- Resource.eval(ServerMiddleware.instrumentation[F])
       enums             <- Resource.eval(pool.use(Enums.load))
       ptc               <- Resource.eval(pool.use(TimeEstimateCalculatorImplementation.fromSession(_, enums)))
       schema            <- Resource.eval(OdbMapping.loadSchema[F])
@@ -279,7 +282,8 @@ object FMain extends MainParams {
       val schedulerRoutes    = SchedulerRoutes.apply[F](pool, ssoClient, emailConfig, commitHash, ptc, httpClient, itcClient, gaiaClient, horizonsClient)
       val emailWebhookRoutes = EmailWebhookRoutes(webhookService, emailConfig)
       val chownRoutes        = ChownRoutes(pool, s3FileService, ssoClient, emailConfig, commitHash, ptc, httpClient, itcClient, gaiaClient, horizonsClient)
-      healthRoutes <+> middleware(graphQLRoutes(wsb) <+> attachmentRoutes <+> GraphQLRoutes.dummyMetadata <+> emailWebhookRoutes <+> schedulerRoutes <+> chownRoutes)
+      instrumentation:
+        (healthRoutes <+> middleware(graphQLRoutes(wsb) <+> attachmentRoutes <+> GraphQLRoutes.dummyMetadata <+> emailWebhookRoutes <+> schedulerRoutes <+> chownRoutes)).orNotFound
     }
 
   /**
@@ -383,12 +387,8 @@ object FMain extends MainParams {
       _  <- Applicative[Resource[F, *]].whenA(reset.isRequested)(Resource.eval(resetDatabase[F](c.database)))
       _  <- Applicative[Resource[F, *]].unlessA(skipMigration.isRequested)(Resource.eval(migrateDatabase[F](c.database)))
       _  <- Resource.eval(runStartupDiagnostics(c.database, true))
-      ot <- OdbTelemetry.otel(ServiceName, c)
-      given Tracer[F]         = ot.tracer
-      given Meter[F]          = ot.meter
-      given TracerProvider[F] = ot.tracerProvider
-      given MeterProvider[F]  = ot.meterProvider
-      ap <- routesResource(c).map(_.map(_.orNotFound))
+      given OtelServices[F] <- OdbTelemetry.otel(ServiceName, c)
+      ap <- routesResource(c)
       _  <- Resource.eval(ItcService.pollVersionsForever(c.itcClient, singleSession(c.database), c.itc.pollPeriod))
       _  <- DbConnections.resource(singleSession(c.database, applicationName = "odb-web-monitor"), 1.minute)
       _  <- serverResource(c.port, ap)
@@ -398,7 +398,7 @@ object FMain extends MainParams {
   def runF[F[_]: Async: Parallel: LiftIO: Logger: LoggerFactory: Console: Network: SecureRandom](
     reset:         ResetDatabase,
     skipMigration: SkipMigration
-  ): F[ExitCode] =
-    server(reset, skipMigration).use(_ => Concurrent[F].never[ExitCode])
+  ): F[Nothing] =
+    server(reset, skipMigration).useForever
 
 }

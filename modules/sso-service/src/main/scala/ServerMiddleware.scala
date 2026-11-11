@@ -5,19 +5,18 @@ package lucuma.sso.service
 
 import cats.*
 import cats.effect.*
-import cats.syntax.all.*
 import lucuma.common.middleware.CorsMiddleware
 import lucuma.common.middleware.LoggingMiddleware
-import lucuma.common.middleware.TracingMiddleware
+import lucuma.otel.HttpInstrumentation
 import lucuma.sso.service.config.Config
 import lucuma.sso.service.config.Environment
 import lucuma.sso.service.config.Environment.*
+import org.http4s.HttpApp
 import org.http4s.HttpRoutes
-import org.http4s.otel4s.middleware.trace.redact.HeaderRedactor
-import org.http4s.otel4s.middleware.trace.server.ServerMiddleware as OtelServerMiddleware
-import org.http4s.otel4s.middleware.trace.server.ServerSpanDataProvider
 import org.http4s.server.middleware.ErrorAction
 import org.typelevel.log4cats.Logger
+import org.typelevel.otel4s.context.ContextManager
+import org.typelevel.otel4s.metrics.MeterProvider
 import org.typelevel.otel4s.trace.TracerProvider
 
 /** A module of all the middlewares we apply to the server routes. */
@@ -25,14 +24,9 @@ object ServerMiddleware:
 
   type Middleware[F[_]] = Endo[HttpRoutes[F]]
 
-  /** A middleware that adds distributed tracing via OpenTelemetry. */
-  def tracing[F[_]: Async: TracerProvider]: F[Middleware[F]] =
-    val spanDataProvider =
-      ServerSpanDataProvider
-        .openTelemetry(TracingMiddleware.redactor)
-        .optIntoHttpRequestHeaders(HeaderRedactor.default)
-        .optIntoHttpResponseHeaders(HeaderRedactor.default)
-    OtelServerMiddleware.builder[F](spanDataProvider).build.map(_.asHttpRoutesMiddleware)
+  /** Adds HTTP metrics and distributed tracing via OpenTelemetry. Apply to the final app, after `orNotFound`. */
+  def instrumentation[F[_]: Async: TracerProvider: MeterProvider: ContextManager]: F[Endo[HttpApp[F]]] =
+    HttpInstrumentation.server[F](recordHeaders = true)
 
   /** A middleware that logs request and response. Sensitive headers are redacted outside Local. */
   def logging[F[_]: Async](
@@ -52,14 +46,12 @@ object ServerMiddleware:
       serviceErrorLogAction   = Logger[F].error(_)(_)
     )
 
-  /** A middleware that composes all the others defined in this module. */
-  def apply[F[_]: Async: TracerProvider: Logger](
+  /** A middleware that composes all the others defined in this module, except instrumentation. */
+  def apply[F[_]: Async: Logger](
     config: Config,
-  ): F[Middleware[F]] =
-    tracing[F].map: tracing =>
-      List[Middleware[F]](
-        CorsMiddleware.cors(domain = List(config.cookieDomain)),
-        logging(config.environment),
-        tracing,
-        errorReporting,
-      ).reduce(_ andThen _) // N.B. the monoid for Endo uses `compose`
+  ): Middleware[F] =
+    List[Middleware[F]](
+      CorsMiddleware.cors(domain = List(config.cookieDomain)),
+      logging(config.environment),
+      errorReporting,
+    ).reduce(_ andThen _) // N.B. the monoid for Endo uses `compose`

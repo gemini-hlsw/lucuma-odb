@@ -4,22 +4,20 @@
 package resource.server.http4s
 import cats.*
 import cats.effect.*
-import cats.syntax.all.*
 import fs2.compression.Compression
 import lucuma.common.middleware.CorsMiddleware
 import lucuma.common.middleware.ErrorReportingMiddleware
 import lucuma.common.middleware.LoggingMiddleware
-import lucuma.common.middleware.MetricsMiddleware
 import lucuma.common.middleware.TracingMiddleware
 import lucuma.core.model.User
+import lucuma.otel.HttpInstrumentation
 import lucuma.sso.client.SsoClient
+import org.http4s.HttpApp
 import org.http4s.HttpRoutes
-import org.http4s.otel4s.middleware.metrics.OtelMetrics
-import org.http4s.otel4s.middleware.trace.server.ServerMiddleware as OtelServerMiddleware
-import org.http4s.otel4s.middleware.trace.server.ServerSpanDataProvider
 import org.http4s.server.middleware.GZip
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
+import org.typelevel.otel4s.context.ContextManager
 import org.typelevel.otel4s.metrics.MeterProvider
 import org.typelevel.otel4s.trace.Tracer
 import org.typelevel.otel4s.trace.TracerProvider
@@ -27,33 +25,28 @@ import org.typelevel.otel4s.trace.TracerProvider
 object ServerMiddleware {
   type Middleware[F[_]] = Endo[HttpRoutes[F]]
 
+  /** HTTP metrics and spans. Apply to the final app, after `orNotFound`. */
+  def instrumentation[F[_]: {Async, TracerProvider, MeterProvider, ContextManager}]
+    : F[Endo[HttpApp[F]]] =
+    HttpInstrumentation.server[F]()
+
   /**
-   * Create a combined middleware to all server routes
+   * Create a combined middleware to all server routes, except instrumentation
    */
-  def apply[F[_]: {Async, Compression, Tracer, TracerProvider, MeterProvider}](
+  def apply[F[_]: {Async, Compression, Tracer}](
     corsOverHttps: Boolean,
     domain:        Seq[String],
     ssoClient:     SsoClient[F, User]
-  ): F[Middleware[F]] = {
+  ): Middleware[F] = {
     given Logger[F] = Slf4jLogger.getLogger[F]
 
-    val logging          = LoggingMiddleware.logging[F]()
-    val spanDataProvider = ServerSpanDataProvider.openTelemetry(TracingMiddleware.redactor)
-    val cors             = CorsMiddleware.cors[F](corsOverHttps, domain.toList)
-
-    (
-      OtelServerMiddleware.builder[F](spanDataProvider).build,
-      OtelMetrics.serverMetricsOps[F]().map(MetricsMiddleware.httpMetrics[F])
-    ).mapN: (otel, httpMetrics) =>
-      List[Middleware[F]](
-        cors,
-        logging,
-        httpMetrics,
-        otel.asHttpRoutesMiddleware,
-        TracingMiddleware.traceUser(ssoClient),
-        ErrorReportingMiddleware.errorReporting,
-        GZip(_)
-      ).reduce(_ andThen _) // N.B. the monoid for Endo uses `compose`
+    List[Middleware[F]](
+      CorsMiddleware.cors[F](corsOverHttps, domain.toList),
+      LoggingMiddleware.logging[F](),
+      TracingMiddleware.traceUser(ssoClient),
+      ErrorReportingMiddleware.errorReporting,
+      GZip(_)
+    ).reduce(_ andThen _) // N.B. the monoid for Endo uses `compose`
   }
 
 }

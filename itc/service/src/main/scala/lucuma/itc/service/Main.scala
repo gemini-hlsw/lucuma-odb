@@ -30,6 +30,9 @@ import lucuma.itc.legacy.FLocalItc
 import lucuma.itc.legacy.ItcImpl
 import lucuma.itc.legacy.LocalItc
 import lucuma.itc.service.config.*
+import lucuma.otel.HttpInstrumentation
+import lucuma.otel.OtelServices
+import lucuma.otel.OtelServices.given
 import lucuma.otel.OtelSetup
 import lucuma.otel.health.HealthCheck
 import lucuma.otel.health.HealthRoutes
@@ -37,19 +40,14 @@ import org.http4s.*
 import org.http4s.ember.server.EmberServerBuilder
 import org.http4s.headers.`Cache-Control`
 import org.http4s.implicits.*
-import org.http4s.otel4s.middleware.metrics.OtelMetrics
-import org.http4s.otel4s.middleware.trace.client.UriRedactor
-import org.http4s.otel4s.middleware.trace.server.ServerMiddleware as OtelServerMiddleware
-import org.http4s.otel4s.middleware.trace.server.ServerSpanDataProvider
 import org.http4s.server.Server
 import org.http4s.server.middleware.CORS
 import org.http4s.server.middleware.CORSPolicy
 import org.http4s.server.middleware.GZip
-import org.http4s.server.middleware.Metrics
 import org.http4s.server.websocket.WebSocketBuilder2
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
-import org.typelevel.otel4s.metrics.Meter
+import org.typelevel.otel4s.context.ContextManager
 import org.typelevel.otel4s.metrics.MeterProvider
 import org.typelevel.otel4s.trace.Tracer
 import org.typelevel.otel4s.trace.TracerProvider
@@ -145,19 +143,13 @@ object Main extends IOApp with ItcCacheOrRemote {
       case None      =>
         Resource.eval(NoOpBinaryCache[F]).map((_, Nil))
 
-  private val redactor: UriRedactor = new UriRedactor:
-    def redactPath(path: Uri.Path) = path
-
-    def redactQuery(query: Query) = query
-
-    def redactFragment(fragment: Uri.Fragment) = fragment.some
-
-  def routes[F[
-    _
-  ]: Async: Logger: Parallel: Tracer: TracerProvider: MeterProvider: Compression: Network](
+  def routes[
+    F[
+      _
+    ]: Async: Logger: Parallel: Tracer: TracerProvider: MeterProvider: ContextManager: Compression: Network
+  ](
     cfg: Config
-  ): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
-    val spanDataProvider = ServerSpanDataProvider.openTelemetry(redactor)
+  ): Resource[F, WebSocketBuilder2[F] => HttpApp[F]] =
     for
       localItc                   <- Resource.eval(legacyItcLoader[F])
       calcSemaphore              <- Resource.eval(Semaphore[F](cfg.maxConcurrentCalculations.toLong))
@@ -182,15 +174,15 @@ object Main extends IOApp with ItcCacheOrRemote {
       given CustomSed.Resolver[F] = CustomSedCachedResolver(customSedResolver, cache, CustomSedTTL)
       mapping                    <- Resource.eval(ItcMapping[F](cache, itc, cfg))
       service                    <- Resource.eval(GraphQLService[F](mapping))
-      otelMiddleware             <- Resource.eval(OtelServerMiddleware.builder[F](spanDataProvider).build)
-      metricsOps                 <- Resource.eval(OtelMetrics.serverMetricsOps[F]())
+      instrumentation            <- Resource.eval(HttpInstrumentation.server[F]())
     yield wsb =>
-      health <+> otelMiddleware.asHttpRoutesMiddleware:
-        GZip:
-          corsPolicy:
-            cacheMiddleware:
-              Metrics[F](metricsOps):
+      instrumentation:
+        val routes =
+          GZip:
+            corsPolicy:
+              cacheMiddleware:
                 Routes.forOpenService(service, wsb, RoutesConfig(graphQLPath = "itc"))
+        (health <+> routes).orNotFound
 
   // Custom class loader to give priority to the jars in the urls over the parent classloader
   class ReverseClassLoader(urls: Array[URL], parent: ClassLoader)
@@ -227,14 +219,10 @@ object Main extends IOApp with ItcCacheOrRemote {
    */
   def server(cfg: Config)(using Logger[IO]): Resource[IO, ExitCode] =
     for
-      _                       <- Resource.eval(banner[IO](cfg))
-      otel                    <- OtelSetup.resource(ServiceName, version.value, cfg.otel)
-      given Tracer[IO]         = otel.tracer
-      given Meter[IO]          = otel.meter
-      given TracerProvider[IO] = otel.tracerProvider
-      given MeterProvider[IO]  = otel.meterProvider
-      ap                      <- routes[IO](cfg).map(_.map(_.orNotFound))
-      _                       <- serverResource(ap, cfg)
+      _                      <- Resource.eval(banner[IO](cfg))
+      given OtelServices[IO] <- OtelSetup.resource(ServiceName, version.value, cfg.otel)
+      ap                     <- routes[IO](cfg)
+      _                      <- serverResource(ap, cfg)
     yield ExitCode.Success
 
   def run(args: List[String]): IO[ExitCode] =

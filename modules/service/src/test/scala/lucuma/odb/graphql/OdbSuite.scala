@@ -91,6 +91,9 @@ import lucuma.odb.service.S3FileService
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.service.Services.Syntax.*
+import lucuma.otel.OtelServices
+import lucuma.otel.OtelServices.given
+import lucuma.otel.OtelSetup
 import lucuma.refined.*
 import munit.AnyFixture
 import munit.CatsEffectSuite
@@ -116,7 +119,7 @@ import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.LoggerFactory
 import org.typelevel.log4cats.slf4j.Slf4jFactory
 import org.typelevel.log4cats.slf4j.Slf4jLogger
-import org.typelevel.otel4s.metrics.Meter
+import org.typelevel.otel4s.context.ContextManager
 import org.typelevel.otel4s.metrics.MeterProvider
 import org.typelevel.otel4s.trace.Tracer
 import org.typelevel.otel4s.trace.TracerProvider
@@ -500,7 +503,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   private val horizonsClient: HorizonsClient[IO] =
     HorizonsClient.forTesting(horizonsFixture)
 
-  private def httpApp(using Tracer[IO], TracerProvider[IO], MeterProvider[IO]): Resource[IO, WebSocketBuilder2[IO] => HttpApp[IO]] =
+  private def httpApp(using Tracer[IO], TracerProvider[IO], MeterProvider[IO], ContextManager[IO]): Resource[IO, WebSocketBuilder2[IO] => HttpApp[IO]] =
     FMain.routesResource[IO](
       databaseConfig,
       awsConfig,
@@ -521,7 +524,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       horizonsClient.pure[Resource[IO, *]],
       Resource.eval(goaClient),
       validateMapping = false // validated once, in OdbMappingValidationSuite
-    ).map(_.map(_.orNotFound))
+    )
 
   /** Resource yielding an instantiated OdbMapping, which we can use for some whitebox testing. */
   def mapping(using Tracer[IO], TracerProvider[IO], MeterProvider[IO]): Resource[IO, Mapping[IO]] =
@@ -581,23 +584,18 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
         sts  <- mon.take
       } yield (json, sts)
 
-  protected def tracerProvider: Resource[IO, TracerProvider[IO]] =
-    Resource.pure(TracerProvider.noop)
-
-  protected def meterProvider: Resource[IO, MeterProvider[IO]] =
-    Resource.pure(MeterProvider.noop)
+  /** Telemetry of the test server. `TraceSuite` overrides it to record spans. */
+  protected def telemetry: Resource[IO, OtelServices[IO]] =
+    Resource.eval(OtelSetup.noop[IO]("test"))
 
   protected def server: Resource[IO, Server] =
     for {
-      given TracerProvider[IO] <- tracerProvider
-      given Tracer[IO]         <- tracerProvider.evalMap(_.get("test-tracer"))
-      given MeterProvider[IO]  <- meterProvider
-      given Meter[IO]          <- meterProvider.evalMap(_.get("test-meter"))
-      a                        <- httpApp
-      s                        <- BlazeServerBuilder[IO]
-                                    .withHttpWebSocketApp(a)
-                                    .bindAny()
-                                    .resource
+      given OtelServices[IO] <- telemetry
+      a                      <- httpApp
+      s                      <- BlazeServerBuilder[IO]
+                                  .withHttpWebSocketApp(a)
+                                  .bindAny()
+                                  .resource
     } yield s
 
   protected def session: Resource[IO, Session[IO]] =

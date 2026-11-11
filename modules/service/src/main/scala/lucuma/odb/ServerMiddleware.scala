@@ -12,20 +12,18 @@ import cats.implicits.*
 import lucuma.common.middleware.CorsMiddleware
 import lucuma.common.middleware.ErrorReportingMiddleware
 import lucuma.common.middleware.LoggingMiddleware
-import lucuma.common.middleware.MetricsMiddleware
 import lucuma.common.middleware.TracingMiddleware
 import lucuma.core.model.User
 import lucuma.odb.service.Services
 import lucuma.odb.service.UserService
+import lucuma.otel.HttpInstrumentation
 import lucuma.sso.client.SsoClient
+import org.http4s.HttpApp
 import org.http4s.HttpRoutes
 import org.http4s.dsl.Http4sDsl
-import org.http4s.otel4s.middleware.metrics.OtelMetrics
 import org.http4s.otel4s.middleware.server.RouteClassifier
-import org.http4s.otel4s.middleware.trace.redact.HeaderRedactor
-import org.http4s.otel4s.middleware.trace.server.ServerMiddleware as OtelServerMiddleware
-import org.http4s.otel4s.middleware.trace.server.ServerSpanDataProvider
 import org.typelevel.log4cats.Logger
+import org.typelevel.otel4s.context.ContextManager
 import org.typelevel.otel4s.metrics.MeterProvider
 import org.typelevel.otel4s.trace.Tracer
 import org.typelevel.otel4s.trace.TracerProvider
@@ -81,32 +79,24 @@ object ServerMiddleware {
     }
   }
 
-  /** A middleware that composes all the others defined in this module. */
-  def apply[F[_]: Async: Tracer: TracerProvider: MeterProvider: Logger](
+  /**
+   * HTTP metrics and spans. Apply to the final app, after `orNotFound`. Recording headers can be
+   * expensive with many calls, but most traffic is WebSocket.
+   */
+  def instrumentation[F[_]: Async: TracerProvider: MeterProvider: ContextManager]: F[Endo[HttpApp[F]]] =
+    HttpInstrumentation.server[F](routeClassifier[F], recordHeaders = true)
+
+  /** A middleware that composes all the others defined in this module, except instrumentation. */
+  def apply[F[_]: Async: Tracer: Logger](
     corsOverHttps: Boolean,
     domain: List[String],
     client: SsoClient[F, User],
     userService: UserService[F],
   ): Resource[F, Middleware[F]] =
-    val spanDataProvider =
-      ServerSpanDataProvider
-        .openTelemetry(TracingMiddleware.redactor)
-        .withRouteClassifier(routeClassifier)
-        // These could be a bit expensive if there are lots of calls
-        // OTOH a lot of traffic is via websockets
-        .optIntoHttpRequestHeaders(HeaderRedactor.default)
-        .optIntoHttpResponseHeaders(HeaderRedactor.default)
-
-    (
-      Resource.eval(userCache(client, userService)),
-      Resource.eval(OtelServerMiddleware.builder[F](spanDataProvider).build),
-      Resource.eval(OtelMetrics.serverMetricsOps[F]())
-    ).mapN { (userCache, otel, metricsOps) =>
+    Resource.eval(userCache(client, userService)).map { userCache =>
       List[Middleware[F]](
         CorsMiddleware.cors(corsOverHttps, domain),
         LoggingMiddleware.logging[F](),
-        MetricsMiddleware.httpMetrics(metricsOps),
-        otel.asHttpRoutesMiddleware,
         TracingMiddleware.traceUser(client),
         ErrorReportingMiddleware.errorReporting,
         userCache,

@@ -40,6 +40,8 @@ import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.service.UserService
 import lucuma.odb.util.OdbTelemetry
+import lucuma.otel.OtelServices
+import lucuma.otel.OtelServices.given
 import lucuma.otel.health.WorkerHeartbeat
 import org.http4s.Credentials
 import org.http4s.client.Client
@@ -48,6 +50,7 @@ import org.typelevel.ci.CIString
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.LoggerFactory
 import org.typelevel.log4cats.slf4j.Slf4jFactory
+import org.typelevel.otel4s.context.ContextManager
 import org.typelevel.otel4s.metrics.Meter
 import org.typelevel.otel4s.metrics.MeterProvider
 import org.typelevel.otel4s.trace.Tracer
@@ -125,7 +128,7 @@ object CalcMain extends MainParams:
       )
       .pooled(config.maxObscalcConnections)
 
-  def serviceUser[F[_]: Async: Network: Logger: TracerProvider](c: Config): F[User] =
+  def serviceUser[F[_]: Async: Network: Logger: TracerProvider: MeterProvider: ContextManager](c: Config): F[User] =
     c.ssoClient
      .use: sso =>
        sso.get(Authorization(Credentials.Token(CIString("Bearer"), c.serviceJwt)))
@@ -307,7 +310,7 @@ object CalcMain extends MainParams:
    * Our main server, as a resource that starts up our server on acquire and shuts it all down
    * in cleanup, yielding an `ExitCode`. Users will `use` this resource and hold it forever.
    */
-  def server[F[_]: Async: Compression: Parallel: Logger: LoggerFactory: Tracer: TracerProvider: Meter: MeterProvider: Console: Network: SecureRandom]: Resource[F, F[Outcome[F, Throwable, Unit]]] =
+  def server[F[_]: Async: Compression: Parallel: Logger: LoggerFactory: Tracer: TracerProvider: Meter: MeterProvider: ContextManager: Console: Network: SecureRandom]: Resource[F, F[Outcome[F, Throwable, Unit]]] =
     for
       c          <- Resource.eval(Config.fromCiris.load[F])
       _          <- Resource.eval(banner[F](c))
@@ -361,13 +364,9 @@ object CalcMain extends MainParams:
   /** Our logical entry point. */
   def runF(using Logger[IO], LoggerFactory[IO]): IO[ExitCode] =
     (for
-      c    <- Resource.eval(Config.fromCiris.load[IO])
-      otel <- OdbTelemetry.otel(ServiceName, c)
-      given Tracer[IO] = otel.tracer
-      given Meter[IO]  = otel.meter
-      given TracerProvider[IO]  = otel.tracerProvider
-      given MeterProvider[IO]   = otel.meterProvider
-      o    <- server[IO]
+      c                      <- Resource.eval(Config.fromCiris.load[IO])
+      given OtelServices[IO] <- OdbTelemetry.otel(ServiceName, c)
+      o                      <- server[IO]
     yield o).use: o =>
       o.flatMap:
         case Outcome.Succeeded(_) => Logger[IO].info("Obscalc completed.")  >> ExitCode.Success.pure[IO]

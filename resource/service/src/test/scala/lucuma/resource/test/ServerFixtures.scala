@@ -4,22 +4,21 @@
 package lucuma.resource.test
 
 import cats.effect.*
-import cats.syntax.all.*
 import com.comcast.ip4s.*
 import com.dimafeng.testcontainers.GenericContainer
 import com.dimafeng.testcontainers.PostgreSQLContainer
 import com.dimafeng.testcontainers.munit.TestContainerForAll
+import lucuma.otel.OtelServices
+import lucuma.otel.OtelServices.given
+import lucuma.otel.OtelSetup
 import lucuma.resource.ResourceBaseSuite
 import munit.catseffect.IOFixture
-import org.http4s.*
 import org.http4s.ember.server.EmberServerBuilder
 import org.http4s.server.Server
 import org.testcontainers.containers.PostgreSQLContainer.POSTGRESQL_PORT
 import org.testcontainers.containers.wait.strategy.Wait
 import org.testcontainers.images.builder.ImageFromDockerfile
-import org.typelevel.otel4s.metrics.Meter
 import org.typelevel.otel4s.metrics.MeterProvider
-import org.typelevel.otel4s.trace.Tracer
 import org.typelevel.otel4s.trace.TracerProvider
 import resource.model.config.DatabaseConfiguration
 import resource.server.http4s.ResourceMain
@@ -60,11 +59,6 @@ object ResourceTestDb:
           .withBuildArgs(dbImageEnv.asJava)
 
 trait ServerFixtures extends munit.CatsEffectSuite with ResourceBaseSuite with TestContainerForAll:
-
-  given TracerProvider[IO] = TracerProvider.noop
-  given Tracer[IO]         = Tracer.Implicits.noop
-  given MeterProvider[IO]  = MeterProvider.noop
-  given Meter[IO]          = Meter.Implicits.noop
 
   override def munitFixtures = super.munitFixtures ++ List(serverFixture)
 
@@ -118,15 +112,15 @@ trait ServerFixtures extends munit.CatsEffectSuite with ResourceBaseSuite with T
 
   private def server: Resource[IO, Server] =
     for
-      config <- IO(databaseConfig).toResource
-      a      <- ResourceMain
-                  .routesResource[IO](config, true, Seq("unused"), TestSso.ssoClient)
-                  .map(_.map(_.orNotFound))
-      s      <- EmberServerBuilder
-                  .default[IO]
-                  .withHost(ipv4"0.0.0.0")
-                  .withPort(port"0")
-                  .withHttpWebSocketApp(a)
-                  .withShutdownTimeout(2.seconds)
-                  .build
+      config                 <- IO(databaseConfig).toResource
+      given OtelServices[IO] <- OtelSetup.noop[IO]("test").toResource
+      a                      <- ResourceMain
+                                  .routesResource[IO](config, true, Seq("unused"), TestSso.ssoClient)
+      s                      <- EmberServerBuilder
+                                  .default[IO]
+                                  .withHost(ipv4"0.0.0.0")
+                                  .withPort(port"0")
+                                  .withHttpWebSocketApp(a)
+                                  .withShutdownTimeout(2.seconds)
+                                  .build
     yield s

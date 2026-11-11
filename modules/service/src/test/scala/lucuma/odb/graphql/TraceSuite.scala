@@ -10,10 +10,10 @@ import io.opentelemetry.sdk.testing.exporter.InMemorySpanExporter
 import io.opentelemetry.sdk.trace.SdkTracerProvider
 import io.opentelemetry.sdk.trace.`export`.SimpleSpanProcessor
 import io.opentelemetry.sdk.trace.data.SpanData
+import lucuma.otel.OtelServices
 import org.typelevel.otel4s.context.LocalProvider
 import org.typelevel.otel4s.oteljava.OtelJava
 import org.typelevel.otel4s.oteljava.context.Context
-import org.typelevel.otel4s.trace.TracerProvider
 
 import scala.jdk.CollectionConverters.*
 
@@ -25,7 +25,7 @@ class TraceSuite extends OdbSuite {
   // Provided by otel4 java for testing, not very functional friendly
   var spanExporter: InMemorySpanExporter = null
 
-  override def tracerProvider: Resource[IO, TracerProvider[IO]] =
+  override def telemetry: Resource[IO, OtelServices[IO]] =
     Resource.eval:
       IO {
         spanExporter = InMemorySpanExporter.create()
@@ -35,7 +35,7 @@ class TraceSuite extends OdbSuite {
         OpenTelemetrySdk.builder().setTracerProvider(sdkProvider).build()
       }.flatMap { sdk =>
         given LocalProvider[IO, Context] = LocalProvider.fromLiftIO[IO, Context]
-        OtelJava.fromJOpenTelemetry[IO](sdk).map(_.tracerProvider)
+        OtelJava.fromJOpenTelemetry[IO](sdk).flatMap(OtelServices.fromOtelJava("test", _))
       }
 
   def clearSpans: IO[Unit] =

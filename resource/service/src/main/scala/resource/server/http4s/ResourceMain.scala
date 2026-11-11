@@ -16,6 +16,8 @@ import fs2.io.net.*
 import grackle.skunk.SkunkMonitor
 import lucuma.core.model.User
 import lucuma.graphql.routes.GraphQLService
+import lucuma.otel.OtelServices
+import lucuma.otel.OtelServices.given
 import lucuma.otel.OtelSetup
 import lucuma.sso.client.SsoClient
 import org.flywaydb.core.Flyway
@@ -27,7 +29,7 @@ import org.http4s.server.*
 import org.http4s.server.websocket.WebSocketBuilder2
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
-import org.typelevel.otel4s.metrics.Meter
+import org.typelevel.otel4s.context.ContextManager
 import org.typelevel.otel4s.metrics.MeterProvider
 import org.typelevel.otel4s.trace.Tracer
 import org.typelevel.otel4s.trace.TracerProvider
@@ -48,18 +50,14 @@ object ResourceMain extends IOApp.Simple {
       _ <- resetDatabase(conf.database.jdbcUrl, conf.database).toResource
       _ <- migrateDatabase(conf.database.jdbcUrl, conf.database).toResource
 
-      otel                   <- OtelSetup.resource(
-                                  "lucuma-resource",
-                                  BuildInfo.gitHeadCommit.getOrElse("000000"),
-                                  conf.otel
-                                )
-      given Tracer[F]         = otel.tracer
-      given Meter[F]          = otel.meter
-      given TracerProvider[F] = otel.tracerProvider
-      given MeterProvider[F]  = otel.meterProvider
-      ssoClient              <- ssoClientResource[F](conf.sso)
-      r                      <- routesResource[F](conf.database, conf.corsOverHttps, conf.domain, ssoClient)
-      s                      <- server(conf, r)
+      given OtelServices[F] <- OtelSetup.resource(
+                                 "lucuma-resource",
+                                 BuildInfo.gitHeadCommit.getOrElse("000000"),
+                                 conf.otel
+                               )
+      ssoClient             <- ssoClientResource[F](conf.sso)
+      r                     <- routesResource[F](conf.database, conf.corsOverHttps, conf.domain, ssoClient)
+      s                     <- server(conf, r)
     yield s
 
   def ssoClientResource[F[_]: {Async, Network, Logger}](
@@ -89,31 +87,32 @@ object ResourceMain extends IOApp.Simple {
   )
 
   def routesResource[
-    F[_]: {Async, Tracer, TracerProvider, MeterProvider, Logger, Console, Network, Files,
-      Compression}
+    F[_]: {Async, Tracer, TracerProvider, MeterProvider, ContextManager, Logger, Console, Network,
+      Files, Compression}
   ](
     databaseConfig: DatabaseConfiguration,
     corsOverHttps:  Boolean,
     domain:         Seq[String],
     ssoClient:      SsoClient[F, User]
-  ): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
+  ): Resource[F, WebSocketBuilder2[F] => HttpApp[F]] =
     for
       pool       <- databasePool(databaseConfig)
       schema     <- GraphQlRoutes.loadSchema[F].toResource
       service    <-
         GraphQLService[F](ResourceMapping(pool, SkunkMonitor.noopMonitor[F])(schema)).toResource
       r           = routes(service, ssoClient)
-      middleware <- ServerMiddleware(corsOverHttps, domain, ssoClient).toResource
-    yield wsb => middleware(r(wsb))
+      middleware  = ServerMiddleware(corsOverHttps, domain, ssoClient)
+      instrument <- ServerMiddleware.instrumentation[F].toResource
+    yield wsb => instrument(middleware(r(wsb)).orNotFound)
 
   def server[F[_]: {Async, Network}](
     conf: ResourceConfiguration,
-    app:  WebSocketBuilder2[F] => HttpRoutes[F]
+    app:  WebSocketBuilder2[F] => HttpApp[F]
   ): Resource[F, Server] = EmberServerBuilder
     .default[F]
     .withHost(ipv4"0.0.0.0")
     .withPort(conf.port)
-    .withHttpWebSocketApp(wsb => app(wsb).orNotFound)
+    .withHttpWebSocketApp(app)
     .build
 
   def databasePool[F[_]: {Temporal, TracerProvider, MeterProvider, Console, Network}](
