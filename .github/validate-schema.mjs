@@ -1,6 +1,6 @@
 //
 // This file has _most_ of the functionality of the validate-schema action, but the main difference with the original action is that it supports loading schema files from JVM resource directories (in the same project). This is done by the LucumaResourceLoader
-// Annotations are supported and added during GitHub actions check using GHA annotations.
+// Annotations are emitted as workflow commands and the step fails through its exit code, so no GitHub API call is involved.
 // Resource import statements are used by schemas like resource.graphql that import from `"lucuma/odb/graphql/OdbSchema.graphql"`.
 // Most of the code is taken from https://github.com/graphql-hive/graphql-inspector
 //
@@ -8,18 +8,12 @@
 // @ts-check
 
 import * as core from '@actions/core';
-import * as github from '@actions/github';
 import { diff } from '@graphql-inspector/action/action/helpers/diff';
 import {
   AnnotationLevel,
   CheckConclusion,
 } from '@graphql-inspector/action/action/helpers/types';
 import { createSummary } from '@graphql-inspector/action/action/helpers/utils';
-import {
-  getAssociatedPullRequest,
-  getCurrentCommitSha,
-} from '@graphql-inspector/action/git';
-import { batch } from '@graphql-inspector/action/utils';
 import { GitLoader } from '@graphql-tools/git-loader';
 import { loadFromGit } from '@graphql-tools/git-loader/load-git';
 import { GraphQLFileLoader } from '@graphql-tools/graphql-file-loader';
@@ -151,118 +145,82 @@ const action = await diff({
   },
 });
 
-async function reportToGithub() {
-  const commitSha = getCurrentCommitSha();
-  const token = process.env.GITHUB_TOKEN;
-  /**
-   * @type {import('@graphql-inspector/action/types').OctokitInstance}
-   */
-  // @ts-ignore
-  const octokit = github.getOctokit(token);
-  const pullRequest = await getAssociatedPullRequest(octokit, commitSha);
-
-  const checkName = core.getInput('name') || 'GraphQL Inspector';
-  const { owner, repo } = github.context.repo;
-
-  core.info(`Creating a check named "${checkName}"`);
-  const check = await octokit.rest.checks.create({
-    owner,
-    repo,
-    name: checkName,
-    head_sha: commitSha,
-    status: 'in_progress',
-  });
-  const checkId = check.data.id;
-
-  let conclusion = action.conclusion;
-  const changes = action.changes ?? [];
-  const annotations =
-    action.annotations?.filter(
-      (c) => c.annotation_level !== AnnotationLevel.Notice,
-    ) ?? [];
-
-  const hasApprovedBreakingChangeLabel = pullRequest?.labels?.some(
-    (label) => label.name === APPROVE_LABEL,
-  );
-  if (hasApprovedBreakingChangeLabel) {
-    conclusion = CheckConclusion.Success;
-  }
-
-  const summary = createSummary(changes, 100, false);
-
-  const title =
-    conclusion === CheckConclusion.Failure
-      ? 'Something is wrong with your schema'
-      : 'Everything looks good';
-  core.info(`Conclusion: ${conclusion}`);
-
-  await updateCheckRun(octokit, checkId, {
-    conclusion,
-    output: { title, summary, annotations },
-  });
-}
+const annotations =
+  action.annotations?.filter(
+    (c) => c.annotation_level !== AnnotationLevel.Notice,
+  ) ?? [];
 
 /**
- * @type {typeof import('@graphql-inspector/action/checks').updateCheckRun}
+ * Reads the labels live, so that re-running the job after adding the label is enough: a re-run
+ * reuses the original event payload, where the label is still missing.
+ * Falls back to the payload when GitHub can't be reached.
+ * @returns {Promise<string[]>}
  */
-const updateCheckRun = async (octokit, checkId, { conclusion, output }) => {
-  core.info(`Updating check: ${checkId}`);
-  const { title, summary, annotations = [] } = output;
-  const batches = batch(annotations, 50);
-  core.info(`annotations to be sent: ${annotations.length}`);
-  await octokit.rest.checks.update({
-    check_run_id: checkId,
-    completed_at: new Date().toISOString(),
-    status: 'completed',
-    ...github.context.repo,
-    conclusion,
-    output: {
-      title,
-      summary,
-    },
-  });
+async function pullRequestLabels() {
+  const eventPath = process.env.GITHUB_EVENT_PATH;
+  if (!eventPath || !fs.existsSync(eventPath)) return [];
+  const pullRequest = JSON.parse(fs.readFileSync(eventPath, 'utf-8')).pull_request;
+  if (!pullRequest) return [];
+  const names = (/** @type {{name: string}[]} */ labels) =>
+    labels.map((label) => label.name);
   try {
-    await Promise.all(
-      batches.map(async (chunk) => {
-        await octokit.rest.checks.update({
-          check_run_id: checkId,
-          ...github.context.repo,
-          output: {
-            title,
-            summary,
-            annotations: chunk,
-          },
-        });
-        core.info(`annotations sent (${chunk.length})`);
-      }),
+    const response = await fetch(
+      `${process.env.GITHUB_API_URL}/repos/${process.env.GITHUB_REPOSITORY}/issues/${pullRequest.number}/labels?per_page=100`,
+      {
+        headers: {
+          accept: 'application/vnd.github+json',
+          ...(process.env.GITHUB_TOKEN
+            ? { authorization: `Bearer ${process.env.GITHUB_TOKEN}` }
+            : {}),
+        },
+        signal: AbortSignal.timeout(10_000),
+      },
     );
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return names(await response.json());
   } catch (error) {
-    core.error(`failed to send annotations: ${error}`);
-    throw error;
-  }
-  // Fail
-  if (conclusion === CheckConclusion.Failure) {
-    core.error(
-      'Schema validation failed:\n' +
-        output.annotations?.map((c) => `${c.path}: ${c.message}`).join('\n'),
+    core.warning(
+      `Could not read the current labels (${error}), using the ones in the event payload`,
     );
-    return core.setFailed(output.title ?? 'Check failed');
+    return names(pullRequest.labels ?? []);
   }
-  // Success or Neutral
-};
+}
+
+// Only a failure needs the labels, so a passing check makes no request at all.
+const approved =
+  action.conclusion === CheckConclusion.Failure &&
+  (await pullRequestLabels()).includes(APPROVE_LABEL);
+const failed = action.conclusion === CheckConclusion.Failure && !approved;
 
 if (process.env.GITHUB_ACTIONS) {
-  reportToGithub();
-} else if (action.conclusion === CheckConclusion.Failure) {
+  for (const annotation of annotations) {
+    const properties = {
+      title: annotation.title,
+      file: annotation.path,
+      startLine: annotation.start_line,
+      endLine: annotation.end_line,
+    };
+    if (annotation.annotation_level === AnnotationLevel.Failure && !approved)
+      core.error(annotation.message, properties);
+    else core.warning(annotation.message, properties);
+  }
+  await core.summary
+    .addHeading(`GraphQL Inspector: ${schemaPath}`, 3)
+    .addEOL()
+    .addRaw(createSummary(action.changes ?? [], 100, false), true)
+    .write();
+  if (approved)
+    core.info(`Breaking changes accepted by the "${APPROVE_LABEL}" label`);
+  if (failed) core.setFailed('Something is wrong with your schema');
+} else if (annotations.length > 0) {
   console.error(
-    'Schema validation failed:\n' +
-      action.annotations
-        ?.filter((c) => c.annotation_level !== AnnotationLevel.Notice)
+    (failed ? 'Schema validation failed:\n' : 'Schema changes:\n') +
+      annotations
         .map(
           (c) =>
             `${c.path}:${c.start_line}${c.start_column ? ':' + c.start_column : ''}: ${c.message}`,
         )
         .join('\n'),
   );
-  process.exit(1);
+  if (failed) process.exit(1);
 }

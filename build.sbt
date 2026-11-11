@@ -129,8 +129,8 @@ val munitFlakyOk = "MUNIT_FLAKY_OK" -> "${{ vars.MUNIT_FLAKY_OK }}"
 // notify of errors on the nightly cron
 ThisBuild / lucumaSlackNotifyWorkflows += "Legacy ITC Tests"
 
-// Required jobs for branch protection: Tests, plus static checks + schema validation.
-ThisBuild / lucumaRequiredCheckJobs := Seq("build", "checks")
+// Required jobs for branch protection: Tests, static checks and schema validation.
+ThisBuild / lucumaRequiredCheckJobs := Seq("build", "checks", "schema")
 
 ThisBuild / githubWorkflowEnv += herokuToken
 ThisBuild / githubWorkflowEnv += munitFlakyOk
@@ -472,47 +472,50 @@ lazy val sbtStaticChecks =
     name = Some("Static checks")
   )
 
-lazy val npmCi = WorkflowStep.Run(
-  List("npm ci"),
-  name = Some("Install npm dependencies"),
-  cond = Some("github.event_name == 'pull_request'")
-)
-
 def validateSchemaStep(schema: String, name: String): WorkflowStep = WorkflowStep.Run(
   List(s"node .github/validate-schema.mjs ${schema}"),
   name = Some(name),
-  cond = Some("github.event_name == 'pull_request'")
+  // The remaining schemas are still checked when an earlier one fails.
+  cond = Some("!cancelled()")
 )
 
-lazy val graphqlInspectorOdb = validateSchemaStep(
-  "modules/schema/src/main/resources/lucuma/odb/graphql/OdbSchema.graphql",
-  name = "Validate ODB GraphQL schema changes",
-)
-
-lazy val graphqlInspectorItc = validateSchemaStep(
-  "itc/service/src/main/resources/graphql/itc.graphql",
-  name = "Validate ITC GraphQL schema changes",
-)
-
-lazy val graphqlInspectorResource = validateSchemaStep(
-  "resource/service/src/main/resources/graphql/resource.graphql",
-  name = "Validate Resource GraphQL schema changes",
+lazy val schemaValidationSteps: List[WorkflowStep] = List(
+  CheckoutFull,
+  WorkflowStep.Run(List("npm ci"), name = Some("Install npm dependencies")),
+  validateSchemaStep(
+    "modules/schema/src/main/resources/lucuma/odb/graphql/OdbSchema.graphql",
+    name = "Validate ODB GraphQL schema changes"
+  ),
+  validateSchemaStep(
+    "itc/service/src/main/resources/graphql/itc.graphql",
+    name = "Validate ITC GraphQL schema changes"
+  ),
+  validateSchemaStep(
+    "resource/service/src/main/resources/graphql/resource.graphql",
+    name = "Validate Resource GraphQL schema changes"
+  )
 )
 
 // Don't do static checks repeatedly on each shard, instead create a separate task only for checks.
 ThisBuild / githubWorkflowAddedJobs ++= Seq(
   WorkflowJob(
     "checks",
-    "Static checks and schema validation",
+    "Static checks",
     githubWorkflowJobSetup.value.toList :::
       sbtStaticChecks ::
-      npmCi ::
-      graphqlInspectorOdb ::
-      graphqlInspectorItc ::
-      graphqlInspectorResource ::
       Nil,
     scalas = List(scalaVersion.value),
     javas = githubWorkflowJavaVersions.value.toList.take(1)
+  ),
+  // A job of its own, without sbt, so that re-running it after adding the
+  // `expected-breaking-change` label takes about a minute.
+  WorkflowJob(
+    "schema",
+    "GraphQL schema validation",
+    schemaValidationSteps,
+    scalas = Nil,
+    javas = Nil,
+    cond = Some("github.event_name == 'pull_request'")
   ),
   // Runs on every merge, even when nothing is deployed: the deployment record has to be complete
   // for every commit so a rollback never has to know which systems were promoted. Individual
@@ -1273,13 +1276,15 @@ lazy val pdfSummary = project
         Cmd(
           "RUN",
           "--mount=type=secret,id=pyexplore_token,required=true",
-          "apt-get update",
-          "&& apt-get install -y --no-install-recommends python3 python3-venv git",
+          // Retried as a pair: apt-get update exits 0 when the index downloads fail (DNS blips on the runners).
+          "n=0; until apt-get update && apt-get install -y --no-install-recommends python3 python3-venv git; do n=$((n+1)); [ \"$n\" -lt 5 ] || exit 1; sleep 10; done",
           "&& python3 -m venv /opt/pyexplore",
-          "&& GIT_CONFIG_COUNT=1",
+          // Braces keep the && chain intact: a bare `;` would run the loop even after a failed step.
+          "&& { n=0; until GIT_CONFIG_COUNT=1",
           "GIT_CONFIG_KEY_0=url.https://x-access-token:$(cat /run/secrets/pyexplore_token)@github.com/.insteadOf",
           "GIT_CONFIG_VALUE_0=https://github.com/",
           s"""/opt/pyexplore/bin/pip install --no-cache-dir "pyexplore[pdf] @ git+https://github.com/andrewwstephens/pyexplore@$pyexploreRef"""",
+          "; do n=$((n+1)); [ \"$n\" -lt 5 ] || exit 1; sleep 10; done; }",
           "&& apt-get purge -y git && apt-get autoremove -y",
           "&& rm -rf /var/lib/apt/lists/*"
         )
