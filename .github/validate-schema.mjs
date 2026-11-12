@@ -212,15 +212,16 @@ if (process.env.GITHUB_ACTIONS) {
   if (approved)
     core.info(`Breaking changes accepted by the "${APPROVE_LABEL}" label`);
   if (failed) core.setFailed('Something is wrong with your schema');
-} else if (annotations.length > 0) {
-  console.error(
-    (failed ? 'Schema validation failed:\n' : 'Schema changes:\n') +
-      annotations
-        .map(
-          (c) =>
-            `${c.path}:${c.start_line}${c.start_column ? ':' + c.start_column : ''}: ${c.message}`,
-        )
-        .join('\n'),
-  );
+} else {
+  if (annotations.length > 0)
+    console.error(
+      (failed ? 'Schema validation failed:\n' : 'Schema changes:\n') +
+        annotations
+          .map(
+            (c) =>
+              `${c.path}:${c.start_line}${c.start_column ? ':' + c.start_column : ''}: ${c.message}`,
+          )
+          .join('\n'),
+    );
   if (failed) process.exit(1);
 }
