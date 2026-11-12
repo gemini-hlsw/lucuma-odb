@@ -168,6 +168,16 @@ class observation_workflow_missing_smart_gcal extends ExecutionTestSupportForGmo
       assertEquals(steps.distinct.sorted, List("ARC", "FLAT", "SCIENCE"))
       assertEquals(msgs, Nil)
 
+  test("an engineering program, which has no proposal, is warned too"):
+    for
+      pid  <- createProgram
+      _    <- setProgramReference(staff, pid, """engineering: { semester: "2025B", instrument: GMOS_NORTH }""")
+      tid  <- createTargetWithProfileAs(pi, pid)
+      oid  <- createObservationWithModeAs(pi, pid, List(tid), mode(none))
+      _    <- runObscalcUpdate(pid, oid)
+      msgs <- missing(oid)
+    yield assertEquals(msgs.size, 2, msgs.toString)
+
   test("a stored sequence runs no lookup and reports nothing"):
     val science =
       """

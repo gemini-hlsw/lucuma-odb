@@ -45,7 +45,7 @@ object StepViolationValidator extends ObservationValidator:
   override def apply(info: ObservationValidationInfo): ObservationValidationMap =
     validations(info)((t, v) => validation(t, v).some)
 
-  /** The one step violation calibration observations are subject to. */
+  /** The one step violation observations outside a proposal are subject to. */
   val missingSmartGcal: ObservationValidator = info =>
     validations(info): (t, v) =>
       Option.when(v.code === ObservationValidationCode.MissingSmartGcal):
