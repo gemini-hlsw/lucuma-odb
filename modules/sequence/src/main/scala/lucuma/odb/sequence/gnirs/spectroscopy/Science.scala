@@ -221,9 +221,6 @@ object Science:
         else b.steps.cals.map(cals => ProtoAtom(AtomTitle(AtomTitle.NighttimeCal, b.titleSuffix).some, cals))
       science ++ closing.toList
 
-    override def violations: List[StepViolation] =
-      blocks.toVector.flatMap(_.steps.missing).toList
-
     // Atom ids come from the atom's index within a single builder, so every
     // segment must feed the same `buildStream`.
     override def generate: Stream[Pure, Atom[GnirsDynamicConfig]] =
@@ -383,6 +380,6 @@ object Science:
     yield Generator(
       bs.toNev,
       AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Science)
-    ): SequenceGenerator[GnirsDynamicConfig]
+    ).reporting(bs.toList.flatMap(_.steps.missing))
 
     gen.value
