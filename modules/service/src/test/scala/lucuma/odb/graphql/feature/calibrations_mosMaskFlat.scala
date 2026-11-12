@@ -9,6 +9,7 @@ import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.PosLong
 import io.circe.Json
 import io.circe.syntax.*
+import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu
@@ -17,20 +18,23 @@ import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
 import lucuma.core.enums.Instrument
+import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.SequenceCommand
+import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.model.Attachment
-import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
+import lucuma.core.syntax.timespan.*
+import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
+import lucuma.odb.service.PerProgramPerConfigCalibrationsService
 import lucuma.odb.service.Services
 import lucuma.odb.smartgcal.data.Gmos
 import lucuma.odb.util.Codecs.attachment_id
 import lucuma.odb.util.Codecs.observation_id
 import lucuma.odb.util.Codecs.program_id
-import lucuma.odb.util.Codecs.science_band
 import skunk.Session
 import skunk.codec.all.text
 import skunk.syntax.all.*
@@ -59,38 +63,6 @@ class calibrations_mosMaskFlat
             services.smartGcalService.insertGmosNorth(200, Gmos.TableRow(PosLong.unsafeFrom(1), gn, gmos_flat)) *>
               services.smartGcalService.insertGmosSouth(200, Gmos.TableRow(PosLong.unsafeFrom(1), gs, gmos_flat))
 
-  private def gmosNorthMos(aid: Option[Attachment.Id]): String =
-    s"""
-      gmosNorthMos: {
-        grating: R831_G5302
-        filter: R_PRIME
-        customMask: {
-          slitWidth: CUSTOM_WIDTH_0_50
-          ${aid.foldMap(a => s"attachmentId: ${a.asJson}")}
-        }
-        centralWavelength: { nanometers: 500 }
-      }
-    """
-
-  private def gmosSouthMos(aid: Attachment.Id): String =
-    s"""
-      gmosSouthMos: {
-        grating: R600_G5324
-        filter: R_PRIME
-        customMask: { slitWidth: CUSTOM_WIDTH_0_50, attachmentId: ${aid.asJson} }
-        centralWavelength: { nanometers: 500 }
-      }
-    """
-
-  private def flamingos2Mos(aid: Attachment.Id): String =
-    s"""
-      flamingos2Mos: {
-        disperser: R1200_JH
-        filter: JH
-        customMask: { slitWidth: CUSTOM_WIDTH_2_PIX, attachmentId: ${aid.asJson} }
-      }
-    """
-
   private def setMask(oid: Observation.Id, aid: Option[Attachment.Id]): IO[Unit] =
     query(
       pi,
@@ -105,35 +77,7 @@ class calibrations_mosMaskFlat
     ).void
 
   private def flatsOf(pid: Program.Id): IO[List[Observation.Id]] =
-    query(
-      serviceUser,
-      s"""query {
-            observations(WHERE: { program: { id: { EQ: "$pid" } }, calibrationRole: { EQ: MOS_MASK_FLAT } }) {
-              matches { id }
-            }
-          }"""
-    ).flatMap: c =>
-      c.hcursor.downFields("observations", "matches").as[List[Json]]
-        .flatMap(_.traverse(_.hcursor.downField("id").as[Observation.Id]))
-        .leftMap(f => new RuntimeException(f.message))
-        .liftTo[IO]
-
-  private def groupOf(oid: Observation.Id): IO[(Option[Group.Id], Option[String])] =
-    query(
-      serviceUser,
-      s"""query {
-            observation(observationId: "$oid") {
-              groupId
-              scienceBand
-            }
-          }"""
-    ).map: c =>
-      val o = c.hcursor.downField("observation")
-      (o.downField("groupId").as[Option[Group.Id]].toOption.flatten, o.downField("scienceBand").as[Option[String]].toOption.flatten)
-
-  private def groupName(gid: Group.Id): IO[Option[String]] =
-    query(serviceUser, s"""query { group(groupId: "$gid") { name } }""")
-      .map(_.hcursor.downFields("group", "name").as[Option[String]].toOption.flatten)
+    queryCalibrationsWithRole(pid, CalibrationRole.MosMaskFlat)
 
   private def maskOfFlat(oid: Observation.Id, mode: String): IO[Option[Attachment.Id]] =
     query(
@@ -144,12 +88,6 @@ class calibrations_mosMaskFlat
             }
           }"""
     ).map(_.hcursor.downFields("observation", "observingMode", mode, "customMask", "attachmentId").as[Option[Attachment.Id]].toOption.flatten)
-
-  private def setInactive(oid: Observation.Id): IO[Unit] =
-    withSession(_.execute(sql"UPDATE t_observation SET c_workflow_user_state = 'inactive' WHERE c_observation_id = $observation_id".command)(oid).void)
-
-  private def setBand(oid: Observation.Id, band: ScienceBand): IO[Unit] =
-    withSession(_.execute(sql"UPDATE t_observation SET c_science_band = $science_band WHERE c_observation_id = $observation_id".command)((band, oid)).void)
 
   private def replaceFile(aid: Attachment.Id, path: String): IO[Unit] =
     withSession(_.execute(sql"UPDATE t_attachment SET c_remote_path = $text WHERE c_attachment_id = $attachment_id".command)((path, aid)).void)
@@ -168,7 +106,7 @@ class calibrations_mosMaskFlat
       pid <- createProgramAs(pi)
       tid <- createTargetWithProfileAs(pi, pid)
       aid <- insertMosMaskAttachment(pid, name, Instrument.GmosNorth)
-      oid <- createObservationWithModeAs(pi, pid, List(tid), gmosNorthMos(aid.some))
+      oid <- createObservationWithModeAs(pi, pid, List(tid), gmosNorthMosMode(aid.some))
     yield (pid, tid, aid, oid)
 
   test("a used GMOS North mask gets one flat in the Calibrations group"):
@@ -176,20 +114,20 @@ class calibrations_mosMaskFlat
       (pid, _, aid, oid) <- gnMosWithMask()
       _                  <- recalc(pid, oid)
       flats              <- flatsOf(pid)
-      (gid, _)           <- groupOf(flats.head)
-      name               <- gid.flatTraverse(groupName)
+      gid                <- queryObservation(flats.head).map(_.groupId)
+      group              <- gid.traverse(queryGroupNameAndRoles)
       mask               <- maskOfFlat(flats.head, "gmosNorthMos")
     yield
       assertEquals(flats.size, 1)
-      assertEquals(name, "Calibrations".some)
+      assertEquals(group.map(_.name), PerProgramPerConfigCalibrationsService.CalibrationsGroupName.value.some)
       assertEquals(mask, aid.some)
 
   test("observations sharing a mask share one flat; a second mask gets its own"):
     for
       (pid, tid, aid, oid) <- gnMosWithMask()
-      _                    <- createObservationWithModeAs(pi, pid, List(tid), gmosNorthMos(aid.some))
+      _                    <- createObservationWithModeAs(pi, pid, List(tid), gmosNorthMosMode(aid.some))
       other                <- insertMosMaskAttachment(pid, "GN2025AQ001-02_ODF.fits", Instrument.GmosNorth)
-      _                    <- createObservationWithModeAs(pi, pid, List(tid), gmosNorthMos(other.some))
+      _                    <- createObservationWithModeAs(pi, pid, List(tid), gmosNorthMosMode(other.some))
       _                    <- recalc(pid, oid)
       flats                <- flatsOf(pid)
       masks                <- flats.traverse(maskOfFlat(_, "gmosNorthMos"))
@@ -211,7 +149,7 @@ class calibrations_mosMaskFlat
       pid <- createProgramAs(pi)
       tid <- createTargetWithProfileAs(pi, pid)
       _   <- insertMosMaskAttachment(pid, "GN2025AQ001-01_ODF.fits", Instrument.GmosNorth)
-      oid <- createObservationWithModeAs(pi, pid, List(tid), gmosNorthMos(none))
+      oid <- createObservationWithModeAs(pi, pid, List(tid), gmosNorthMosMode(none))
       _   <- recalc(pid, oid)
       fs  <- flatsOf(pid)
     yield assertEquals(fs, Nil)
@@ -235,7 +173,7 @@ class calibrations_mosMaskFlat
       (pid, _, _, oid) <- gnMosWithMask()
       _                <- recalc(pid, oid)
       before           <- flatsOf(pid)
-      _                <- setInactive(oid)
+      _                <- setObservationWorkflowState(pi, oid, ObservationWorkflowState.Inactive)
       _                <- recalculateCalibrations(pid, when, oid)
       after            <- flatsOf(pid)
     yield
@@ -291,13 +229,17 @@ class calibrations_mosMaskFlat
   test("the flat takes the best band of the observations using the mask"):
     for
       (pid, tid, aid, oid) <- gnMosWithMask()
-      other                <- createObservationWithModeAs(pi, pid, List(tid), gmosNorthMos(aid.some))
-      _                    <- setBand(oid, ScienceBand.Band3)
-      _                    <- setBand(other, ScienceBand.Band2)
+      other                <- createObservationWithModeAs(pi, pid, List(tid), gmosNorthMosMode(aid.some))
+      _                    <- setAllocationsAs(staff, pid, List(
+                                AllocationInput(TimeAccountingCategory.US, ScienceBand.Band2, 1.hourTimeSpan),
+                                AllocationInput(TimeAccountingCategory.US, ScienceBand.Band3, 1.hourTimeSpan)
+                              ))
+      _                    <- setScienceBandAs(pi, oid, ScienceBand.Band3.some)
+      _                    <- setScienceBandAs(pi, other, ScienceBand.Band2.some)
       _                    <- recalc(pid, oid)
       flats                <- flatsOf(pid)
-      (_, band)            <- groupOf(flats.head)
-    yield assertEquals(band, "BAND2".some)
+      band                 <- queryScienceBand(flats.head)
+    yield assertEquals(band, ScienceBand.Band2.some)
 
   test("GMOS North flat is one day-cal flat through the mask: mirror, r, 1x1, fast, low, full frame"):
     for
@@ -345,7 +287,7 @@ class calibrations_mosMaskFlat
       pid  <- createProgramAs(pi)
       tid  <- createTargetWithProfileAs(pi, pid)
       aid  <- insertMosMaskAttachment(pid, "GS2025AQ001-01_ODF.fits", Instrument.GmosSouth)
-      oid  <- createObservationWithModeAs(pi, pid, List(tid), gmosSouthMos(aid))
+      oid  <- createObservationWithModeAs(pi, pid, List(tid), gmosSouthMosMode(aid.some))
       _    <- recalc(pid, oid)
       flat <- flatsOf(pid).map(_.head)
       _    <- runObscalcUpdate(pid, flat)
@@ -360,7 +302,7 @@ class calibrations_mosMaskFlat
       pid  <- createProgramAs(pi)
       tid  <- createTargetWithProfileAs(pi, pid)
       aid  <- insertMosMaskAttachment(pid, "GS2025AQ001-01_ODF.fits", Instrument.Flamingos2)
-      oid  <- createObservationWithModeAs(pi, pid, List(tid), flamingos2Mos(aid))
+      oid  <- createObservationWithModeAs(pi, pid, List(tid), flamingos2MosMode(aid.some))
       _    <- recalc(pid, oid)
       flat <- flatsOf(pid).map(_.head)
       mask <- maskOfFlat(flat, "flamingos2Mos")

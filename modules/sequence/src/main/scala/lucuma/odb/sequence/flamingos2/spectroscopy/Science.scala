@@ -39,13 +39,14 @@ import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.*
+import lucuma.odb.sequence.SmartGcalExpander.Calibration
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.syntax.all.*
-import lucuma.odb.sequence.SmartGcalExpander.Calibration
 import lucuma.odb.sequence.util.AtomBuilder
 import lucuma.odb.sequence.util.DaytimeSmartGcal
 import lucuma.odb.sequence.util.definitionError
+import lucuma.refined.*
 
 import java.util.UUID
 
@@ -64,9 +65,9 @@ object Science:
   /**
    * The name of the ABBA cycle atoms.
    */
-  val AbbaCycleTitle: NonEmptyString = NonEmptyString.unsafeFrom("ABBA Cycle")
+  val AbbaCycleTitle: NonEmptyString = "ABBA Cycle".refined
 
-  val MosMaskFlatTitle: NonEmptyString = NonEmptyString.unsafeFrom("MOS Mask Flat")
+  val MosMaskFlatTitle: NonEmptyString = "MOS Mask Flat".refined
 
   case class StepDefinition(
     a0:   ProtoStep[F2],
@@ -185,6 +186,7 @@ object Science:
   /**
    * The sequence of a MOS mask flat: one smart GCAL flat imaging the mask with
    * no disperser, the H filter, the MOS decker and bright read mode.
+   * The selection is the defined on sc-11482 specification
    */
   private def mosMaskFlat[F[_]: Monad](
     observationId: Observation.Id,

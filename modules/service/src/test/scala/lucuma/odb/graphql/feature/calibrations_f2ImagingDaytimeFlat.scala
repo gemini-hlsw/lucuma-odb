@@ -18,7 +18,6 @@ import lucuma.core.enums.GcalDiffuser
 import lucuma.core.enums.GcalFilter
 import lucuma.core.enums.GcalShutter
 import lucuma.core.enums.ObservationWorkflowState
-import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
@@ -111,20 +110,6 @@ class calibrations_f2ImagingDaytimeFlat
 
   private def queryObscalcState(oid: Observation.Id): IO[String] =
     session.use(_.unique(sql"SELECT c_obscalc_state::text FROM t_obscalc WHERE c_observation_id = $observation_id".query(text))(oid))
-
-  case class GroupNameAndRoles(name: String, calibrationRoles: List[CalibrationRole]) derives Decoder
-
-  private def queryGroupNameAndRoles(gid: Group.Id): IO[GroupNameAndRoles] =
-    query(
-      serviceUser,
-      s"""query {
-            group(groupId: "$gid") {
-              name
-              calibrationRoles
-            }
-          }"""
-    ).flatMap: c =>
-      c.hcursor.downField("group").as[GroupNameAndRoles].leftMap(f => new RuntimeException(f.message)).liftTo[IO]
 
   private def queryAsterismIds(oid: Observation.Id): IO[List[Json]] =
     query(

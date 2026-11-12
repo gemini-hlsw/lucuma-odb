@@ -354,6 +354,7 @@ object Science:
       /**
        * The flat of a MOS mask flat: the mask imaged through the mirror and r,
        * full frame, unbinned, fast read and low gain.
+       * The selection is the defined on sc-11482 specification
        */
       def mosMaskFlat(config: Config[G, L, U]): NonEmptyList[(NonEmptyString, ProtoStep[D])] =
         val flat = eval:
