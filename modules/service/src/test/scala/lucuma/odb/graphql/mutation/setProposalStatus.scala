@@ -22,6 +22,8 @@ import lucuma.core.enums.ProgramType
 import lucuma.core.enums.ProposalStatus
 import lucuma.core.enums.ProposalSubmissionError
 import lucuma.core.enums.ProposalSubmissionError.*
+import lucuma.core.enums.ScienceBand
+import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.model.CallForProposals
 import lucuma.core.model.PartnerLink
 import lucuma.core.model.Program
@@ -470,6 +472,37 @@ class setProposalStatus extends OdbSuite
         expected =
           Left(List(error.notAuthorizedNew(pid, pi, ProposalStatus.Accepted).message))
       )
+    }
+  }
+
+  test("⨯ ngo cannot set the proposal status, even with write access") {
+    // The CA allocation gives the CA NGO write access to the program.
+    List(ProposalStatus.Submitted, ProposalStatus.Accepted).traverse_ { status =>
+      createProgramAs(pi).flatMap { pid =>
+        addProposal(pi, pid) >>
+        addSubmissionPrerequisites(pid) >>
+        setOneAllocationAs(staff, pid, TimeAccountingCategory.CA, ScienceBand.Band1, TimeSpan.fromHours(1).get) >>
+        expect(
+          user = ngo,
+          query = s"""
+            mutation {
+              setProposalStatus(
+                input: {
+                  programId: "$pid"
+                  status: ${status.tag.toUpperCase}
+                }
+              ) {
+                program {
+                  id
+                  proposalStatus
+                }
+              }
+            }
+          """,
+          expected =
+            Left(List(error.notAuthorizedNew(pid, ngo, status).message))
+        )
+      }
     }
   }
 

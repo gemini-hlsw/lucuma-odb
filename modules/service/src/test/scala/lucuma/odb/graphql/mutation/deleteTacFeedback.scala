@@ -4,7 +4,6 @@
 package lucuma.odb.graphql
 package mutation
 
-import cats.data.Ior
 import cats.effect.IO
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.PosBigDecimal
@@ -159,29 +158,6 @@ class deleteTacFeedback extends OdbSuite with query.ObservingModeSetupOperations
       deleteTacFeedbackAs(staff, pid, US).map(assert(_)) *>
       allocations(pid).map(assertEquals(_, List(("CA", "BAND1"), ("US", "BAND2"))))
 
-  test("deleting TAC feedback warns about observations whose band loses its time"):
-    for
-      pid <- createProgramWithFeedback
-      // US now recommends time only in BAND2, and CA only in BAND1.
-      _   <- setTacFeedbackAs(staff, pid, feedback(US).copy(recommendedTimes = List(TacRecommendedTimeInput(ScienceBand.Band2, TimeSpan.fromHours(1).get)).some))
-      oid <- createObservationAs(pi, pid)
-      _   <- setScienceBandAs(pi, oid, ScienceBand.Band2.some)
-      _   <- expectIor(
-               user     = staff,
-               query    = s"""
-                 mutation {
-                   deleteTacFeedback(input: { programId: "$pid", timeAccountingCategory: US }) {
-                     result
-                   }
-                 }
-               """,
-               expected = Ior.both(
-                 List(s"The following observations now have a science band for which no time is allocated: $oid"),
-                 json"""{ "deleteTacFeedback": { "result": true } }"""
-               )
-             )
-    yield ()
-
   test("deleting the proposal deletes its TAC feedback and recommended times"):
     createProgramWithFeedback.flatMap: pid =>
       setOneAllocationAs(staff, pid, US, ScienceBand.Band2, TimeSpan.fromHours(3).get) *>
@@ -216,13 +192,11 @@ class deleteTacFeedback extends OdbSuite with query.ObservingModeSetupOperations
       cid <- createGeminiCallForProposalsAs(staff, RegularSemester, Semester.unsafeFromString("2025A"))
       pid <- createProgramWithUsPi(pi)
       _   <- addProposal(pi, pid, cid.some)
-      _   <- addProposalPrerequisitesAs(pi, pid)
-      oid <- addDefinedObservationAs(pi, pid).map(_._2)
+      _   <- addSubmissionPrerequisitesAs(pi, pid)
       _   <- addPartnerSplits(pi, pid, partnerSplits = List((Partner.US, 100)))
       ref <- submitProposal(pi, pid)
-      // The recommended time gives the observation BAND1, which then loses its time.
       _   <- setTacFeedbackAs(staff, pid, feedback(US))
-      _   <- expectIor(
+      _   <- expect(
                user     = ngoUs,
                query    = s"""
                  mutation {
@@ -234,10 +208,7 @@ class deleteTacFeedback extends OdbSuite with query.ObservingModeSetupOperations
                    }
                  }
                """,
-               expected = Ior.both(
-                 List(s"The following observations now have a science band for which no time is allocated: $oid"),
-                 json"""{ "deleteTacFeedback": { "result": true } }"""
-               )
+               expected = json"""{ "deleteTacFeedback": { "result": true } }""".asRight
              )
       _   <- categories(pid).map(assertEquals(_, Nil))
     yield ()

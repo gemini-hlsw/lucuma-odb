@@ -586,13 +586,18 @@ object ObservationValidationInfo {
     def ProgramAllocations[A <: NonEmptyList[Program.Id]](enc: Encoder[A]): Query[A, (Program.Id, ScienceBand)] =
       sql"""
         SELECT DISTINCT
-          c_program_id,
-          c_science_band
+          a.c_program_id,
+          a.c_science_band
         FROM
-          t_allocation
+          t_allocation a
+        JOIN
+          t_program p ON p.c_program_id = a.c_program_id
         WHERE
-          c_program_id IN ($enc)
-          AND c_duration > INTERVAL '0'
+          a.c_program_id IN ($enc)
+          AND a.c_duration > INTERVAL '0'
+          -- While the proposal is submitted the allocations are only TAC
+          -- recommendations, which observation bands do not follow.
+          AND p.c_proposal_status <> 'submitted'
       """.query(program_id *: science_band)
 
     // The obscalc invalidation trigger on t_cfp (V1342) fires only when one of

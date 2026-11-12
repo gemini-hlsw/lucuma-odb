@@ -4,7 +4,6 @@
 package lucuma.odb.graphql
 package mutation
 
-import cats.data.Ior
 import cats.effect.IO
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.PosBigDecimal
@@ -466,41 +465,24 @@ class setTacFeedback extends OdbSuite with query.ObservingModeSetupOperations:
         .leftMap(f => new RuntimeException(f.message))
         .liftTo[IO]
 
-  test("a recommended time in a single band gives it to observations without one"):
+  test("recommended times leave observation bands alone"):
+    // Bands follow the allocations only once the proposal is accepted.
     for
       pid <- createProgramWithProposal()
       oid <- createObservationAs(pi, pid)
       _   <- setTacFeedbackAs(staff, pid, feedback(US))
       b   <- scienceBand(oid)
-    yield assertEquals(b, ScienceBand.Band1.some)
+    yield assertEquals(b, none)
 
-  test("removing a recommended time warns about observations in its band"):
+  test("removing a recommended time gives no warning about observation bands"):
+    // setTacFeedbackAs fails on a warning.
     val times = List(ScienceBand.Band1 -> BigDecimal(2), ScienceBand.Band2 -> BigDecimal(1))
     for
       pid <- createProgramWithProposal()
       _   <- setTacFeedbackAs(staff, pid, feedback(US, times = times))
       oid <- createObservationAs(pi, pid)
       _   <- setScienceBandAs(pi, oid, ScienceBand.Band2.some)
-      _   <- expectIor(
-               user     = staff,
-               query    = s"""
-                 mutation {
-                   setTacFeedback(input: {
-                     programId: "$pid"
-                     tacFeedback: {
-                       timeAccountingCategory: US
-                       recommendedTimes: [ { band: BAND1, time: { hours: 2 } } ]
-                     }
-                   }) {
-                     tacFeedback { timeAccountingCategory }
-                   }
-                 }
-               """,
-               expected = Ior.both(
-                 List(s"The following observations now have a science band for which no time is allocated: $oid"),
-                 json"""{ "setTacFeedback": { "tacFeedback": { "timeAccountingCategory": "US" } } }"""
-               )
-             )
+      _   <- setTacFeedbackAs(staff, pid, partial(US).copy(recommendedTimes = recommendedTimes(ScienceBand.Band1 -> BigDecimal(2)).some))
     yield ()
 
   test("recommended times may not repeat a band"):

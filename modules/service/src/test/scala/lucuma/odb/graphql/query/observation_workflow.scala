@@ -8,6 +8,7 @@ package query
 import cats.effect.IO
 import cats.syntax.all.*
 import clue.ResponseException
+import eu.timepit.refined.types.numeric.PosBigDecimal
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
@@ -18,6 +19,7 @@ import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ScienceBand
+import lucuma.core.enums.TacPartnerDecision
 import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.model.CallForProposals
 import lucuma.core.model.CloudExtinction
@@ -32,7 +34,10 @@ import lucuma.core.syntax.timespan.*
 import lucuma.core.util.CalculatedValue
 import lucuma.core.util.CalculationState
 import lucuma.core.util.TimeSpan
+import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.input.AllocationInput
+import lucuma.odb.graphql.input.TacFeedbackInput
+import lucuma.odb.graphql.input.TacRecommendedTimeInput
 import lucuma.odb.graphql.mutation.UpdateObservationsOps
 import lucuma.odb.service.GuideProbeRules
 import lucuma.odb.service.ObservationService
@@ -758,6 +763,51 @@ class observation_workflow
       _   <- runObscalcUpdateAs(serviceUser, pid, oid)
       _   <- setReady(oid, json"""{ "setObservationWorkflowState": { "state": "READY" } }""".asRight)
     yield ()
+
+  test("recommended times raise no band error until acceptance assigns the band"):
+    def workflowJson(pid: Program.Id, oid: Observation.Id): IO[String] =
+      runObscalcUpdateAs(serviceUser, pid, oid) *>
+        query(pi, workflowQuery(oid)).map(_.noSpaces)
+
+    def scienceBand(oid: Observation.Id): IO[Option[ScienceBand]] =
+      query(staff, s"""query { observation(observationId: "$oid") { scienceBand } }""").flatMap: js =>
+        js.hcursor
+          .downFields("observation", "scienceBand")
+          .as[Option[ScienceBand]]
+          .leftMap(f => new RuntimeException(f.message))
+          .liftTo[IO]
+
+    val recommendation =
+      TacFeedbackInput(
+        TimeAccountingCategory.US,
+        TacPartnerDecision.Accepted.some,
+        PosBigDecimal.unsafeFrom(BigDecimal(1)).some,
+        List(TacRecommendedTimeInput(ScienceBand.Band2, 2.hourTimeSpan)).some,
+        Nullable.Absent
+      )
+
+    for
+      cfp <- createGeminiCallForProposalsAs(staff)
+      pid <- createProgramWithNonPartnerPi(pi)
+      _   <- addProposal(pi, pid, Some(cfp), None)
+      _   <- addPartnerSplits(pi, pid)
+      _   <- addCoisAs(pi, pid)
+      tid <- createTargetWithProfileAs(pi, pid)
+      oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      _   <- createConfigurationRequestAs(pi, oid).flatMap(setConfigurationRequestStatusAs(staff, _, ConfigurationRequestStatus.Approved))
+      _   <- computeItcResultAs(pi, oid)
+      _   <- setProposalSubmittedDirectly(pid)
+      // The recommendation creates a BAND2 allocation, but the proposal is
+      // still submitted, so the observation needs no band yet.
+      _   <- setTacFeedbackAs(staff, pid, recommendation)
+      w   <- workflowJson(pid, oid)
+      b0  <- scienceBand(oid)
+      _   <- setProposalStatus(staff, pid, "ACCEPTED")
+      b1  <- scienceBand(oid)
+    yield
+      assert(!w.contains(BandValidator.missingScienceBand), w)
+      assertEquals(b0, none)
+      assertEquals(b1, ScienceBand.Band2.some)
 
   test("calibration with no band is Undefined"):
     val allocations = List(

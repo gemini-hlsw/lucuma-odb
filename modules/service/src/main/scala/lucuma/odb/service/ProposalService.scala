@@ -213,9 +213,10 @@ object ProposalService {
       import error.*
 
       extension (ps: ProposalStatus)
+        // NGO users may never set the proposal status.
         def userCanChangeStatus: Boolean =
-          ps <= ProposalStatus.Submitted ||
-          user.role.access >= Access.Ngo
+          user.role.access =!= Access.Ngo &&
+          (ps <= ProposalStatus.Submitted || user.role.access >= Access.Staff)
 
         def userCanEditProposal: Boolean =
           ps < ProposalStatus.Submitted ||
@@ -1029,6 +1030,9 @@ object ProposalService {
                       newStatus  = input.status
                       _         <- ResultT.fromResult(validate(pid, info, states, missing, oldStatus, newStatus))
                       _         <- ResultT.liftF(update(pid, input.status))
+                      // Acceptance makes the allocations final, so observations
+                      // are brought in line with them, as by setAllocations.
+                      _         <- ResultT(Services.asSuperUser(allocationService.afterAllocationsChange(pid))).whenA(oldStatus =!= ProposalStatus.Accepted && newStatus === ProposalStatus.Accepted)
                       _         <- ResultT(configurationService.canonicalizeAll(pid)).whenA(oldStatus === ProposalStatus.NotSubmitted && newStatus === ProposalStatus.Submitted)
                       _         <- ResultT.liftF(Services.asSuperUser(pdfSummaryJobService.enqueue(pid)).void).whenA(oldStatus === ProposalStatus.NotSubmitted && newStatus === ProposalStatus.Submitted)
                       _         <- ResultT(configurationService.deleteAll(pid)).whenA(oldStatus === ProposalStatus.Submitted && newStatus === ProposalStatus.NotSubmitted)

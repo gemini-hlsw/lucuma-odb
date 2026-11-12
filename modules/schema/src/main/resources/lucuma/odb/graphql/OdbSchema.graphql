@@ -4232,10 +4232,8 @@ type Mutation {
     proposals is of type DIRECTORS_TIME, DEMO_SCIENCE, LARGE_PROGRAM or
     SYSTEM_VERIFICATION, respectively.
 
-  When recommended times are supplied, observations without a science band are
-  given the program's only allocated band, if it has just one, and a warning
-  lists observations whose band no longer has time allocated, as for
-  `setAllocations`.
+  Recommended times do not change observation science bands, which follow the
+  allocations once the proposal is accepted.
   """
   setTacFeedback(input: SetTacFeedbackInput!): TacFeedbackResult!
 
@@ -4244,9 +4242,7 @@ type Mutation {
   with the allocations that carry its recommended times.  The program must have
   a proposal whose status is SUBMITTED.  For a category that belongs to a
   partner, the user must be staff or an NGO user of that partner who can read
-  the program.  Only staff may delete feedback for the other categories.  As
-  for `setTacFeedback`, observations are then brought in line with the
-  remaining allocations, which may produce a warning.
+  the program.  Only staff may delete feedback for the other categories.
   """
   deleteTacFeedback(input: DeleteTacFeedbackInput!): DeleteTacFeedbackResult!
 
@@ -4285,7 +4281,13 @@ type Mutation {
   """
   regenerateProposalSummaries(input: RegenerateProposalSummariesInput!): RegenerateProposalSummariesResult!
 
-  "Set the proposal status."
+  """
+  Set the proposal status.  NGO users may not set the proposal status.
+
+  When the proposal is accepted, observations without a science band are given
+  the program's only allocated band, if it has just one, and a warning lists
+  observations whose band has no time allocated, as for `setAllocations`.
+  """
   setProposalStatus(input: SetProposalStatusInput!): SetProposalStatusResult!
 
   """

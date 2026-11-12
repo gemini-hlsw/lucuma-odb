@@ -34,10 +34,10 @@ trait AllocationService[F[_]] {
   def setAllocations(input: AccessControl.CheckedWithId[List[AllocationInput], Program.Id])(using Transaction[F]): F[Result[Program.Id]]
 
   /**
-   * Brings the program's observations in line with its allocations after they
-   * change.  When time is allocated in exactly one science band, observations
-   * without a band are given it.  Observations whose band no longer has time
-   * allocated produce a warning.
+   * Brings the program's observations in line with its allocations, when
+   * staff set them and when the proposal is accepted.  When time is allocated
+   * in exactly one science band, observations without a band are given it.
+   * Observations whose band no longer has time allocated produce a warning.
    */
   def afterAllocationsChange(pid: Program.Id)(using Transaction[F], SuperUserAccess): F[Result[Unit]]
 

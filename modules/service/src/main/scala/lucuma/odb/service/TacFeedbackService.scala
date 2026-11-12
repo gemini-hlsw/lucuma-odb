@@ -43,9 +43,8 @@ trait TacFeedbackService[F[_]]:
    *
    * Recommended times are kept with the program's allocations.  Setting one
    * also sets the allocated duration to the same time, and removing one
-   * removes the allocation.  The observations are then brought in line with
-   * the allocations, as by `AllocationService.afterAllocationsChange`, which
-   * may produce a warning.
+   * removes the allocation.  Observation bands are left alone: they follow
+   * the allocations once the proposal is accepted.
    *
    * @return the program id and time accounting category identifying the feedback
    */
@@ -56,8 +55,7 @@ trait TacFeedbackService[F[_]]:
   /**
    * Deletes the TAC feedback of a time accounting category for a program,
    * along with the allocations that carry its recommended times.  The program
-   * must have a submitted proposal.  As when setting feedback, the observations
-   * are then brought in line with the allocations.
+   * must have a submitted proposal.
    *
    * @return `true` if feedback was deleted, `false` if there was none
    */
@@ -163,12 +161,7 @@ object TacFeedbackService:
         input.foldWithId(OdbError.InvalidArgument().asFailureF): (feedback, pid) =>
           checkEligibility(pid, feedback.timeAccountingCategory, forDelete = false).flatMap: r =>
             r.flatTraverse: _ =>
-              upsert(pid, feedback).flatMap: r =>
-                r.flatTraverse: _ =>
-                  feedback
-                    .recommendedTimes
-                    .fold(Result.unit.pure[F])(_ => Services.asSuperUser(allocationService.afterAllocationsChange(pid)))
-                    .map(_.as((pid, feedback.timeAccountingCategory)))
+              upsert(pid, feedback).map(_.as((pid, feedback.timeAccountingCategory)))
 
       override def deleteTacFeedback(
         input: AccessControl.CheckedWithId[TimeAccountingCategory, Program.Id]
@@ -179,14 +172,11 @@ object TacFeedbackService:
               for
                 deleted <- session.option(Statements.DeleteTacFeedback)((pid, category))
                 _       <- session.execute(Statements.DeleteRecommendedAllocations)((pid, category))
-                r       <- Services.asSuperUser(allocationService.afterAllocationsChange(pid))
-              yield r.as(deleted.isDefined)
+              yield Result(deleted.isDefined)
 
       override def deleteAllTacFeedback(pid: Program.Id)(using Transaction[F], Services.SuperUserAccess): F[Unit] =
-        // Proposal deletion has no way to report a warning about observation bands.
         session.execute(Statements.DeleteAllTacFeedback)(pid) *>
-          session.execute(Statements.DeleteAllRecommendedAllocations)(pid) *>
-          allocationService.afterAllocationsChange(pid).void
+          session.execute(Statements.DeleteAllRecommendedAllocations)(pid).void
 
       private def checkEligibility(
         pid:       Program.Id,
@@ -261,7 +251,8 @@ object TacFeedbackService:
       (proposal_status *: gemini_proposal_type.opt *: partner.opt *: exchange_partner.opt *: _partner.map(_.toList.toSet))
         .to[FeedbackContext]
 
-    // No row when the program has no proposal.
+    // No row when the program has no proposal.  The program row is locked so
+    // that its proposal status cannot change before the feedback is written.
     val SelectFeedbackContext: Query[Program.Id, FeedbackContext] =
       sql"""
         SELECT prog.c_proposal_status,
@@ -281,6 +272,7 @@ object TacFeedbackService:
             ON pi.c_program_id = prog.c_program_id
            AND pi.c_role = 'pi'
          WHERE prop.c_program_id = $program_id
+           FOR SHARE OF prog
       """.query(feedback_context)
 
     val DeleteTacFeedback: Query[(Program.Id, TimeAccountingCategory), TimeAccountingCategory] =
