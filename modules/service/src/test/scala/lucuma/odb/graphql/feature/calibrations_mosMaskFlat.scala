@@ -92,6 +92,9 @@ class calibrations_mosMaskFlat
   private def replaceFile(aid: Attachment.Id, path: String): IO[Unit] =
     withSession(_.execute(sql"UPDATE t_attachment SET c_remote_path = $text WHERE c_attachment_id = $attachment_id".command)((path, aid)).void)
 
+  private def deleteMask(aid: Attachment.Id): IO[Unit] =
+    withSession(_.execute(sql"DELETE FROM t_attachment WHERE c_attachment_id = $attachment_id".command)(aid).void)
+
   private def queuedForCalibration(pid: Program.Id): IO[List[Observation.Id]] =
     withSession(_.execute(sql"SELECT c_observation_id FROM t_calibration_calc WHERE c_program_id = $program_id".query(observation_id))(pid))
 
@@ -211,6 +214,18 @@ class calibrations_mosMaskFlat
       assertEquals(flat1.size, 1)
       assertEquals(gone, Nil)
       assertEquals(kept, flat2)
+
+  test("deleting the mask removes an untaken flat"):
+    for
+      (pid, _, aid, oid) <- gnMosWithMask()
+      _                  <- recalc(pid, oid)
+      before             <- flatsOf(pid)
+      _                  <- deleteMask(aid)
+      _                  <- recalc(pid, oid)
+      after              <- flatsOf(pid)
+    yield
+      assertEquals(before.size, 1)
+      assertEquals(after, Nil)
 
   test("a replaced mask file queues a recalculation for the observations using it"):
     for
