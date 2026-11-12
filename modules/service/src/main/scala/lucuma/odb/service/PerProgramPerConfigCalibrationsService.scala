@@ -342,20 +342,27 @@ object PerProgramPerConfigCalibrationsService:
         session.execute(Statements.updateBand)((band, oid)).void
 
       // One flat per mask in use, copying the mode of the lowest-id observation
-      // using it.  A flat taken of a replaced file is kept and a new one made;
-      // an untaken flat simply follows the new file.
+      // using it; an untaken flat recopies it on every pass.  A flat taken of a
+      // replaced file is kept and a new one made; an untaken flat simply follows
+      // the new file.
       private def syncMosMaskFlats(pid: Program.Id)(using Transaction[F], ServiceAccess): F[(List[Observation.Id], List[Observation.Id])] =
         def sync(cg: Group.Id, flats: List[MaskFlat], untaken: Set[Observation.Id], uses: NonEmptyList[MaskUse]): F[Option[Observation.Id]] =
           val source = uses.minimumBy(_.oid)
           val band   = uses.toList.flatMap(_.band).minOption
           val mine   = flats.filter(_.attachment.contains(source.attachment))
+          def refresh(oid: Observation.Id): F[Unit] =
+            for
+              modes <- selectObservingModeTypes(List(oid))
+              _     <- replaceObservingMode(source.oid, source.modeType.some, oid, modes.get(oid).flatten)
+              _     <- setBand(oid, band)
+            yield ()
           mine.find(_.remotePath.contains(source.remotePath)) match
             case Some(f) =>
-              setBand(f.oid, band).whenA(untaken.contains(f.oid)).as(none)
+              refresh(f.oid).whenA(untaken.contains(f.oid)).as(none)
             case None    =>
               mine.find(f => untaken.contains(f.oid)) match
                 case Some(f) =>
-                  (recordMaskFile(f.oid, source.remotePath) *> setBand(f.oid, band)).as(none)
+                  (recordMaskFile(f.oid, source.remotePath) *> refresh(f.oid)).as(none)
                 case None    =>
                   for
                     oid <- insertDaytimeCalibration(pid, cg, CalibrationRole.MosMaskFlat)

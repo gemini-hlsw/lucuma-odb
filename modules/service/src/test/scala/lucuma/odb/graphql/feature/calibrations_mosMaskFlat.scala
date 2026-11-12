@@ -55,26 +55,38 @@ class calibrations_mosMaskFlat
   // for a long slit, so its flat is a Missing Smart GCAL Calibration.
   override def dbInitialization: Option[Session[IO] => IO[Unit]] = Some: s =>
     val gn: Gmos.TableKey.North = Gmos.TableKey(none, GmosNorthFilter.RPrime.some, GmosNorthFpu.LongSlit_0_50.some, GmosXBinning.One, GmosYBinning.One, GmosAmpGain.Low)
+    val gn1: Gmos.TableKey.North = gn.copy(fpu = GmosNorthFpu.LongSlit_1_00.some)
     val gs: Gmos.TableKey.South = Gmos.TableKey(none, GmosSouthFilter.RPrime.some, GmosSouthFpu.LongSlit_0_50.some, GmosXBinning.One, GmosYBinning.One, GmosAmpGain.Low)
     super.dbInitialization.traverse_(_(s)) *>
       servicesFor(pi).map(_(s)).use: services =>
         services.transactionally:
           Services.asSuperUser:
             services.smartGcalService.insertGmosNorth(200, Gmos.TableRow(PosLong.unsafeFrom(1), gn, gmos_flat)) *>
+              services.smartGcalService.insertGmosNorth(201, Gmos.TableRow(PosLong.unsafeFrom(1), gn1, gmos_flat)) *>
               services.smartGcalService.insertGmosSouth(200, Gmos.TableRow(PosLong.unsafeFrom(1), gs, gmos_flat))
 
-  private def setMask(oid: Observation.Id, aid: Option[Attachment.Id]): IO[Unit] =
+  private def setMask(oid: Observation.Id, aid: Option[Attachment.Id], width: String = "CUSTOM_WIDTH_0_50"): IO[Unit] =
     query(
       pi,
       s"""mutation {
             updateObservations(input: {
               WHERE: { id: { EQ: "$oid" } }
-              SET: { observingMode: { gmosNorthMos: { customMask: { slitWidth: CUSTOM_WIDTH_0_50, attachmentId: ${aid.fold("null")(_.asJson.noSpaces)} } } } }
+              SET: { observingMode: { gmosNorthMos: { customMask: { slitWidth: $width, attachmentId: ${aid.fold("null")(_.asJson.noSpaces)} } } } }
             }) {
               observations { id }
             }
           }"""
     ).void
+
+  private def slitWidthOf(oid: Observation.Id): IO[String] =
+    query(
+      serviceUser,
+      s"""query {
+            observation(observationId: "$oid") {
+              observingMode { gmosNorthMos { customMask { slitWidth } } }
+            }
+          }"""
+    ).flatMap(_.hcursor.downFields("observation", "observingMode", "gmosNorthMos", "customMask", "slitWidth").as[String].liftTo[IO])
 
   private def flatsOf(pid: Program.Id): IO[List[Observation.Id]] =
     queryCalibrationsWithRole(pid, CalibrationRole.MosMaskFlat)
@@ -267,6 +279,22 @@ class calibrations_mosMaskFlat
       flats                <- flatsOf(pid)
       band                 <- queryScienceBand(flats.head)
     yield assertEquals(band, ScienceBand.Band2.some)
+
+  test("an untaken flat follows edits to the mode it copied, a started one does not"):
+    for
+      (pid, _, aid, oid) <- gnMosWithMask()
+      _                  <- recalc(pid, oid)
+      flat1              <- flatsOf(pid)
+      _                  <- setMask(oid, aid.some, "CUSTOM_WIDTH_1_00")
+      _                  <- recalc(pid, oid)
+      followed           <- slitWidthOf(flat1.head)
+      _                  <- start(flat1.head)
+      _                  <- setMask(oid, aid.some, "CUSTOM_WIDTH_0_75")
+      _                  <- recalc(pid, oid)
+      kept               <- slitWidthOf(flat1.head)
+    yield
+      assertEquals(followed, "CUSTOM_WIDTH_1_00")
+      assertEquals(kept, "CUSTOM_WIDTH_1_00")
 
   test("GMOS North flat is one day-cal flat through the mask: mirror, r, 1x1, fast, low, full frame"):
     for
