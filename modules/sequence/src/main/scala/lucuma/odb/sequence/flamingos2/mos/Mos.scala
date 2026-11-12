@@ -7,6 +7,7 @@ package mos
 
 import cats.Monad
 import cats.data.EitherT
+import cats.syntax.either.*
 import fs2.Pure
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.model.Observation
@@ -41,6 +42,9 @@ object Mos:
     calRole:        Option[CalibrationRole]
   ): F[Either[OdbError, StreamingExecutionConfig[Pure, F2Static, F2Dynamic]]] =
     (for
-       a <- EitherT.fromEither(Acquisition.instantiate(observationId, estimator, Static, namespace, config))
+       a <- EitherT.fromEither:
+              // A daytime calibration has no target to acquire.
+              if calRole.isDayCalibration then SequenceGenerator.empty[F2Dynamic].asRight
+              else Acquisition.instantiate(observationId, estimator, Static, namespace, config)
        s <- EitherT(spectroscopy.Science.instantiate(observationId, estimator, Static, namespace, expander, ObservingMode.Flamingos2MosName, config, scienceItc, calRole))
     yield StreamingExecutionConfig.fromGenerators(Static, a, s)).value
