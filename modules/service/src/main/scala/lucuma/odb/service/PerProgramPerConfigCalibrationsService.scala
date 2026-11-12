@@ -611,10 +611,12 @@ object PerProgramPerConfigCalibrationsService:
         ) m
         JOIN t_observation o ON o.c_observation_id = m.c_observation_id
         JOIN t_attachment  a ON a.c_attachment_id  = m.c_mask_attachment_id
+        JOIN v_execution_state e ON e.c_observation_id = o.c_observation_id
         WHERE o.c_program_id       = $program_id
           AND o.c_calibration_role IS NULL
           AND o.c_existence        = 'present'
           AND o.c_workflow_user_state IS DISTINCT FROM 'inactive'
+          AND e.c_execution_state NOT IN ('completed', 'declared_complete')
       """.query(attachment_id *: observation_id *: observing_mode_type *: science_band.opt *: text)
 
     // Present MOS mask flats with the mask their mode holds and the file they imaged.

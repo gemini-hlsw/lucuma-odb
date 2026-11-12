@@ -180,6 +180,18 @@ class calibrations_mosMaskFlat
       assertEquals(before.size, 1)
       assertEquals(after, Nil)
 
+  test("a mask used only by a completed observation loses its flat"):
+    for
+      (pid, _, _, oid) <- gnMosWithMask()
+      _                <- recalc(pid, oid)
+      before           <- flatsOf(pid)
+      _                <- declareExecutionComplete(oid)
+      _                <- recalc(pid, oid)
+      after            <- flatsOf(pid)
+    yield
+      assertEquals(before.size, 1)
+      assertEquals(after, Nil)
+
   test("unassigning the mask removes an untaken flat but keeps a started one"):
     for
       (pid, _, aid, oid) <- gnMosWithMask()

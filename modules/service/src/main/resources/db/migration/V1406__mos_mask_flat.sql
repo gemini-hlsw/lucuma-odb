@@ -45,3 +45,31 @@ CREATE TRIGGER mos_mask_file_replaced_trigger
   FOR EACH ROW
   WHEN (NEW.c_attachment_type = 'mos_mask' AND NEW.c_remote_path IS DISTINCT FROM OLD.c_remote_path)
   EXECUTE FUNCTION mos_mask_file_replaced();
+
+-- Queue one calibration recalculation per program with an uncompleted MOS
+-- observation using a mask, so existing masks get their flats.
+DO $$
+DECLARE
+  r record;
+BEGIN
+  FOR r IN
+    SELECT DISTINCT ON (o.c_program_id) o.c_observation_id, o.c_program_id
+    FROM (
+      SELECT c_observation_id, c_mask_attachment_id FROM t_gmos_north_mos
+      UNION ALL
+      SELECT c_observation_id, c_mask_attachment_id FROM t_gmos_south_mos
+      UNION ALL
+      SELECT c_observation_id, c_mask_attachment_id FROM t_flamingos_2_mos
+    ) m
+    JOIN t_observation o ON o.c_observation_id = m.c_observation_id
+    JOIN v_execution_state e ON e.c_observation_id = o.c_observation_id
+    WHERE m.c_mask_attachment_id IS NOT NULL
+      AND o.c_calibration_role IS NULL
+      AND o.c_existence = 'present'
+      AND o.c_workflow_user_state IS DISTINCT FROM 'inactive'
+      AND e.c_execution_state NOT IN ('completed', 'declared_complete')
+    ORDER BY o.c_program_id, o.c_observation_id
+  LOOP
+    CALL invalidate_calibration_calc(r.c_observation_id, r.c_program_id, 'recalc');
+  END LOOP;
+END $$;
