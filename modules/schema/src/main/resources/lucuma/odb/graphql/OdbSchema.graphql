@@ -22419,6 +22419,11 @@ enum CalibrationRole {
   CalibrationRole DaytimeCalibration
   """
   DAYTIME_CALIBRATION
+
+  """
+  CalibrationRole MosMaskFlat
+  """
+  MOS_MASK_FLAT
 }
 
 """
