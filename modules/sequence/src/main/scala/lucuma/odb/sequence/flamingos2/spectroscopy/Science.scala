@@ -186,7 +186,6 @@ object Science:
   /**
    * The sequence of a MOS mask flat: one smart GCAL flat imaging the mask with
    * no disperser, the H filter, the MOS decker and bright read mode.
-   * The selection is the defined on sc-11482 specification
    */
   private def mosMaskFlat[F[_]: Monad](
     observationId: Observation.Id,

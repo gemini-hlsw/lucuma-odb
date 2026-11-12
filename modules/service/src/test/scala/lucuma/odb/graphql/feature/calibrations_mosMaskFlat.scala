@@ -157,7 +157,8 @@ class calibrations_mosMaskFlat
       after            <- flatsOf(pid)
     yield
       assertEquals(after, before)
-      assert(!added.exists(before.contains) && !removed.exists(before.contains))
+      assertEquals(added, Nil)
+      assertEquals(removed, Nil)
 
   test("no flat for a mask no observation uses"):
     for

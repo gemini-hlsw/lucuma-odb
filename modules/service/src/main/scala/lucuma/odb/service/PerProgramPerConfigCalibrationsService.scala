@@ -654,5 +654,8 @@ object PerProgramPerConfigCalibrationsService:
 
     val updateBand: Command[(Option[ScienceBand], Observation.Id)] =
       sql"""
-        UPDATE t_observation SET c_science_band = ${science_band.opt} WHERE c_observation_id = $observation_id
-      """.command
+        UPDATE t_observation
+        SET    c_science_band = ${science_band.opt}
+        WHERE  c_observation_id = $observation_id
+          AND  c_science_band IS DISTINCT FROM ${science_band.opt}
+      """.command.contramap((band, oid) => (band, oid, band))
