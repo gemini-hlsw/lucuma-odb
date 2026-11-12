@@ -5,8 +5,10 @@ package lucuma.odb.sequence
 package util
 
 import cats.Monad
-import cats.data.EitherT
 import cats.data.NonEmptyList
+import cats.syntax.bifunctor.*
+import cats.syntax.foldable.*
+import cats.syntax.functor.*
 import cats.syntax.option.*
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Pure
@@ -15,6 +17,7 @@ import lucuma.core.enums.SequenceType
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Atom
 import lucuma.odb.data.OdbError
+import lucuma.odb.sequence.SmartGcalExpander.Calibration
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
 
@@ -23,7 +26,8 @@ import java.util.UUID
 /**
  * A generated daytime calibration sequence: no acquisition, no ITC, one
  * titled atom per smart GCAL step, each expanded by SmartGcal.  A step
- * without a SmartGcal row fails the whole sequence.
+ * without a SmartGcal definition is left out and reported; a sequence left
+ * with no step at all fails.
  */
 object DaytimeSmartGcal:
 
@@ -33,16 +37,19 @@ object DaytimeSmartGcal:
     static:        S,
     namespace:     UUID,
     expander:      SmartGcalExpander[F, S, D],
+    calibration:   Calibration,
     atoms:         NonEmptyList[(NonEmptyString, ProtoStep[D])]
   ): F[Either[OdbError, SequenceGenerator[D]]] =
-    atoms
-      .traverse: (title, step) =>
-        EitherT(expander.expandStep(static, step)).map(steps => ProtoAtom(title.some, steps))
-      .bimap(
-        m => definitionError(observationId, m),
-        atoms =>
-          val builder = AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Science)
-          new SequenceGenerator[D]:
-            def generate: Stream[Pure, Atom[D]] =
-              builder.buildStream(Stream.emits(atoms.toList))
-      ).value
+    atoms.toList
+      .foldMapM: (title, step) =>
+        expander.expandAtom(static, ProtoAtom(title.some, NonEmptyList.one(step)), calibration).map(_.map(_.toList))
+      .map: (missing, protoAtoms) =>
+        SmartGcalExpander.remaining(missing, protoAtoms).bimap(
+          definitionError(observationId, _),
+          (missing, protoAtoms) =>
+            val builder = AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Science)
+            val generator = new SequenceGenerator[D]:
+              def generate: Stream[Pure, Atom[D]] =
+                builder.buildStream(Stream.emits(protoAtoms))
+            generator.reporting(missing)
+        )

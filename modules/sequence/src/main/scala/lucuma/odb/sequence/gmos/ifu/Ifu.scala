@@ -35,7 +35,7 @@ object Ifu:
     (for
       a <- EitherT.fromEither(acquisition)
       s <- EitherT(science)
-    yield StreamingExecutionConfig(static, a.generate, s.generate)).value
+    yield StreamingExecutionConfig.fromGenerators(static, a, s)).value
 
   def gmosNorth[F[_]: Monad](
     observationId:  Observation.Id,

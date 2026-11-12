@@ -58,12 +58,14 @@ object ObservationValidator:
 
     // Here are our composed validators
 
-    val engValidator: ObservationValidator = _ =>
-      ObservationValidationMap.empty
+    val engValidator: ObservationValidator =
+      StepViolationValidator.missingSmartGcal
 
     val calibrationValidator: ObservationValidator = info =>
-      if info.isDaytimeCalibration then DaytimeCalibrationValidator(info)
-      else BandValidator(info)
+      val own =
+        if info.isDaytimeCalibration then DaytimeCalibrationValidator(info)
+        else BandValidator(info)
+      own |+| StepViolationValidator.missingSmartGcal(info)
 
     val scienceValidator1: ObservationValidator =
       GeneratorValidator                       |+|

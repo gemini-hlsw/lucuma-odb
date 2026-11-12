@@ -84,7 +84,7 @@ class SmartGcalServiceSuite_NullKeys extends OdbSuite:
           val k = gmosNorthKey(fpu)
           s.smartGcalService
            .selectGmosNorth(Gmos.SearchKey.North(none, k.filter, k.fpu, k.xBin, k.yBin, k.gain), SmartGcalType.Flat)
-           .map(_.map(_._2))
+           .map(_.orEmpty.map(_._2))
 
     for
       _        <- insert
@@ -108,7 +108,7 @@ class SmartGcalServiceSuite_NullKeys extends OdbSuite:
           val k = gmosSouthKey(fpu)
           s.smartGcalService
            .selectGmosSouth(Gmos.SearchKey.South(none, k.filter, k.fpu, k.xBin, k.yBin, k.gain), SmartGcalType.Flat)
-           .map(_.map(_._2))
+           .map(_.orEmpty.map(_._2))
 
     for
       _        <- insert
@@ -131,7 +131,7 @@ class SmartGcalServiceSuite_NullKeys extends OdbSuite:
         Services.asSuperUser:
           s.smartGcalService
            .selectFlamingos2(f2Key(fpu), SmartGcalType.Flat)
-           .map(_.map(_._2))
+           .map(_.orEmpty.map(_._2))
 
     for
       _        <- insert

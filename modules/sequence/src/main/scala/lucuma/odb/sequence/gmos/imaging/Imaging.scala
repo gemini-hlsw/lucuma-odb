@@ -26,7 +26,7 @@ object Imaging:
     science: F[Either[OdbError, SequenceGenerator[D]]]
   ): F[Either[OdbError, StreamingExecutionConfig[Pure, S, D]]] =
     EitherT(science)
-      .map(s => StreamingExecutionConfig(static, SequenceGenerator.empty.generate, s.generate))
+      .map(s => StreamingExecutionConfig.fromGenerators(static, SequenceGenerator.empty, s))
       .value
 
   def gmosNorth[F[_]: Sync](

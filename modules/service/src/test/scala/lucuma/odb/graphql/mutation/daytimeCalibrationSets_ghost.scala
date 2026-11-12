@@ -8,6 +8,7 @@ import cats.data.NonEmptySet
 import cats.effect.IO
 import cats.syntax.either.*
 import cats.syntax.foldable.*
+import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.numeric.PosLong
@@ -522,13 +523,12 @@ class daytimeCalibrationSets_ghost extends OdbSuite with DatabaseOperations with
     yield ()
 
   // The seeded rows are for 1x1 binning only.
-  test("a smart flat with an unmapped binning fails generation, naming the row"):
+  test("a smart flat with an unmapped binning is left out of the sequence"):
     for
       pid <- createProgramAs(staff)
       oid <- createWithSets(pid, s"{ kind: SMART_FLAT, ${setup(1, 1)} }, { kind: SMART_FLAT, ${setup(1, 1, "TWO_BY_TWO")} }")
-      _   <- expectOdbError(
-        user     = staff,
-        query    = executionQuery(oid),
-        expected = { case OdbError.SequenceUnavailable(_, Some(m)) if m.startsWith("Calibration set 2 (Smart Flat): missing Smart GCAL mapping") => () }
-      )
-    yield ()
+      js  <- query(staff, executionQuery(oid))
+    yield
+      val science = js.hcursor.downFields("executionConfig", "ghost", "science")
+      assert(science.downField("nextAtom").focus.exists(!_.isNull), js.spaces2)
+      assertEquals(science.downField("possibleFuture").values.map(_.size), 0.some, js.spaces2)

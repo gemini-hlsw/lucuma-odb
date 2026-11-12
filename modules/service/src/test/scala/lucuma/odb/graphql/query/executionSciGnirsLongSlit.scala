@@ -306,7 +306,7 @@ class executionSciGnirsLongSlit extends ExecutionTestSupportForGnirs:
         assertEquals(flatT, BigDecimal(0))
         assertEquals(obsT + arcT + flatT, total)
 
-  test("[gnirs] 111/LXD short camera has neither flat nor arc -> sequence error"):
+  test("[gnirs] 111/LXD short camera has neither flat nor arc -> science alone"):
     // The 111/LXD rows exist only for the long camera (0.05"/pix), so the same
     // config on the short camera resolves to neither flat nor arc.
     val setup: IO[Observation.Id] =
@@ -316,14 +316,11 @@ class executionSciGnirsLongSlit extends ExecutionTestSupportForGnirs:
       yield oid
 
     setup.flatMap: oid =>
-      expect(
-        user     = pi,
-        query    = gnirsScienceQuery(oid),
-        expected =
-          List(
-            s"Could not generate a sequence for $oid: missing Smart GCAL mapping: Gnirs { pixelScale: PixelScale_0_15, disperser: D111, crossDispersed: Lxd, wavelength: 1600.000 nm, fpu: LongSlit_0_675, wellDepth: Shallow } (a flat or an arc is required)"
-          ).asLeft
-      )
+      query(pi, gnirsScienceQuery(oid)).map: js =>
+        val science = js.hcursor.downFields("executionConfig", "gnirs", "science")
+        val atoms   = science.downField("nextAtom").focus.toList ++ science.downField("possibleFuture").values.toList.flatten
+        val types   = atoms.flatMap(_.hcursor.downField("steps").values.toList.flatten).flatMap(_.hcursor.downFields("stepConfig", "stepType").as[String].toOption)
+        assertEquals(types.distinct, List("SCIENCE"), js.spaces2)
 
   test("[gnirs] short camera default offsets, frameCount=3 -> 1 cycle of 4, unsplittable"):
     for

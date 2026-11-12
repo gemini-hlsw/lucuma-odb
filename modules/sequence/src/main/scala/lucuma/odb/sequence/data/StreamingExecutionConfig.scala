@@ -11,7 +11,9 @@ import fs2.Pure
 import fs2.Stream
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Atom
+import lucuma.core.model.sequence.StepViolation
 import lucuma.odb.data.OdbError
+import lucuma.odb.sequence.SequenceGenerator
 
 /**
  * A precursor to a lucuma.core.model.sequence.ExecutionConfig, which contains
@@ -24,19 +26,31 @@ import lucuma.odb.data.OdbError
  * @tparam A step type
  */
 case class StreamingExecutionConfig[F[_], S, D](
-  static:      S,
-  acquisition: Stream[F, Atom[D]],
-  science:     Stream[F, Atom[D]]
+  static:                S,
+  acquisition:           Stream[F, Atom[D]],
+  science:               Stream[F, Atom[D]],
+  acquisitionViolations: List[StepViolation] = List.empty,
+  scienceViolations:     List[StepViolation] = List.empty
 )
 
 object StreamingExecutionConfig:
+
+  /** The sequences of a pair of generators, with the violations each reports. */
+  def fromGenerators[S, D](
+    static:      S,
+    acquisition: SequenceGenerator[D],
+    science:     SequenceGenerator[D]
+  ): StreamingExecutionConfig[Pure, S, D] =
+    StreamingExecutionConfig(static, acquisition.generate, science.generate, acquisition.violations, science.violations)
 
   extension [S, D](self: StreamingExecutionConfig[Pure, S, D])
     def covary[F[_]]: StreamingExecutionConfig[F, S, D] =
       StreamingExecutionConfig[F, S, D](
         self.static,
         self.acquisition.covary[F],
-        self.science.covary[F]
+        self.science.covary[F],
+        self.acquisitionViolations,
+        self.scienceViolations
       )
 
     /**

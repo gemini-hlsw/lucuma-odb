@@ -9,6 +9,7 @@ import cats.Monad
 import cats.data.EitherT
 import cats.data.NonEmptyList
 import cats.syntax.either.*
+import cats.syntax.functor.*
 import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.string.NonEmptyString
@@ -21,6 +22,7 @@ import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepGuideState.Disabled
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Atom
+import lucuma.core.model.sequence.StepViolation
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig as F2
 import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
@@ -55,7 +57,7 @@ object MosTelluric:
 
   case class StepDefinition(
     science: NonEmptyList[ProtoStep[F2]],
-    cals:    NonEmptyList[ProtoStep[F2]]
+    cals:    List[ProtoStep[F2]]
   ):
     def cycleCount(t: IntegrationTime): Either[String, NonNegInt] =
       calculateCycleCount[F2](s => s.telescopeConfig.guiding.isGuided, science.toList, t)
@@ -103,9 +105,9 @@ object MosTelluric:
     science:  NonEmptyList[ProtoStep[F2]],
     flat:     ProtoStep[F2],
     arc:      ProtoStep[F2]
-  ): EitherT[F, String, StepDefinition] =
-    EitherT(expander.expandFlatAndOrArc(static, flat, arc))
-      .map(cs => StepDefinition(science, cs))
+  ): F[(List[StepViolation], StepDefinition)] =
+    expander.expandFlatAndArc(static, flat, arc).map: (missing, cs) =>
+      (missing, StepDefinition(science, cs))
 
   private case class Generator(
     steps:      StepDefinition,
@@ -116,8 +118,8 @@ object MosTelluric:
     override def generate: Stream[Pure, Atom[F2]] =
       builder.buildStream:
         Stream.emits:
-          List.fill(1.max(goalCycles.value))(ProtoAtom(ScienceAtomTitle.some, steps.science)) :+
-            ProtoAtom(AtomTitle.NighttimeCal.some, steps.cals)
+          List.fill(1.max(goalCycles.value))(ProtoAtom(ScienceAtomTitle.some, steps.science)) ++
+            NonEmptyList.fromList(steps.cals).map(ProtoAtom(AtomTitle.NighttimeCal.some, _)).toList
 
   def instantiate[F[_]: Monad](
     observationId: Observation.Id,
@@ -138,6 +140,6 @@ object MosTelluric:
                       )
        r         <- EitherT.fromEither[F](itcReadMode(t).leftMap(definitionError(observationId, _)))
        (ss, f, a) = StepComputer.compute(config, t, r, calRole)
-       d         <- expand(static, expander, ss, f, a).leftMap(definitionError(observationId, _))
+       (m, d)    <- EitherT.liftF(expand(static, expander, ss, f, a))
        c         <- EitherT.fromEither[F](d.cycleCount(t).leftMap(definitionError(observationId, _)))
-     yield Generator(d, AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Science), c): SequenceGenerator[F2]).value
+     yield Generator(d, AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Science), c).reporting(m)).value

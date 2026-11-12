@@ -7,7 +7,6 @@ package query
 import cats.data.NonEmptySet
 import cats.data.State
 import cats.effect.IO
-import cats.syntax.either.*
 import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.PosInt
@@ -784,7 +783,7 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
     }
   }
 
-  test("missing definition") {
+  test("missing definition: the calibrations are left out") {
     val setup: IO[Observation.Id] =
       for {
         p <- createProgram
@@ -802,8 +801,9 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
         )
       } yield o
 
+    // The calibrations are left out; the science step is still generated.
     setup.flatMap: oid =>
-      expect(
+      query(
         user  = user,
         query =
           s"""
@@ -812,17 +812,22 @@ class smartgcal extends OdbSuite with ObservingModeSetupOperations {
                  gmosNorth {
                    science {
                      nextAtom {
-                       $AtomQuery
+                       steps { stepConfig { stepType } }
                      }
                    }
                  }
                }
              }
-           """,
-        expected = List(
-          s"Could not generate a sequence for $oid: missing Smart GCAL mapping: GmosNorth { grating: (B1200_G5301, One, 500.000 nm), filter: RPrime, fpu: LongSlit_0_50, binning: 1x2, gain: Low }"
-        ).asLeft
-      )
+           """
+      ).map: js =>
+        val types =
+          js.hcursor
+            .downFields("executionConfig", "gmosNorth", "science", "nextAtom", "steps")
+            .values
+            .toList
+            .flatten
+            .flatMap(_.hcursor.downFields("stepConfig", "stepType").as[String].toOption)
+        assertEquals(types.distinct, List("SCIENCE"), js.spaces2)
   }
 
 }

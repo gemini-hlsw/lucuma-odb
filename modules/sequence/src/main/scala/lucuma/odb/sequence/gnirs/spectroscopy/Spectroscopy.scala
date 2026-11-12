@@ -56,4 +56,4 @@ object Spectroscopy:
              observationId, estimator, static, namespace, expander, config,
              scienceItc, calRole
            ))
-    yield StreamingExecutionConfig(static, a.generate, s.generate)).value
+    yield StreamingExecutionConfig.fromGenerators(static, a, s)).value

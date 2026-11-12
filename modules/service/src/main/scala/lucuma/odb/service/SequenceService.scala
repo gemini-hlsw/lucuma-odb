@@ -1493,7 +1493,10 @@ object SequenceService:
           ResultT:
             expander
               .expandStep(static, smart)
-              .map(_.fold(m => invalid(s"Cannot insert a smart GCAL ${sgt.tag} step: $m"), Result.success))
+              .map:
+                _.leftMap(_.message)
+                  .flatMap(NonEmptyList.fromList(_).toRight(SmartGcalExpander.NoSteps))
+                  .fold(m => invalid(s"Cannot insert a smart GCAL ${sgt.tag} step: $m"), Result.success)
 
         // The unexecuted part of an unsplittable observation's science
         // sequence is a single atom, which may not grow beyond the step limit.

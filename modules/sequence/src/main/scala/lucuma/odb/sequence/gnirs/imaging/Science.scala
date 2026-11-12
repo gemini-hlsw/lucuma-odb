@@ -26,6 +26,7 @@ import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.StepGuideState
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.StepConfig
+import lucuma.core.model.sequence.StepViolation
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.gnirs.GnirsDynamicConfig
 import lucuma.core.model.sequence.gnirs.GnirsFpu
@@ -35,6 +36,7 @@ import lucuma.itc.IntegrationTime
 import lucuma.odb.data.ItcResult as Result
 import lucuma.odb.data.ItcScience.GnirsImaging
 import lucuma.odb.data.OdbError
+import lucuma.odb.sequence.SmartGcalExpander.Calibration
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.TelescopeConfigGenerator
@@ -204,11 +206,10 @@ object Science:
 
     /**
      * Expands each filter's smart flat up front, so the science stream stays
-     * lazy. A filter without a row in the SmartGcal table silently gets no
-     * flats rather than failing the sequence: the red cameras (deep well)
-     * image in the thermal IR, where GCAL saturates and no row exists. The
-     * same happens, unreported, for a filter whose wavelength falls in a gap
-     * of the table or for a deep well on a blue camera.
+     * lazy. A filter without a row in the SmartGcal table gets no flats and
+     * is reported, rather than failing the sequence: the red cameras (deep
+     * well) image in the thermal IR, where GCAL saturates, and a filter's
+     * wavelength may fall in a gap of the table.
      */
     private def expandFlats[F[_]: Monad](
       expander:  SmartGcalExpander[F, GnirsStaticConfig, GnirsDynamicConfig],
@@ -216,13 +217,14 @@ object Science:
       config:    Config,
       time:      NonEmptyMap[GnirsFilter, Zipper[Result]],
       readModes: NonEmptyMap[GnirsFilter, GnirsReadMode]
-    ): F[Flats] =
+    ): F[(List[StepViolation], Flats)] =
       time.toNel.toList
-        .flatTraverse: (filter, zipper) =>
+        .traverse: (filter, zipper) =>
           val flat: ProtoStep[GnirsDynamicConfig] =
             ProtoSequences.smartFlat(config, filter, zipper.focus._2, readModes(filter).get)
-          expander.expandStepOptional(static, flat).map(steps => NonEmptyList.fromList(steps).tupleLeft(filter).toList)
-        .map(_.toMap)
+          expander.expandOrReport(static, flat, Calibration.ImagingFlat).map: (missing, steps) =>
+            (missing, NonEmptyList.fromList(steps).tupleLeft(filter).toList)
+        .map(rs => (rs.flatMap(_._1), rs.flatMap(_._2).toMap))
 
     def instantiate[F[_]: Sync](
       observationId: Observation.Id,
@@ -286,9 +288,8 @@ object Science:
             generateOffsets(offsets, NonNegInt.MinValue, skyOffsets)(ExposuresPerOffset.groupedOffsetCount(_, exposuresPerOffset)).map: (o, s) =>
               ProtoSequences.grouped(config, nem, readModes, flats, o, s, exposuresPerOffset)
 
-        expandFlats(expander, static, config, nem, readModes)
-          .flatMap(protoAtoms)
-          .map(ImagingSequence.makeGenerator(estimator, static, namespace, _))
+        expandFlats(expander, static, config, nem, readModes).flatMap: (missing, flats) =>
+          protoAtoms(flats).map(ImagingSequence.makeGenerator(estimator, static, namespace, _).reporting(missing))
 
   def gnirs[F[_]: Sync](
     observationId: Observation.Id,

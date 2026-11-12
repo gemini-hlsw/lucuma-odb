@@ -19,6 +19,7 @@ import lucuma.core.enums.StepGuideState
 import lucuma.core.math.Offset
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.StepConfig
+import lucuma.core.model.sequence.StepViolation
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.SequenceGenerator
@@ -45,10 +46,6 @@ object DaytimeCalibration:
   // Numbered from one, as the user sees the rows.
   private def unavailable(oid: Observation.Id, index: Int, kind: CalibrationSetType, msg: String): OdbError =
     OdbError.SequenceUnavailable(oid, s"Calibration set ${index + 1} (${kind.name})$msg".some)
-
-  /** The complaint for a smart set whose lookup failed. */
-  def lookupFailed(oid: Observation.Id, index: Int, kind: CalibrationSetType, error: String): OdbError =
-    unavailable(oid, index, kind, s": $error.")
 
   private def stepConfig(oid: Observation.Id, index: Int, set: CalibrationSet[?]): Either[OdbError, StepConfig] =
     (set.kind, set.gcal) match
@@ -100,6 +97,11 @@ object DaytimeCalibration:
     estimator: StepTimeEstimateCalculator[S, D],
     static:    S,
     namespace: UUID,
-    atoms:     List[ProtoAtom[ProtoStep[D]]]
+    atoms:     List[ProtoAtom[ProtoStep[D]]],
+    missing:   List[StepViolation]
   ): StreamingExecutionConfig[Pure, S, D] =
-    StreamingExecutionConfig(static, SequenceGenerator.empty.generate, generator(estimator, static, namespace, atoms).generate)
+    StreamingExecutionConfig.fromGenerators(
+      static,
+      SequenceGenerator.empty,
+      generator(estimator, static, namespace, atoms).reporting(missing)
+    )

@@ -98,7 +98,7 @@ class SmartGcalServiceSuite_Ghost extends ExecutionTestSupportForGhost:
       ).asBlue
     )
 
-    assertIO(insert *> select.map(lst => lst.head._1.apply(initial)), expected)
+    assertIO(insert *> select.map(lst => lst.toList.flatten.head._1.apply(initial)), expected)
 
   test("select - missing"):
     val missingKey = Ghost.SearchKey(
@@ -112,6 +112,6 @@ class SmartGcalServiceSuite_Ghost extends ExecutionTestSupportForGhost:
         s.smartGcalService
          .selectGhost(missingKey, SmartGcalType.Arc)
 
-    assertIO(select, Nil)
+    assertIO(select.map(_.isEmpty), true)
 
 
