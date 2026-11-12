@@ -17,7 +17,6 @@ import grackle.QueryCompiler.Elab
 import grackle.Result
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
-import lucuma.core.enums.Partner
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.model.Attachment
@@ -258,7 +257,7 @@ trait ProgramMapping[F[_]]
 
     case (ProgramType, "tacFeedback", Nil) =>
       Elab.transformChild: child =>
-        OrderBy(OrderSelections(List(OrderSelection[Partner](TacFeedbackType / "partner"))), child)
+        OrderBy(OrderSelections(List(OrderSelection[TimeAccountingCategory](TacFeedbackType / "timeAccountingCategory"))), child)
 
   }
 

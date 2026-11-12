@@ -844,12 +844,12 @@ trait MutationMapping[F[_]] extends AccessControl[F] with UserEnv {
       services.useTransactionally:
         selectForUpdate(input).flatMap: r =>
           r.flatTraverse: checked =>
-            tacFeedbackService.setTacFeedback(checked).nestMap: (pid, partner) =>
+            tacFeedbackService.setTacFeedback(checked).nestMap: (pid, category) =>
               Unique(
                 Filter(
                   And(
                     Predicates.tacFeedbackResult.programId.eql(pid),
-                    Predicates.tacFeedbackResult.partner.eql(partner)
+                    Predicates.tacFeedbackResult.category.eql(category)
                   ),
                   child
                 )

@@ -7,19 +7,26 @@ package mutation
 import cats.data.Ior
 import cats.effect.IO
 import cats.syntax.all.*
+import eu.timepit.refined.types.numeric.PosBigDecimal
+import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.GeminiCallForProposalsType.DemoScience
 import lucuma.core.enums.Partner
 import lucuma.core.enums.ScienceBand
+import lucuma.core.enums.TacPartnerDecision
 import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.model.Observation
+import lucuma.core.model.Program
 import lucuma.core.model.ProgramReference
 import lucuma.core.model.ProposalReference
 import lucuma.core.model.Semester
 import lucuma.core.model.User
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
+import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.input.AllocationInput
+import lucuma.odb.graphql.input.TacFeedbackInput
+import lucuma.odb.graphql.input.TacRecommendedTimeInput
 
 class setAllocations extends OdbSuite with query.ObservingModeSetupOperations {
 
@@ -346,5 +353,110 @@ class setAllocations extends OdbSuite with query.ObservingModeSetupOperations {
           }
         """.asRight
       )
+
+  // A program whose submitted proposal requests US time, with US TAC feedback
+  // recommending 2 hours in BAND1 and 1 hour in BAND2.
+  def createProgramWithRecommendedTimes: IO[Program.Id] =
+    for
+      pid <- createProgramAs(pi)
+      _   <- addProposal(pi, pid)
+      _   <- addPartnerSplits(pi, pid, partnerSplits = List((Partner.US, 100)))
+      _   <- setProposalSubmittedDirectly(pid)
+      _   <- setTacFeedbackAs(staff, pid, TacFeedbackInput(
+               TimeAccountingCategory.US,
+               TacPartnerDecision.Accepted.some,
+               PosBigDecimal.unsafeFrom(BigDecimal(1)).some,
+               List(
+                 TacRecommendedTimeInput(ScienceBand.Band1, 2.hourTimeSpan),
+                 TacRecommendedTimeInput(ScienceBand.Band2, 1.hourTimeSpan)
+               ).some,
+               Nullable.Absent
+             ))
+    yield pid
+
+  // The program's allocations and TAC recommended times.
+  def allocationsAndRecommendations(pid: Program.Id): IO[Json] =
+    query(
+      user  = staff,
+      query = s"""
+        query {
+          program(programId: "$pid") {
+            allocations { category scienceBand duration { hours } }
+            tacFeedback { recommendedTimes { band time { hours } } }
+          }
+        }
+      """
+    )
+
+  test("setting allocations keeps TAC recommended times"):
+    for
+      pid <- createProgramWithRecommendedTimes
+      _   <- setAllocationsAs(staff, pid, List(
+               AllocationInput(TimeAccountingCategory.US, ScienceBand.Band1, 5.hourTimeSpan),
+               AllocationInput(TimeAccountingCategory.US, ScienceBand.Band2, 1.hourTimeSpan),
+               AllocationInput(TimeAccountingCategory.CA, ScienceBand.Band1, 3.hourTimeSpan)
+             ))
+      js  <- allocationsAndRecommendations(pid)
+    yield assertEquals(js, json"""
+      {
+        "program": {
+          "allocations": [
+            { "category": "CA", "scienceBand": "BAND1", "duration": { "hours": 3.000000 } },
+            { "category": "US", "scienceBand": "BAND1", "duration": { "hours": 5.000000 } },
+            { "category": "US", "scienceBand": "BAND2", "duration": { "hours": 1.000000 } }
+          ],
+          "tacFeedback": [
+            {
+              "recommendedTimes": [
+                { "band": "BAND1", "time": { "hours": 2.000000 } },
+                { "band": "BAND2", "time": { "hours": 1.000000 } }
+              ]
+            }
+          ]
+        }
+      }
+    """)
+
+  test("omitted allocations with a TAC recommended time are kept with no time allocated"):
+    for
+      pid <- createProgramWithRecommendedTimes
+      _   <- setOneAllocationAs(staff, pid, TimeAccountingCategory.CA, ScienceBand.Band1, 3.hourTimeSpan)
+      // The CA allocation has no recommended time, so omitting it deletes it.
+      _   <- setAllocationsAs(staff, pid, List(AllocationInput(TimeAccountingCategory.US, ScienceBand.Band2, 4.hourTimeSpan)))
+      js  <- allocationsAndRecommendations(pid)
+    yield assertEquals(js, json"""
+      {
+        "program": {
+          "allocations": [
+            { "category": "US", "scienceBand": "BAND1", "duration": { "hours": 0.000000 } },
+            { "category": "US", "scienceBand": "BAND2", "duration": { "hours": 4.000000 } }
+          ],
+          "tacFeedback": [
+            {
+              "recommendedTimes": [
+                { "band": "BAND1", "time": { "hours": 2.000000 } },
+                { "band": "BAND2", "time": { "hours": 1.000000 } }
+              ]
+            }
+          ]
+        }
+      }
+    """)
+
+  test("an empty allocation list keeps only the allocations with TAC recommended times"):
+    for
+      pid <- createProgramWithRecommendedTimes
+      _   <- setOneAllocationAs(staff, pid, TimeAccountingCategory.CA, ScienceBand.Band1, 3.hourTimeSpan)
+      _   <- setAllocationsAs(staff, pid, Nil)
+      js  <- allocationsAndRecommendations(pid)
+    yield assertEquals(
+      js.hcursor.downFields("program", "allocations").focus,
+      json"""
+        [
+          { "category": "US", "scienceBand": "BAND1", "duration": { "hours": 0.000000 } },
+          { "category": "US", "scienceBand": "BAND2", "duration": { "hours": 0.000000 } }
+        ]
+      """.some
+    )
 
 }

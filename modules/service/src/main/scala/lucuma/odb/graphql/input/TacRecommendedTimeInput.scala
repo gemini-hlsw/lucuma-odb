@@ -5,11 +5,13 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.all.*
+import grackle.Result
+import grackle.syntax.*
 import lucuma.core.enums.ScienceBand
 import lucuma.core.util.TimeSpan
 import lucuma.odb.graphql.binding.*
 
-/** The time a partner TAC recommends for a science band. */
+/** The time, always positive, a TAC recommends for a science band. */
 case class TacRecommendedTimeInput(
   band: ScienceBand,
   time: TimeSpan
@@ -23,4 +25,7 @@ object TacRecommendedTimeInput:
         ScienceBandBinding("band", rBand),
         TimeSpanInput.Binding("time", rTime)
       ) =>
-        (rBand, rTime).parMapN(apply)
+        val rTimeʹ = rTime.flatMap: t =>
+          if t.toNonNegMicroseconds.value > 0 then t.success
+          else Result.failure("Recommended times must be greater than zero.")
+        (rBand, rTimeʹ).parMapN(apply)
