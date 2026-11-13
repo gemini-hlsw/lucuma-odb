@@ -187,7 +187,8 @@ trait AccessControl[F[_]] extends Predicates[F] {
     WHERE:                       Option[Predicate],
     includeCalibrations:         Boolean,
     includeUserDefinedTellurics: Boolean,
-    admittedTelluricModes:       List[ObservingModeType] = Nil
+    admittedTelluricModes:       List[ObservingModeType] = Nil,
+    admitSpecPhots:              Boolean = false
   )(using Services[F]): Result[AppliedFragment] =
     // A user-defined telluric is edited like a science observation, as is a
     // daytime calibration, but only by staff: a PI may hold one in their program
@@ -208,17 +209,25 @@ trait AccessControl[F[_]] extends Predicates[F] {
         )
       else editable
 
+    val scienceOrSpecPhots: Predicate =
+      if admitSpecPhots && user.role.access >= Access.Staff then
+        Or(
+          science,
+          Predicates.observation.calibrationRole.eql(CalibrationRole.SpectroPhotometric.some)
+        )
+      else science
+
     val calibrations: Predicate =
       if includeCalibrations then True
       else if admittedTelluricModes.nonEmpty then
         Or(
-          science,
+          scienceOrSpecPhots,
           And(
             Predicates.observation.calibrationRole.eql(CalibrationRole.Telluric.some),
             Predicates.observation.observingModeType.in(admittedTelluricModes)
           )
         )
-      else science
+      else scienceOrSpecPhots
 
     idSelectFromPredicate(
       ObservationType,
@@ -240,10 +249,11 @@ trait AccessControl[F[_]] extends Predicates[F] {
     WHERE:               Option[Predicate],
     includeCalibrations: Boolean,
     allowedStates:       Set[ObservationWorkflowState],
-    admittedTelluricModes: List[ObservingModeType] = Nil
+    admittedTelluricModes: List[ObservingModeType] = Nil,
+    admitSpecPhots:      Boolean = false
   )(using Services[F], NoTransaction[F]): F[Result[List[Observation.Id]]] =
     Services.asSuperUser:
-      writableOids(includeDeleted, WHERE, includeCalibrations, includeUserDefinedTellurics = true, admittedTelluricModes)
+      writableOids(includeDeleted, WHERE, includeCalibrations, includeUserDefinedTellurics = true, admittedTelluricModes, admitSpecPhots)
         .flatTraverse: which =>
           observationWorkflowService.filterState(which, allowedStates)
 
@@ -421,17 +431,19 @@ trait AccessControl[F[_]] extends Predicates[F] {
         then ObservationWorkflowState.allButComplete
         else ObservationWorkflowState.fullSet         // always ok
 
-      // Calibration observations are otherwise read-only, with two exceptions:
+      // Calibration observations are otherwise read-only, with three exceptions:
       // any calibration accepts an edit that only sets or clears the QA state
-      // override (staff only), and a telluric calibration accepts an edit to
-      // its science exposure time mode alone, from a SET for its own observing
-      // mode.
+      // override (staff only), a telluric calibration accepts an edit to its
+      // science exposure time mode alone, from a SET for its own observing
+      // mode, and a spectrophotometric standard accepts a staff edit to its
+      // constraint set alone.
       selectForObservationUpdateImpl(
         input.includeDeleted,
         input.WHERE,
         includeCalibrations || input.SET.onlyOverridesQaState,
         allowedStates,
-        admittedTelluricModes = input.SET.admittedTelluricModes
+        admittedTelluricModes = input.SET.admittedTelluricModes,
+        admitSpecPhots = input.SET.onlyEditsConstraintSet
       ).nestMap: oids =>
         Services.asSuperUser:
           AccessControl.unchecked(input.SET, oids, observation_id)

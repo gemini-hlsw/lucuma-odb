@@ -172,6 +172,14 @@ object ObservationPropertiesInput {
       !qaStateOverride.isAbsent && copy(qaStateOverride = Nullable.Absent) === Edit.Empty
 
     /**
+     * Whether this edit does nothing but change the constraint set. Staff may
+     * make such an edit to a spectrophotometric standard, whose worst-case
+     * default conditions can leave it without a guide star.
+     */
+    def onlyEditsConstraintSet: Boolean =
+      constraintSet.isDefined && copy(constraintSet = None) === Edit.Empty
+
+    /**
      * The observing mode types of the tellurics this edit may touch: a science
      * `exposureTimeMode` alone is the one edit a telluric calibration accepts.
      */
