@@ -1,6 +1,9 @@
-1,2024/03/05 00:00:00 UTC
-Mode,Calibration Lamps,Calibration Shutter,Calibration Filter,Calibration Diffuser,Calibration Observe,Calibration Exposure Time,Calibration Coadds,Calibration Basecal
 # 2024-Mar-05, hsuh
+# 2026-Nov-04, hsuh, updated
 #
-Spectroscopy,IR grey body - high,Closed,ND2.0,Visible,10,30,1,Day
-Spectroscopy,Quartz Halogen,Closed,ND2.0,Visible,10,30,1,Day
+Mode,Calibration Lamps,Calibration Shutter,Calibration Filter,Calibration Diffuser,Calibration Observe,Calibration Exposure Time,Calibration Coadds,Calibration Basecal
+#
+Spectroscopy,IR grey body - high,Closed,none,IR,10,25,1,Day
+Spectroscopy,IR grey body - high,Open,ND3.0,IR,10,25,1,Day
+Spectroscopy,IR grey body - high,Open,none,IR,10,25,1,Day
+
