@@ -180,7 +180,7 @@ object GroupStandingService:
         prog
           .toList
           .collect:
-            case (gid, GroupProgress.Ongoing(_, _, Some(w)))
+            case (gid, GroupProgress.Ongoing(_, _, Some(w), _))
               if standings.get(gid).contains(GroupStanding.Viable) && w.end >= now && w.end < Timestamp.Max => w.end
           .minOption
 

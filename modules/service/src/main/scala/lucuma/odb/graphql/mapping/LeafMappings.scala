@@ -17,7 +17,7 @@ import io.circe.refined.*
 import lucuma.core.data.EmailAddress
 import lucuma.core.enums.*
 import lucuma.core.enums.GmosMosAcquisitionType
-import lucuma.core.enums.GroupConstraintViolation
+import lucuma.core.enums.GroupConstraintViolationCode
 import lucuma.core.enums.GroupStatus
 import lucuma.core.enums.ProposalSummaryGenerationState
 import lucuma.core.math.Epoch
@@ -42,6 +42,7 @@ import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.model.UserInvitation
 import lucuma.core.model.Visit
+import lucuma.core.model.group.GroupConstraintWaiver
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.DatasetReference
@@ -183,7 +184,8 @@ trait LeafMappings[F[_]] extends BaseMapping[F]:
       LeafMapping[GnirsWellDepth](GnirsWellDepthType),
       LeafMapping[ArchiveDuplication.State](ArchiveDuplicationStateType),
       LeafMapping[Group.Id](GroupIdType),
-      LeafMapping[GroupConstraintViolation](GroupConstraintViolationType),
+      LeafMapping[GroupConstraintViolationCode](GroupConstraintViolationCodeType),
+      LeafMapping[GroupConstraintWaiver.Id](GroupConstraintWaiverIdType),
       LeafMapping[GroupStatus](GroupStatusType),
       LeafMapping[GroupStandingStatus](GroupStandingStatusType),
       LeafMapping[GuideProbe](GuideProbeType),

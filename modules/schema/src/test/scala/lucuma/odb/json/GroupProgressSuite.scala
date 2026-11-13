@@ -3,9 +3,11 @@
 
 package lucuma.odb.json
 
+import io.circe.Json
 import io.circe.literal.*
 import io.circe.testing.ArbitraryInstances
 import io.circe.testing.CodecTests
+import lucuma.core.model.group.GroupConstraintWaiver
 import lucuma.core.model.group.GroupProgress
 import lucuma.core.model.group.arb.ArbGroupProgress
 import lucuma.core.util.Timestamp
@@ -54,5 +56,23 @@ class GroupProgressSuite extends DisciplineSuite with ArbitraryInstances {
         }
       """
     assert(js.as[GroupProgress].isLeft)
+
+  test("a waiver of a violation that can't be waived doesn't decode"):
+    val waiver = (code: String, element: Json) =>
+      json"""
+        {
+          "id": "w-1",
+          "groupId": "g-1",
+          "violation": { "code": $code, "element": $element, "night": null, "subgroupId": null },
+          "reason": "The PI accepts it.",
+          "grantedBy": "u-1",
+          "grantedAt": ${Timestamp.Min},
+          "revokedBy": null,
+          "revokedAt": null
+        }
+      """
+    val element = json"""{ "groupId": null, "observationId": "o-1" }"""
+    assert(waiver("ORDER", element).as[GroupConstraintWaiver].isRight)
+    assert(waiver("INSUFFICIENT_ELEMENTS", Json.Null).as[GroupConstraintWaiver].isLeft)
 
 }

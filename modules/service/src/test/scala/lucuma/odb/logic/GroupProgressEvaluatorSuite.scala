@@ -3,20 +3,27 @@
 
 package lucuma.odb.logic
 
-import cats.data.NonEmptySet
+import cats.Order.catsKernelOrderingForOrder
+import cats.syntax.either.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.numeric.PosShort
+import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ExecutionState
-import lucuma.core.enums.GroupConstraintViolation
-import lucuma.core.enums.GroupConstraintViolation.*
+import lucuma.core.enums.GroupConstraintViolationCode
+import lucuma.core.enums.GroupConstraintViolationCode.*
 import lucuma.core.enums.GroupStatus
 import lucuma.core.enums.ObservationQaState
 import lucuma.core.enums.Site
 import lucuma.core.model.Group
+import lucuma.core.model.LocalObservingNight
 import lucuma.core.model.Observation
+import lucuma.core.model.ObservingNight
+import lucuma.core.model.User
+import lucuma.core.model.group.GroupConstraintViolation as Violation
+import lucuma.core.model.group.GroupConstraintWaiver
 import lucuma.core.model.group.GroupProgress
 import lucuma.core.model.group.GroupStanding
 import lucuma.core.util.TimeSpan
@@ -98,36 +105,64 @@ class GroupProgressEvaluatorSuite extends FunSuite:
       children.flatMap(_.facts).toMap
     )
 
-  def evalAll(n: Node, now: Timestamp = t0): Map[Group.Id, GroupProgress] =
-    GroupProgressEvaluator.evaluate(List(n.branch), n.facts, now)
+  // A group's progress as most tests check it: an unschedulable group's
+  // violations by their codes alone, and no waivers.  The waiver tests check
+  // the whole progress.
+  enum Progress:
+    case Empty
+    case Pending(required: PosInt)
+    case Ongoing(completed: NonNegInt, required: PosInt, nextWindow: Option[TimestampInterval])
+    case Complete(completed: NonNegInt, required: PosInt)
+    case Unschedulable(completed: NonNegInt, required: PosInt, codes: Set[GroupConstraintViolationCode])
 
-  def eval(n: Node, now: Timestamp = t0): GroupProgress =
+  def summary(p: GroupProgress): Progress =
+    p match
+      case GroupProgress.Empty                     => Progress.Empty
+      case GroupProgress.Pending(r)                => Progress.Pending(r)
+      case GroupProgress.Ongoing(c, r, w, _)       => Progress.Ongoing(c, r, w)
+      case GroupProgress.Complete(c, r, _)         => Progress.Complete(c, r)
+      case u @ GroupProgress.Unschedulable(c, r, _, _) => Progress.Unschedulable(c, r, u.codes.toSortedSet.toSet)
+
+  def evalFull(n: Node, now: Timestamp = t0, waivers: List[GroupConstraintWaiver] = Nil): Map[Group.Id, GroupProgress] =
+    GroupProgressEvaluator.evaluate(List(n.branch), n.facts, waivers.groupBy(_.groupId), now)
+
+  def evalAll(n: Node, now: Timestamp = t0): Map[Group.Id, Progress] =
+    evalFull(n, now).view.mapValues(summary).toMap
+
+  def eval(n: Node, now: Timestamp = t0): Progress =
     evalAll(n, now)(n.branch.groupId)
 
   def pos(n: Int): PosInt   = PosInt.unsafeFrom(n)
   def nn(n: Int): NonNegInt = NonNegInt.unsafeFrom(n)
 
-  def pending(required: Int): GroupProgress =
-    GroupProgress.Pending(pos(required))
+  def pending(required: Int): Progress =
+    Progress.Pending(pos(required))
 
-  def ongoing(completed: Int, required: Int, nextWindow: Option[TimestampInterval] = None): GroupProgress =
-    GroupProgress.Ongoing(nn(completed), pos(required), nextWindow)
+  def ongoing(completed: Int, required: Int, nextWindow: Option[TimestampInterval] = None): Progress =
+    Progress.Ongoing(nn(completed), pos(required), nextWindow)
 
-  def complete(completed: Int, required: Int): GroupProgress =
-    GroupProgress.Complete(nn(completed), pos(required))
+  def complete(completed: Int, required: Int): Progress =
+    Progress.Complete(nn(completed), pos(required))
 
-  def unschedulable(completed: Int, required: Int, v: GroupConstraintViolation, vs: GroupConstraintViolation*): GroupProgress =
-    GroupProgress.Unschedulable(nn(completed), pos(required), NonEmptySet.of(v, vs*))
+  def unschedulable(completed: Int, required: Int, v: GroupConstraintViolationCode, vs: GroupConstraintViolationCode*): Progress =
+    Progress.Unschedulable(nn(completed), pos(required), (v +: vs).toSet)
 
-  extension (p: GroupProgress)
-    def violationList: List[GroupConstraintViolation] =
+  extension (p: Progress)
+    def violationList: List[GroupConstraintViolationCode] =
       p match
-        case GroupProgress.Unschedulable(_, _, v) => v.toSortedSet.toList
-        case _                                    => Nil
+        case Progress.Unschedulable(_, _, v) => v.toList.sorted
+        case _                               => Nil
     def window: Option[TimestampInterval] =
       p match
-        case GroupProgress.Ongoing(_, _, w) => w
-        case _                              => None
+        case Progress.Ongoing(_, _, w) => w
+        case _                         => None
+    def status: GroupStatus =
+      p match
+        case Progress.Empty                 => GroupStatus.Empty
+        case Progress.Pending(_)            => GroupStatus.Pending
+        case Progress.Ongoing(_, _, _)      => GroupStatus.Ongoing
+        case Progress.Complete(_, _)        => GroupStatus.Complete
+        case Progress.Unschedulable(_, _, _) => GroupStatus.Unschedulable
 
   // Counting
 
@@ -171,7 +206,7 @@ class GroupProgressEvaluatorSuite extends FunSuite:
     )
     assertEquals(
       eval(branch(1, List(leaf(1, ExecutionState.DeclaredComplete)))),
-      GroupProgress.Empty
+      Progress.Empty
     )
 
   test("inactive observations don't count toward 'all required'"):
@@ -213,14 +248,14 @@ class GroupProgressEvaluatorSuite extends FunSuite:
   test("a subgroup whose observations were all suspended is left out, but has started its parent"):
     val sub = branch(2, List(leaf(2, ExecutionState.Ongoing, start = Some(t0), inactive = true)))
     val all = evalAll(branch(1, List(leaf(1), sub)), t0)
-    assertEquals(all(gid(2)), GroupProgress.Empty)
+    assertEquals(all(gid(2)), Progress.Empty)
     assertEquals(all(gid(1)), ongoing(0, 1))
 
   test("a suspended science observation with a telluric not yet taken has started the group holding its calibration group"):
     val science  = leaf(2, ExecutionState.Ongoing, start = Some(t0), inactive = true)
     val telluric = leaf(3, role = Some(CalibrationRole.Telluric), science = Some(2), inactive = true)
     val all      = evalAll(branch(1, List(leaf(1), branch(2, List(science, telluric)))), t0)
-    assertEquals(all(gid(2)), GroupProgress.Empty)
+    assertEquals(all(gid(2)), Progress.Empty)
     assertEquals(all(gid(1)), ongoing(0, 1))
 
   // QA
@@ -333,13 +368,13 @@ class GroupProgressEvaluatorSuite extends FunSuite:
     val sub      = (qa: Option[ObservationQaState]) => branch(2, List(leaf(2, ExecutionState.DeclaredComplete, qa = qa), telluric))
     List(None, Some(ObservationQaState.Fail)).foreach: qa =>
       val all = evalAll(branch(1, List(done(1, t0), sub(qa))), t0 +| hours(1))
-      assertEquals(all(gid(2)), GroupProgress.Empty, clue(qa))
+      assertEquals(all(gid(2)), Progress.Empty, clue(qa))
       assertEquals(all(gid(1)), complete(1, 1), clue(qa))
 
   test("a completed telluric goes with its inactive science observation"):
     val telluric = leaf(3, ExecutionState.Completed, Some(t0), start = Some(t0), role = Some(CalibrationRole.Telluric), science = Some(2))
     val all      = evalAll(branch(1, List(done(1, t0), branch(2, List(leaf(2, inactive = true), telluric)))), t0 +| hours(1))
-    assertEquals(all(gid(2)), GroupProgress.Empty)
+    assertEquals(all(gid(2)), Progress.Empty)
     assertEquals(all(gid(1)), complete(1, 1))
 
   test("a telluric's own QA doesn't affect its calibration group"):
@@ -381,13 +416,13 @@ class GroupProgressEvaluatorSuite extends FunSuite:
     val empty  = branch(2, List(leaf(2, inactive = true), leaf(3, inactive = true)))
     val parent = branch(1, List(done(1, t0), empty))
     val all    = evalAll(parent, t0)
-    assertEquals(all(gid(2)), GroupProgress.Empty)
+    assertEquals(all(gid(2)), Progress.Empty)
     assertEquals(all(gid(1)), complete(1, 1))
 
   test("a new, empty subgroup doesn't complete a one-of-n parent"):
     val parent = branch(1, List(branch(2, Nil), leaf(2)), min = Some(1))
     val all    = evalAll(parent)
-    assertEquals(all(gid(2)), GroupProgress.Empty)
+    assertEquals(all(gid(2)), Progress.Empty)
     assertEquals(all(gid(1)), pending(1))
 
   // Order
@@ -596,7 +631,7 @@ class GroupProgressEvaluatorSuite extends FunSuite:
   test("a subgroup of only untimed completions is left out"):
     val sub    = branch(2, List(leaf(2, ExecutionState.DeclaredComplete), leaf(3, ExecutionState.DeclaredComplete)))
     val parent = branch(1, List(done(1, t0), sub), maxI = Some(hours(1)))
-    assertEquals(evalAll(parent, now = t0 +| hours(6))(gid(2)), GroupProgress.Empty)
+    assertEquals(evalAll(parent, now = t0 +| hours(6))(gid(2)), Progress.Empty)
     assertEquals(eval(parent, now = t0 +| hours(6)), complete(1, 1))
 
   // Same night
@@ -625,12 +660,21 @@ class GroupProgressEvaluatorSuite extends FunSuite:
     assertEquals(eval(g), unschedulable(2, 2, SameNight))
 
   test("same night: observations at more than one site"):
+    // Completions at two sites are on different nights, even on the same date.
     val g = branch(1, List(done(1, t0, Site.GN), done(2, t0 +| hours(1), Site.GS)), sameNight = true)
-    assertEquals(eval(g), unschedulable(2, 2, SameNightMultipleSites))
+    assertEquals(eval(g), unschedulable(2, 2, SameNight, SameNightMultipleSites))
 
   test("same night: an observation still to do at another site"):
     val g = branch(1, List(leaf(1, site = Site.GN), leaf(2, site = Site.GS)), sameNight = true)
     assertEquals(eval(g), unschedulable(0, 2, SameNightMultipleSites))
+
+  test("same night: completions on different nights are reported with another site still to do"):
+    // 19:00 HST on 16 October is in the night of 16-17 October.
+    val t1 = ts("2026-10-17T05:00:00Z")
+    val g  = branch(1, List(done(1, t0), done(2, t1), leaf(3, site = Site.GS)), sameNight = true)
+    val p  = evalFull(g, t1 +| hours(1))(gid(1))
+    assertEquals(summary(p), unschedulable(2, 3, SameNight, SameNightMultipleSites))
+    assert(p.located.contains(Violation.Waivable.SameNight(nightAt(t0))))
 
   test("same night: an inactive observation at another site doesn't count"):
     val g = branch(1, List(done(1, t0), leaf(2), leaf(3, site = Site.GS, inactive = true)), sameNight = true)
@@ -981,12 +1025,136 @@ class GroupProgressEvaluatorSuite extends FunSuite:
     val parent = branch(1, List(branch(2, List(leaf(1))), branch(3, List(branch(4, List(leaf(2)))))))
     assertEquals(evalAll(parent, t0).keySet, Set(1L, 2L, 3L, 4L).map(gid))
 
+  // Waivers
+
+  def waiver(v: Violation.Waivable, revoked: Boolean = false): GroupConstraintWaiver =
+    GroupConstraintWaiver(
+      GroupConstraintWaiver.Id.fromLong(1L).get,
+      gid(1),
+      v,
+      NonEmptyString.unsafeFrom("The PI accepts it."),
+      User.Id.fromLong(1L).get,
+      t0,
+      Option.when(revoked)(GroupConstraintWaiver.Revocation(User.Id.fromLong(2L).get, t0))
+    )
+
+  def nightAt(t: Timestamp, site: Site = Site.GN): ObservingNight =
+    LocalObservingNight.fromSiteAndInstant(site, t.toInstant).atSite(site)
+
+  def full(n: Node, now: Timestamp = t0, waivers: List[GroupConstraintWaiver] = Nil): GroupProgress =
+    evalFull(n, now, waivers)(n.branch.groupId)
+
+  extension (p: GroupProgress)
+    def located: List[Violation] =
+      p match
+        case u: GroupProgress.Unschedulable => u.violations.toList
+        case _                              => Nil
+
+  val outOfOrder: Node =
+    branch(1, List(leaf(1), done(2, t0)), ordered = true)
+
+  test("waivers: a violation names the element out of order"):
+    assertEquals(full(outOfOrder).located, List(Violation.Waivable.Order(oid(2).asRight)))
+
+  test("waivers: a waived out-of-order completion no longer counts, and the waiver is reported"):
+    val w = waiver(Violation.Waivable.Order(oid(2).asRight))
+    val p = full(outOfOrder, waivers = List(w))
+    assertEquals(summary(p), ongoing(1, 2))
+    assertEquals(p.waived, List(w))
+
+  test("waivers: a revoked waiver doesn't apply"):
+    val p = full(outOfOrder, waivers = List(waiver(Violation.Waivable.Order(oid(2).asRight), revoked = true)))
+    assertEquals(summary(p), unschedulable(1, 2, Order))
+    assertEquals(p.waived, Nil)
+
+  test("waivers: a waiver of another violation doesn't apply, and isn't reported"):
+    val p = full(outOfOrder, waivers = List(waiver(Violation.Waivable.Order(oid(1).asRight))))
+    assertEquals(summary(p), unschedulable(1, 2, Order))
+    assertEquals(p.waived, Nil)
+
+  test("waivers: a complete group lists the waivers that accepted its violations"):
+    val g = branch(1, List(done(1, t0), done(2, t0 +| minutes(30))), minI = Some(hours(1)))
+    assertEquals(full(g).located, List(Violation.Waivable.MinimumInterval(oid(1).asRight)))
+    val w = waiver(Violation.Waivable.MinimumInterval(oid(1).asRight))
+    val p = full(g, waivers = List(w))
+    assertEquals(summary(p), complete(2, 2))
+    assertEquals(p.waived, List(w))
+
+  test("waivers: waiving the minimum interval after the last completion lifts it from the next window"):
+    val g = branch(1, List(done(1, t0), leaf(2, ExecutionState.Ongoing, start = Some(t0 +| minutes(10))), leaf(3)), minI = Some(hours(1)))
+    val now = t0 +| minutes(20)
+    assertEquals(full(g, now).located, List(Violation.Waivable.MinimumInterval(oid(1).asRight)))
+    val p = full(g, now, List(waiver(Violation.Waivable.MinimumInterval(oid(1).asRight))))
+    assertEquals(p.status, GroupStatus.Ongoing)
+    assertEquals(summary(p).window.map(_.start), Some(t0))
+
+  test("waivers: waiving the maximum interval after the last completion lifts its deadline"):
+    val g   = (second: Node) => branch(1, List(done(1, t0), second), maxI = Some(hours(1)))
+    val now = t0 +| hours(2)
+    assertEquals(full(g(leaf(2)), now).located, List(Violation.Waivable.MaximumInterval(oid(1).asRight)))
+    val w = waiver(Violation.Waivable.MaximumInterval(oid(1).asRight))
+    val p = full(g(leaf(2)), now, List(w))
+    assertEquals(p.status, GroupStatus.Ongoing)
+    assertEquals(summary(p).window.map(_.end), Some(Timestamp.Max))
+    // And the late completion it was waived for.
+    assertEquals(summary(full(g(done(2, t0 +| hours(3))), t0 +| hours(4), List(w))), complete(2, 2))
+
+  test("waivers: a same-night group's waived night is exempt, but the rest must share one night"):
+    val t1 = ts("2026-10-17T05:00:00Z") // the next night
+    val t2 = ts("2026-10-18T05:00:00Z") // the night after
+    val g  = (third: Node) => branch(1, List(done(1, t0), done(2, t1), third), sameNight = true)
+    assertEquals(full(g(leaf(3)), t1 +| hours(1)).located, List(Violation.Waivable.SameNight(nightAt(t0))))
+    val w = waiver(Violation.Waivable.SameNight(nightAt(t0)))
+    assertEquals(full(g(leaf(3)), t1 +| hours(1), List(w)).status, GroupStatus.Ongoing)
+    assertEquals(summary(full(g(done(3, t1 +| hours(1))), t1 +| hours(2), List(w))), complete(3, 3))
+    assertEquals(full(g(done(3, t2)), t2 +| hours(1), List(w)).located, List(Violation.Waivable.SameNight(nightAt(t1))))
+
+  test("waivers: a waived night short of the per-night minimum no longer counts"):
+    val t1 = ts("2026-10-17T05:00:00Z")
+    val g  = branch(1, List(done(1, t0), done(2, t1), done(3, t1 +| hours(1)), leaf(4)), minN = Some(2))
+    val now = t1 +| hours(2)
+    assertEquals(full(g, now).located, List(Violation.Waivable.ObservationsPerNightMinimum(nightAt(t0))))
+    val p = full(g, now, List(waiver(Violation.Waivable.ObservationsPerNightMinimum(nightAt(t0)))))
+    assertEquals((p.status, p.located), (GroupStatus.Ongoing, Nil))
+
+  test("waivers: a waived night in progress short of the per-night minimum isn't waited on"):
+    val g = branch(1, List(done(1, t0), leaf(2), leaf(3)), minI = Some(hours(20)), minN = Some(2))
+    val now = t0 +| hours(1)
+    assertEquals(full(g, now).located, List(Violation.Waivable.ObservationsPerNightMinimum(nightAt(t0))))
+    val w = waiver(Violation.Waivable.ObservationsPerNightMinimum(nightAt(t0)))
+    val p = full(g, now, List(w))
+    assertEquals(p.status, GroupStatus.Ongoing)
+    assertEquals(p.waived, List(w))
+    // The window no longer ends with the night.
+    assertEquals(summary(p).window.map(_.end), Some(Timestamp.Max))
+
+  test("waivers: a waived night over the per-night maximum no longer counts"):
+    val g = branch(1, List(done(1, t0), done(2, t0 +| hours(1)), done(3, t0 +| hours(2))), maxN = Some(2))
+    assertEquals(full(g, t0 +| hours(3)).located, List(Violation.Waivable.ObservationsPerNightMaximum(nightAt(t0))))
+    assertEquals(summary(full(g, t0 +| hours(3), List(waiver(Violation.Waivable.ObservationsPerNightMaximum(nightAt(t0)))))), complete(3, 3))
+
+  test("located: each element completed out of order is named"):
+    val g = branch(1, List(leaf(1), done(2, t0), done(3, t0 +| hours(1))), ordered = true)
+    assertEquals(full(g, t0 +| hours(2)).located, List(Violation.Waivable.Order(oid(2).asRight), Violation.Waivable.Order(oid(3).asRight)))
+
+  test("located: an element started too soon is named by the completion it followed"):
+    val g = branch(1, List(done(1, t0), done(2, t0 +| hours(2)), done(3, t0 +| minutes(150))), minI = Some(hours(1)))
+    assertEquals(full(g, t0 +| hours(3)).located, List(Violation.Waivable.MinimumInterval(oid(2).asRight)))
+
+  test("located: a late completion is named by the completion it followed"):
+    val g = branch(1, List(done(1, t0), done(2, t0 +| hours(3)), done(3, t0 +| hours(4))), maxI = Some(hours(1)))
+    assertEquals(full(g, t0 +| hours(5)).located, List(Violation.Waivable.MaximumInterval(oid(1).asRight)))
+
+  test("waivers: an unschedulable subgroup is named"):
+    val sub = branch(2, List(done(2, t0), assessed(3, t0, ObservationQaState.Fail)))
+    assert(full(branch(1, List(sub, done(1, t0)), min = Some(1), ordered = true), t0 +| hours(1)).located.contains(Violation.Unwaivable.SubgroupUnschedulable(gid(2))))
+
   // Input
 
   test("an observation without facts is not started"):
     val g = branch(1, List(done(1, t0), leaf(2)))
     assertEquals(
-      GroupProgressEvaluator.evaluate(List(g.branch), g.facts - oid(2), t0)(gid(1)),
+      summary(GroupProgressEvaluator.evaluate(List(g.branch), g.facts - oid(2), Map.empty, t0)(gid(1))),
       ongoing(1, 2)
     )
 
@@ -996,7 +1164,7 @@ class GroupProgressEvaluatorSuite extends FunSuite:
   // Standing
 
   def standings(n: Node): Map[Group.Id, GroupStanding] =
-    GroupProgressEvaluator.standings(List(n.branch), evalAll(n))
+    GroupProgressEvaluator.standings(List(n.branch), evalFull(n))
 
   // Complete: one of two required, and it's done.
   def complete(n: Long, o: Long): Node =

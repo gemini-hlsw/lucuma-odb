@@ -16174,8 +16174,12 @@ enum GroupStatus {
   UNSCHEDULABLE
 }
 
-"A reason a group can no longer be completed: a constraint it can no longer meet."
-enum GroupConstraintViolation {
+"""
+A kind of violation of a group's constraints, which, unless waived, means the
+group can no longer be completed.  A particular violation, with where in the
+group it happened, is a `GroupConstraintViolation`.
+"""
+enum GroupConstraintViolationCode {
   "In an ordered group, an element completed before an earlier one."
   ORDER
 
@@ -16310,12 +16314,91 @@ type GroupProgress {
   nextWindow: GroupWindow
 
   """
-  Why the group can no longer be completed: the constraints it can no longer
-  meet.  Empty unless unschedulable.  A subgroup's own violations are on its
-  own `progress`.
+  Why the group can no longer be completed: the violations of its constraints
+  that no waiver accepts.  Empty unless unschedulable.  A subgroup's own
+  violations are on its own `progress`.
   """
   violations: [GroupConstraintViolation!]!
+
+  """
+  The waivers that accept violations of the group's constraints which would
+  otherwise make it unschedulable.  An ongoing, complete or unschedulable group
+  may have them.
+  """
+  waived: [GroupConstraintWaiver!]!
 }
+
+"""
+One particular violation of a group's constraints: its kind and where in the
+group it happened.  Which of `element`, `night` and `subgroupId` is set depends
+on the `code`; the others are null.
+"""
+type GroupConstraintViolation {
+  "The kind of violation."
+  code: GroupConstraintViolationCode!
+
+  """
+  For `ORDER`, the element that completed before an earlier one.  For
+  `MINIMUM_INTERVAL` and `MAXIMUM_INTERVAL`, the element whose completion the
+  interval is measured from.
+  """
+  element: GroupElementId
+
+  """
+  For `SAME_NIGHT`, the night whose completions didn't finish the group.  For
+  `OBSERVATIONS_PER_NIGHT_MINIMUM` and `OBSERVATIONS_PER_NIGHT_MAXIMUM`, the
+  night with too few or too many.
+  """
+  night: GroupNight
+
+  "For `SUBGROUP_UNSCHEDULABLE`, the subgroup."
+  subgroupId: GroupId
+}
+
+"An element of a group: a subgroup or an observation.  Exactly one is set."
+type GroupElementId {
+  groupId: GroupId
+  observationId: ObservationId
+}
+
+"An observing night at a site."
+type GroupNight {
+  site: Site!
+
+  "The local date on which the night starts."
+  date: Date!
+}
+
+"""
+The acceptance of one violation of a group's constraints, say because the PI
+judged data taken at the wrong time usable.  A waived violation no longer
+counts against the group, while the constraint itself stays as written, so
+that any other violation is still caught.  A waiver is granted only for a
+violation that has happened.  A revoked waiver is kept, but no longer applies.
+"""
+type GroupConstraintWaiver {
+  id: GroupConstraintWaiverId!
+
+  "The group whose violation is accepted."
+  groupId: GroupId!
+
+  "The violation accepted."
+  violation: GroupConstraintViolation!
+
+  "Why the violation was accepted."
+  reason: NonEmptyString!
+
+  grantedBy: UserId!
+  grantedAt: Timestamp!
+
+  "Who revoked the waiver, if it has been revoked."
+  revokedBy: UserId
+
+  "When the waiver was revoked, if it has been."
+  revokedAt: Timestamp
+}
+
+scalar GroupConstraintWaiverId
 
 """
 The status of a `GroupStanding`: whether a group or observation is still worth

@@ -58,7 +58,7 @@ object GroupProgressService:
             now   <- timeService.transactionTime
             facts <- selectFacts(subtrees.flatMap(_._2.flatMap(_.allObservations)))
           yield subtrees.flatMap: (pt, branches) =>
-            val all = GroupProgressEvaluator.evaluate(branches, facts, now)
+            val all = GroupProgressEvaluator.evaluate(branches, facts, Map.empty, now)
             pt.groupIds.flatMap(gid => all.get(gid).tupleLeft(gid))
           .toMap
 
