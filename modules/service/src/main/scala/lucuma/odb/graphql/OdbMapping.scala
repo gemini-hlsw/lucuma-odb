@@ -915,28 +915,9 @@ object OdbMapping {
       emailConfig,
       schema,
       allowSub = false,
-      shouldValidate = false, // seems to cause overflow from time to time
+      shouldValidate = false, // built per session; the web dyno validates the type mappings at startup
     )
 
-
-  /**
-   * Validates the type mappings of `mapping` against its schema, raising a `ValidationException`
-   * if there are problems. It runs once per process, and the `GraphQLService` is then built with
-   * `GraphQLService.unvalidated`.
-   *
-   * TEMPORARY: the validation runs on a dedicated thread with an 8 MB stack. Grackle 0.30.0's
-   * `MappingValidator` recurses over the type mappings without stack safety and, with a schema
-   * this size, overflows the default thread stack depending on JIT state (it fails intermittently,
-   * not every time). The fix (typelevel/grackle#940) is merged but unreleased. Once a Grackle
-   * release includes it, delete this method and build the service with `GraphQLService.apply`
-   * from lucuma-graphql-routes, which validates the mapping itself.
-   */
-  def validate[F[_]: Async](mapping: Mapping[F]): F[Unit] =
-    Async[F].async_ : cb =>
-      val run: Runnable = () => cb(try Right(mapping.unsafeValidate()) catch case t => Left(t))
-      val t: Thread     = new Thread(null, run, "odb-mapping-validation", 8L * 1024 * 1024)
-      t.setDaemon(true)
-      t.start()
 
   def loadSchema[F[_]: ApplicativeThrow: Logger]: F[Schema] =
     // NOTE: `load` is an inline macro -- it reads the .graphql at *compile time* and bakes the

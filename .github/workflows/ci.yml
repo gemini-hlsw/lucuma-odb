@@ -252,7 +252,7 @@ jobs:
       - run: scala-steward validate-repo-config .scala-steward.conf
 
   checks:
-    name: Static checks and schema validation
+    name: Static checks
     strategy:
       matrix:
         os: [ubuntu-22.04]
@@ -295,20 +295,32 @@ jobs:
       - name: Static checks
         run: sbt -v -J-Xmx6g -J-Xss4M '++ ${{ matrix.scala }}' githubWorkflowCheck headerCheckAll scalafmtCheckAll 'project /' scalafmtSbtCheck lucumaScalafmtCheck lucumaScalafixCheck lucumaSlackNotifyCheck 'scalafixAll --check' mimaReportBinaryIssues doc
 
+  schema:
+    name: GraphQL schema validation
+    if: github.event_name == 'pull_request'
+    strategy:
+      matrix:
+        os: [ubuntu-22.04]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout current branch
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
       - name: Install npm dependencies
-        if: github.event_name == 'pull_request'
         run: npm ci
 
       - name: Validate ODB GraphQL schema changes
-        if: github.event_name == 'pull_request'
+        if: '!cancelled()'
         run: node .github/validate-schema.mjs modules/schema/src/main/resources/lucuma/odb/graphql/OdbSchema.graphql
 
       - name: Validate ITC GraphQL schema changes
-        if: github.event_name == 'pull_request'
+        if: '!cancelled()'
         run: node .github/validate-schema.mjs itc/service/src/main/resources/graphql/itc.graphql
 
       - name: Validate Resource GraphQL schema changes
-        if: github.event_name == 'pull_request'
+        if: '!cancelled()'
         run: node .github/validate-schema.mjs resource/service/src/main/resources/graphql/resource.graphql
 
   deploy:
@@ -699,7 +711,7 @@ jobs:
 
   required-checks:
     name: REQUIRED CHECKS FOR BRANCH PROTECTION - AGGREGATED
-    needs: [build, checks]
+    needs: [build, checks, schema]
     if: always()
     strategy:
       matrix:
@@ -713,4 +725,4 @@ jobs:
           exit 1
 
       - name: Report success
-        run: echo "all of build, checks passed or were skipped"
+        run: echo "all of build, checks, schema passed or were skipped"
