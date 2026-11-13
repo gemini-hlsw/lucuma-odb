@@ -167,6 +167,7 @@ class observation_configurationRequests
       case ObservingModeType.GnirsImaging       => IO.unit
       case ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu => IO.unit // TODO implement Gnirs
       case ObservingModeType.Igrins2LongSlit    => Mutation.forIgrins2LongSlit(user, oid, SlitOffsetMode.NodAlongSlit)
+      case ObservingModeType.ScorpioLongSlit    => IO.unit
       case _: VisitorObservingModeType          => IO.unit
 
   def compatibleMutation(user: User, oid: Observation.Id, mode: ObservingModeType): IO[Unit] =
@@ -188,6 +189,7 @@ class observation_configurationRequests
       case ObservingModeType.GnirsImaging       => IO.unit
       case ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu => IO.unit // TODO implement Gnirs
       case ObservingModeType.Igrins2LongSlit    => IO.unit // no changes are compatible
+      case ObservingModeType.ScorpioLongSlit    => IO.unit
       case _: VisitorObservingModeType          => IO.unit
 
   def incompatibleMutation(user: User, oid: Observation.Id, mode: ObservingModeType): Option[IO[Unit]] =
@@ -211,6 +213,7 @@ class observation_configurationRequests
       case ObservingModeType.GnirsImaging       => None
       case ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu => Some(IO.unit) // TODO implement Gnirs
       case ObservingModeType.Igrins2LongSlit    => None // Mutation.forIgrins2LongSlit(user, oid, SlitOffsetMode.NodToSky)
+      case ObservingModeType.ScorpioLongSlit    => None
       case _: VisitorObservingModeType          => None
 
   private def updateObservationAs(user: User, oid: Observation.Id)(update: String): IO[Unit] =
@@ -299,6 +302,7 @@ class observation_configurationRequests
           case ObservingModeType.GnirsImaging       => IO.raiseError(new RuntimeException("GNIRS imaging not supported yet"))
           case ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu => IO.raiseError(new RuntimeException("GNIRS not supported yet"))
           case ObservingModeType.Igrins2LongSlit    => createIgrins2LongSlitObservationAs(pi, pid, tid)
+          case ObservingModeType.ScorpioLongSlit    => IO.raiseError(new RuntimeException("SCORPIO not supported yet"))
           case v: VisitorObservingModeType          => createVisitorModeObservationAs(pi, pid, v, tid)
     yield oid
 

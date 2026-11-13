@@ -387,6 +387,7 @@ trait SequenceCodec {
           case i@InstrumentExecutionConfig.GmosSouth(_)  => "gmosSouth"  -> i.asJson
           case i@InstrumentExecutionConfig.Gnirs(_)      => "gnirs"      -> i.asJson
           case i@InstrumentExecutionConfig.Igrins2(_)    => "igrins2"    -> i.asJson
+          case InstrumentExecutionConfig.Scorpio(_)      => "instrument" -> Instrument.Scorpio.asJson // no SCORPIO sequence codec yet
           case InstrumentExecutionConfig.Visitor(vi)     => "instrument" -> vi.asJson  // no visitor instance
       )
 

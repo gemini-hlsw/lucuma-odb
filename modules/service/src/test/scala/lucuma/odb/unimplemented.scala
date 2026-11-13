@@ -10,7 +10,8 @@ import lucuma.core.enums.ObservingModeType
 // require a matching exchange proposal and do not participate in configuration
 // requests; they are covered by their own dedicated suites instead.  Daytime
 // calibrations are staff-only and have no target, so no configuration
-// requests either; they too have dedicated suites.
+// requests either; they too have dedicated suites.  SCORPIO long slit cannot
+// be created yet.
 val UnImplementedModes: Set[ObservingModeType] =
   Set(
     ObservingModeType.DaytimeCalibration,
@@ -19,7 +20,8 @@ val UnImplementedModes: Set[ObservingModeType] =
     ObservingModeType.Flamingos2Imaging,
     ObservingModeType.GnirsImaging,
     ObservingModeType.GnirsLongSlit,
-    ObservingModeType.GnirsIfu
+    ObservingModeType.GnirsIfu,
+    ObservingModeType.ScorpioLongSlit
   )
 
 extension (mode: ObservingModeType)
