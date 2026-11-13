@@ -11,8 +11,8 @@ import lucuma.core.enums.CalibrationRole
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
-import lucuma.odb.graphql.feature.TelluricCalibrationsTestSupport
 import lucuma.odb.graphql.TestUsers
+import lucuma.odb.graphql.feature.TelluricCalibrationsTestSupport
 import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
 
 import java.time.Instant
