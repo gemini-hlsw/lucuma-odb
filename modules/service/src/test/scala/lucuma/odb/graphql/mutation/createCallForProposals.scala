@@ -739,12 +739,12 @@ class createCallForProposals extends OdbSuite:
               "gemini": {
                 "coordinateLimits": {
                   "north": {
-                    "raStart": { "hms": "20:00:00.000000" },
-                    "raEnd": { "hms": "12:00:00.000000" }
+                    "raStart": { "hms": "18:30:00.000000" },
+                    "raEnd": { "hms": "13:30:00.000000" }
                   },
                   "south": {
-                    "raStart": { "hms": "20:00:00.000000" },
-                    "raEnd": { "hms": "10:00:00.000000" }
+                    "raStart": { "hms": "18:30:00.000000" },
+                    "raEnd": { "hms": "11:30:00.000000" }
                   }
                 }
               }

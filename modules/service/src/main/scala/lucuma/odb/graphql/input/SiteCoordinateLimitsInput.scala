@@ -9,6 +9,8 @@ import lucuma.core.enums.Site
 import lucuma.core.util.DateInterval
 import lucuma.odb.graphql.binding.*
 
+import java.time.Duration
+
 object SiteCoordinateLimitsInput {
 
   case class Create(
@@ -17,22 +19,22 @@ object SiteCoordinateLimitsInput {
   )
 
   object Create:
-    val Binding: Matcher[DateInterval => Create] =
+    val Binding: Matcher[(DateInterval, Duration) => Create] =
       ObjectFieldsBinding.rmap {
         case List(
           CoordinateLimitsInput.Create.Binding.Option("north", rNorth),
           CoordinateLimitsInput.Create.Binding.Option("south", rSouth)
         ) => (rNorth, rSouth).parMapN { (north, south) =>
-          (date: DateInterval) =>
+          (date: DateInterval, buffer: Duration) =>
             val n = north.getOrElse(CoordinateLimitsInput.Create.default)
             val s = south.getOrElse(CoordinateLimitsInput.Create.default)
-            Create(n(Site.GN, date), s(Site.GS, date))
+            Create(n(Site.GN, date, buffer), s(Site.GS, date, buffer))
         }
       }
 
-    def default(date: DateInterval): Create =
-      val north = CoordinateLimitsInput.Create.default(Site.GN, date)
-      val south = CoordinateLimitsInput.Create.default(Site.GS, date)
+    def default(date: DateInterval, buffer: Duration): Create =
+      val north = CoordinateLimitsInput.Create.default(Site.GN, date, buffer)
+      val south = CoordinateLimitsInput.Create.default(Site.GS, date, buffer)
       Create(north, south)
 
   case class Edit(
