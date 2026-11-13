@@ -24,13 +24,18 @@ import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Pure
 import fs2.Stream
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.GmosAmpGain
+import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.GmosGratingOrder
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu
 import lucuma.core.enums.GmosNorthGrating
+import lucuma.core.enums.GmosRoi
 import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
+import lucuma.core.enums.GmosXBinning
+import lucuma.core.enums.GmosYBinning
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepGuideState
@@ -104,6 +109,8 @@ object Science:
     30.secondTimeSpan
 
   val DaytimeArcTitle: NonEmptyString = "Daytime Arc".refined
+
+  val MosMaskFlatTitle: NonEmptyString = "MOS Mask Flat".refined
 
   extension (t: Timestamp)
     def plusCalValidityPeriod: Timestamp =
@@ -342,13 +349,37 @@ object Science:
             yield a
           (title(Δλ), arc)
 
+      def rFilter: L
+
+      /**
+       * The flat of a MOS mask flat: the mask imaged through the mirror and r,
+       * full frame, unbinned, fast read and low gain.
+       */
+      def mosMaskFlat(config: Config[G, L, U]): NonEmptyList[(NonEmptyString, ProtoStep[D])] =
+        val flat = eval:
+          for
+            _ <- optics.exposure    := TimeSpan.Zero
+            _ <- optics.grating     := none[(G, GmosGratingOrder, Wavelength)]
+            _ <- optics.filter      := rFilter.some
+            _ <- optics.fpu         := config.fpuMask.some
+            _ <- optics.xBin        := GmosXBinning.One
+            _ <- optics.yBin        := GmosYBinning.One
+            _ <- optics.ampReadMode := GmosAmpReadMode.Fast
+            _ <- optics.ampGain     := GmosAmpGain.Low
+            _ <- optics.roi         := GmosRoi.FullFrame
+            f <- flatStep(TelescopeConfig(Offset.Zero, StepGuideState.Disabled), ObserveClass.DayCal)
+          yield f
+        NonEmptyList.one((MosMaskFlatTitle, flat))
+
     end Computer
 
     object North extends GmosNorthSequenceState
-                    with Computer[GmosNorth, GmosNorthGrating, GmosNorthFilter, GmosNorthFpu]
+                    with Computer[GmosNorth, GmosNorthGrating, GmosNorthFilter, GmosNorthFpu]:
+      val rFilter: GmosNorthFilter = GmosNorthFilter.RPrime
 
     object South extends GmosSouthSequenceState
-                    with Computer[GmosSouth, GmosSouthGrating, GmosSouthFilter, GmosSouthFpu]
+                    with Computer[GmosSouth, GmosSouthGrating, GmosSouthFilter, GmosSouthFpu]:
+      val rFilter: GmosSouthFilter = GmosSouthFilter.RPrime
   end StepDefinition
 
   /**
@@ -452,6 +483,8 @@ object Science:
       // A daytime arc has no ITC: its exposures come from SmartGcal.
       if calRole.contains(CalibrationRole.DaytimeArc) then
         DaytimeSmartGcal.sequence(oid, estimator, static, namespace, expander, Calibration.Arc, stepDef.daytimeArcs(calibrationObservationConfig(config)))
+      else if calRole.contains(CalibrationRole.MosMaskFlat) then
+        DaytimeSmartGcal.sequence(oid, estimator, static, namespace, expander, Calibration.ImagingFlat, stepDef.mosMaskFlat(config))
       else
         def sequenceUnavailable(m: String): OdbError =
           OdbError.SequenceUnavailable(oid, s"Could not generate a sequence for $oid: $m".some)

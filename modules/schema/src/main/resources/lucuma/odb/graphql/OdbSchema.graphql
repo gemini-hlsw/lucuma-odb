@@ -4213,16 +4213,36 @@ type Mutation {
   setAllocations(input: SetAllocationsInput!): SetAllocationsResult!
 
   """
-  Sets, or updates, a partner's TAC feedback for a program.  Feedback may only
-  be provided by partners with a non-zero time split in the proposal.  NGO users
-  may only set feedback for their own partner, and only for programs they can
-  read.
+  Sets, or updates, the TAC feedback of a time accounting category for a
+  program.  The program must have a proposal whose status is SUBMITTED.
+
+  For a category that belongs to a partner, the user must be staff or an NGO
+  user of that partner who can read the program.  The partner must have a
+  non-zero time split in the proposal or, when the proposal's call for
+  proposals is of type FAST_TURNAROUND or POOR_WEATHER, be the PI's partner.
+
+  Only staff may set feedback for the other categories, which are limited as
+  follows:
+
+  * CAL, ENG and CFHT never have TAC feedback.
+  * GT and LTP may provide feedback for any proposal.
+  * JP and KECK may provide feedback when the proposal requests time on behalf
+    of Subaru or Keck, respectively.
+  * DD, DS, LP and SV may provide feedback when the proposal's call for
+    proposals is of type DIRECTORS_TIME, DEMO_SCIENCE, LARGE_PROGRAM or
+    SYSTEM_VERIFICATION, respectively.
+
+  Recommended times do not change observation science bands, which follow the
+  allocations once the proposal is accepted.
   """
   setTacFeedback(input: SetTacFeedbackInput!): TacFeedbackResult!
 
   """
-  Deletes a partner's TAC feedback for a program.  NGO users may only delete
-  feedback for their own partner, and only for programs they can read.
+  Deletes the TAC feedback of a time accounting category for a program, along
+  with the allocations that carry its recommended times.  The program must have
+  a proposal whose status is SUBMITTED.  For a category that belongs to a
+  partner, the user must be staff or an NGO user of that partner who can read
+  the program.  Only staff may delete feedback for the other categories.
   """
   deleteTacFeedback(input: DeleteTacFeedbackInput!): DeleteTacFeedbackResult!
 
@@ -4261,7 +4281,13 @@ type Mutation {
   """
   regenerateProposalSummaries(input: RegenerateProposalSummariesInput!): RegenerateProposalSummariesResult!
 
-  "Set the proposal status."
+  """
+  Set the proposal status.  NGO users may not set the proposal status.
+
+  When the proposal is accepted, observations without a science band are given
+  the program's only allocated band, if it has just one, and a warning lists
+  observations whose band has no time allocated, as for `setAllocations`.
+  """
   setProposalStatus(input: SetProposalStatusInput!): SetProposalStatusResult!
 
   """
@@ -6604,8 +6630,8 @@ type SetAllocationsResult {
 }
 
 """
-Sets or updates the TAC feedback of a single partner for a program, which must
-have a proposal in which the partner has a non-zero time split. One of
+Sets or updates the TAC feedback of a single time accounting category for a
+program, subject to the rules described on the `setTacFeedback` mutation. One of
 programId, programReference or proposalReference is required. (If two or more are provided, they must refer to the same program.)
 """
 input SetTacFeedbackInput {
@@ -16091,6 +16117,14 @@ type Group {
   """
   progress: GroupProgress
 
+  """
+  Whether the groups around this one, itself included, still want work in it.
+  Calculated in the background when something relevant changes (or when time
+  passing may change it), so it may briefly lag `progress`: see
+  `CalculatedGroupStanding`.  Null for a deleted group.
+  """
+  standing: CalculatedGroupStanding
+
   existence: Existence!
 
   """
@@ -16281,6 +16315,104 @@ type GroupProgress {
   own `progress`.
   """
   violations: [GroupConstraintViolation!]!
+}
+
+"""
+The status of a `GroupStanding`: whether a group or observation is still worth
+doing, given the groups it belongs to.  See `GroupStanding` for how it's
+decided.
+"""
+enum GroupStandingStatus {
+  "None of the groups it belongs to is complete or unschedulable."
+  VIABLE
+
+  "A group it belongs to is complete, so it is no longer needed."
+  COMPLETE
+
+  """
+  A group it belongs to can no longer be completed without human intervention,
+  so doing it couldn't help.
+  """
+  UNSCHEDULABLE
+}
+
+"""
+Every group and observation has a group standing.  It says whether the group
+or observation is still worth doing, given the groups it belongs to.  It is
+stored for each group, and an observation has its group's.
+For example, a `READY` observation in a group that can no longer be completed
+is `UNSCHEDULABLE`: completing it couldn't help complete the group.  Similarly,
+the observations left over in a group that already has the observations it
+requires are `COMPLETE`: they're no longer needed.
+
+The standing comes from the progress (`Group.progress`) of the groups
+containing the observation, or, for a group, the groups containing it and the
+group itself.  The outermost of these that is complete or unschedulable decides
+the standing and is named in it.  If none is, the standing is `VIABLE`.  An
+observation outside any group is always `VIABLE`.
+
+Together with the observation workflow state, the standing can filter the
+observations to consider for scheduling: only `VIABLE` ones need further
+consideration.  The standing is calculated in the background, so it may be out
+of date while the `calculationState` of the `CalculatedGroupStanding` holding
+it is `PENDING`.  A strict filter also matches `READY` (see
+`WhereCalculatedGroupStanding`).
+"""
+type GroupStanding {
+  status: GroupStandingStatus!
+
+  "The group that decided the status, unless viable."
+  groupId: GroupId
+}
+
+"""
+A group standing, as last calculated in the background.
+
+The standing is recalculated whenever something that may change it happens:
+a change to the group or one of its observations, an observation in its tree
+starting or completing, or the time for observing a group's next element
+running out.  Until then `calculationState` is `PENDING` (or `RETRY`, after a
+failed calculation), and `value` is the standing last calculated, which may be
+out of date in either direction.  It is `READY` once the standing reflects
+everything recorded.
+"""
+type CalculatedGroupStanding {
+  "The current state of the background calculation."
+  calculationState: CalculationState!
+
+  "The standing, as last calculated."
+  value: GroupStanding!
+}
+
+"""
+Filters on equality (or not) of a group standing status and the supplied
+criteria.  All supplied criteria must match, but usually only one is selected.
+"""
+input WhereEqGroupStandingStatus {
+  "Matches if the status is exactly the supplied value."
+  EQ: GroupStandingStatus
+
+  "Matches if the status is not the supplied value."
+  NEQ: GroupStandingStatus
+
+  "Matches if the status is any of the supplied options."
+  IN: [GroupStandingStatus!]
+
+  "Matches if the status is none of the supplied values."
+  NIN: [GroupStandingStatus!]
+}
+
+"""
+Matches a group standing.  The status alone matches the value last
+calculated, which may be out of date while a recalculation is pending.  To
+match only up-to-date standings, also match `calculationState` `READY`.
+"""
+input WhereCalculatedGroupStanding {
+  "Matches the current state of the background calculation."
+  calculationState: WhereOrderCalculationState
+
+  "Matches the standing status."
+  status: WhereEqGroupStandingStatus
 }
 
 "Groups contain observations and other groups. Exactly one will be defined."
@@ -17770,6 +17902,14 @@ type Observation {
   workflow: CalculatedObservationWorkflow
 
   """
+  Whether the groups around the observation still want it: its group's
+  standing, or viable outside any group.  Independent of the workflow state.
+  Calculated in the background, like the group's: see
+  `CalculatedGroupStanding`.
+  """
+  groupStanding: CalculatedGroupStanding!
+
+  """
   Result of the Archive Duplication Search: what the Gemini Observatory Archive
   held around this observation's pointing.
   """
@@ -19161,7 +19301,8 @@ type Program {
   allocations: [Allocation!]!
 
   """
-  TAC feedback from each partner that has provided it, ordered by partner.
+  TAC feedback for each time accounting category that has provided it, ordered
+  by time accounting category.
   """
   tacFeedback: [TacFeedback!]!
 
@@ -22239,37 +22380,38 @@ enum TacCategory {
 }
 
 """
-A partner's TAC (Time Allocation Committee) feedback for a program.
+The TAC (Time Allocation Committee) feedback of a time accounting category for
+a program.
 """
 type TacFeedback {
-  "The partner whose TAC provided the feedback."
-  partner: Partner!
+  "The time accounting category whose TAC provided the feedback."
+  timeAccountingCategory: TimeAccountingCategory!
 
-  "The partner TAC's decision."
+  "The TAC's decision."
   decision: TacPartnerDecision!
 
-  "The partner TAC's ranking of the proposal."
+  "The TAC's ranking of the proposal."
   ranking: PosBigDecimal!
 
   """
-  The time recommended by the partner TAC, at most one entry per science band,
-  sorted by band.  Empty if the partner TAC recommends no time.
+  The time recommended by the TAC, at most one entry per science band, sorted
+  by band.  Empty if the TAC recommends no time.
   """
   recommendedTimes: [TacRecommendedTime!]!
 
-  "The partner TAC's comments, if any."
+  "The TAC's comments, if any."
   comments: NonEmptyString
 }
 
 """
-A partner's TAC feedback input.  When the partner has no feedback yet for the
-program, the decision and ranking are required.  Otherwise, omitted fields keep
-their existing values.  The decision, ranking and recommended times may not be
-set to null.  Comments are optional, and setting them to null removes any
-existing comments.
+The TAC feedback input of a time accounting category.  When the category has no
+feedback yet for the program, the decision and ranking are required.
+Otherwise, omitted fields keep their existing values.  The decision, ranking
+and recommended times may not be set to null.  Comments are optional, and
+setting them to null removes any existing comments.
 """
 input TacFeedbackInput {
-  partner: Partner!
+  timeAccountingCategory: TimeAccountingCategory!
   decision: TacPartnerDecision
   ranking: PosBigDecimal
 
@@ -22278,6 +22420,11 @@ input TacFeedbackInput {
   once.  When supplied, the list (even an empty one) replaces all existing
   recommended times.  When omitted, existing recommended times are kept, or
   none are recorded for new feedback.
+
+  Each recommended time is stored with the program's allocation for the
+  category and band.  Setting a recommended time also sets the allocated
+  duration to the same time, and removing a recommended time removes the
+  allocation.
   """
   recommendedTimes: [TacRecommendedTimeInput!]
 
@@ -22285,17 +22432,17 @@ input TacFeedbackInput {
 }
 
 """
-Deletes the TAC feedback of a single partner for a program. One of programId,
-programReference or proposalReference is required. (If two or more are
-provided, they must refer to the same program.)
+Deletes the TAC feedback of a single time accounting category for a program.
+One of programId, programReference or proposalReference is required. (If two
+or more are provided, they must refer to the same program.)
 """
 input DeleteTacFeedbackInput {
   programId: ProgramId
   proposalReference: ProposalReferenceLabel
   programReference: ProgramReferenceLabel
 
-  "The partner whose TAC feedback should be deleted."
-  partner: Partner!
+  "The time accounting category whose TAC feedback should be deleted."
+  timeAccountingCategory: TimeAccountingCategory!
 }
 
 "The result of deleting TAC feedback."
@@ -22313,7 +22460,7 @@ type TacFeedbackResult {
 }
 
 """
-A partner TAC's decision on a proposal.
+A TAC's decision on a proposal.
 """
 enum TacPartnerDecision {
   """
@@ -22328,24 +22475,24 @@ enum TacPartnerDecision {
 }
 
 """
-The time recommended by a partner TAC for a science band.
+The time recommended by a TAC for a science band.
 """
 type TacRecommendedTime {
   "The science band for which the time is recommended."
   band: ScienceBand!
 
-  "The time recommended for this band."
+  "The time recommended for this band, which is always positive."
   time: TimeSpan!
 }
 
 """
-The time recommended by a partner TAC for a science band.
+The time recommended by a TAC for a science band.
 """
 input TacRecommendedTimeInput {
   "The science band for which the time is recommended."
   band: ScienceBand!
 
-  "The time recommended for this band."
+  "The time recommended for this band, which must be positive."
   time: TimeSpanInput!
 }
 
@@ -24315,6 +24462,11 @@ input WhereObservation {
   Matches on the observation workflow state.
   """
   workflow: WhereCalculatedObservationWorkflow
+
+  """
+  Matches on the observation's group standing.
+  """
+  groupStanding: WhereCalculatedGroupStanding
 
   """
   Matches the calibration role.

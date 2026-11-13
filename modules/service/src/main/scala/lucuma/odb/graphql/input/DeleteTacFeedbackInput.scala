@@ -5,17 +5,17 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.all.*
-import lucuma.core.enums.Partner
+import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.model.Program
 import lucuma.core.model.ProgramReference
 import lucuma.core.model.ProposalReference
 import lucuma.odb.graphql.binding.*
 
 case class DeleteTacFeedbackInput(
-  programId:         Option[Program.Id],
-  proposalReference: Option[ProposalReference],
-  programReference:  Option[ProgramReference],
-  partner:           Partner
+  programId:              Option[Program.Id],
+  proposalReference:      Option[ProposalReference],
+  programReference:       Option[ProgramReference],
+  timeAccountingCategory: TimeAccountingCategory
 )
 
 object DeleteTacFeedbackInput:
@@ -26,6 +26,6 @@ object DeleteTacFeedbackInput:
         ProgramIdBinding.Option("programId", rPid),
         ProposalReferenceBinding.Option("proposalReference", rProp),
         ProgramReferenceBinding.Option("programReference", rProg),
-        PartnerBinding("partner", rPartner)
+        TimeAccountingCategoryBinding("timeAccountingCategory", rCategory)
       ) =>
-        (rPid, rProp, rProg, rPartner).parMapN(apply)
+        (rPid, rProp, rProg, rCategory).parMapN(apply)

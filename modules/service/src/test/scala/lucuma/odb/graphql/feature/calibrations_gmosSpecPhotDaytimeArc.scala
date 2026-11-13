@@ -95,20 +95,6 @@ class calibrations_gmosSpecPhotDaytimeArc
           }"""
     ).map(_.hcursor.downFields("observation", "targetEnvironment", "asterism").as[List[Json]].getOrElse(Nil))
 
-  private def queryCalibrationsWithRole(pid: Program.Id, calibrationRole: CalibrationRole): IO[List[Observation.Id]] =
-    query(
-      serviceUser,
-      s"""query {
-            observations(WHERE: { program: { id: { EQ: "$pid" } }, calibrationRole: { EQ: ${calibrationRole.tag.toUpperCase} } }) {
-              matches { id }
-            }
-          }"""
-    ).flatMap: c =>
-      c.hcursor.downFields("observations", "matches").as[List[Json]]
-        .flatMap(_.traverse(_.hcursor.downField("id").as[Observation.Id]))
-        .leftMap(f => new RuntimeException(f.message))
-        .liftTo[IO]
-
   private def queryLongSlitMode(oid: Observation.Id): IO[Json] =
     query(
       serviceUser,

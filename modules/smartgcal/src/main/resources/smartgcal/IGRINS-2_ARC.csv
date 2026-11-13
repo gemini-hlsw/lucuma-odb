@@ -1,3 +1,5 @@
-1,2024/03/05 00:00:00 UTC
+# 2026-Mar-11, hsuh, created smartCal for IGRINS-2
+#
 Mode,Calibration Lamps,Calibration Shutter,Calibration Filter,Calibration Diffuser,Calibration Observe,Calibration Exposure Time,Calibration Coadds,Calibration Basecal
-Spectroscopy,CuAr arc;Xe arc,Closed,none,Visible,2,10,1,Day
+#
+Spectroscopy,CuAr arc+Xe arc,Closed,none,IR,2,10.0,1,Day

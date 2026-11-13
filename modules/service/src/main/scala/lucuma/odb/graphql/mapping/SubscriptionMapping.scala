@@ -170,7 +170,7 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] with UserEnv {
               Filter(
                 Predicates.obscalcUpdate.programId.eql(e.programId),
                 Query.mapSomeFields(child):
-                  case Select("value", a, c) =>
+                  case Select("value", a, c, l) =>
                     Select("value", a,
                       // This predicate needs to be down here
                       Filter(
@@ -178,7 +178,8 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] with UserEnv {
                         then Predicates.observation.id.isNull(true)
                         else Predicates.observation.id.eql(e.observationId),
                         c
-                      )
+                      ),
+                      l
                     )
               )
             )
@@ -205,7 +206,7 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] with UserEnv {
               Filter(
                 Predicates.observationEdit.programId.eql(e.programId),
                 Query.mapSomeFields(child):
-                  case Select("value", a, c) =>
+                  case Select("value", a, c, l) =>
                     Select("value", a,
                       // This predicate needs to be down here
                       Filter(
@@ -213,7 +214,8 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] with UserEnv {
                         then Predicates.observation.id.isNull(true) // always false; Predicate.False doesn't work
                         else Predicates.observation.id.eql(e.observationId),
                         c
-                      )
+                      ),
+                      l
                     )
               )
             )
@@ -241,7 +243,7 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] with UserEnv {
               Filter(
                 Predicates.observationEdit.programId.eql(e.programId),
                 Query.mapSomeFields(child):
-                  case Select("configurationRequest", a, c) =>
+                  case Select("configurationRequest", a, c, l) =>
                     Select("configurationRequest", a,
                       // This predicate needs to be down here
                       Filter(
@@ -249,7 +251,8 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] with UserEnv {
                         then Predicates.configurationRequest.id.isNull(true) // always false; Predicate.False doesn't work
                         else Predicates.configurationRequest.id.eql(e.configurationRequestId),
                         c
-                      )
+                      ),
+                      l
                     )
               )
             )
@@ -306,7 +309,7 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] with UserEnv {
               Filter(
                 Predicates.targetEdit.programId.eql(e.programId),
                 Query.mapSomeFields(child):
-                  case Select("value", a, c) =>
+                  case Select("value", a, c, l) =>
                     Select("value", a,
                       // This predicate needs to be down here
                       Filter(
@@ -314,7 +317,8 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] with UserEnv {
                         then Predicates.target.id.isNull(true) // always false; Predicate.False doesn't work
                         else Predicates.target.id.eql(e.targetId),
                         c
-                      )
+                      ),
+                      l
                     )
               )
             )
@@ -348,7 +352,7 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] with UserEnv {
           val predicate   = Predicates.group.id.eql(e.groupId.getOrElse(lastGroupId))
           def addValueFilter(q: Query): Query =
             q match
-              case Select("value", a, c) => Select("value", a, Unique(Filter(predicate, c)))
+              case Select("value", a, c, l) => Select("value", a, Unique(Filter(predicate, c)), l)
               case Query.Group(queries)  => Query.Group(queries.map(addValueFilter))
               case c                     => c
 

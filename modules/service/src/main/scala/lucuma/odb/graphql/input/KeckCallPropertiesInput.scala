@@ -36,7 +36,7 @@ object KeckCallPropertiesInput:
               // GN coordinate limit defaults apply to Keck as well.
               Create(
                 instruments,
-                limits.fold(CoordinateLimitsInput.Create.default(Site.GN, active))(f => f(Site.GN, active))
+                limits.fold(CoordinateLimitsInput.Create.default(Site.GN, active))(f => f(Site.GN, active, CoordinateLimitsInput.RegularRaBuffer))
               )
 
 

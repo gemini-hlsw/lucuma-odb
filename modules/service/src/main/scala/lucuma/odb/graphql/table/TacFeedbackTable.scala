@@ -11,13 +11,13 @@ trait TacFeedbackTable[F[_]] extends BaseMapping[F]:
 
   object TacFeedbackTable extends TableDef("t_tac_feedback"):
     val ProgramId       = col("c_program_id",       program_id)
-    val Partner         = col("c_partner",          partner)
+    val Category        = col("c_ta_category",      time_accounting_category)
     val Decision        = col("c_decision",         tac_partner_decision)
     val Ranking         = col("c_ranking",          numeric_pos)
     val Comments        = col("c_comments",         text_nonempty.opt)
 
-  object TacRecommendedTimeTable extends TableDef("t_tac_recommended_time"):
+  object TacRecommendedTimeTable extends TableDef("v_tac_recommended_time"):
     val ProgramId       = col("c_program_id",       program_id)
-    val Partner         = col("c_partner",          partner)
+    val Category        = col("c_ta_category",      time_accounting_category)
     val ScienceBand     = col("c_science_band",     science_band)
     val RecommendedTime = col("c_recommended_time", time_span)

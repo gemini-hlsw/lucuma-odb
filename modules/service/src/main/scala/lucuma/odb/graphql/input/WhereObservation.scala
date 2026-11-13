@@ -77,6 +77,7 @@ object WhereObservation {
     val ObservingModeTypeBinding = WhereOptionEq.unwrappedBinding(path / "observingMode" / "mode", enumeratedBinding[ObservingModeType])
     val SiteBinding = siteBinding(enumeratedBinding[Site])
     val WorkflowBinding = WhereCalculatedObservationWorkflow.binding(path / "workflow")
+    val GroupStandingBinding = WhereCalculatedGroupStanding.binding(path / "groupStanding")
     val CalibrationRoleBinding = WhereOptionEq.binding[CalibrationRole](path / "calibrationRole", enumeratedBinding[CalibrationRole])
     val QaBinding = WhereObservationQa.binding(path / "qa")
     val TargetCoordinatesBinding = WhereTargetCoordinates.binding(path / "id", ConeFilter.ConeEntity.Observation, "observations", allowCone)
@@ -97,12 +98,13 @@ object WhereObservation {
         ObservingModeTypeBinding.Option("observingModeType", rObservingModeType),
         SiteBinding.Option("site", rSite),
         WorkflowBinding.Option("workflow", rWorkflow),
+        GroupStandingBinding.Option("groupStanding", rGroupStanding),
         CalibrationRoleBinding.Option("calibrationRole", rCalibrationRole),
         QaBinding.Option("qa", rQa),
         TargetCoordinatesBinding.Option("targetCoordinates", rTargetCoordinates)
       ) =>
-        (rAND, rOR, rNOT, rId, rRef, rProgram, rSubtitle, rScienceBand, rPriority, rInstrument, rObservingModeType, rSite, rWorkflow, rCalibrationRole, rQa, rTargetCoordinates).parMapN {
-          (AND, OR, NOT, id, ref, program, subtitle, scienceBand, priority, instrument, observingModeType, site, workflow, calibrationRole, qa, targetCoordinates) =>
+        (rAND, rOR, rNOT, rId, rRef, rProgram, rSubtitle, rScienceBand, rPriority, rInstrument, rObservingModeType, rSite, rWorkflow, rGroupStanding, rCalibrationRole, rQa, rTargetCoordinates).parMapN {
+          (AND, OR, NOT, id, ref, program, subtitle, scienceBand, priority, instrument, observingModeType, site, workflow, groupStanding, calibrationRole, qa, targetCoordinates) =>
             and(List(
               AND.map(and),
               OR.map(or),
@@ -117,6 +119,7 @@ object WhereObservation {
               observingModeType,
               site,
               workflow,
+              groupStanding,
               calibrationRole,
               qa,
               targetCoordinates

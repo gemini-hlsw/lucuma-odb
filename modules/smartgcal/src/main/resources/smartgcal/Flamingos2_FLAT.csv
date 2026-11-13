@@ -1,7 +1,7 @@
-479,2022/09/10 14:24:06 HST
+525,2025/05/30 05:58:27 HST
 # F2_FLAT.csv,,,,,,,,,,,,,
 #,,,,,,,,,,,,,
-#,2016 Feb 10,,,,,,,,,,,,
+#,2025 Apr 30,,,,,,,,,,,,
 #,,,,,,,,,,,,,
 #,Recommended GCAL configurations and Exp. Times for F2 calibrations:,,,,,,,,,,,,
 #,IR lamp,,,,,,,,,,,,
@@ -11,8 +11,8 @@
 #,"All Flats are taken with GCALlamp=IR grey body-high, GCALdiffuser=IR",,,,,,,,,,,,
 #,The choice of filter within F2 is considered because they sort orders,,,,,,,,,,,,
 #,"The Read Mode is Bright Object, Readout mode Science",,,,,,,,,,,,
-#, Added the 'R=3000 grism  + Y filter. Also made edits based on M. Schirmer checks done in July 2013. 082113,,,,,,,,,,,,
-#,,,,,,,,,,,,,
+#,Added the 'R=3000 grism  + Y filter. Also made edits based on M. Schirmer checks done in July 2013. 082113,,,,,,,,,,,,
+#,2025: Added configuration for the MOS through-slit image,,,,,,,,,,,,
 #,,,,,,,,,,,,,
 #  Instrument Configuration from OT,,,,,,,GCAL configuration from OT,,,,,,
 Disperser,Filter,Focal Plane Unit,,/=>/,,Calibration Observe,Calibration Filter,Calibration Diffuser,Calibration Lamps,Calibration Shutter,Calibration Exposure Time,Calibration Coadds,Calibration Basecal
@@ -29,7 +29,7 @@ None,K-short (2.15 um),Imaging (none),,,,6,ND2.0,IR,IR grey body - high,Closed,3
 None,JH (spectroscopic),Imaging (none),,,,6,ND4-5,IR,IR grey body - high,Open,2,1,Day
 None,JH (spectroscopic),Imaging (none),,,,6,ND4-5,IR,IR grey body - high,Closed,2,1,Day
 None,HK (spectroscopic),Imaging (none),,,,6,ND4-5,IR,IR grey body - high,Closed,2,1,Day
-#,,,,,,,,,,,,,
+None,H (1.65 um),$.*Mask|.*pix longslit,,,,1,ND4-5,IR,IR grey body - high,Open,2,1,Day
 #,,,,,,,,,,,,,
 R=1200 (J + H) grism,JH (spectroscopic),1-pix longslit,,,,1,ND2.0,IR,IR grey body - high,Open,15,1,Night
 R=1200 (J + H) grism,JH (spectroscopic),2-pix longslit,,,,1,ND2.0,IR,IR grey body - high,Open,8,1,Night

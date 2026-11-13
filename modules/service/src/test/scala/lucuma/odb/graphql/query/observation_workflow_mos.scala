@@ -6,7 +6,6 @@ package query
 
 import cats.effect.IO
 import cats.syntax.all.*
-import io.circe.syntax.*
 import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservationValidationCode
@@ -14,7 +13,6 @@ import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.math.Angle
-import lucuma.core.model.Attachment
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
@@ -26,28 +24,6 @@ import lucuma.odb.service.workflow.validator.PosAngleValidator
  * MOS observations checked against `PosAngleValidator`.
  */
 class observation_workflow_mos extends ExecutionTestSupportForGmos with MosMaskSupport:
-
-  private def gmosNorthMos(aid: Option[Attachment.Id]): String =
-    s"""
-      gmosNorthMos: {
-        grating: R831_G5302
-        filter: R_PRIME
-        customMask: {
-          slitWidth: CUSTOM_WIDTH_0_50
-          ${aid.foldMap(a => s"attachmentId: ${a.asJson}")}
-        }
-        centralWavelength: { nanometers: 500 }
-      }
-    """
-
-  private def flamingos2Mos: String =
-    """
-      flamingos2Mos: {
-        disperser: R1200_JH
-        filter: JH
-        customMask: { slitWidth: CUSTOM_WIDTH_2_PIX }
-      }
-    """
 
   private def setPosAngle(oid: Observation.Id, mode: String, degrees: Int): IO[Unit] =
     query(
@@ -96,7 +72,7 @@ class observation_workflow_mos extends ExecutionTestSupportForGmos with MosMaskS
   test("a GMOS MOS observation with an unfixed position angle is an error"):
     for
       (pid, tid) <- setup
-      oid        <- createObservationWithModeAs(pi, pid, List(tid), gmosNorthMos(none))
+      oid        <- createObservationWithModeAs(pi, pid, List(tid), gmosNorthMosMode(none))
       _          <- setPosAngle(oid, "AVERAGE_PARALLACTIC", 0)
       _          <- expectValidations(pid, oid, error(PosAngleValidator.ModeMessage))
     yield ()
@@ -104,7 +80,7 @@ class observation_workflow_mos extends ExecutionTestSupportForGmos with MosMaskS
   test("a Flamingos-2 MOS observation that allows flipping is an error"):
     for
       (pid, tid) <- setup
-      oid        <- createObservationWithModeAs(pi, pid, List(tid), flamingos2Mos)
+      oid        <- createObservationWithModeAs(pi, pid, List(tid), flamingos2MosMode(none))
       _          <- setPosAngle(oid, "ALLOW_FLIP", 0)
       _          <- expectValidations(pid, oid, error(PosAngleValidator.ModeMessage))
     yield ()
@@ -113,7 +89,7 @@ class observation_workflow_mos extends ExecutionTestSupportForGmos with MosMaskS
     for
       (pid, tid) <- setup
       aid        <- insertMosMaskAttachment(pid, "GN2025AQ001-01_ODF.fits", Instrument.GmosNorth, Angle.fromDoubleDegrees(45.0).some)
-      oid        <- createObservationWithModeAs(pi, pid, List(tid), gmosNorthMos(aid.some))
+      oid        <- createObservationWithModeAs(pi, pid, List(tid), gmosNorthMosMode(aid.some))
       _          <- setPosAngle(oid, "FIXED", 30)
       _          <- expectValidations(pid, oid, warning(PosAngleValidator.angleMessage(Angle.fromDoubleDegrees(45.0), Angle.fromDoubleDegrees(30.0))))
     yield ()
@@ -122,7 +98,7 @@ class observation_workflow_mos extends ExecutionTestSupportForGmos with MosMaskS
     for
       (pid, tid) <- setup
       aid        <- insertMosMaskAttachment(pid, "GN2025AQ001-02_ODF.fits", Instrument.GmosNorth, Angle.fromDoubleDegrees(45.0).some)
-      oid        <- createObservationWithModeAs(pi, pid, List(tid), gmosNorthMos(aid.some))
+      oid        <- createObservationWithModeAs(pi, pid, List(tid), gmosNorthMosMode(aid.some))
       _          <- setPosAngle(oid, "FIXED", 45)
       _          <- expectValidations(pid, oid)
     yield ()
@@ -131,7 +107,7 @@ class observation_workflow_mos extends ExecutionTestSupportForGmos with MosMaskS
     for
       (pid, tid) <- setup
       aid        <- insertMosMaskAttachment(pid, "GN2025AQ001-03_ODF.fits", Instrument.GmosNorth)
-      oid        <- createObservationWithModeAs(pi, pid, List(tid), gmosNorthMos(aid.some))
+      oid        <- createObservationWithModeAs(pi, pid, List(tid), gmosNorthMosMode(aid.some))
       _          <- setPosAngle(oid, "FIXED", 30)
       _          <- expectValidations(pid, oid)
     yield ()
@@ -156,7 +132,7 @@ class observation_workflow_mos extends ExecutionTestSupportForGmos with MosMaskS
       _   <- addPartnerSplits(pi, pid)
       _   <- addCoisAs(pi, pid)
       tid <- createTargetWithProfileAs(pi, pid)
-      oid <- createObservationWithModeAs(pi, pid, List(tid), gmosNorthMos(aid))
+      oid <- createObservationWithModeAs(pi, pid, List(tid), gmosNorthMosMode(aid))
       _   <- createConfigurationRequestAs(pi, oid).flatMap(setConfigurationRequestStatusAs(staff, _, ConfigurationRequestStatus.Approved))
       _   <- computeItcResultAs(pi, oid)
       _   <- setProposalStatus(staff, pid, "ACCEPTED")

@@ -202,7 +202,10 @@ object ObsExtract:
   def telluricsForVisit(visitTime: TimeSpan): NonNegInt =
     if visitTime > TelluricTargetsService.MultiTelluricThreshold then 2.refined else 1.refined
 
-  /** Roles generated into the per-program "Calibrations" group, one per configuration, in creation order. */
+  /**
+   * Roles generated one per configuration into the per-program "Calibrations" group, in creation order.
+   * MOS mask flats share that group but are one per mask, so they are not listed here.
+   */
   val PerProgramPerConfigCalibrationTypes: List[CalibrationRole] =
     List(CalibrationRole.SpectroPhotometric, CalibrationRole.Twilight)
 

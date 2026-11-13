@@ -6,6 +6,7 @@ package input
 
 import cats.syntax.apply.*
 import cats.syntax.parallel.*
+import lucuma.core.enums.GeminiCallForProposalsType
 import lucuma.core.enums.Site
 import lucuma.core.enums.TwilightType.Nautical
 import lucuma.core.math.Declination
@@ -24,11 +25,16 @@ import java.time.ZoneOffset.UTC
 
 object CoordinateLimitsInput {
 
-  // From Andy: A simple suggestion would be to set the RA limits to half an
-  // hour after the LST at evening twilight on the first night of the semester
-  // and half an hour before the LST at morning twilight on the last night of
-  // the semester.
-  private val Buffer = Duration.ofMinutes(30L)
+  // RA limits default to the LST at evening twilight on the first night plus
+  // the buffer, and the LST at morning twilight on the last night minus the
+  // buffer. Fast Turnaround uses a negative buffer to widen the range.
+  val RegularRaBuffer: Duration       = Duration.ofMinutes(30L)
+  val FastTurnaroundRaBuffer: Duration = Duration.ofHours(-1L)
+
+  def raBuffer(cfpType: GeminiCallForProposalsType): Duration =
+    cfpType match
+      case GeminiCallForProposalsType.FastTurnaround => FastTurnaroundRaBuffer
+      case _                                         => RegularRaBuffer
 
   private def toRa(t: LocalTime): RightAscension =
     val h = t.getHour
@@ -41,7 +47,11 @@ object CoordinateLimitsInput {
       Math.round((h + m / 60.0 + (s + n/1000000000.0) / 3600.0) * 2.0) / 2.0
     ))
 
-  def defaultRaLimits(site: Site, dateInterval: DateInterval): (RightAscension, RightAscension) =
+  def defaultRaLimits(
+    site:         Site,
+    dateInterval: DateInterval,
+    buffer:       Duration = RegularRaBuffer
+  ): (RightAscension, RightAscension) =
 
     if (dateInterval.isEmpty) (RightAscension.Zero, RightAscension.Zero)
     else {
@@ -59,8 +69,8 @@ object CoordinateLimitsInput {
       def lstAt(instant: Instant): LocalTime =
         sc.getLst(instant).withZoneSameInstant(UTC).toLocalTime
 
-      val lstStart = lstAt(start.plus(Buffer))
-      val lstEnd   = lstAt(end.minus(Buffer))
+      val lstStart = lstAt(start.plus(buffer))
+      val lstEnd   = lstAt(end.minus(buffer))
 
       (toRa(lstStart), toRa(lstEnd))
     }
@@ -82,7 +92,7 @@ object CoordinateLimitsInput {
   )
 
   object Create:
-    val Binding: Matcher[(Site, DateInterval) => Create] =
+    val Binding: Matcher[(Site, DateInterval, Duration) => Create] =
       ObjectFieldsBinding.rmap {
         case List(
           RightAscensionInput.Binding.Option("raStart", rRaStart),
@@ -96,8 +106,8 @@ object CoordinateLimitsInput {
             rDecStart,
             rDecEnd
           ).parMapN { (raStart, raEnd, decStart, decEnd) =>
-            (site: Site, date: DateInterval) => {
-              val defaultRa  = (raStart, raEnd).tupled.getOrElse(defaultRaLimits(site, date))
+            (site: Site, date: DateInterval, buffer: Duration) => {
+              val defaultRa  = (raStart, raEnd).tupled.getOrElse(defaultRaLimits(site, date, buffer))
               val defaultDec = (decStart, decEnd).tupled.getOrElse(defaultDecLimits(site))
 
               Create(
@@ -110,8 +120,8 @@ object CoordinateLimitsInput {
           }
       }
 
-    def default(site: Site, date: DateInterval): Create =
-      val ra  = defaultRaLimits(site, date)
+    def default(site: Site, date: DateInterval, buffer: Duration = RegularRaBuffer): Create =
+      val ra  = defaultRaLimits(site, date, buffer)
       val dec = defaultDecLimits(site)
       Create(ra._1, ra._2, dec._1, dec._2)
 
