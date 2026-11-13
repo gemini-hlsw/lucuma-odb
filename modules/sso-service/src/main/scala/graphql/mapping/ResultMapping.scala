@@ -58,8 +58,8 @@ object ResultMapping {
     // final results. See an `SelectResultMapping` to see how `hasMore` works.
     def transformMatches(q: Query): Query =
       Query.mapSomeFields(q) {
-        case Select(`collectionField`, alias, child) =>
-          Select(collectionField, alias, TransformCursor(Take(limit), transform(child)))
+        case Select(`collectionField`, alias, child, loc) =>
+          Select(collectionField, alias, TransformCursor(Take(limit), transform(child)), loc)
       }
 
     // If we're selecting collectionField then continue by transforming the child query, otherwise
