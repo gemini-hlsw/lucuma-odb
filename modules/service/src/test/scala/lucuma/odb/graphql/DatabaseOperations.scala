@@ -92,12 +92,14 @@ import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.graphql.input.TacFeedbackInput
 import lucuma.odb.graphql.input.TimeChargeCorrectionInput
 import lucuma.odb.service.EmailService
+import lucuma.odb.service.GroupStandingService
 import lucuma.odb.service.ObscalcService
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.syntax.instrument.*
 import lucuma.odb.util.Codecs.*
 import lucuma.refined.*
+import org.typelevel.log4cats.Logger
 import org.typelevel.otel4s.metrics.MeterProvider
 import org.typelevel.otel4s.trace.TracerProvider
 import skunk.*
@@ -141,6 +143,17 @@ trait DatabaseOperations { this: OdbSuite =>
       given Services[IO] = services
       requireServiceAccessOrThrow:
         services.transactionally(ObscalcService.instantiate[IO].refreshCalibrations(1024))
+
+  // Runs the obscalc daemon's group standing refresh on demand, logging to
+  // `logger` if given.
+  def refreshGroupStandingsAs(user: ServiceUser, logger: Option[Logger[IO]] = None): IO[Int] =
+    withServicesForObscalc(user): services =>
+      given Services[IO] = services
+      val service = logger.fold(services.groupStandingService): l =>
+        given Logger[IO] = l
+        GroupStandingService.instantiate[IO]
+      requireServiceAccessOrThrow:
+        service.refresh(1024)
 
   // Obscalc state and last invalidation, for tests that check whether an edit
   // invalidated the calculation.

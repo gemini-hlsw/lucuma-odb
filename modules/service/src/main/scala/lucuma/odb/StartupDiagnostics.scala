@@ -93,6 +93,7 @@ object StartupDiagnostics:
           checkPostgresEnum(gmos_mos_acquisition_type),
           checkPostgresEnum(gender),
           checkPostgresEnum(archive_duplication_state),
+          checkPostgresEnum(group_standing_status),
           checkPostgresEnum(guide_state),
           checkPostgresEnum(keck_instrument),
           checkPostgresEnum(multiple_filters_mode),

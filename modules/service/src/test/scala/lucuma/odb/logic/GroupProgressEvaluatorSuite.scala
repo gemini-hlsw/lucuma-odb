@@ -18,6 +18,7 @@ import lucuma.core.enums.Site
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.group.GroupProgress
+import lucuma.core.model.group.GroupStanding
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
@@ -191,6 +192,37 @@ class GroupProgressEvaluatorSuite extends FunSuite:
       unschedulable(0, 3, InsufficientElements)
     )
 
+  test("a suspended observation is left out, but its group has started"):
+    assertEquals(
+      eval(branch(1, List(leaf(1, ExecutionState.Ongoing, start = Some(t0), inactive = true), leaf(2)))),
+      ongoing(0, 1)
+    )
+
+  test("with no minimum, suspending an executing observation lets the group complete without it"):
+    assertEquals(
+      eval(branch(1, List(done(1, t0), leaf(2, ExecutionState.Ongoing, start = Some(t0), inactive = true)))),
+      complete(1, 1)
+    )
+
+  test("a daytime calibration that has started doesn't start its group"):
+    assertEquals(
+      eval(branch(1, List(leaf(1), leaf(2, ExecutionState.Ongoing, start = Some(t0), role = Some(CalibrationRole.DaytimeFlat))))),
+      pending(1)
+    )
+
+  test("a subgroup whose observations were all suspended is left out, but has started its parent"):
+    val sub = branch(2, List(leaf(2, ExecutionState.Ongoing, start = Some(t0), inactive = true)))
+    val all = evalAll(branch(1, List(leaf(1), sub)), t0)
+    assertEquals(all(gid(2)), GroupProgress.Empty)
+    assertEquals(all(gid(1)), ongoing(0, 1))
+
+  test("a suspended science observation with a telluric not yet taken has started the group holding its calibration group"):
+    val science  = leaf(2, ExecutionState.Ongoing, start = Some(t0), inactive = true)
+    val telluric = leaf(3, role = Some(CalibrationRole.Telluric), science = Some(2), inactive = true)
+    val all      = evalAll(branch(1, List(leaf(1), branch(2, List(science, telluric)))), t0)
+    assertEquals(all(gid(2)), GroupProgress.Empty)
+    assertEquals(all(gid(1)), ongoing(0, 1))
+
   // QA
 
   // A completed observation, started and completed at `t`, with QA state `qa`.
@@ -203,9 +235,9 @@ class GroupProgressEvaluatorSuite extends FunSuite:
       ongoing(0, 1)
     )
 
-  test("an ordered group has started with a completion past its first required, whatever its QA"):
+  test("an ordered group has started with an element past its first required executing or rejected"):
     val g = (second: Node) => branch(1, List(leaf(1), second), min = Some(1), ordered = true)
-    assertEquals(eval(g(done(2, t0)), t0 +| hours(1)), ongoing(0, 1))
+    assertEquals(eval(g(leaf(2, ExecutionState.Ongoing, start = Some(t0))), t0 +| hours(1)), ongoing(0, 1))
     assertEquals(eval(g(assessed(2, t0, ObservationQaState.Fail)), t0 +| hours(1)), ongoing(0, 1))
     assertEquals(eval(g(leaf(2)), t0 +| hours(1)), pending(1))
 
@@ -342,7 +374,8 @@ class GroupProgressEvaluatorSuite extends FunSuite:
     val sub = branch(2, List(done(2, t0), assessed(3, t0, ObservationQaState.Fail)))
     val all = evalAll(branch(1, List(sub, done(1, t0)), min = Some(1), ordered = true), t0 +| hours(1))
     assertEquals(all(gid(2)), unschedulable(1, 2, InsufficientElements))
-    assertEquals(all(gid(1)), unschedulable(0, 1, SubgroupUnschedulable))
+    // The observation after it, which never counts, completed first as well.
+    assertEquals(all(gid(1)), unschedulable(0, 1, Order, SubgroupUnschedulable))
 
   test("a group with nothing viable is empty, and its parent leaves it out"):
     val empty  = branch(2, List(leaf(2, inactive = true), leaf(3, inactive = true)))
@@ -386,18 +419,48 @@ class GroupProgressEvaluatorSuite extends FunSuite:
       eval(branch(1, List(done(1, t0), done(2, t0 +| hours(1)), leaf(3)), min = Some(2), ordered = true)),
       complete(2, 2)
     )
-    // The third element never counts, so completing it out of order is no
-    // violation.
+    // The third element never counts, but completing it before the second is
+    // out of order.
     assertEquals(
       eval(branch(1, List(done(1, t0), leaf(2), done(3, t0 +| hours(1))), min = Some(2), ordered = true)),
-      ongoing(1, 2)
+      unschedulable(1, 2, Order)
     )
 
-  test("ordered n of m: an element after the first n completing first doesn't matter"):
+  test("ordered n of m: an element after the first n completing first is out of order"):
     assertEquals(
       eval(branch(1, List(done(1, t0 +| hours(1)), done(2, t0 +| hours(2)), done(3, t0)), min = Some(2), ordered = true)),
+      unschedulable(2, 2, Order)
+    )
+
+  test("ordered n of m: elements after the first n completing after them, in order, are extra"):
+    assertEquals(
+      eval(branch(1, List(done(1, t0), done(2, t0 +| hours(1)), done(3, t0 +| hours(2))), min = Some(2), ordered = true)),
       complete(2, 2)
     )
+    assertEquals(
+      eval(branch(1, List(done(1, t0), done(2, t0 +| hours(1)), done(3, t0 +| hours(2)), done(4, t0 +| hours(3))), min = Some(2), ordered = true)),
+      complete(2, 2)
+    )
+
+  test("ordered n of m: elements after the first n are held to the order among themselves"):
+    // The fourth completes while the third is still to do, or before it.
+    assertEquals(
+      eval(branch(1, List(done(1, t0), done(2, t0 +| hours(1)), leaf(3), done(4, t0 +| hours(2))), min = Some(2), ordered = true)),
+      unschedulable(2, 2, Order)
+    )
+    assertEquals(
+      eval(branch(1, List(done(1, t0), done(2, t0 +| hours(1)), done(3, t0 +| hours(3)), done(4, t0 +| hours(2))), min = Some(2), ordered = true)),
+      unschedulable(2, 2, Order)
+    )
+
+  test("ordered n of m with per-night limits: an element after the first n completing first is out of order at once"):
+    // The surplus element completes before the first starts, closer than the
+    // minimum interval: the group is unschedulable as soon as it completes,
+    // not only once the count is met.
+    val g = (second: Node) =>
+      branch(1, List(done(1, t0 +| hours(2), start = Some(t0 +| hours(1))), second, done(3, t0)), min = Some(2), ordered = true, minI = Some(hours(3)), minN = Some(2))
+    assertEquals(eval(g(leaf(2)), now = t0 +| hours(3)).violationList, List(Order))
+    assert(eval(g(done(2, t0 +| hours(5))), now = t0 +| hours(6)).violationList.contains(Order))
 
   // Extra elements
 
@@ -448,6 +511,13 @@ class GroupProgressEvaluatorSuite extends FunSuite:
     assertEquals(
       eval(g, now = t0 +| hours(1)),
       unschedulable(1, 2, MinimumInterval)
+    )
+
+  test("suspending an element that started too soon takes back the violation"):
+    val g = branch(1, List(done(1, t0), leaf(2, ExecutionState.Ongoing, start = Some(t0 +| minutes(30)), inactive = true), leaf(3)), minI = Some(hours(1)))
+    assertEquals(
+      eval(g, now = t0 +| hours(1)),
+      ongoing(1, 2, nextWindow = Some(TimestampInterval.from(t0 +| hours(1))))
     )
 
   test("an element still executing that started after the minimum interval"):
@@ -641,6 +711,40 @@ class GroupProgressEvaluatorSuite extends FunSuite:
       eval(g, now = t0 +| hours(2)),
       ongoing(2, 2, nextWindow = Some(TimestampInterval.between(t0 +| hours(1), night0End)))
     )
+
+  // 2 of 4 required, 3 per night, completions an hour apart.
+  def shortNight(extra: Node, minI: Option[TimeSpan] = None, maxI: Option[TimeSpan] = None): Node =
+    branch(1, List(done(1, t0), done(2, t0 +| hours(1)), extra, leaf(4)), min = Some(2), minI = minI, maxI = maxI, minN = Some(3))
+
+  test("per night: a short night's extra must complete within the maximum interval"):
+    val g = shortNight(leaf(3), maxI = Some(hours(2)))
+    assertEquals(
+      eval(g, now = t0 +| hours(2)),
+      ongoing(2, 2, nextWindow = Some(TimestampInterval.between(t0 +| hours(1), t0 +| hours(3))))
+    )
+    assertEquals(eval(g, now = t0 +| hours(4)), unschedulable(2, 2, MaximumInterval))
+
+  test("per night: a short night's extra completed within the maximum interval completes the group"):
+    assertEquals(eval(shortNight(done(3, t0 +| hours(2)), maxI = Some(hours(2))), now = t0 +| hours(5)), complete(2, 2))
+
+  test("per night: a short night's extra completed after the maximum interval doesn't complete the group"):
+    assertEquals(
+      eval(shortNight(done(3, t0 +| hours(4)), maxI = Some(hours(2))), now = t0 +| hours(5)),
+      unschedulable(2, 2, MaximumInterval)
+    )
+
+  test("per night: a short night's extra started before the minimum interval"):
+    // The two completions are the minimum interval apart, and the extra starts
+    // an hour after the second.
+    val g = (start: Timestamp) =>
+      branch(1, List(done(1, t0), done(2, t0 +| hours(2)), leaf(3, ExecutionState.Ongoing, start = Some(start)), leaf(4)), min = Some(2), minI = Some(hours(2)), minN = Some(3))
+    assertEquals(eval(g(t0 +| hours(3)), now = t0 +| hours(3)), unschedulable(2, 2, MinimumInterval))
+    assertEquals(eval(g(t0 +| hours(4)), now = t0 +| hours(5)).violationList, Nil)
+
+  test("per night: an extra on the night its group completes is held to the maximum interval"):
+    // The night already has its 2, but the third completion counts toward it.
+    val g = branch(1, List(done(1, t0), done(2, t0 +| hours(1)), done(3, t0 +| hours(3))), min = Some(2), maxI = Some(hours(1)), minN = Some(2))
+    assertEquals(eval(g, now = t0 +| hours(4)), unschedulable(2, 2, MaximumInterval))
 
   test("per night: a short night in progress is settled when no extras remain"):
     val g = branch(1, List(done(1, t0), done(2, t0 +| hours(1))), minN = Some(3))
@@ -888,3 +992,54 @@ class GroupProgressEvaluatorSuite extends FunSuite:
 
   test("a minimum of zero requires every element"):
     assertEquals(eval(branch(1, List(done(1, t0), leaf(2)), min = Some(0))), ongoing(1, 2))
+
+  // Standing
+
+  def standings(n: Node): Map[Group.Id, GroupStanding] =
+    GroupProgressEvaluator.standings(List(n.branch), evalAll(n))
+
+  // Complete: one of two required, and it's done.
+  def complete(n: Long, o: Long): Node =
+    branch(n, List(done(o, t0), leaf(o + 1)), min = Some(1))
+
+  // Unschedulable: two required, but one of the two is inactive.
+  def unschedulable(n: Long, o: Long): Node =
+    branch(n, List(leaf(o), leaf(o + 1, inactive = true)), min = Some(2))
+
+  test("standing: a group that is neither complete nor unschedulable is viable"):
+    assertEquals(standings(branch(1, List(leaf(1), leaf(2)))), Map(gid(1) -> GroupStanding.Viable))
+
+  test("standing: a complete group decides for itself and its subgroups"):
+    val g = branch(1, List(done(1, t0), branch(2, List(leaf(2)))), min = Some(1))
+    assertEquals(
+      standings(g),
+      Map(gid(1) -> GroupStanding.Complete(gid(1)), gid(2) -> GroupStanding.Complete(gid(1)))
+    )
+
+  test("standing: a complete subgroup of a viable group decides only for itself"):
+    val g = branch(1, List(complete(2, 1), leaf(3)))
+    assertEquals(
+      standings(g),
+      Map(gid(1) -> GroupStanding.Viable, gid(2) -> GroupStanding.Complete(gid(2)))
+    )
+
+  test("standing: a viable group under an unschedulable parent is unschedulable"):
+    // The parent needs both subgroups, and one of them can no longer complete.
+    val g = branch(1, List(branch(2, List(done(1, t0), leaf(2))), unschedulable(3, 3)))
+    assertEquals(evalAll(g)(gid(2)).status, GroupStatus.Ongoing)
+    assertEquals(
+      standings(g),
+      Map(
+        gid(1) -> GroupStanding.Unschedulable(gid(1)),
+        gid(2) -> GroupStanding.Unschedulable(gid(1)),
+        gid(3) -> GroupStanding.Unschedulable(gid(1))
+      )
+    )
+
+  test("standing: the outer group decides when a complete group holds an unschedulable one"):
+    val g = branch(1, List(done(1, t0), unschedulable(2, 2)), min = Some(1))
+    assertEquals(standings(g)(gid(2)), GroupStanding.Complete(gid(1)))
+
+  test("standing: the outer group decides when an unschedulable group holds a complete one"):
+    val g = branch(1, List(complete(2, 1), leaf(3), leaf(4, inactive = true)), min = Some(3))
+    assertEquals(standings(g)(gid(2)), GroupStanding.Unschedulable(gid(1)))
