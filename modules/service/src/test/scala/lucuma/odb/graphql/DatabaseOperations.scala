@@ -1506,6 +1506,8 @@ trait DatabaseOperations { this: OdbSuite =>
 
   private def observingModeObject(observingMode: ObservingModeType): String =
     observingMode match
+      case ObservingModeType.ScorpioLongSlit => ???
+
       case _: DaytimeCalibrationObservingModeType =>
         """{
           daytimeCalibration: {

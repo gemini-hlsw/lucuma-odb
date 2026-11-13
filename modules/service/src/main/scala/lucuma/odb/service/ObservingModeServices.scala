@@ -4,6 +4,7 @@
 package lucuma.odb.service
 
 import cats.effect.MonadCancelThrow
+import cats.syntax.applicative.*
 import cats.syntax.apply.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
@@ -162,6 +163,9 @@ object ObservingModeServices:
               .select(oids)
               .map(_.widen[ObservingMode])
 
+          case (ScorpioLongSlit, _) =>
+            Map.empty[Observation.Id, ObservingMode].pure[F]
+
           case (Igrins2LongSlit, oids) =>
             igrins2LongSlitService
               .select(oids)
@@ -246,6 +250,7 @@ object ObservingModeServices:
             case ObservingModeType.GnirsImaging         => gnirsImagingService.delete(which)
             case ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu => gnirsSpectroscopyService.delete(which)
             case ObservingModeType.Igrins2LongSlit      => igrins2LongSlitService.delete(which)
+            case ObservingModeType.ScorpioLongSlit      => ().pure[F]
             case _: VisitorObservingModeType            => visitorService.delete(which)
 
         deleteObservingMode *> deleteExposureTimeModes
@@ -311,6 +316,7 @@ object ObservingModeServices:
             case ObservingModeType.GnirsImaging         => gnirsImagingService.clone(origOid, newOid, etms)
             case ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu => gnirsSpectroscopyService.clone(origOid, newOid, etms)
             case ObservingModeType.Igrins2LongSlit      => igrins2LongSlitService.clone(origOid, newOid)
+            case ObservingModeType.ScorpioLongSlit      => ().pure[F]
             case _: VisitorObservingModeType            => visitorService.clone(origOid, newOid)
 
         exposureTimeModeService

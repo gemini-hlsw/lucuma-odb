@@ -9136,6 +9136,11 @@ enum ObservingModeType {
   MAROON_X
 
   """
+  ObservingModeType ScorpioLongSlit
+  """
+  SCORPIO_LONG_SLIT
+
+  """
   ObservingModeType VisitorNorth
   """
   VISITOR_NORTH
