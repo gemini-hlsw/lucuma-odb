@@ -4,6 +4,7 @@
 package lucuma.odb.feature
 
 import cats.Eq
+import cats.data.Ior
 import cats.derived.*
 import cats.effect.IO
 import cats.effect.kernel.Ref
@@ -684,7 +685,7 @@ class perProgramPerConfigCalibrations
       _    <- recalculateCalibrations(pid, when, oid1)
       ob   <- queryObservations(pid)
       cid = ob.callibrationIds
-      _    <- expect(
+      _    <- expectIor(
                 user = pi,
                 query = s"""
                   mutation {
@@ -706,13 +707,10 @@ class perProgramPerConfigCalibrations
                     }
                   }
                 """,
-                expected =json"""
-                  {
-                    "updateObservations": {
-                      "observations": []
-                    }
-                  }
-                """.asRight
+                expected = Ior.both(
+                  List(s"Calibration observation ${cid.get(0).get} is read-only: staff may edit only its constraint set or its QA state, each on its own."),
+                  json"""{ "updateObservations": { "observations": [] } }"""
+                )
               )
     } yield ()
   }
