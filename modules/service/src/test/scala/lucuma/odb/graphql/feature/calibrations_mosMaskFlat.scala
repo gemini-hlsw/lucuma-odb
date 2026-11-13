@@ -6,10 +6,18 @@ package feature
 
 import cats.effect.IO
 import cats.syntax.all.*
+import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.PosLong
 import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.Flamingos2Filter
+import lucuma.core.enums.Flamingos2Fpu
+import lucuma.core.enums.GcalBaselineType
+import lucuma.core.enums.GcalContinuum
+import lucuma.core.enums.GcalDiffuser
+import lucuma.core.enums.GcalFilter
+import lucuma.core.enums.GcalShutter
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu
@@ -26,12 +34,17 @@ import lucuma.core.model.Attachment
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
+import lucuma.core.model.sequence.StepConfig.Gcal
 import lucuma.core.syntax.timespan.*
+import lucuma.core.util.TimeSpan
 import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
 import lucuma.odb.service.PerProgramPerConfigCalibrationsService
 import lucuma.odb.service.Services
+import lucuma.odb.smartgcal.data.Flamingos2
 import lucuma.odb.smartgcal.data.Gmos
+import lucuma.odb.smartgcal.data.SmartGcalValue
+import lucuma.odb.smartgcal.data.SmartGcalValue.LegacyInstrumentConfig
 import lucuma.odb.util.Codecs.attachment_id
 import lucuma.odb.util.Codecs.observation_id
 import lucuma.odb.util.Codecs.program_id
@@ -51,19 +64,28 @@ class calibrations_mosMaskFlat
   val when: Instant = LocalDateTime.of(2024, 1, 1, 12, 0, 0).toInstant(ZoneOffset.UTC)
 
   // A custom mask is looked up as its equivalent long slit, which the mirror and
-  // r rows of the GMOS tables cover.  Flamingos-2 has no row without a disperser
-  // for a long slit, so its flat is a Missing Smart GCAL Calibration.
+  // r rows of the GMOS tables and the MOS through-slit H row of Flamingos-2 cover.
+  private val f2MaskFlat: SmartGcalValue[LegacyInstrumentConfig] =
+    SmartGcalValue(
+      Gcal(Gcal.Lamp.fromContinuum(GcalContinuum.IrGreyBodyHigh), GcalFilter.Nd45, GcalDiffuser.Ir, GcalShutter.Open),
+      GcalBaselineType.Day,
+      NonNegInt.unsafeFrom(1),
+      LegacyInstrumentConfig(TimeSpan.unsafeFromMicroseconds(2_000_000L))
+    )
+
   override def dbInitialization: Option[Session[IO] => IO[Unit]] = Some: s =>
     val gn: Gmos.TableKey.North = Gmos.TableKey(none, GmosNorthFilter.RPrime.some, GmosNorthFpu.LongSlit_0_50.some, GmosXBinning.One, GmosYBinning.One, GmosAmpGain.Low)
     val gn1: Gmos.TableKey.North = gn.copy(fpu = GmosNorthFpu.LongSlit_1_00.some)
     val gs: Gmos.TableKey.South = Gmos.TableKey(none, GmosSouthFilter.RPrime.some, GmosSouthFpu.LongSlit_0_50.some, GmosXBinning.One, GmosYBinning.One, GmosAmpGain.Low)
+    val f2: Flamingos2.TableKey = Flamingos2.TableKey(none, Flamingos2Filter.H, Flamingos2Fpu.LongSlit2.some)
     super.dbInitialization.traverse_(_(s)) *>
       servicesFor(pi).map(_(s)).use: services =>
         services.transactionally:
           Services.asSuperUser:
             services.smartGcalService.insertGmosNorth(200, Gmos.TableRow(PosLong.unsafeFrom(1), gn, gmos_flat)) *>
               services.smartGcalService.insertGmosNorth(201, Gmos.TableRow(PosLong.unsafeFrom(1), gn1, gmos_flat)) *>
-              services.smartGcalService.insertGmosSouth(200, Gmos.TableRow(PosLong.unsafeFrom(1), gs, gmos_flat))
+              services.smartGcalService.insertGmosSouth(200, Gmos.TableRow(PosLong.unsafeFrom(1), gs, gmos_flat)) *>
+              services.smartGcalService.insertFlamingos2(200, Flamingos2.TableRow(PosLong.unsafeFrom(1), f2, f2MaskFlat))
 
   private def setMask(oid: Observation.Id, aid: Option[Attachment.Id], width: String = "CUSTOM_WIDTH_0_50"): IO[Unit] =
     query(
@@ -353,7 +375,7 @@ class calibrations_mosMaskFlat
       assertEquals(inst.downField("filter").as[String].toOption, "R_PRIME".some)
       assert(inst.downField("gratingConfig").focus.exists(_.isNull))
 
-  test("Flamingos-2 flat is made, but its missing Smart GCAL row stops generation"):
+  test("Flamingos-2 flat is one day-cal flat through the mask: no disperser, H, MOS decker, bright read"):
     for
       pid  <- createProgramAs(pi)
       tid  <- createTargetWithProfileAs(pi, pid)
@@ -362,10 +384,16 @@ class calibrations_mosMaskFlat
       _    <- recalc(pid, oid)
       flat <- flatsOf(pid).map(_.head)
       mask <- maskOfFlat(flat, "flamingos2Mos")
-      res  <- query(pi, executionConfigQuery(flat, "flamingos2", "science", "observeClass", none)).attempt
+      _    <- runObscalcUpdate(pid, flat)
+      c    <- query(pi, executionConfigQuery(flat, "flamingos2", "science", "observeClass steps { observeClass instrumentConfig { disperser filter decker readMode } }", none))
     yield
+      val atom = c.hcursor.downFields("executionConfig", "flamingos2", "science", "nextAtom")
+      val step = atom.downField("steps").downArray
+      val inst = step.downField("instrumentConfig")
       assertEquals(mask, aid.some)
-      assert(
-        res.left.exists(_.getMessage.contains("No Smart GCAL imaging flat is defined for this configuration: Flamingos2 { disperser: None, filter: H, fpu: LongSlit2 }")),
-        s"unexpected result: $res"
-      )
+      assertEquals(atom.downField("observeClass").as[String].toOption, "DAY_CAL".some)
+      assertEquals(step.downField("observeClass").as[String].toOption, "DAY_CAL".some)
+      assert(inst.downField("disperser").focus.exists(_.isNull))
+      assertEquals(inst.downField("filter").as[String].toOption, "H".some)
+      assertEquals(inst.downField("decker").as[String].toOption, "MOS".some)
+      assertEquals(inst.downField("readMode").as[String].toOption, "BRIGHT".some)
