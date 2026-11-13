@@ -12,11 +12,13 @@ import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.enums.ProgramType
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.Site
 import lucuma.core.math.Coordinates
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
+import lucuma.core.model.Attachment
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
@@ -45,8 +47,10 @@ import org.typelevel.log4cats.LoggerFactory
 import org.typelevel.log4cats.syntax.*
 import org.typelevel.otel4s.trace.Tracer
 import skunk.AppliedFragment
+import skunk.Command
 import skunk.Query
 import skunk.Transaction
+import skunk.codec.all.text
 import skunk.syntax.all.*
 
 import java.time.Instant
@@ -122,7 +126,7 @@ object PerProgramPerConfigCalibrationsService:
                           program_id
                         ),
                     system = true,
-                    calibrationRoles = List(CalibrationRole.Twilight, CalibrationRole.SpectroPhotometric)
+                    calibrationRoles = List(CalibrationRole.Twilight, CalibrationRole.SpectroPhotometric, CalibrationRole.MosMaskFlat)
                   ).map(_.toOption)
               }
             case _ => none.pure[F]
@@ -315,6 +319,77 @@ object PerProgramPerConfigCalibrationsService:
               _         <- groupService.deleteSystemGroup(pid, gid).whenA(deletable.length === arcs.length)
             yield deletable
 
+      // A MOS science observation using a mask, with the file the mask holds now.
+      private case class MaskUse(
+        attachment: Attachment.Id,
+        oid:        Observation.Id,
+        modeType:   ObservingModeType,
+        band:       Option[ScienceBand],
+        remotePath: String
+      )
+
+      // A present MOS mask flat, the mask its mode holds and the file it imaged.
+      private case class MaskFlat(
+        oid:        Observation.Id,
+        attachment: Option[Attachment.Id],
+        remotePath: Option[String]
+      )
+
+      private def recordMaskFile(oid: Observation.Id, remotePath: String): F[Unit] =
+        session.execute(Statements.upsertMosMaskFlatFile)((oid, remotePath)).void
+
+      private def setBand(oid: Observation.Id, band: Option[ScienceBand]): F[Unit] =
+        session.execute(Statements.updateBand)((band, oid)).void
+
+      // One flat per mask in use, copying the mode of the lowest-id observation
+      // using it; an untaken flat recopies it on every pass.  A flat taken of a
+      // replaced file is kept and a new one made; an untaken flat simply follows
+      // the new file.
+      private def syncMosMaskFlats(pid: Program.Id)(using Transaction[F], ServiceAccess): F[(List[Observation.Id], List[Observation.Id])] =
+        def sync(cg: Group.Id, flats: List[MaskFlat], untaken: Set[Observation.Id], uses: NonEmptyList[MaskUse]): F[Option[Observation.Id]] =
+          val source = uses.minimumBy(_.oid)
+          val band   = uses.toList.flatMap(_.band).minOption
+          val mine   = flats.filter(_.attachment.contains(source.attachment))
+          def refresh(oid: Observation.Id): F[Unit] =
+            for
+              modes <- selectObservingModeTypes(List(oid))
+              _     <- replaceObservingMode(source.oid, source.modeType.some, oid, modes.get(oid).flatten)
+              _     <- setBand(oid, band)
+            yield ()
+          mine.find(_.remotePath.contains(source.remotePath)) match
+            case Some(f) =>
+              refresh(f.oid).whenA(untaken.contains(f.oid)).as(none)
+            case None    =>
+              mine.find(f => untaken.contains(f.oid)) match
+                case Some(f) =>
+                  (recordMaskFile(f.oid, source.remotePath) *> refresh(f.oid)).as(none)
+                case None    =>
+                  for
+                    oid <- insertDaytimeCalibration(pid, cg, CalibrationRole.MosMaskFlat)
+                    _   <- replaceObservingMode(source.oid, source.modeType.some, oid, none)
+                    _   <- recordMaskFile(oid, source.remotePath)
+                    _   <- setBand(oid, band)
+                  yield oid.some
+
+        session.unique(Statements.selectProgramType)(pid).flatMap:
+          case ProgramType.Calibration =>
+            (List.empty[Observation.Id], List.empty[Observation.Id]).pure[F]
+          case _                       =>
+            for
+              uses      <- session.execute(Statements.selectMaskUses)(pid).map(_.map(MaskUse.apply))
+              byMask     = uses.groupByNel(_.attachment)
+              flats     <- session.execute(Statements.selectMosMaskFlats)(pid).map(_.map(MaskFlat.apply))
+              unused     = flats.filterNot(_.attachment.exists(byMask.contains))
+              removable <- excludeOngoingAndCompleted(unused, _.oid).map(_.map(_.oid))
+              _         <- NonEmptyList.fromList(removable).traverse_(observationService.deleteCalibrationObservations)
+              untaken   <- excludeOngoingAndCompleted(flats.filterNot(f => removable.contains(f.oid)), _.oid).map(_.map(_.oid).toSet)
+              parent    <- calibrationsGroup(pid, byMask.size)
+              added     <- parent.fold(List.empty[Observation.Id].pure[F]): cg =>
+                             byMask.values.toList.traverse(sync(cg, flats, untaken, _)).map(_.flatten)
+              _         <- (info"Program $pid added MOS mask flats $added").whenA(added.nonEmpty)
+              _         <- (info"Program $pid removed MOS mask flats $removable").whenA(removable.nonEmpty)
+            yield (added, removable)
+
       // Update the signal to noise at wavelength for each calbiration observation depending
       // on the average wavelength of the configuration.  The spec-phot ETM is a fixed time
       // and count, so only its band follows the science.
@@ -475,9 +550,10 @@ object PerProgramPerConfigCalibrationsService:
           // once the standard's band is final
           orphanedArcs   <- cleanupOrphanedSpecPhotGroups(pid)
           addedArcs      <- syncDaytimeArcs(pid)
+          (addedFlats, removedFlats) <- syncMosMaskFlats(pid)
           // Delete the calibration group if empty
           _              <- deleteEmptyCalibrationGroup(pid)
-        } yield (addedOids ++ addedArcs, removedOids ++ orphanedArcs)
+        } yield (addedOids ++ addedArcs ++ addedFlats, removedOids ++ orphanedArcs ++ removedFlats)
 
   object Statements:
 
@@ -523,3 +599,63 @@ object PerProgramPerConfigCalibrationsService:
           )
         GROUP BY g.c_group_id
       """.query(group_id *: _gid[Observation.Id])
+
+    val selectProgramType: Query[Program.Id, ProgramType] =
+      sql"""
+        SELECT c_program_type FROM t_program WHERE c_program_id = $program_id
+      """.query(program_type)
+
+    // Masks used by present, not inactive, science MOS observations.
+    val selectMaskUses: Query[Program.Id, (Attachment.Id, Observation.Id, ObservingModeType, Option[ScienceBand], String)] =
+      sql"""
+        SELECT m.c_mask_attachment_id, o.c_observation_id, o.c_observing_mode_type, o.c_science_band, a.c_remote_path
+        FROM (
+          SELECT c_observation_id, c_mask_attachment_id FROM t_gmos_north_mos
+          UNION ALL
+          SELECT c_observation_id, c_mask_attachment_id FROM t_gmos_south_mos
+          UNION ALL
+          SELECT c_observation_id, c_mask_attachment_id FROM t_flamingos_2_mos
+        ) m
+        JOIN t_observation o ON o.c_observation_id = m.c_observation_id
+        JOIN t_attachment  a ON a.c_attachment_id  = m.c_mask_attachment_id
+        JOIN v_execution_state e ON e.c_observation_id = o.c_observation_id
+        WHERE o.c_program_id       = $program_id
+          AND o.c_calibration_role IS NULL
+          AND o.c_existence        = 'present'
+          AND o.c_workflow_user_state IS DISTINCT FROM 'inactive'
+          AND e.c_execution_state NOT IN ('completed', 'declared_complete')
+      """.query(attachment_id *: observation_id *: observing_mode_type *: science_band.opt *: text)
+
+    // Present MOS mask flats with the mask their mode holds and the file they imaged.
+    val selectMosMaskFlats: Query[Program.Id, (Observation.Id, Option[Attachment.Id], Option[String])] =
+      sql"""
+        SELECT o.c_observation_id, m.c_mask_attachment_id, f.c_remote_path
+        FROM t_observation o
+        LEFT JOIN (
+          SELECT c_observation_id, c_mask_attachment_id FROM t_gmos_north_mos
+          UNION ALL
+          SELECT c_observation_id, c_mask_attachment_id FROM t_gmos_south_mos
+          UNION ALL
+          SELECT c_observation_id, c_mask_attachment_id FROM t_flamingos_2_mos
+        ) m ON m.c_observation_id = o.c_observation_id
+        LEFT JOIN t_mos_mask_flat f ON f.c_observation_id = o.c_observation_id
+        WHERE o.c_program_id       = $program_id
+          AND o.c_calibration_role = 'mos_mask_flat'
+          AND o.c_existence        = 'present'
+        ORDER BY o.c_observation_id
+      """.query(observation_id *: attachment_id.opt *: text.opt)
+
+    val upsertMosMaskFlatFile: Command[(Observation.Id, String)] =
+      sql"""
+        INSERT INTO t_mos_mask_flat (c_observation_id, c_remote_path)
+        VALUES ($observation_id, $text)
+        ON CONFLICT (c_observation_id) DO UPDATE SET c_remote_path = EXCLUDED.c_remote_path
+      """.command
+
+    val updateBand: Command[(Option[ScienceBand], Observation.Id)] =
+      sql"""
+        UPDATE t_observation
+        SET    c_science_band = ${science_band.opt}
+        WHERE  c_observation_id = $observation_id
+          AND  c_science_band IS DISTINCT FROM ${science_band.opt}
+      """.command.contramap((band, oid) => (band, oid, band))

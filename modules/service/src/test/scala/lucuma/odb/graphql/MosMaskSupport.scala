@@ -74,6 +74,39 @@ trait MosMaskSupport:
       """.query(attachment_id)
     withSession(_.unique(q)(pid, tpe, fileName))
 
+  /** GMOS North MOS mode input, with the mask attachment if given. */
+  protected def gmosNorthMosMode(aid: Option[Attachment.Id]): String =
+    s"""
+      gmosNorthMos: {
+        grating: R831_G5302
+        filter: R_PRIME
+        customMask: { slitWidth: CUSTOM_WIDTH_0_50${maskField(aid)} }
+        centralWavelength: { nanometers: 500 }
+      }
+    """
+
+  protected def gmosSouthMosMode(aid: Option[Attachment.Id]): String =
+    s"""
+      gmosSouthMos: {
+        grating: R600_G5324
+        filter: R_PRIME
+        customMask: { slitWidth: CUSTOM_WIDTH_0_50${maskField(aid)} }
+        centralWavelength: { nanometers: 500 }
+      }
+    """
+
+  protected def flamingos2MosMode(aid: Option[Attachment.Id]): String =
+    s"""
+      flamingos2Mos: {
+        disperser: R1200_JH
+        filter: JH
+        customMask: { slitWidth: CUSTOM_WIDTH_2_PIX${maskField(aid)} }
+      }
+    """
+
+  private def maskField(aid: Option[Attachment.Id]): String =
+    aid.fold("")(a => s", attachmentId: ${a.asJson}")
+
   private def maskName(fileName: String): String =
     fileName.stripSuffix("_ODF.fits").toUpperCase
 

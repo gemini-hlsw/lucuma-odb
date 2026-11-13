@@ -7,10 +7,12 @@ package feature
 import cats.effect.IO
 import cats.syntax.all.*
 import io.circe.Decoder
+import io.circe.Json
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ScienceBand
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
+import lucuma.core.model.Program
 import lucuma.odb.graphql.query.ExecutionTestSupport
 
 trait TelluricCalibrationsTestSupport:
@@ -127,3 +129,31 @@ trait TelluricCalibrationsTestSupport:
             }
           }"""
     ).map(_.hcursor.downField("group").focus.exists(!_.isNull))
+
+  case class GroupNameAndRoles(name: String, calibrationRoles: List[CalibrationRole]) derives Decoder
+
+  protected def queryGroupNameAndRoles(gid: Group.Id): IO[GroupNameAndRoles] =
+    query(
+      serviceUser,
+      s"""query {
+            group(groupId: "$gid") {
+              name
+              calibrationRoles
+            }
+          }"""
+    ).flatMap: c =>
+      c.hcursor.downField("group").as[GroupNameAndRoles].leftMap(f => new RuntimeException(f.message)).liftTo[IO]
+
+  protected def queryCalibrationsWithRole(pid: Program.Id, calibrationRole: CalibrationRole): IO[List[Observation.Id]] =
+    query(
+      serviceUser,
+      s"""query {
+            observations(WHERE: { program: { id: { EQ: "$pid" } }, calibrationRole: { EQ: ${calibrationRole.tag.toUpperCase} } }) {
+              matches { id }
+            }
+          }"""
+    ).flatMap: c =>
+      c.hcursor.downFields("observations", "matches").as[List[Json]]
+        .flatMap(_.traverse(_.hcursor.downField("id").as[Observation.Id]))
+        .leftMap(f => new RuntimeException(f.message))
+        .liftTo[IO]
