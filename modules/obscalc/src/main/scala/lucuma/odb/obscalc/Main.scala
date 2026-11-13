@@ -282,20 +282,35 @@ object CalcMain extends MainParams:
               .handleErrorWith: t =>
                 Logger[F].warn(t)("Group standing refresh failed")
 
+    val WaitToRestart: FiniteDuration = 5.seconds
+
+    // A failure that ends the stream interrupts the calculations in flight and
+    // leaves them 'calculating', which `load` skips. Re-pend them on every
+    // (re)start of the stream, not just at daemon startup.
+    val resetCalculating: F[Unit] =
+      T.rootSpan("obscalc.startup.reset").surround:
+        services.useTransactionally:
+          requireServiceAccessOrThrow:
+            obscalcService.reset
+
+    // Losing the database fails the whole stream. Restart it here rather than
+    // exit: a new process cannot start while the database is down, and Heroku
+    // waits a long time before retrying a dyno that crashed twice.
+    val daemonStream: Stream[F, Unit] =
+      (Stream.exec(resetCalculating) ++
+        calcAndUpdateStream
+          .merge(refreshCalibrationsStream)
+          .merge(visitorTimeAccountingStream)
+          .merge(refreshGroupStandingsStream))
+        .attempts(Stream.constant(WaitToRestart))
+        .evalTap:
+          case Left(e)  => Logger[F].error(e)(s"Obscalc daemon crashed, restarting in $WaitToRestart")
+          case Right(_) => ().pure[F]
+        .void
+
     for
       _ <- Resource.eval(Logger[F].info("Processing PendingCalc"))
-      _ <- Resource.eval:
-             T.rootSpan("obscalc.startup.reset").surround:
-               services.useTransactionally:
-                 requireServiceAccessOrThrow:
-                   obscalcService.reset
-      o <- calcAndUpdateStream
-             .merge(refreshCalibrationsStream)
-             .merge(visitorTimeAccountingStream)
-             .merge(refreshGroupStandingsStream)
-             .compile
-             .drain
-             .background
+      o <- daemonStream.compile.drain.background
     yield o
 
   def services[F[_]: Async: Parallel: UUIDGen: Tracer: Logger: LoggerFactory](
