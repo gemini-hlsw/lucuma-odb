@@ -93,12 +93,10 @@ object GraphQLRoutes {
       val odbMapping: Mapping[F] & ConeCandidatesMapping[F] =
         OdbMapping(pool, monitor, topics, gaiaClient, itcClient, commitHash, goaUsers, ptc, httpClient, horizonsClient, goaClient, emailConfig, schema, shouldValidate = false)
 
-      // Validate here, not in `GraphQLService.apply`: that validates on the calling thread, and the
-      // ODB mapping can overflow the default thread stack. `OdbMapping.validate` uses a thread with
-      // an 8 MB stack. When a Grackle release fixes the stack overflow, use `GraphQLService.apply`.
+      // Once per process: the mapping is built unchecked, and startup fails if it is invalid.
       val validateOnce: Resource[F, Unit] =
         Resource.eval:
-          OdbMapping.validate(odbMapping).whenA(validateMapping)
+          F.defer(odbMapping.validateInto[F]()).whenA(validateMapping)
 
       // Sometimes we get invalid cursors on startup; this works around the error by doing the thing again.
       extension [A](fa: F[A]) def retryOnInvalidCursorName: F[A] =
@@ -120,7 +118,6 @@ object GraphQLRoutes {
       def debug(ctx: RequestContext, message: String): F[Unit] =
         L.debug(s"${describe(ctx)}: $message")
 
-      // Unvalidated, because `validateOnce` validates the mapping with a larger thread stack.
       val service: GraphQLService[F] =
         new GraphQLService[F](odbMapping) {
 
