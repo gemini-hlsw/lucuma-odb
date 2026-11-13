@@ -137,7 +137,8 @@ ThisBuild / githubWorkflowEnv += munitFlakyOk
 // pyexplore is private; the pdfSummary image clones it with this token.
 ThisBuild / githubWorkflowEnv += ("PYEXPLORE_TOKEN" -> "${{ secrets.PYEXPLORE_TOKEN }}")
 
-ThisBuild / githubWorkflowSbtCommand := "sbt -v -J-Xmx6g"
+// The compiler overflows the default stack on the service module.
+ThisBuild / githubWorkflowSbtCommand := "sbt -v -J-Xmx6g -J-Xss4M"
 
 ThisBuild / githubWorkflowBuildPreamble ~= { steps =>
   Seq(
