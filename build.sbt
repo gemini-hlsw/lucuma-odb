@@ -137,7 +137,7 @@ ThisBuild / githubWorkflowEnv += munitFlakyOk
 // pyexplore is private; the pdfSummary image clones it with this token.
 ThisBuild / githubWorkflowEnv += ("PYEXPLORE_TOKEN" -> "${{ secrets.PYEXPLORE_TOKEN }}")
 
-ThisBuild / githubWorkflowSbtCommand := "sbt -v -J-Xmx6g -J-Xss4M"
+ThisBuild / githubWorkflowSbtCommand := "sbt -v -J-Xmx6g"
 
 ThisBuild / githubWorkflowBuildPreamble ~= { steps =>
   Seq(
@@ -1195,8 +1195,6 @@ lazy val service = project
     reStartArgs += "serve",
     reStart / javaOptions += s"-D$RealStackTracesProp",
     description                     := "Lucuma ODB Service",
-    // Grackle validates the type mappings per new user; Heroku's default stack is too small
-    bashScriptExtraDefines += """addJava "-Xss1m"""",
     realStackTraces,
     // Add command line parameters
     bashScriptExtraDefines += """set -- -Dfile.encoding=UTF-8 serve""",
@@ -1254,8 +1252,6 @@ lazy val pdfSummary = project
     reStart / envVars += "PORT" -> "8083",
     // The Python renderer shares the dyno's memory with the JVM; leave it room.
     lucumaDockerHeapSubtract := 400,
-    // We need a bit larger stack space for the grackle mapping
-    bashScriptExtraDefines += """addJava "-Xss1m"""",
     realStackTraces,
     bashScriptExtraDefines += """set -- -Dfile.encoding=UTF-8""",
     executableScriptName            := "lucuma-odb-pdf-summary-service",

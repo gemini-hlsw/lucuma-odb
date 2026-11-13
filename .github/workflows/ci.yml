@@ -67,7 +67,7 @@ jobs:
         if: matrix.java == 'temurin@25' && steps.setup-java-temurin-25.outputs.cache-hit == 'false'
         run: |
           for attempt in 1 2 3; do
-            sbt -v -J-Xmx6g -J-Xss4M +update +scalaCompilerBridgeBinaryJar && exit 0
+            sbt -v -J-Xmx6g +update +scalaCompilerBridgeBinaryJar && exit 0
             [ "$attempt" = 3 ] || sleep 30
           done
           exit 1
@@ -130,7 +130,7 @@ jobs:
           TEST_SHARD_COUNT: 8
           SSO_TEST_DB_IMAGE: 'lucuma-sso-test-db:ci'
           RESOURCE_TEST_DB_IMAGE: 'lucuma-resource-test-db:ci'
-        run: sbt -v -J-Xmx6g -J-Xss4M '++ ${{ matrix.scala }}' lucumaTestAffected
+        run: sbt -v -J-Xmx6g '++ ${{ matrix.scala }}' lucumaTestAffected
 
       - name: Docker compose down
         run: docker compose down
@@ -187,7 +187,7 @@ jobs:
         if: matrix.java == 'temurin@25' && steps.setup-java-temurin-25.outputs.cache-hit == 'false'
         run: |
           for attempt in 1 2 3; do
-            sbt -v -J-Xmx6g -J-Xss4M +update +scalaCompilerBridgeBinaryJar && exit 0
+            sbt -v -J-Xmx6g +update +scalaCompilerBridgeBinaryJar && exit 0
             [ "$attempt" = 3 ] || sleep 30
           done
           exit 1
@@ -224,7 +224,7 @@ jobs:
           SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
           SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
           SONATYPE_CREDENTIAL_HOST: ${{ secrets.SONATYPE_CREDENTIAL_HOST }}
-        run: sbt -v -J-Xmx6g -J-Xss4M tlCiRelease
+        run: sbt -v -J-Xmx6g tlCiRelease
 
   validate-steward:
     name: Validate Steward Config
@@ -287,13 +287,13 @@ jobs:
         if: matrix.java == 'temurin@25' && steps.setup-java-temurin-25.outputs.cache-hit == 'false'
         run: |
           for attempt in 1 2 3; do
-            sbt -v -J-Xmx6g -J-Xss4M +update +scalaCompilerBridgeBinaryJar && exit 0
+            sbt -v -J-Xmx6g +update +scalaCompilerBridgeBinaryJar && exit 0
             [ "$attempt" = 3 ] || sleep 30
           done
           exit 1
 
       - name: Static checks
-        run: sbt -v -J-Xmx6g -J-Xss4M '++ ${{ matrix.scala }}' githubWorkflowCheck headerCheckAll scalafmtCheckAll 'project /' scalafmtSbtCheck lucumaScalafmtCheck lucumaScalafixCheck lucumaSlackNotifyCheck 'scalafixAll --check' mimaReportBinaryIssues doc
+        run: sbt -v -J-Xmx6g '++ ${{ matrix.scala }}' githubWorkflowCheck headerCheckAll scalafmtCheckAll 'project /' scalafmtSbtCheck lucumaScalafmtCheck lucumaScalafixCheck lucumaSlackNotifyCheck 'scalafixAll --check' mimaReportBinaryIssues doc
 
   schema:
     name: GraphQL schema validation
@@ -361,30 +361,30 @@ jobs:
         if: matrix.java == 'temurin@25' && steps.setup-java-temurin-25.outputs.cache-hit == 'false'
         run: |
           for attempt in 1 2 3; do
-            sbt -v -J-Xmx6g -J-Xss4M +update +scalaCompilerBridgeBinaryJar && exit 0
+            sbt -v -J-Xmx6g +update +scalaCompilerBridgeBinaryJar && exit 0
             [ "$attempt" = 3 ] || sleep 30
           done
           exit 1
 
       - name: Clean
         if: (contains(fromJSON(needs.affected.outputs.projects), 'ssoService') || contains(fromJSON(needs.affected.outputs.projects), 'itcService') || contains(fromJSON(needs.affected.outputs.projects), 'service') || contains(fromJSON(needs.affected.outputs.projects), 'obscalc') || contains(fromJSON(needs.affected.outputs.projects), 'calibrations') || contains(fromJSON(needs.affected.outputs.projects), 'pdfSummary') || contains(fromJSON(needs.affected.outputs.projects), 'resourceService'))
-        run: sbt -v -J-Xmx6g -J-Xss4M '++ ${{ matrix.scala }}' clean
+        run: sbt -v -J-Xmx6g '++ ${{ matrix.scala }}' clean
 
       - name: Build SSO Docker images
         if: (contains(fromJSON(needs.affected.outputs.projects), 'ssoService'))
-        run: 'sbt -v -J-Xmx6g -J-Xss4M ''++ ${{ matrix.scala }}'' ssoService/docker:publishLocal'
+        run: 'sbt -v -J-Xmx6g ''++ ${{ matrix.scala }}'' ssoService/docker:publishLocal'
 
       - name: Build ITC Docker images
         if: (contains(fromJSON(needs.affected.outputs.projects), 'itcService'))
-        run: 'sbt -v -J-Xmx6g -J-Xss4M ''++ ${{ matrix.scala }}'' itcService/docker:publishLocal'
+        run: 'sbt -v -J-Xmx6g ''++ ${{ matrix.scala }}'' itcService/docker:publishLocal'
 
       - name: Build ODB Docker images
         if: (contains(fromJSON(needs.affected.outputs.projects), 'service') || contains(fromJSON(needs.affected.outputs.projects), 'obscalc') || contains(fromJSON(needs.affected.outputs.projects), 'calibrations') || contains(fromJSON(needs.affected.outputs.projects), 'pdfSummary'))
-        run: 'sbt -v -J-Xmx6g -J-Xss4M ''++ ${{ matrix.scala }}'' service/docker:publishLocal obscalc/docker:publishLocal calibrations/docker:publishLocal pdfSummary/docker:publishLocal'
+        run: 'sbt -v -J-Xmx6g ''++ ${{ matrix.scala }}'' service/docker:publishLocal obscalc/docker:publishLocal calibrations/docker:publishLocal pdfSummary/docker:publishLocal'
 
       - name: Build RESOURCE Docker images
         if: (contains(fromJSON(needs.affected.outputs.projects), 'resourceService'))
-        run: 'sbt -v -J-Xmx6g -J-Xss4M ''++ ${{ matrix.scala }}'' resourceService/docker:publishLocal'
+        run: 'sbt -v -J-Xmx6g ''++ ${{ matrix.scala }}'' resourceService/docker:publishLocal'
 
       - name: Detect PDF renderer changes
         id: pdf-render-changed
@@ -641,7 +641,7 @@ jobs:
         if: matrix.java == 'temurin@25' && steps.setup-java-temurin-25.outputs.cache-hit == 'false'
         run: |
           for attempt in 1 2 3; do
-            sbt -v -J-Xmx6g -J-Xss4M +update +scalaCompilerBridgeBinaryJar && exit 0
+            sbt -v -J-Xmx6g +update +scalaCompilerBridgeBinaryJar && exit 0
             [ "$attempt" = 3 ] || sleep 30
           done
           exit 1
@@ -652,7 +652,7 @@ jobs:
 
       - name: Build PDF summary Docker image
         if: steps.pdf-render-changed.outputs.changed == 'true'
-        run: 'sbt -v -J-Xmx6g -J-Xss4M ''++ ${{ matrix.scala }}'' pdfSummary/docker:publishLocal'
+        run: 'sbt -v -J-Xmx6g ''++ ${{ matrix.scala }}'' pdfSummary/docker:publishLocal'
 
       - name: Check PDF summary rendering
         if: steps.pdf-render-changed.outputs.changed == 'true'
@@ -698,7 +698,7 @@ jobs:
         if: matrix.java == 'temurin@25' && steps.setup-java-temurin-25.outputs.cache-hit == 'false'
         run: |
           for attempt in 1 2 3; do
-            sbt -v -J-Xmx6g -J-Xss4M +update +scalaCompilerBridgeBinaryJar && exit 0
+            sbt -v -J-Xmx6g +update +scalaCompilerBridgeBinaryJar && exit 0
             [ "$attempt" = 3 ] || sleep 30
           done
           exit 1
@@ -707,7 +707,7 @@ jobs:
         id: report
         env:
           LUCUMA_AFFECTED_PUSH_BASE: ${{ github.event.before }}
-        run: sbt -v -J-Xmx6g -J-Xss4M lucumaAffectedReport
+        run: sbt -v -J-Xmx6g lucumaAffectedReport
 
   required-checks:
     name: REQUIRED CHECKS FOR BRANCH PROTECTION - AGGREGATED

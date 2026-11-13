@@ -21,4 +21,4 @@ class OdbMappingValidationSuite extends OdbSuite:
     given Tracer[IO]         = Tracer.noop
     given TracerProvider[IO] = TracerProvider.noop
     given MeterProvider[IO]  = MeterProvider.noop
-    mapping.use(OdbMapping.validate[IO])
+    mapping.use(m => IO.defer(m.validateInto[IO]()))
