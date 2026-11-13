@@ -12,8 +12,10 @@ import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ObservationQaState
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.SlewStage
+import lucuma.core.enums.Site
 import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.model.Group
+import lucuma.core.model.LocalObservingNight
 import lucuma.core.model.Observation
 import lucuma.core.syntax.string.*
 import lucuma.core.syntax.timespan.*
@@ -36,7 +38,7 @@ class groupProgress extends GroupTestSupport:
             completed
             required
             nextWindow { start end }
-            violations
+            violations { code }
           }
         }
       }
@@ -200,7 +202,7 @@ class groupProgress extends GroupTestSupport:
           "completed": 1,
           "required": 2,
           "nextWindow": null,
-          "violations": ["INSUFFICIENT_ELEMENTS"]
+          "violations": [{ "code": "INSUFFICIENT_ELEMENTS" }]
         }
       """
     )
@@ -221,7 +223,7 @@ class groupProgress extends GroupTestSupport:
           "completed": 0,
           "required": 2,
           "nextWindow": null,
-          "violations": ["INSUFFICIENT_ELEMENTS"]
+          "violations": [{ "code": "INSUFFICIENT_ELEMENTS" }]
         }
       """
     )
@@ -363,7 +365,7 @@ class groupProgress extends GroupTestSupport:
       assertEquals(js.hcursor.downField("status").require[String], "UNSCHEDULABLE")
       assertEquals(
         js.hcursor.downField("violations").focus.get,
-        json"""["MINIMUM_INTERVAL"]"""
+        json"""[{ "code": "MINIMUM_INTERVAL" }]"""
       )
 
   // An ordered group requiring one of two observations, the first `completed`
@@ -382,7 +384,65 @@ class groupProgress extends GroupTestSupport:
   test("an ordered group's observation past its minimum, completed before the first, is out of order"):
     orderedOneOfTwo((_, o2) => List(o2)).map: js =>
       assertEquals(js.hcursor.downField("status").require[String], "UNSCHEDULABLE")
-      assertEquals(js.hcursor.downField("violations").focus.get, json"""["ORDER"]""")
+      assertEquals(js.hcursor.downField("violations").focus.get, json"""[{ "code": "ORDER" }]""")
+
+  test("a violation names where it happened, and nothing is waived"):
+    for
+      p  <- createProgram
+      o1 <- newObservation(p)
+      o2 <- newObservation(p)
+      g  <- group(p, List(o1, o2))
+      _  <- setOrdered(g)
+      _  <- completeObservation(o2)
+      js <- query(pi, s"""
+              query {
+                group(groupId: "$g") {
+                  progress {
+                    violations {
+                      code
+                      element { groupId observationId }
+                      night { site date }
+                      subgroupId
+                    }
+                    waived { id }
+                  }
+                }
+              }
+            """)
+    yield assertEquals(
+      js.hcursor.downFields("group", "progress").focus.get,
+      json"""
+        {
+          "violations": [
+            {
+              "code": "ORDER",
+              "element": { "groupId": null, "observationId": $o2 },
+              "night": null,
+              "subgroupId": null
+            }
+          ],
+          "waived": []
+        }
+      """
+    )
+
+  test("a violation on a night names the night"):
+    for
+      p  <- createProgram
+      o1 <- newObservation(p)
+      o2 <- newObservation(p)
+      g  <- group(p, List(o1, o2))
+      _  <- query(pi, s"""mutation { updateGroups(input: { SET: { maximumObservationsPerNight: 1 }, WHERE: { id: { EQ: "$g" } } }) { groups { id } } }""")
+      _  <- completeObservation(o1)
+      _  <- completeObservation(o2)
+      c  <- completionTime(o1)
+      js <- query(pi, s"""query { group(groupId: "$g") { progress { violations { code night { site date } } } } }""")
+    yield
+      val date = LocalObservingNight.fromSiteAndInstant(Site.GN, c.toInstant).toLocalDate
+      assertEquals(
+        js.hcursor.downFields("group", "progress", "violations").focus.get,
+        json"""[{ "code": "OBSERVATIONS_PER_NIGHT_MAXIMUM", "night": { "site": "GN", "date": ${date.toString} } }]"""
+      )
 
   test("an ordered group's observation past its minimum, completed after the first, is extra"):
     orderedOneOfTwo((o1, o2) => List(o1, o2)).map: js =>
@@ -401,7 +461,7 @@ class groupProgress extends GroupTestSupport:
       js <- progress(g)
     yield assertEquals(
       js.hcursor.downFields("violations").focus.get,
-      json"""["SAME_NIGHT_MULTIPLE_SITES"]"""
+      json"""[{ "code": "SAME_NIGHT_MULTIPLE_SITES" }]"""
     )
 
   test("an observation declared complete without ever having been observed is left out"):

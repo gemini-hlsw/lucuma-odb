@@ -7,6 +7,7 @@ import cats.data.NonEmptyList
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.PosInt
+import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.ACursor
 import io.circe.Decoder
 import io.circe.DecodingFailure
@@ -14,11 +15,22 @@ import io.circe.Encoder
 import io.circe.Json
 import io.circe.refined.*
 import io.circe.syntax.*
-import lucuma.core.enums.GroupConstraintViolation
+import lucuma.core.enums.GroupConstraintViolationCode
 import lucuma.core.enums.GroupStatus
+import lucuma.core.enums.Site
+import lucuma.core.model.Attribution
+import lucuma.core.model.Group
+import lucuma.core.model.LocalObservingNight
+import lucuma.core.model.Observation
+import lucuma.core.model.ObservingNight
+import lucuma.core.model.User
+import lucuma.core.model.group.GroupConstraintViolation
+import lucuma.core.model.group.GroupConstraintWaiver
 import lucuma.core.model.group.GroupProgress
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
+
+import java.time.LocalDate
 
 trait GroupProgressCodec:
 
@@ -40,6 +52,114 @@ trait GroupProgressCodec:
            )
     yield w
 
+  // A GroupElementId: exactly one of the two ids is set.
+  private def elementJson(e: Either[Group.Id, Observation.Id]): Json =
+    Json.obj(
+      "groupId"       -> e.left.toOption.asJson,
+      "observationId" -> e.toOption.asJson
+    )
+
+  private def decodeElement(c: ACursor): Decoder.Result[Either[Group.Id, Observation.Id]] =
+    (c.downField("groupId").as[Option[Group.Id]], c.downField("observationId").as[Option[Observation.Id]]).tupled.flatMap:
+      case (Some(g), None) => g.asLeft.asRight
+      case (None, Some(o)) => o.asRight.asRight
+      case _               => DecodingFailure("A group element needs exactly one of groupId and observationId", c.history).asLeft
+
+  // An ObservingNight.
+  private def nightJson(n: ObservingNight): Json =
+    Json.obj(
+      "site" -> n.site.asJson,
+      "date" -> n.toLocalObservingNight.toLocalDate.asJson
+    )
+
+  private def decodeNight(c: ACursor): Decoder.Result[ObservingNight] =
+    for
+      s <- c.downField("site").as[Site]
+      d <- c.downField("date").as[LocalDate]
+    yield ObservingNight(s, LocalObservingNight(d))
+
+  // A GroupConstraintViolation: the fields that don't apply to its code are
+  // null.
+  given Encoder_GroupConstraintViolation: Encoder[GroupConstraintViolation] =
+    Encoder.instance: v =>
+      import GroupConstraintViolation.Unwaivable.*
+      import GroupConstraintViolation.Waivable.*
+      val (element, night, subgroup) =
+        v match
+          case Order(e)                       => (e.some, none, none)
+          case MinimumInterval(e)             => (e.some, none, none)
+          case MaximumInterval(e)             => (e.some, none, none)
+          case SameNight(n)                   => (none, n.some, none)
+          case ObservationsPerNightMinimum(n) => (none, n.some, none)
+          case ObservationsPerNightMaximum(n) => (none, n.some, none)
+          case SubgroupUnschedulable(g)       => (none, none, g.some)
+          case SameNightMultipleSites            |
+               ObservationsPerNightMultipleSites |
+               InsufficientElements              => (none, none, none)
+      Json.obj(
+        "code"       -> v.code.asJson,
+        "element"    -> element.map(elementJson).asJson,
+        "night"      -> night.map(nightJson).asJson,
+        "subgroupId" -> subgroup.asJson
+      )
+
+  given Decoder_GroupConstraintViolation: Decoder[GroupConstraintViolation] =
+    Decoder.instance: c =>
+      import GroupConstraintViolationCode as Code
+      import GroupConstraintViolation.Unwaivable
+      import GroupConstraintViolation.Waivable
+      def element = decodeElement(c.downField("element"))
+      def night   = decodeNight(c.downField("night"))
+      c.downField("code").as[GroupConstraintViolationCode].flatMap:
+        case Code.Order                             => element.map(Waivable.Order(_))
+        case Code.MinimumInterval                   => element.map(Waivable.MinimumInterval(_))
+        case Code.MaximumInterval                   => element.map(Waivable.MaximumInterval(_))
+        case Code.SameNight                         => night.map(Waivable.SameNight(_))
+        case Code.SameNightMultipleSites            => Unwaivable.SameNightMultipleSites.asRight
+        case Code.ObservationsPerNightMinimum       => night.map(Waivable.ObservationsPerNightMinimum(_))
+        case Code.ObservationsPerNightMaximum       => night.map(Waivable.ObservationsPerNightMaximum(_))
+        case Code.ObservationsPerNightMultipleSites => Unwaivable.ObservationsPerNightMultipleSites.asRight
+        case Code.InsufficientElements              => Unwaivable.InsufficientElements.asRight
+        case Code.SubgroupUnschedulable             => c.downField("subgroupId").as[Group.Id].map(Unwaivable.SubgroupUnschedulable(_))
+
+  given Encoder_Attribution: Encoder[Attribution] =
+    Encoder.instance: a =>
+      Json.obj(
+        "by"     -> a.by.asJson,
+        "at"     -> a.at.asJson,
+        "reason" -> a.reason.asJson
+      )
+
+  given Decoder_Attribution: Decoder[Attribution] =
+    Decoder.instance: c =>
+      for
+        b <- c.downField("by").as[User.Id]
+        a <- c.downField("at").as[Timestamp]
+        r <- c.downField("reason").as[Option[NonEmptyString]]
+      yield Attribution(b, a, r)
+
+  given Encoder_GroupConstraintWaiver: Encoder[GroupConstraintWaiver] =
+    Encoder.instance: w =>
+      Json.obj(
+        "id"        -> w.id.asJson,
+        "groupId"   -> w.groupId.asJson,
+        "violation" -> (w.violation: GroupConstraintViolation).asJson,
+        "granted"   -> w.granted.asJson,
+        "revoked"   -> w.revoked.asJson
+      )
+
+  given Decoder_GroupConstraintWaiver: Decoder[GroupConstraintWaiver] =
+    Decoder.instance: c =>
+      for
+        id <- c.downField("id").as[GroupConstraintWaiver.Id]
+        g  <- c.downField("groupId").as[Group.Id]
+        v  <- c.downField("violation").as[GroupConstraintViolation].flatMap:
+                case w: GroupConstraintViolation.Waivable => w.asRight
+                case u                                    => DecodingFailure(s"A ${u.code} violation can't be waived", c.history).asLeft
+        a  <- c.downField("granted").as[Attribution]
+        r  <- c.downField("revoked").as[Option[Attribution]]
+      yield GroupConstraintWaiver(id, g, v, a, r)
+
   // The GraphQL type is flat: the fields that apply to the status are read
   // and the rest ignored.  Every status but empty requires at least one
   // element.
@@ -47,6 +167,10 @@ trait GroupProgressCodec:
     Decoder.instance: c =>
       def required: Decoder.Result[PosInt] =
         c.downField("required").as[PosInt]
+
+      // Empty when not selected.
+      def waived: Decoder.Result[List[GroupConstraintWaiver]] =
+        c.downField("waived").as[Option[List[GroupConstraintWaiver]]].map(_.orEmpty)
 
       for
         s <- c.downField("status").as[GroupStatus]
@@ -58,17 +182,19 @@ trait GroupProgressCodec:
                  required.map(GroupProgress.Pending(_))
                case GroupStatus.Ongoing       =>
                  for
-                   r <- required
-                   w <- c.downField("nextWindow").as[Option[Json]].flatMap(_.traverse(j => decodeWindow(j.hcursor)))
-                 yield GroupProgress.Ongoing(d, r, w)
+                   r  <- required
+                   w  <- c.downField("nextWindow").as[Option[Json]].flatMap(_.traverse(j => decodeWindow(j.hcursor)))
+                   ws <- waived
+                 yield GroupProgress.Ongoing(d, r, w, ws)
                case GroupStatus.Complete      =>
-                 required.map(GroupProgress.Complete(d, _))
+                 (required, waived).mapN(GroupProgress.Complete(d, _, _))
                case GroupStatus.Unschedulable =>
                  for
                    r  <- required
                    vs <- c.downField("violations").as[List[GroupConstraintViolation]]
                    ns <- NonEmptyList.fromList(vs).toRight(DecodingFailure("An unschedulable group has no violations", c.history))
-                 yield GroupProgress.Unschedulable(d, r, ns.toNes)
+                   ws <- waived
+                 yield GroupProgress.Unschedulable(d, r, ns, ws)
       yield p
 
   // The GraphQL type is flat: fields that don't apply to a status are zero,
@@ -77,17 +203,18 @@ trait GroupProgressCodec:
     Encoder.instance: p =>
       val (completed, required, nextWindow, violations) =
         p match
-          case GroupProgress.Empty                  => (0, 0, None, Nil)
-          case GroupProgress.Pending(r)             => (0, r.value, None, Nil)
-          case GroupProgress.Ongoing(c, r, w)       => (c.value, r.value, w, Nil)
-          case GroupProgress.Complete(c, r)         => (c.value, r.value, None, Nil)
-          case GroupProgress.Unschedulable(c, r, v) => (c.value, r.value, None, v.toSortedSet.toList)
+          case GroupProgress.Empty                         => (0, 0, None, Nil)
+          case GroupProgress.Pending(r)                    => (0, r.value, None, Nil)
+          case GroupProgress.Ongoing(c, r, w, _)           => (c.value, r.value, w, Nil)
+          case GroupProgress.Complete(c, r, _)             => (c.value, r.value, None, Nil)
+          case GroupProgress.Unschedulable(c, r, vs, _)    => (c.value, r.value, None, vs.toList)
       Json.obj(
         "status"     -> p.status.asJson,
         "completed"  -> completed.asJson,
         "required"   -> required.asJson,
         "nextWindow" -> nextWindow.map(windowJson).asJson,
-        "violations" -> violations.asJson
+        "violations" -> violations.asJson,
+        "waived"     -> p.waived.asJson
       )
 
 object groupprogress extends GroupProgressCodec
