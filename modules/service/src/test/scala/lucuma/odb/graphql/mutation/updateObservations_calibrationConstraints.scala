@@ -12,6 +12,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.odb.graphql.feature.TelluricCalibrationsTestSupport
+import lucuma.odb.graphql.TestUsers
 import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
 
 import java.time.Instant
@@ -27,7 +28,15 @@ class updateObservations_calibrationConstraints
   // Image quality the calibrations service gives standards and twilights.
   val DefaultIq: String = "TWO_POINT_ZERO"
 
+  val admin: User = TestUsers.Standard.admin(5, 34)
+
+  override val validUsers: List[User] =
+    List(pi, pi2, serviceUser, staff, admin)
+
   case class Setup(pid: Program.Id, science: Observation.Id, spec: Observation.Id, twilight: Observation.Id)
+
+  // The ids the mutation updated, and the messages of any warnings.
+  case class Outcome(updated: Set[Observation.Id], warnings: List[String])
 
   // A GMOS North long slit science observation with its standard and twilight.
   private def setup: IO[Setup] =
@@ -41,9 +50,8 @@ class updateObservations_calibrationConstraints
       twi  <- queryCalibrationsWithRole(pid, CalibrationRole.Twilight).map(_.head)
     yield Setup(pid, oid, spec, twi)
 
-  // Returns the ids the mutation actually updated.
-  private def update(user: User, oids: List[Observation.Id], set: String): IO[Set[Observation.Id]] =
-    query(
+  private def update(user: User, oids: List[Observation.Id], set: String): IO[Outcome] =
+    queryIor(
       user,
       s"""
         mutation {
@@ -55,14 +63,16 @@ class updateObservations_calibrationConstraints
           }
         }
       """
-    ).flatMap: c =>
-      c.hcursor.downFields("updateObservations", "observations").as[List[Json]]
-        .flatMap(_.traverse(_.hcursor.downField("id").as[Observation.Id]))
-        .map(_.toSet)
-        .leftMap(f => new RuntimeException(f.message))
-        .liftTo[IO]
+    ).flatMap: ior =>
+      val warnings = ior.left.toList.flatMap(_.toList.map(_.message))
+      ior.right.liftTo[IO](new RuntimeException(warnings.mkString("; "))).flatMap: c =>
+        c.hcursor.downFields("updateObservations", "observations").as[List[Json]]
+          .flatMap(_.traverse(_.hcursor.downField("id").as[Observation.Id]))
+          .map(ids => Outcome(ids.toSet, warnings))
+          .leftMap(f => new RuntimeException(f.message))
+          .liftTo[IO]
 
-  private def setPointEight(user: User, oids: Observation.Id*): IO[Set[Observation.Id]] =
+  private def setPointEight(user: User, oids: Observation.Id*): IO[Outcome] =
     update(user, oids.toList, "{ constraintSet: { imageQuality: POINT_EIGHT } }")
 
   private def imageQuality(oid: Observation.Id): IO[String] =
@@ -74,42 +84,54 @@ class updateObservations_calibrationConstraints
         .leftMap(f => new RuntimeException(f.message))
         .liftTo[IO]
 
-  test("staff may edit a standard's conditions alongside science observations"):
-    for
-      s       <- setup
-      updated <- setPointEight(staff, s.science, s.spec)
-      sciIq   <- imageQuality(s.science)
-      specIq  <- imageQuality(s.spec)
-    yield
-      assertEquals(updated, Set(s.science, s.spec))
-      assertEquals(sciIq, "POINT_EIGHT")
-      assertEquals(specIq, "POINT_EIGHT")
+  private def assertReadOnlyWarning(o: Outcome, oid: Observation.Id): Unit =
+    assertEquals(o.updated, Set.empty)
+    assert(o.warnings.exists(_.contains(s"Calibration observation $oid is read-only")), o.warnings)
 
-  test("a PI edit skips the standard and updates the science observations"):
+  List(staff, admin, serviceUser).foreach: user =>
+    test(s"${user.role.access} may edit a standard's conditions"):
+      for
+        s  <- setup
+        o  <- setPointEight(user, s.spec)
+        iq <- imageQuality(s.spec)
+      yield
+        assertEquals(o, Outcome(Set(s.spec), Nil))
+        assertEquals(iq, "POINT_EIGHT")
+
+  test("a staff edit that also selects science observations skips the standard"):
     for
-      s       <- setup
-      updated <- setPointEight(pi, s.science, s.spec)
-      specIq  <- imageQuality(s.spec)
+      s      <- setup
+      o      <- setPointEight(staff, s.science, s.spec)
+      specIq <- imageQuality(s.spec)
     yield
-      assertEquals(updated, Set(s.science))
+      assertEquals(o, Outcome(Set(s.science), Nil))
       assertEquals(specIq, DefaultIq)
 
-  test("a staff edit to a standard's conditions and other fields skips the standard"):
+  test("a PI edit to a standard is skipped with a warning"):
     for
-      s       <- setup
-      updated <- update(staff, List(s.spec), """{ subtitle: "renamed", constraintSet: { imageQuality: POINT_EIGHT } }""")
-      iq      <- imageQuality(s.spec)
+      s  <- setup
+      o  <- setPointEight(pi, s.spec)
+      iq <- imageQuality(s.spec)
     yield
-      assertEquals(updated, Set.empty)
+      assertReadOnlyWarning(o, s.spec)
+      assertEquals(iq, DefaultIq)
+
+  test("a staff edit to a standard's conditions and other fields is skipped with a warning"):
+    for
+      s  <- setup
+      o  <- update(staff, List(s.spec), """{ subtitle: "renamed", constraintSet: { imageQuality: POINT_EIGHT } }""")
+      iq <- imageQuality(s.spec)
+    yield
+      assertReadOnlyWarning(o, s.spec)
       assertEquals(iq, DefaultIq)
 
   test("staff may not edit a twilight's conditions"):
     for
-      s       <- setup
-      updated <- setPointEight(staff, s.twilight)
-      iq      <- imageQuality(s.twilight)
+      s  <- setup
+      o  <- setPointEight(staff, s.twilight)
+      iq <- imageQuality(s.twilight)
     yield
-      assertEquals(updated, Set.empty)
+      assertReadOnlyWarning(o, s.twilight)
       assertEquals(iq, DefaultIq)
 
   test("a staff edit survives a calibrations re-sync"):

@@ -4,6 +4,7 @@
 package lucuma.odb.graphql
 package feature
 
+import cats.data.Ior
 import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.syntax.all.*
@@ -3929,18 +3930,36 @@ class perScienceObservationCalibrations
   // Telluric science exposure time mode override
   // ---------------------------------------------------------------------------
 
-  private def setTelluricScienceEtm(oid: Observation.Id, etm: String, extra: String = ""): IO[List[Observation.Id]] =
+  private def setTelluricScienceEtm(oid: Observation.Id, etm: String): IO[List[Observation.Id]] =
     query(
       pi,
       s"""mutation {
         updateObservations(input: {
-          SET: { observingMode: { flamingos2LongSlit: { exposureTimeMode: $etm $extra } } }
+          SET: { observingMode: { flamingos2LongSlit: { exposureTimeMode: $etm } } }
           WHERE: { id: { EQ: "$oid" } }
         }) {
           observations { id }
         }
       }"""
     ).map(_.hcursor.downFields("updateObservations", "observations").require[List[ObsInfo]].map(_.id))
+
+  // A PI edit to the telluric's observing mode that it refuses with a warning.
+  private def expectTelluricSkipped(oid: Observation.Id, observingMode: String): IO[Unit] =
+    expectIor(
+      pi,
+      s"""mutation {
+        updateObservations(input: {
+          SET: { observingMode: { $observingMode } }
+          WHERE: { id: { EQ: "$oid" } }
+        }) {
+          observations { id }
+        }
+      }""",
+      Ior.both(
+        List(s"Calibration observation $oid is read-only: it accepts only a staff QA state override or an edit to its science exposure time mode alone."),
+        json"""{ "updateObservations": { "observations": [] } }"""
+      )
+    )
 
   private def snEtm(value: Int, atNm: Int = 500): String =
     s"{ signalToNoise: { value: $value at: { nanometers: $atNm } } }"
@@ -4025,31 +4044,17 @@ class perScienceObservationCalibrations
     for
       pid        <- createProgramAs(pi)
       (_, tel)   <- createF2WithTelluric(pid)
-      updated    <- setTelluricScienceEtm(tel, snEtm(250), extra = "explicitReadMode: FAINT")
+      _          <- expectTelluricSkipped(tel, s"flamingos2LongSlit: { exposureTimeMode: ${snEtm(250)} explicitReadMode: FAINT }")
       after      <- queryF2ScienceEtm(tel)
-    yield
-      assertEquals(updated, Nil)
-      assertEquals(after, (Some(120), false))
+    yield assertEquals(after, (Some(120), false))
 
   test("telluric etm override: an ETM-only edit for another mode leaves the telluric alone"):
     for
       pid        <- createProgramAs(pi)
       (_, tel)   <- createF2WithTelluric(pid)
-      updated    <- query(
-                      pi,
-                      s"""mutation {
-                        updateObservations(input: {
-                          SET: { observingMode: { igrins2LongSlit: { exposureTimeMode: ${snEtm(250)} } } }
-                          WHERE: { id: { EQ: "$tel" } }
-                        }) {
-                          observations { id }
-                        }
-                      }"""
-                    ).map(_.hcursor.downFields("updateObservations", "observations").require[List[ObsInfo]].map(_.id))
+      _          <- expectTelluricSkipped(tel, s"igrins2LongSlit: { exposureTimeMode: ${snEtm(250)} }")
       after      <- queryF2ScienceEtm(tel)
-    yield
-      assertEquals(updated, Nil)
-      assertEquals(after, (Some(120), false))
+    yield assertEquals(after, (Some(120), false))
 
   test("telluric etm override: null on a science observation is rejected"):
     for

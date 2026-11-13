@@ -4,7 +4,9 @@
 package lucuma.odb.graphql
 package mutation
 
+import cats.data.Ior
 import cats.syntax.either.*
+import cats.syntax.foldable.*
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.SequenceType
@@ -112,16 +114,15 @@ class updateObservations_DaytimeCalibration extends OdbSuite with DatabaseOperat
     for
       pid <- createProgramAs(pi)
       oid <- createDaytimeCalibrationAs(staff, pid)
-      _   <- expect(
-        user     = pi,
-        query    = updateQuery(oid, "null"),
-        expected = json"""{ "updateObservations": { "observations": [] } }""".asRight
-      )
-      _   <- expect(
-        user     = pi,
-        query    = updateQuery(oid, gmosNorthLongSlit),
-        expected = json"""{ "updateObservations": { "observations": [] } }""".asRight
-      )
+      _   <- List("null", gmosNorthLongSlit).traverse_ : mode =>
+               expectIor(
+                 user     = pi,
+                 query    = updateQuery(oid, mode),
+                 expected = Ior.both(
+                   List(s"Calibration observation $oid is read-only: only staff may edit a daytime calibration."),
+                   json"""{ "updateObservations": { "observations": [] } }"""
+                 )
+               )
     yield ()
 
   test("staff may clear a daytime calibration's mode while no sequence is stored"):
