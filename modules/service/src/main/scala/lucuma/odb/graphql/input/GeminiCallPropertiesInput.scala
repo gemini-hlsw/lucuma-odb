@@ -46,9 +46,10 @@ object GeminiCallPropertiesInput:
             rExchangeʹ
           ).parMapN: (cfpType, limits, instruments, proprietary, exchange) =>
             (active: DateInterval) =>
+              val buffer = CoordinateLimitsInput.raBuffer(cfpType)
               Create(
                 cfpType,
-                limits.fold(SiteCoordinateLimitsInput.Create.default(active))(f => f(active)),
+                limits.fold(SiteCoordinateLimitsInput.Create.default(active, buffer))(f => f(active, buffer)),
                 instruments,
                 proprietary,
                 exchange

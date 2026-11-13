@@ -41,7 +41,7 @@ object SubaruCallPropertiesInput:
               Create(
                 subaruType,
                 instruments,
-                limits.fold(CoordinateLimitsInput.Create.default(Site.GN, active))(f => f(Site.GN, active))
+                limits.fold(CoordinateLimitsInput.Create.default(Site.GN, active))(f => f(Site.GN, active, CoordinateLimitsInput.RegularRaBuffer))
               )
 
   case class Edit(
