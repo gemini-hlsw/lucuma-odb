@@ -28,7 +28,6 @@ import lucuma.core.enums.GnirsGrating
 import lucuma.core.enums.GnirsPrism
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.SchedulingMode
-import lucuma.core.enums.ScorpioFpu
 import lucuma.core.enums.SkyBackground
 import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.enums.WaterVapor
@@ -52,6 +51,7 @@ object configurationrequest:
     object DecodingFailures:
       val NoReferenceCoordinates = DecodingFailure("Reference coordinates are undefined.", Nil)
       val NoObservingMode = DecodingFailure("Observing mode is undefined.", Nil)
+      val ScorpioLongSlitUnsupported = DecodingFailure("SCORPIO Long Slit configurations are not supported yet.", Nil)
 
     given Decoder[Conditions] = hc =>
       for
@@ -104,9 +104,6 @@ object configurationrequest:
         grating <- hc.downField("grating").as[GmosNorthGrating]
         fpu     <- hc.downField("fpu").as[GmosNorthIfuFpu]
       yield GmosNorthIfu(grating, fpu)
-
-    val DecodeScorpioLongSlit: Decoder[ScorpioLongSlit] = hc =>
-      hc.downField("fpu").as[ScorpioFpu].map(ScorpioLongSlit(_))
 
     val DecodeGmosSouthIfu: Decoder[GmosSouthIfu] = hc =>
       for
@@ -169,11 +166,12 @@ object configurationrequest:
         case ObservingModeType.GnirsLongSlit      => sub("gnirsLongSlit",      DecodeGnirsLongSlit)
         case ObservingModeType.GnirsIfu           => sub("gnirsIfu",           DecodeGnirsIfu)
         case ObservingModeType.GnirsImaging       => sub("gnirsImaging",       DecodeGnirsImaging)
-        case ObservingModeType.ScorpioLongSlit    => sub("scorpioLongSlit",    DecodeScorpioLongSlit)
         case _: VisitorObservingModeType          => sub("visitor",            DecodeVisitor)
 
         // This mode has no parameters, so the mode alone identifies it.
         case ObservingModeType.Igrins2LongSlit    => Igrins2LongSlit.asRight
+
+        case ObservingModeType.ScorpioLongSlit    => Left(DecodingFailures.ScorpioLongSlitUnsupported)
 
         // Exchange observations are not approved through configuration requests and have no
         // `Configuration.ObservingMode`. `ConfigurationService` relies on this failing.
