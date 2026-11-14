@@ -492,6 +492,8 @@ trait CalibrationObservations {
     val band: Option[ScienceBand]          = matchingProps.flatMap(_.band)
     specPhotoObservation(pid, gid, tid, etm, band, config.toInput)
 
+  // Applied only when a calibration is created: staff edits to a standard
+  // survive a re-sync, but a standard that is replaced starts from these again.
   def roleConstraints(role: CalibrationRole) =
     role match
       case CalibrationRole.SpectroPhotometric => ConstraintSetInput.SpecPhotoCalibration

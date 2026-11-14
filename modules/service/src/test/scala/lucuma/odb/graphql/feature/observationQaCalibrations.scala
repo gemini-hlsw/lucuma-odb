@@ -4,6 +4,7 @@
 package lucuma.odb.graphql
 package feature
 
+import cats.data.Ior
 import cats.effect.IO
 import cats.syntax.either.*
 import io.circe.Json
@@ -35,7 +36,10 @@ class observationQaCalibrations
     yield tel.get
 
   def update(oid: Observation.Id, set: String): IO[Json] =
-    query(staff, s"""
+    query(staff, updateQuery(oid, set))
+
+  def updateQuery(oid: Observation.Id, set: String): String =
+    s"""
       mutation {
         updateObservations(input: {
           SET: { $set }
@@ -44,7 +48,7 @@ class observationQaCalibrations
           observations { id }
         }
       }
-    """)
+    """
 
   def expectStored(oid: Observation.Id, subtitle: Option[String], over: Option[String]): IO[Unit] =
     expect(staff, s"""
@@ -77,6 +81,9 @@ class observationQaCalibrations
   test("an override combined with another field does not reach a generated telluric"):
     for
       tel <- createTelluric
-      _   <- assertIO(update(tel, """qaStateOverride: FAIL, subtitle: "edited""""), json"""{ "updateObservations": { "observations": [] } }""")
+      _   <- expectIor(staff, updateQuery(tel, """qaStateOverride: FAIL, subtitle: "edited""""), Ior.both(
+               List(s"Calibration observation $tel is read-only: it accepts only a staff QA state override or an edit to its science exposure time mode alone."),
+               json"""{ "updateObservations": { "observations": [] } }"""
+             ))
       _   <- expectStored(tel, None, None)
     yield ()

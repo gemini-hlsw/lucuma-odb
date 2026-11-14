@@ -4,12 +4,14 @@
 package lucuma.odb.graphql
 package feature
 
+import cats.data.Ior
 import cats.effect.IO
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.PosLong
 import io.circe.Decoder
 import io.circe.Json
+import io.circe.literal.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.GcalBaselineType
@@ -178,8 +180,8 @@ class calibrations_f2ImagingDaytimeFlat
           }"""
     ).void
 
-  private def updateSubtitleAs(user: User, oid: Observation.Id): IO[List[Json]] =
-    query(
+  private def expectSubtitleRefusedFor(user: User, oid: Observation.Id): IO[Unit] =
+    expectIor(
       user,
       s"""mutation {
             updateObservations(input: {
@@ -188,8 +190,12 @@ class calibrations_f2ImagingDaytimeFlat
             }) {
               observations { id }
             }
-          }"""
-    ).map(_.hcursor.downFields("updateObservations", "observations").as[List[Json]].getOrElse(Nil))
+          }""",
+      Ior.both(
+        List(s"Calibration observation $oid is read-only: staff may override only its QA state."),
+        json"""{ "updateObservations": { "observations": [] } }"""
+      )
+    )
 
   // An F2 imaging science observation after a calibration pass, with its flat.
   private def setup: IO[(Program.Id, Observation.Id, Observation.Id)] =
@@ -274,11 +280,9 @@ class calibrations_f2ImagingDaytimeFlat
   test("neither pi nor staff can edit the daytime flat"):
     for
       (_, _, flat) <- setup
-      byPi         <- updateSubtitleAs(pi, flat)
-      byStaff      <- updateSubtitleAs(staff, flat)
-    yield
-      assertEquals(byPi, Nil)
-      assertEquals(byStaff, Nil)
+      _            <- expectSubtitleRefusedFor(pi, flat)
+      _            <- expectSubtitleRefusedFor(staff, flat)
+    yield ()
 
   test("daytime flat cannot be declined"):
     for
