@@ -11,7 +11,7 @@ import lucuma.core.enums.ObservingModeType
 // requests; they are covered by their own dedicated suites instead.  Daytime
 // calibrations are staff-only and have no target, so no configuration
 // requests either; they too have dedicated suites.  SCORPIO long slit cannot
-// be created yet.
+// be cloned and has no configuration requests yet.
 val UnImplementedModes: Set[ObservingModeType] =
   Set(
     ObservingModeType.DaytimeCalibration,

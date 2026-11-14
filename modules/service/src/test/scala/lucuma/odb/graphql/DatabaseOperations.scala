@@ -1506,7 +1506,16 @@ trait DatabaseOperations { this: OdbSuite =>
 
   private def observingModeObject(observingMode: ObservingModeType): String =
     observingMode match
-      case ObservingModeType.ScorpioLongSlit => ???
+      case ObservingModeType.ScorpioLongSlit =>
+        """{
+          scorpioLongSlit: {
+            fpu: LONG_SLIT_0_54
+            g: { timeAndCount: { time: { seconds: 10.0 }, count: 2, at: { nanometers: 469 } } }
+            r: { timeAndCount: { time: { seconds: 10.0 }, count: 2, at: { nanometers: 622 } } }
+            i: { timeAndCount: { time: { seconds: 20.0 }, count: 1, at: { nanometers: 755 } } }
+            z: { timeAndCount: { time: { seconds: 20.0 }, count: 1, at: { nanometers: 889 } } }
+          }
+        }"""
 
       case _: DaytimeCalibrationObservingModeType =>
         """{

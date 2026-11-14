@@ -431,6 +431,7 @@ trait BaseMapping[F[_]]
   lazy val RightAscensionArcType                   = schema.ref("RightAscensionArc")
   lazy val ScienceBandType                         = schema.ref("ScienceBand")
   lazy val ScorpioFpuType                          = schema.ref("ScorpioFpu")
+  lazy val ScorpioLongSlitType                     = schema.ref("ScorpioLongSlit")
   lazy val ScienceModeType                         = schema.ref("ScienceMode")
   lazy val ScienceProgramReferenceType             = schema.ref("ScienceProgramReference")
   lazy val ScienceRequirementsType                 = schema.ref("ScienceRequirements")

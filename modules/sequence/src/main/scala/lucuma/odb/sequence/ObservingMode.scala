@@ -26,6 +26,7 @@ import lucuma.odb.sequence.gmos.mos.Config.GmosSouth as GmosSouthMos
 import lucuma.odb.sequence.gnirs.imaging.Config as GnirsImaging
 import lucuma.odb.sequence.gnirs.spectroscopy.Config as GnirsSpectroscopy
 import lucuma.odb.sequence.igrins2.longslit.Config as Igrins2LongSlit
+import lucuma.odb.sequence.scorpio.longslit.Config as ScorpioLongSlit
 import lucuma.odb.sequence.syntax.all.hashBytes
 import lucuma.odb.sequence.util.HashBytes
 import lucuma.odb.sequence.visitor.Config as Visitor
@@ -51,6 +52,7 @@ type ObservingMode =
   GnirsImaging       |
   GnirsSpectroscopy  |
   Igrins2LongSlit    |
+  ScorpioLongSlit    |
   Visitor
 
 object ObservingMode:
@@ -72,6 +74,7 @@ object ObservingMode:
   val GnirsImagingName: String       = "GNIRS Imaging"
   val GnirsSpectroscopyName: String  = "GNIRS Spectroscopy"
   val Igrins2LongSlitName: String    = "IGRINS-2 Long Slit"
+  val ScorpioLongSlitName: String    = "SCORPIO Long Slit"
   val VisitorName: String            = "Visitor"
 
   object Instances:
@@ -94,6 +97,7 @@ object ObservingMode:
         case (a: GnirsImaging,       b: GnirsImaging)       => a === b
         case (a: GnirsSpectroscopy,  b: GnirsSpectroscopy)  => a === b
         case (a: Igrins2LongSlit,    b: Igrins2LongSlit)    => a === b
+        case (a: ScorpioLongSlit,    b: ScorpioLongSlit)    => a === b
         case (a: Visitor,            b: Visitor)            => a === b
         case _                                               => false
 
@@ -115,6 +119,7 @@ object ObservingMode:
       case gnm: GnirsImaging       => gnm.hashBytes
       case gns: GnirsSpectroscopy  => gns.hashBytes
       case ig2: Igrins2LongSlit    => ig2.hashBytes
+      case sco: ScorpioLongSlit    => sco.hashBytes
       case vis: Visitor            => vis.hashBytes
 
   object Syntax:
@@ -139,6 +144,7 @@ object ObservingMode:
           case _: GnirsImaging                    => Instrument.Gnirs.some
           case _: GnirsSpectroscopy               => Instrument.Gnirs.some
           case _: Igrins2LongSlit                 => Instrument.Igrins2.some
+          case _: ScorpioLongSlit                 => Instrument.Scorpio.some
           case v: Visitor                         => v.mode.instrument.some
 
       def name: String =
@@ -160,6 +166,7 @@ object ObservingMode:
           case _: GnirsImaging          => GnirsImagingName
           case _: GnirsSpectroscopy     => GnirsSpectroscopyName
           case _: Igrins2LongSlit       => Igrins2LongSlitName
+          case _: ScorpioLongSlit       => ScorpioLongSlitName
           case _: Visitor               => VisitorName
 
       def modeType: ObservingModeType =
@@ -184,6 +191,7 @@ object ObservingMode:
               case _: GnirsFpu.Spectroscopy.Slit => ObservingModeType.GnirsLongSlit
               case _: GnirsFpu.Spectroscopy.Ifu  => ObservingModeType.GnirsIfu
           case _: Igrins2LongSlit           => ObservingModeType.Igrins2LongSlit
+          case _: ScorpioLongSlit           => ObservingModeType.ScorpioLongSlit
           case v: Visitor                   => v.mode
 
       def asDaytimeCalibration: Option[DaytimeCalibration] =
@@ -269,6 +277,11 @@ object ObservingMode:
       def asIgrins2LongSlit: Option[Igrins2LongSlit] =
         m match
           case a: Igrins2LongSlit => a.some
+          case _                  => none
+
+      def asScorpioLongSlit: Option[ScorpioLongSlit] =
+        m match
+          case a: ScorpioLongSlit => a.some
           case _                  => none
 
       def asVisitor: Option[Visitor] =
