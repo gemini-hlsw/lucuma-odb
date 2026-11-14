@@ -20,6 +20,7 @@ import lucuma.odb.format.telescopeConfigs.*
 import lucuma.odb.graphql.input.ScorpioLongSlitInput
 import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.sequence.scorpio.longslit.Config
+import lucuma.odb.syntax.exposureTimeMode.*
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.ScorpioCodecs.*
 import skunk.*
@@ -43,9 +44,23 @@ trait ScorpioLongSlitService[F[_]]:
     which: List[Observation.Id]
   )(using Transaction[F]): F[Unit]
 
+  def update(
+    SET:   ScorpioLongSlitInput.Edit,
+    which: List[Observation.Id]
+  )(using Transaction[F]): F[Result[Unit]]
+
 object ScorpioLongSlitService:
 
-  private type ChannelModes = NonEmptyList[(ScorpioFilter, ExposureTimeMode)]
+  private type ChannelModes = List[(ScorpioFilter, ExposureTimeMode)]
+
+  // Channels read out by one detector controller cannot be exposed differently.
+  private val SharedControllers: List[(ScorpioFilter, ScorpioFilter)] =
+    List(ScorpioFilter.G -> ScorpioFilter.R, ScorpioFilter.I -> ScorpioFilter.Z)
+
+  private def controllerPartner(channel: ScorpioFilter): Option[ScorpioFilter] =
+    SharedControllers.collectFirst:
+      case (`channel`, b) => b
+      case (a, `channel`) => a
 
   private object validateEtms:
 
@@ -56,7 +71,6 @@ object ScorpioLongSlitService:
       failure(s"${ObservingMode.ScorpioLongSlitName} requires time and count exposure time modes.")
         .unlessA(modes.forall((_, etm) => ExposureTimeMode.timeAndCount.getOption(etm).isDefined))
 
-    // Channels read out by one detector controller cannot be exposed differently.
     private def sharedController(modes: ChannelModes, a: ScorpioFilter, b: ScorpioFilter): Result[Unit] =
       def exposure(f: ScorpioFilter) =
         modes
@@ -65,12 +79,12 @@ object ScorpioLongSlitService:
           .map(tc => (tc.time, tc.count.value))
 
       failure(s"The SCORPIO ${a.shortName} and ${b.shortName} channels share a detector controller and must have the same exposure time and count.")
-        .unlessA(exposure(a) === exposure(b))
+        .unlessA((exposure(a), exposure(b)).mapN(_ === _).getOrElse(true))
 
+    // A channel missing from `modes` is not compared with its partner.
     def apply(modes: ChannelModes): Result[Unit] =
       timeAndCount(modes) *>
-        sharedController(modes, ScorpioFilter.G, ScorpioFilter.R) *>
-        sharedController(modes, ScorpioFilter.I, ScorpioFilter.Z)
+        SharedControllers.traverse_((a, b) => sharedController(modes, a, b))
 
   def instantiate[F[_]: {Concurrent as F, Services}]: ScorpioLongSlitService[F] =
 
@@ -98,7 +112,7 @@ object ScorpioLongSlitService:
             for
               r   <- ResultT(exposureTimeModeService.resolve(ObservingMode.ScorpioLongSlitName, none, input.exposureTimeModes, reqEtm, which))
               sci  = r.view.mapValues(_._2).toMap
-              _   <- ResultT.fromResult(sci.values.toList.traverse_(validateEtms.apply))
+              _   <- ResultT.fromResult(sci.values.toList.traverse_(m => validateEtms(m.toList)))
               ids <- ResultT.liftF(exposureTimeModeService.insertResolvedScienceOnly(sci))
               _   <- ResultT.liftF:
                        oids.traverse_ : oid =>
@@ -110,6 +124,30 @@ object ScorpioLongSlitService:
         which: List[Observation.Id]
       )(using Transaction[F]): F[Unit] =
         Statements.delete(which).traverse_(session.exec)
+
+      override def update(
+        SET:   ScorpioLongSlitInput.Edit,
+        which: List[Observation.Id]
+      )(using Transaction[F]): F[Result[Unit]] =
+        val modes = SET.exposureTimeModes
+
+        // A channel edited alone takes its controller partner along.
+        val partners: List[(ScorpioFilter, ExposureTimeMode)] =
+          modes.flatMap: (channel, etm) =>
+            controllerPartner(channel)
+              .filterNot(p => modes.exists(_._1 === p))
+              .tupleRight(etm)
+
+        NonEmptyList
+          .fromList(which)
+          .fold(ResultT.unit[F]): oids =>
+            for
+              _ <- ResultT.fromResult(validateEtms(modes))
+              _ <- ResultT.liftF(Statements.update(SET, oids).traverse_(session.exec))
+              _ <- ResultT.liftF(modes.traverse_((c, etm) => session.exec(Statements.updateEtm(oids, c, etm))))
+              _ <- ResultT.liftF(partners.traverse_((c, etm) => session.exec(Statements.updateExposure(oids, c, etm))))
+            yield ()
+          .value
 
   object Statements:
 
@@ -214,6 +252,67 @@ object ScorpioLongSlitService:
         input.explicitSlitOffsetMode,
         input.formattedTelescopeConfigs
       )
+
+    def update(
+      SET:   ScorpioLongSlitInput.Edit,
+      which: NonEmptyList[Observation.Id]
+    ): Option[AppliedFragment] =
+      val upFpu              = sql"c_fpu               = $scorpio_fpu"
+      val upSlitOffsetMode   = sql"c_slit_offset_mode  = ${slit_offset_mode.opt}"
+      val upTelescopeConfigs = sql"c_telescope_configs = ${text.opt}"
+
+      NonEmptyList
+        .fromList:
+          List(
+            SET.fpu.map(upFpu),
+            SET.explicitSlitOffsetMode.toOptionOption.map(upSlitOffsetMode),
+            SET.formattedTelescopeConfigs.toOptionOption.map(upTelescopeConfigs)
+          ).flatten
+        .map: us =>
+          void"UPDATE t_scorpio_long_slit " |+|
+            void"SET " |+| us.intercalate(void", ") |+| void" " |+|
+            void"WHERE " |+| observationIdIn(which)
+
+    def updateEtm(
+      which:   NonEmptyList[Observation.Id],
+      channel: ScorpioFilter,
+      update:  ExposureTimeMode
+    ): AppliedFragment =
+      sql"""
+        UPDATE t_exposure_time_mode e
+        SET c_exposure_time_mode = $exposure_time_mode_type,
+            c_signal_to_noise    = ${signal_to_noise.opt},
+            c_signal_to_noise_at = $wavelength_pm,
+            c_exposure_time      = ${time_span.opt},
+            c_exposure_count     = ${int4_pos.opt}
+        FROM t_scorpio_long_slit s
+        WHERE s.c_observation_id         = e.c_observation_id
+          AND s.#${etmIdColumn(channel)} = e.c_exposure_time_mode_id
+          AND """.apply(
+        update.modeType,
+        update.signalToNoise,
+        update.at,
+        update.exposureTime,
+        update.frameCount
+      ) |+| observationIdIn(which, "e".some)
+
+    // Copies the exposure time and count, leaving the channel's own wavelength.
+    def updateExposure(
+      which:   NonEmptyList[Observation.Id],
+      channel: ScorpioFilter,
+      update:  ExposureTimeMode
+    ): AppliedFragment =
+      sql"""
+        UPDATE t_exposure_time_mode e
+        SET c_exposure_time  = ${time_span.opt},
+            c_exposure_count = ${int4_pos.opt}
+        FROM t_scorpio_long_slit s
+        WHERE s.c_observation_id         = e.c_observation_id
+          AND s.#${etmIdColumn(channel)} = e.c_exposure_time_mode_id
+          AND """.apply(
+        update.exposureTime,
+        update.frameCount
+      ) |+| observationIdIn(which, "e".some)
 
     def delete(
       which: List[Observation.Id]

@@ -5,6 +5,7 @@ package lucuma.odb.graphql
 package input
 
 import cats.data.NonEmptyList
+import cats.syntax.functor.*
 import cats.syntax.parallel.*
 import grackle.Result
 import lucuma.core.enums.ObservingModeType
@@ -72,6 +73,20 @@ object ScorpioLongSlitInput:
   ):
     def observingModeType: ObservingModeType =
       ObservingModeType.ScorpioLongSlit
+
+    private val stored = explicitTelescopeConfigs.map(storedSlitTelescopeConfigs)
+
+    val explicitSlitOffsetMode = stored.map(_.slitOffsetMode)
+
+    val formattedTelescopeConfigs = stored.map(_.telescopeConfigs)
+
+    def exposureTimeModes: List[(ScorpioFilter, ExposureTimeMode)] =
+      List(
+        g.tupleLeft(ScorpioFilter.G),
+        r.tupleLeft(ScorpioFilter.R),
+        i.tupleLeft(ScorpioFilter.I),
+        z.tupleLeft(ScorpioFilter.Z)
+      ).flatten
 
     def toCreate: Result[Create] =
       Result
