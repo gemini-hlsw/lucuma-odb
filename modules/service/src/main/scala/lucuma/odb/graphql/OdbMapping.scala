@@ -224,6 +224,7 @@ object OdbMapping {
           with Flamingos2StaticMapping[F]
           with Igrins2DynamicMapping[F]
           with Igrins2LongSlitMapping[F]
+          with ScorpioLongSlitMapping[F]
           with GnirsImagingMapping[F]
           with GnirsSpectroscopyMapping[F]
           with ArchiveDuplicationMapping[F]
@@ -510,6 +511,7 @@ object OdbMapping {
                 DatasetQaCountsMapping,
                 GroupElementMapping,
                 Igrins2LongSlitMapping,
+                ScorpioLongSlitMapping,
                 Igrins2StaticMapping,
                 GnirsSpectroscopyAcquisitionMapping,
                 GnirsSpectroscopyMapping,
@@ -739,6 +741,7 @@ object OdbMapping {
                 Flamingos2LongSlitElaborator,
                 Flamingos2MosElaborator,
                 Igrins2LongSlitElaborator,
+                ScorpioLongSlitElaborator,
                 GnirsImagingElaborator,
                 GnirsSpectroscopyElaborator,
                 GhostIfuElaborator,

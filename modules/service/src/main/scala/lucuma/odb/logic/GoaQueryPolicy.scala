@@ -18,6 +18,7 @@ import lucuma.core.geom.gmos.scienceArea as gmosScienceArea
 import lucuma.core.geom.gnirs.scienceArea as gnirsScienceArea
 import lucuma.core.geom.igrins2.scienceArea as igrins2ScienceArea
 import lucuma.core.geom.jts.interpreter.given
+import lucuma.core.geom.scorpio.scienceArea as scorpioScienceArea
 import lucuma.core.geom.visitors.visitorScienceArea
 import lucuma.core.math.Angle
 import lucuma.core.math.Coordinates
@@ -44,6 +45,7 @@ import lucuma.odb.sequence.gmos.mos.Config.GmosSouth as GmosSouthMos
 import lucuma.odb.sequence.gnirs.imaging.Config as GnirsImaging
 import lucuma.odb.sequence.gnirs.spectroscopy.Config as GnirsSpectroscopy
 import lucuma.odb.sequence.igrins2.longslit.Config as Igrins2LongSlit
+import lucuma.odb.sequence.scorpio.longslit.Config as ScorpioLongSlit
 import lucuma.odb.sequence.visitor.Config as Visitor
 
 /**
@@ -171,6 +173,8 @@ object GoaQueryPolicy:
         gnirsScienceArea.shapeAt(pa, off, c.fpu, c.camera, c.prism).toList
       case _: Igrins2LongSlit    =>
         List(igrins2ScienceArea.scienceSlitFOV)
+      case c: ScorpioLongSlit    =>
+        List(scorpioScienceArea.longSlitMode.shapeAt(pa, off, c.fpu))
       case c: Visitor            =>
         List(visitorScienceArea.fov(c.scienceFovDiameter))
 
@@ -199,6 +203,7 @@ object GoaQueryPolicy:
       case _: GnirsImaging       => ScienceMode.Imaging.some
       case _: GnirsSpectroscopy  => ScienceMode.Spectroscopy.some
       case _: Igrins2LongSlit    => ScienceMode.Spectroscopy.some
+      case _: ScorpioLongSlit    => ScienceMode.Spectroscopy.some
       case v: Visitor            =>
         v.mode match
           case VisitorObservingModeType.AlopekeSpeckle

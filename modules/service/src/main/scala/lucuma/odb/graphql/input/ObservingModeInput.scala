@@ -36,6 +36,7 @@ object ObservingModeInput:
     gnirsImaging:       Option[GnirsImagingInput.Create],
     gnirsSpectroscopy:  Option[GnirsSpectroscopyInput.Create],
     igrins2LongSlit:    Option[Igrins2LongSlitInput.Create],
+    scorpioLongSlit:    Option[ScorpioLongSlitInput.Create],
     visitor:            Option[VisitorInput.Create]
   ):
 
@@ -59,6 +60,7 @@ object ObservingModeInput:
         .orElse(gnirsImaging.map(_.observingModeType))
         .orElse(gnirsSpectroscopy.map(_.observingModeType))
         .orElse(igrins2LongSlit.map(_.observingModeType))
+        .orElse(scorpioLongSlit.map(_.observingModeType))
         .orElse(visitor.map(_.mode))
 
     /** The MOS mask attached at creation, if any. */
@@ -104,6 +106,7 @@ object ObservingModeInput:
         gnirsImaging       = None,
         gnirsSpectroscopy  = None,
         igrins2LongSlit    = None,
+        scorpioLongSlit    = None,
         visitor            = None
       )
 
@@ -128,6 +131,7 @@ object ObservingModeInput:
         "gnirsLongSlit"      -> GnirsLongSlitInput.Create.Binding.map(m => Empty.copy(gnirsSpectroscopy = Some(m))),
         "gnirsSpectroscopy"  -> GnirsSpectroscopyInput.Create.Binding.map(m => Empty.copy(gnirsSpectroscopy = Some(m))),
         "igrins2LongSlit"    -> Igrins2LongSlitInput.Create.Binding.map(m => Empty.copy(igrins2LongSlit = Some(m))),
+        "scorpioLongSlit"    -> ScorpioLongSlitInput.Create.Binding.map(m => Empty.copy(scorpioLongSlit = Some(m))),
         "visitor"            -> VisitorInput.CreateBinding.map(m => Empty.copy(visitor = Some(m)))
       )
 
@@ -149,6 +153,7 @@ object ObservingModeInput:
     gnirsImaging:       Option[GnirsImagingInput.Edit],
     gnirsSpectroscopy:  Option[GnirsSpectroscopyInput.Edit],
     igrins2LongSlit:    Option[Igrins2LongSlitInput.Edit],
+    scorpioLongSlit:    Option[ScorpioLongSlitInput.Edit],
     visitor:            Option[VisitorInput.Edit]
   ):
     def updatesAcquisition: Boolean =
@@ -180,7 +185,8 @@ object ObservingModeInput:
         gmosSouthIfu.exists(_.limitToPreExecution(access))       ||
         gnirsImaging.exists(_.limitToPreExecution(access))       ||
         gnirsSpectroscopy.exists(_.limitToPreExecution(access))  ||
-        igrins2LongSlit.isDefined
+        igrins2LongSlit.isDefined                                ||
+        scorpioLongSlit.isDefined
 
     def needsStaffAccess: Boolean =
       daytimeCalibration.isDefined                    ||
@@ -230,6 +236,7 @@ object ObservingModeInput:
         .orElse(gnirsImaging.map(_.observingModeType))
         .orElse(gnirsSpectroscopy.flatMap(_.observingModeType))
         .orElse(igrins2LongSlit.map(_.observingModeType))
+        .orElse(scorpioLongSlit.map(_.observingModeType))
         .orElse(visitor.flatMap(_.mode))
 
     def toCreate: Result[Create] =
@@ -250,6 +257,7 @@ object ObservingModeInput:
        gnirsImaging.traverse(_.toCreate),
        gnirsSpectroscopy.traverse(_.toCreate),
        igrins2LongSlit.traverse(_.toCreate),
+       scorpioLongSlit.traverse(_.toCreate),
        visitor.traverse(_.toCreate)
       ).parMapN(Create.apply)
 
@@ -275,6 +283,7 @@ object ObservingModeInput:
         gnirsImaging       = None,
         gnirsSpectroscopy  = None,
         igrins2LongSlit    = None,
+        scorpioLongSlit    = None,
         visitor            = None
       )
 
@@ -299,5 +308,6 @@ object ObservingModeInput:
         "gnirsLongSlit"      -> GnirsLongSlitInput.Edit.Binding.map(m => Empty.copy(gnirsSpectroscopy = Some(m))),
         "gnirsSpectroscopy"  -> GnirsSpectroscopyInput.Edit.Binding.map(m => Empty.copy(gnirsSpectroscopy = Some(m))),
         "igrins2LongSlit"    -> Igrins2LongSlitInput.Edit.Binding.map(m => Empty.copy(igrins2LongSlit = Some(m))),
+        "scorpioLongSlit"    -> ScorpioLongSlitInput.Edit.Binding.map(m => Empty.copy(scorpioLongSlit = Some(m))),
         "visitor"            -> VisitorInput.EditBinding.map(m => Empty.copy(visitor = Some(m)))
       )

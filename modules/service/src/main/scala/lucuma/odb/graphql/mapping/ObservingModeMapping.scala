@@ -24,6 +24,7 @@ trait ObservingModeMapping[F[_]]
      with GnirsSpectroscopyView[F]
      with Flamingos2MosView[F]
      with Igrins2LongSlitView[F]
+     with ScorpioLongSlitView[F]
      with VisitorTable[F] { this: SkunkMapping[F] =>
 
   lazy val ObservingModeMapping: ObjectMapping =
@@ -49,6 +50,7 @@ trait ObservingModeMapping[F[_]]
       SqlObject("gmosSouthLongSlit",  Join(ObservationView.Id, GmosSouthLongSlitView.Common.ObservationId)),
       SqlObject("gmosSouthMos",       Join(ObservationView.Id, GmosSouthMosView.Common.ObservationId)),
       SqlObject("igrins2LongSlit",    Join(ObservationView.Id, Igrins2LongSlitView.ObservationId)),
+      SqlObject("scorpioLongSlit",    Join(ObservationView.Id, ScorpioLongSlitView.ObservationId)),
       SqlObject("gnirsIfu",           Join(ObservationView.Id, GnirsSpectroscopyView.ObservationId)),
       SqlObject("gnirsLongSlit",      Join(ObservationView.Id, GnirsSpectroscopyView.ObservationId)),
       SqlObject("gnirsSpectroscopy",  Join(ObservationView.Id, GnirsSpectroscopyView.ObservationId)),

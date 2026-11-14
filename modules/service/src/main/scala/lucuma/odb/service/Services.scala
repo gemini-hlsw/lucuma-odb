@@ -207,6 +207,9 @@ trait Services[F[_]]:
   /** The `Igrins2SequenceService` */
   def igrins2SequenceService: Igrins2SequenceService[F]
 
+  /** The `ScorpioLongSlitService`. */
+  def scorpioLongSlitService: ScorpioLongSlitService[F]
+
   /** The `ObsAttachmentAssignmentService`. */
   def obsAttachmentAssignmentService: ObsAttachmentAssignmentService[F]
 
@@ -416,6 +419,7 @@ object Services:
       lazy val archiveDuplicationService = ArchiveDuplicationService.instantiate
       lazy val igrins2LongSlitService = Igrins2LongSlitService.instantiate
       lazy val igrins2SequenceService = Igrins2SequenceService.instantiate
+      lazy val scorpioLongSlitService = ScorpioLongSlitService.instantiate
       lazy val obsAttachmentAssignmentService = ObsAttachmentAssignmentService.instantiate
       lazy val observationService = ObservationService.instantiate
       lazy val observingModeServices = ObservingModeServices.instantiate
@@ -506,6 +510,7 @@ object Services:
     def groupProgressService[F[_]](using Services[F]): GroupProgressService[F] = summon[Services[F]].groupProgressService
     def groupStandingService[F[_]](using Services[F]): GroupStandingService[F] = summon[Services[F]].groupStandingService
     def igrins2LongSlitService[F[_]](using Services[F]): Igrins2LongSlitService[F] = summon[Services[F]].igrins2LongSlitService
+    def scorpioLongSlitService[F[_]](using Services[F]): ScorpioLongSlitService[F] = summon[Services[F]].scorpioLongSlitService
     def igrins2SequenceService[F[_]](using Services[F]): Igrins2SequenceService[F] = summon[Services[F]].igrins2SequenceService
     def obsAttachmentAssignmentService[F[_]](using Services[F]): ObsAttachmentAssignmentService[F] = summon[Services[F]].obsAttachmentAssignmentService
     def observationService[F[_]](using Services[F]): ObservationService[F] = summon[Services[F]].observationService

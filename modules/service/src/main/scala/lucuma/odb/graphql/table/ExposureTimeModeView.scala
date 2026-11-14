@@ -40,3 +40,7 @@ trait ExposureTimeModeView[F[_]] extends BaseMapping[F]:
   object ExposureTimeModeView          extends BaseExposureTimeModeView("v_exposure_time_mode")
   object GhostBlueExposureTimeModeView extends BaseExposureTimeModeView("v_ghost_blue_exposure_time_mode")
   object GhostRedExposureTimeModeView  extends BaseExposureTimeModeView("v_ghost_red_exposure_time_mode")
+  object ScorpioGExposureTimeModeView  extends BaseExposureTimeModeView("v_scorpio_g_exposure_time_mode")
+  object ScorpioRExposureTimeModeView  extends BaseExposureTimeModeView("v_scorpio_r_exposure_time_mode")
+  object ScorpioIExposureTimeModeView  extends BaseExposureTimeModeView("v_scorpio_i_exposure_time_mode")
+  object ScorpioZExposureTimeModeView  extends BaseExposureTimeModeView("v_scorpio_z_exposure_time_mode")

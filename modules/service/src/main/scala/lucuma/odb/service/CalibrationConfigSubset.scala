@@ -45,6 +45,7 @@ import lucuma.odb.sequence.gmos.spectroscopy.Config as SpectroscopyConfig
 import lucuma.odb.sequence.gnirs.imaging.Config as GnirsImagingConfig
 import lucuma.odb.sequence.gnirs.spectroscopy.Config as GnirsSpectroscopyConfig
 import lucuma.odb.sequence.igrins2.longslit.Config as Igrins2Config
+import lucuma.odb.sequence.scorpio.longslit.Config as ScorpioConfig
 import lucuma.odb.sequence.visitor.Config as VisitorConfig
 
 sealed trait CalibrationConfigSubset derives Eq:
@@ -216,6 +217,7 @@ object CalibrationConfigSubset:
         none,
         none,
         none,
+        none,
         none
       )
 
@@ -257,6 +259,7 @@ object CalibrationConfigSubset:
         none,
         none,
         none,
+        none,
         none
       )
 
@@ -287,6 +290,7 @@ object CalibrationConfigSubset:
         none,
         none,
         none,
+        none,
         none
       )
 
@@ -303,6 +307,9 @@ object CalibrationConfigSubset:
 
   case object Igrins2Configs extends CalibrationConfigSubset derives Eq:
     def modeType: ObservingModeType = ObservingModeType.Igrins2LongSlit
+
+  case object ScorpioConfigs extends CalibrationConfigSubset derives Eq:
+    def modeType: ObservingModeType = ObservingModeType.ScorpioLongSlit
 
   extension (mode: ObservingMode)
     def toConfigSubset: CalibrationConfigSubset =
@@ -428,6 +435,9 @@ object CalibrationConfigSubset:
           )
         case _: Igrins2Config =>
           Igrins2Configs
+
+        case _: ScorpioConfig =>
+          ScorpioConfigs
 
         case v: VisitorConfig =>
           VisitorConfigSubset(v)

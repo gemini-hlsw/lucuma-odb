@@ -78,6 +78,7 @@ object CalibrationConfigMatcher:
       case _: Flamingos2ImagingConfigs => Flamingos2Imaging
       case _: GnirsImagingConfigs      => GnirsImaging
       case Igrins2Configs              => Igrins2LongSlit
+      case ScorpioConfigs              => ScorpioLongSlit
       case VisitorConfigSubset(v)      => v.mode
     matchers(modeType, calibRole)
 
