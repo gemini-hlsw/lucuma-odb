@@ -163,8 +163,10 @@ object ObservingModeServices:
               .select(oids)
               .map(_.widen[ObservingMode])
 
-          case (ScorpioLongSlit, _) =>
-            Map.empty[Observation.Id, ObservingMode].pure[F]
+          case (ScorpioLongSlit, oids) =>
+            scorpioLongSlitService
+              .select(oids)
+              .map(_.widen[ObservingMode])
 
           case (Igrins2LongSlit, oids) =>
             igrins2LongSlitService
@@ -215,6 +217,7 @@ object ObservingModeServices:
           input.gmosSouthLongSlit.map(m =>  gmosLongSlitService.insertSouth(m, etm, which)),
           input.gmosSouthMos.map(m =>       gmosMosService.insertSouth(m, etm, which)),
           input.igrins2LongSlit.map(m =>    igrins2LongSlitService.insert(m, etm, which)),
+          input.scorpioLongSlit.map(m =>    scorpioLongSlitService.insert(m, etm, which)),
           input.gnirsImaging.map(m =>       gnirsImagingService.insert(m, etm, which)),
           input.gnirsSpectroscopy.map(m =>  gnirsSpectroscopyService.insert(m, etm, which)),
           input.visitor.map(m => visitorService.insert(m, which)),
@@ -250,7 +253,7 @@ object ObservingModeServices:
             case ObservingModeType.GnirsImaging         => gnirsImagingService.delete(which)
             case ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu => gnirsSpectroscopyService.delete(which)
             case ObservingModeType.Igrins2LongSlit      => igrins2LongSlitService.delete(which)
-            case ObservingModeType.ScorpioLongSlit      => ().pure[F]
+            case ObservingModeType.ScorpioLongSlit      => scorpioLongSlitService.delete(which)
             case _: VisitorObservingModeType            => visitorService.delete(which)
 
         deleteObservingMode *> deleteExposureTimeModes
@@ -275,6 +278,7 @@ object ObservingModeServices:
           input.gmosSouthLongSlit.map(m => gmosLongSlitService.updateSouth(m, which).map(_.success)),
           input.gmosSouthMos.map(m => gmosMosService.updateSouth(m, which)),
           input.igrins2LongSlit.map(m => igrins2LongSlitService.update(m, which)),
+          input.scorpioLongSlit.map(_ => OdbError.InvalidArgument(s"${ObservingMode.ScorpioLongSlitName} observing modes cannot be edited yet.".some).asFailureF[F, Unit]),
           input.gnirsImaging.map(m => gnirsImagingService.update(m, which)),
           input.gnirsSpectroscopy.map(m => gnirsSpectroscopyService.update(m, which)),
           input.visitor.map(m => visitorService.update(m, which).map(_.success))

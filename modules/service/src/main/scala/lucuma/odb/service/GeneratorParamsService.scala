@@ -74,6 +74,7 @@ import lucuma.odb.sequence.gnirs
 import lucuma.odb.sequence.igrins2
 import lucuma.odb.sequence.imaging.ImagingSequence
 import lucuma.odb.sequence.isDayCalibration
+import lucuma.odb.sequence.scorpio
 import lucuma.odb.sequence.visitor
 import lucuma.odb.util.Codecs.*
 import skunk.*
@@ -806,6 +807,24 @@ object GeneratorParamsService {
             val sciMode = InstrumentMode.Igrins2Spectroscopy(ig.scienceExposureTimeMode)
 
             scienceOnlySpectroscopyGeneratorParams(ig, sciMode).asRight
+
+          // SCORPIO has no ITC support yet.
+          case sco: scorpio.longslit.Config =>
+            GeneratorParams(
+              ItcInputDerivation.NotApplicable,
+              obsParams.scienceBand,
+              sco,
+              obsParams.calibrationRole,
+              obsParams.proposalStatus,
+              hasTarget,
+              obsParams.declaredState,
+              obsParams.executionState,
+              obsParams.stepCount,
+              obsParams.schedulingMode.isSplittable,
+              obsParams.altair,
+              obsParams.guideProbe,
+              obsParams.tellurics
+            ).asRight
 
           // Visitor Modes
           case vis: visitor.Config =>

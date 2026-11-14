@@ -6316,6 +6316,11 @@ input ObservingModeInput @oneOf {
   igrins2LongSlit: Igrins2LongSlitInput
 
   """
+  The scorpioLongSlit field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  """
+  scorpioLongSlit: ScorpioLongSlitInput
+
+  """
   A visiting instrument mode. It cannot be unset with a null value.
   """
   visitor: VisitorInput
@@ -17045,6 +17050,100 @@ enum ScorpioFpu {
   LONG_SLIT_4_32
 }
 
+"""
+SCORPIO Long Slit mode.  Only the visible arm is configured, with one exposure
+time mode for each of its channels.
+"""
+type ScorpioLongSlit {
+
+  """
+  The long slit.
+  """
+  fpu: ScorpioFpu!
+
+  """
+  Exposure time mode of the g channel.  Always the same as r, which shares its
+  detector controller.
+  """
+  g: ExposureTimeMode!
+
+  """
+  Exposure time mode of the r channel.  Always the same as g, which shares its
+  detector controller.
+  """
+  r: ExposureTimeMode!
+
+  """
+  Exposure time mode of the i channel.  Always the same as z, which shares its
+  detector controller.
+  """
+  i: ExposureTimeMode!
+
+  """
+  Exposure time mode of the z channel.  Always the same as i, which shares its
+  detector controller.
+  """
+  z: ExposureTimeMode!
+
+  """
+  Effective telescope configs (explicit override coalesced with the default).
+  """
+  telescopeConfigs: SlitTelescopeConfigs!
+
+  """
+  Default telescope configs: four positions along the slit,
+  q = 0, -15, +15, 0 arcsec, all guided.
+  """
+  defaultTelescopeConfigs: SlitTelescopeConfigs!
+
+  """
+  Optional explicitly specified telescope configs. If set they override the
+  default.
+  """
+  explicitTelescopeConfigs: SlitTelescopeConfigs
+
+}
+
+"""
+Edit or create SCORPIO Long Slit configuration.  Each channel exposure time mode
+must be time and count.  A channel that is not specified on create takes the
+exposure time mode of the observation's science requirements.  The g and r
+channels must be equal, and so must i and z.
+"""
+input ScorpioLongSlitInput {
+
+  """
+  The long slit.  Required on create.  It cannot be unset with a null value.
+  """
+  fpu: ScorpioFpu
+
+  """
+  Exposure time mode of the g channel.  It cannot be unset with a null value.
+  """
+  g: ExposureTimeModeInput
+
+  """
+  Exposure time mode of the r channel.  It cannot be unset with a null value.
+  """
+  r: ExposureTimeModeInput
+
+  """
+  Exposure time mode of the i channel.  It cannot be unset with a null value.
+  """
+  i: ExposureTimeModeInput
+
+  """
+  Exposure time mode of the z channel.  It cannot be unset with a null value.
+  """
+  z: ExposureTimeModeInput
+
+  """
+  Explicit telescope configs. May be unset by assigning a null value, or ignored by skipping.
+  """
+  explicitTelescopeConfigs: SlitTelescopeConfigsInput
+
+}
+
 enum GnirsCamera {
   LONG_BLUE
   LONG_RED
@@ -20453,6 +20552,11 @@ type ObservingMode {
   IGRINS-2 Long Slit mode
   """
   igrins2LongSlit: Igrins2LongSlit
+
+  """
+  SCORPIO Long Slit mode
+  """
+  scorpioLongSlit: ScorpioLongSlit
 
   visitor: Visitor
 
