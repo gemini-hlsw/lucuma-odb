@@ -32,12 +32,13 @@ object ScorpioLongSlitInput:
     def observingModeType: ObservingModeType =
       ObservingModeType.ScorpioLongSlit
 
+    // A channel left out takes its controller partner's mode before the requirements'.
     def exposureTimeModes: NonEmptyList[(ScorpioFilter, Option[ExposureTimeMode])] =
       NonEmptyList.of(
-        ScorpioFilter.G -> g,
-        ScorpioFilter.R -> r,
-        ScorpioFilter.I -> i,
-        ScorpioFilter.Z -> z
+        ScorpioFilter.G -> g.orElse(r),
+        ScorpioFilter.R -> r.orElse(g),
+        ScorpioFilter.I -> i.orElse(z),
+        ScorpioFilter.Z -> z.orElse(i)
       )
 
     private val stored = explicitTelescopeConfigs.map(storedSlitTelescopeConfigs)

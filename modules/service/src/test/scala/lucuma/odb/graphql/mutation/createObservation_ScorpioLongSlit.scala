@@ -181,6 +181,71 @@ class createObservation_ScorpioLongSlit extends OdbSuite:
           """.asRight
       )
 
+  test("a channel left out takes the mode of the channel it shares a controller with"):
+    createProgramAs(pi).flatMap: pid =>
+      expect(
+        user  = pi,
+        query = createMutation(
+          pid,
+          scienceRequirementsObject(GhostIfu),
+          s"""
+            fpu: LONG_SLIT_0_54
+            g: ${timeAndCount(10, 2, 469)}
+            z: ${timeAndCount(20, 1, 889)}
+          """,
+          s"observingMode { scorpioLongSlit { g $ChannelQuery r $ChannelQuery i $ChannelQuery z $ChannelQuery } }"
+        ),
+        expected =
+          json"""
+            {
+              "createObservation": {
+                "observation": {
+                  "observingMode": {
+                    "scorpioLongSlit": {
+                      "g": ${channelJson(10, 2, 469)},
+                      "r": ${channelJson(10, 2, 469)},
+                      "i": ${channelJson(20, 1, 889)},
+                      "z": ${channelJson(20, 1, 889)}
+                    }
+                  }
+                }
+              }
+            }
+          """.asRight
+      )
+
+  test("a pair left out entirely still takes the science requirements"):
+    createProgramAs(pi).flatMap: pid =>
+      expect(
+        user  = pi,
+        query = createMutation(
+          pid,
+          scienceRequirementsObject(GhostIfu),
+          s"""
+            fpu: LONG_SLIT_0_54
+            r: ${timeAndCount(10, 2, 622)}
+          """,
+          s"observingMode { scorpioLongSlit { g $ChannelQuery r $ChannelQuery i $ChannelQuery z $ChannelQuery } }"
+        ),
+        expected =
+          json"""
+            {
+              "createObservation": {
+                "observation": {
+                  "observingMode": {
+                    "scorpioLongSlit": {
+                      "g": ${channelJson(10, 2, 622)},
+                      "r": ${channelJson(10, 2, 622)},
+                      "i": ${channelJson(1, 5, 500)},
+                      "z": ${channelJson(1, 5, 500)}
+                    }
+                  }
+                }
+              }
+            }
+          """.asRight
+      )
+
   test("explicit telescope configs override the default"):
     createProgramAs(pi).flatMap: pid =>
       expect(
