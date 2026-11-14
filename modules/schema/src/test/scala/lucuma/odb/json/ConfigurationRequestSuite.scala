@@ -71,6 +71,12 @@ class ConfigurationRequestSuite extends FunSuite:
   test("an exchange mode reports the mode it could not decode"):
     assert(decode("EXCHANGE_KECK").left.exists(_.message.contains("couldn't decode mode: EXCHANGE_KECK")))
 
+  test("SCORPIO long slit is rejected until configuration requests support it"):
+    assert(
+      decode("SCORPIO_LONG_SLIT", "scorpioLongSlit" -> json"""{ "fpu": "LONG_SLIT_0_54" }""")
+        .left.exists(_.message.contains("SCORPIO Long Slit configurations are not supported yet"))
+    )
+
   // A string that is not an `ObservingModeType` at all fails earlier, in the enum decoder.
   test("a mode that is not an observing mode type at all is rejected"):
     assert(decode("NO_SUCH_MODE").left.exists(_.message.contains("NO_SUCH_MODE")))

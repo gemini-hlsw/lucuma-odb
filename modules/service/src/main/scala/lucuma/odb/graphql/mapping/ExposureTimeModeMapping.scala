@@ -113,6 +113,12 @@ trait ExposureTimeModeMapping[F[_]] extends ExposureTimeModeView[F]:
       // IGRINS2
       etmMappings(Igrins2LongSlitType, ExposureTimeModeView),
 
+      // SCORPIO
+      etmMappings(ScorpioLongSlitType, ScorpioGExposureTimeModeView, "g", false),
+      etmMappings(ScorpioLongSlitType, ScorpioRExposureTimeModeView, "r", false),
+      etmMappings(ScorpioLongSlitType, ScorpioIExposureTimeModeView, "i", false),
+      etmMappings(ScorpioLongSlitType, ScorpioZExposureTimeModeView, "z", false),
+
       // Science Requirements
       etmMappings(ScienceRequirementsType, ExposureTimeModeView)
     ).flatten

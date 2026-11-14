@@ -35,6 +35,7 @@ import lucuma.core.enums.GuideProbe
 import lucuma.core.enums.GuideSpeed
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.PortDisposition
+import lucuma.core.enums.ScorpioFilter
 import lucuma.core.enums.Site
 import lucuma.core.enums.TrackType
 import lucuma.core.geom.jts.interpreter.given
@@ -87,6 +88,7 @@ import lucuma.odb.sequence.gnirs
 import lucuma.odb.sequence.igrins2
 import lucuma.odb.sequence.imaging.Variant
 import lucuma.odb.sequence.isDayCalibration
+import lucuma.odb.sequence.scorpio
 import lucuma.odb.sequence.syntax.hash.*
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.sequence.util.HashBytes
@@ -465,6 +467,9 @@ object GuideService {
           (Site.GN, tpe, mode.filter.centralWavelength)
         case _: igrins2.longslit.Config                       =>
           (Site.GN, ObservingModeType.Igrins2LongSlit, Igrins2CentralWavelength)
+        case _: scorpio.longslit.Config                       =>
+          // No guide probe is defined for SCORPIO yet, so the wavelength is not used.
+          (Site.GS, ObservingModeType.ScorpioLongSlit, ScorpioFilter.R.wavelength)
         case visitor.Config(mode, wavelength, _, _, _, _)        =>
           (mode.instrument.site, mode, wavelength)
 
@@ -502,6 +507,7 @@ object GuideService {
         case c: gnirs.imaging.Config           => imagingOffsetDefinition(c.variant)
         case c: gnirs.spectroscopy.Config      => c.telescopeConfigs.hashBytes
         case c: igrins2.longslit.Config        => c.steps.hashBytes
+        case c: scorpio.longslit.Config        => c.steps.hashBytes
         case _: visitor.Config                 => Array.emptyByteArray
 
     // The AOWFS guides only behind Altair; every other probe and mode combination is decided by

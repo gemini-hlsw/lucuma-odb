@@ -270,6 +270,9 @@ object Generator:
       private def unsupportedDaytimeInstrument(ctx: GeneratorContext, inst: Instrument): OdbError =
         GeneratorError.sequenceUnavailable(ctx.oid, s"Daytime calibrations are not supported for ${inst.longName}")
 
+      private def unsupportedScorpio[A](ctx: GeneratorContext): EitherT[F, OdbError, A] =
+        EitherT.leftT(GeneratorError.sequenceUnavailable(ctx.oid, s"Sequences are not supported for ${Instrument.Scorpio.longName}"))
+
       // Dispatches on the daytime calibration's instrument, reading its stored sequence.
       private def daytimeCalibration[A](ctx: GeneratorContext)(
         f: (di: DaytimeInstrument[F]) => StreamingExecutionConfig[F, di.S, di.D] => EitherT[F, OdbError, A]
@@ -383,6 +386,8 @@ object Generator:
         else if ctx.params.isSpecPhotoProposal then EitherT.pure(flatDigest(ctx, SpecPhotoTimeEstimate))
         else
           ctx.params.observingMode.modeType match
+            case ObservingModeType.ScorpioLongSlit =>
+              unsupportedScorpio(ctx)
             case ObservingModeType.Flamingos2Imaging    =>
               EitherT(streaming.selectOrGenerateFlamingos2Imaging(ctx)).flatMap(digest(_, calculator.flamingos2ImagingSetup))
             case ObservingModeType.Flamingos2Mos        =>
@@ -480,6 +485,8 @@ object Generator:
 
         if isUnresolvedTelluric(ctx) || ctx.params.isSpecPhotoProposal then noSequence
         else ctx.params.observingMode.modeType match
+          case ObservingModeType.ScorpioLongSlit =>
+            unsupportedScorpio(ctx)
           case _: ExchangeObservingModeType           => noSequence
           case ObservingModeType.Flamingos2Imaging    => digests(EitherT(streaming.selectOrGenerateFlamingos2Imaging(ctx)))
           case ObservingModeType.Flamingos2LongSlit   => digests(EitherT(streaming.selectOrGenerateFlamingos2LongSlit(ctx)))
@@ -566,6 +573,8 @@ object Generator:
           ctx: GeneratorContext
         )(using Transaction[F]): EitherT[F, OdbError, InstrumentExecutionConfig] =
           ctx.params.observingMode.modeType match
+            case ObservingModeType.ScorpioLongSlit =>
+              unsupportedScorpio(ctx)
 
             case _: ExchangeObservingModeType =>
               EitherT.rightT(InstrumentExecutionConfig.Exchange)
@@ -673,6 +682,8 @@ object Generator:
         def reset(ctx: GeneratorContext, freshAcq: ItcAcquisition)(using Transaction[F]): EitherT[F, OdbError, Unit] =
           val ctxʹ = ctx.copy(itcRes = ctx.itcRes.map(_.copy(acquisition = freshAcq)))
           ctxʹ.params.observingMode.modeType match
+            case ObservingModeType.ScorpioLongSlit =>
+              unsupportedScorpio(ctx)
             case _: ExchangeObservingModeType =>
               EitherT.pure(())
 
@@ -779,6 +790,8 @@ object Generator:
           ctx: GeneratorContext
         )(using Transaction[F]): EitherT[F, OdbError, Unit] =
           ctx.params.observingMode.modeType match
+            case ObservingModeType.ScorpioLongSlit =>
+              unsupportedScorpio(ctx)
 
             case ObservingModeType.Flamingos2Imaging  =>
               EitherT(streaming.generateFlamingos2Imaging(ctx))

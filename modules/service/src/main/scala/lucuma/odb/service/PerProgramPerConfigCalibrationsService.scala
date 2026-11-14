@@ -436,6 +436,7 @@ object PerProgramPerConfigCalibrationsService:
           gnirsImaging       = none,
           gnirsSpectroscopy  = none,
           igrins2LongSlit    = none,
+          scorpioLongSlit    = none,
           visitor            = none
         )
 

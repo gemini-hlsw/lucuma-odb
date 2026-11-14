@@ -51,6 +51,7 @@ object configurationrequest:
     object DecodingFailures:
       val NoReferenceCoordinates = DecodingFailure("Reference coordinates are undefined.", Nil)
       val NoObservingMode = DecodingFailure("Observing mode is undefined.", Nil)
+      val ScorpioLongSlitUnsupported = DecodingFailure("SCORPIO Long Slit configurations are not supported yet.", Nil)
 
     given Decoder[Conditions] = hc =>
       for
@@ -170,6 +171,8 @@ object configurationrequest:
         // This mode has no parameters, so the mode alone identifies it.
         case ObservingModeType.Igrins2LongSlit    => Igrins2LongSlit.asRight
 
+        case ObservingModeType.ScorpioLongSlit    => Left(DecodingFailures.ScorpioLongSlitUnsupported)
+
         // Exchange observations are not approved through configuration requests and have no
         // `Configuration.ObservingMode`. `ConfigurationService` relies on this failing.
         case _: ExchangeObservingModeType | _: DaytimeCalibrationObservingModeType =>
@@ -200,6 +203,7 @@ object configurationrequest:
         "gnirsIfu"           -> Json.Null,
         "gnirsImaging"       -> Json.Null,
         "igrins2LongSlit"    -> Json.Null, // one of these will be replaced below
+        "scorpioLongSlit"    -> Json.Null,
         "visitor"            -> Json.Null,  // one of these will be replaced below
         m match
           case Flamingos2Imaging(filters)            => "flamingos2Imaging"  -> Json.obj("filters" -> filters.asJson)
@@ -218,6 +222,7 @@ object configurationrequest:
           case GnirsIfu(grating, fpu)                => "gnirsIfu"           -> Json.obj("grating" -> grating.asJson, "fpu" -> fpu.asJson)
           case GnirsImaging(camera, filters)         => "gnirsImaging"       -> Json.obj("camera" -> camera.asJson, "filters" -> filters.asJson)
           case Igrins2LongSlit                       => "igrins2LongSlit"    -> Json.obj("ignore" -> Json.Null)
+          case ScorpioLongSlit(fpu)                  => "scorpioLongSlit"    -> Json.obj("fpu" -> fpu.asJson)
           case Visitor(mode, radius)                 => "visitor"            -> Json.obj("mode" -> mode.asJson, "radius" -> radius.asJson)
       )
 

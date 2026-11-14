@@ -40,6 +40,7 @@ import lucuma.core.model.sequence.gmos.arb.ArbStaticConfig
 import lucuma.core.util.arb.ArbGid
 import lucuma.refined.*
 import munit.DisciplineSuite
+import org.scalacheck.Arbitrary
 import org.scalacheck.Cogen
 
 import scala.collection.immutable.SortedSet
@@ -51,7 +52,13 @@ class SequenceSuite extends DisciplineSuite with ArbitraryInstances:
   import ArbDynamicConfig.given
   import ArbGid.given
   import ArbExecutionConfig.given
-  import ArbInstrumentExecutionConfig.given
+
+  // SCORPIO has no sequence codec yet.
+  given Arbitrary[InstrumentExecutionConfig] =
+    Arbitrary:
+      ArbInstrumentExecutionConfig.given_Arbitrary_InstrumentExecutionConfig.arbitrary.filter:
+        case InstrumentExecutionConfig.Scorpio(_) => false
+        case _                                    => true
 
   given Cogen[InstrumentExecutionConfig] = ArbInstrumentExecutionConfig.given_Cogen_InstrumentExecutionConfig
   import ArbExecutionDigest.given
