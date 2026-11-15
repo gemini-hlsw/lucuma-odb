@@ -71,7 +71,7 @@ The FPU of a MOS observation: a physically machined plate carrying many slitlets
 _Avoid_: MDF (that names the file, not the FPU), mask FPU, custom FPU.
 
 **Custom Slit Width**:
-The representative width of the slitlets cut into a Custom Mask, from `GmosCustomSlitWidth`. Always known — it is how the mode is chosen at Phase 0 — and so is required even when the mask itself has not been made. In 1:1 correspondence with the builtin long slit FPU widths, which is what lets a MOS observation be calibrated as a long slit.
+The representative width of the slitlets cut into a Custom Mask, from `GmosCustomSlitWidth`. Always known — it is how the mode is chosen at Phase 0 — and so is required even when the mask itself has not been made. In 1:1 correspondence with the builtin long slit FPU widths, which is what lets a MOS observation be estimated as a long slit and take its spectrophotometric standard through the equivalent long slit.
 
 **Mask Attachment**:
 The uploaded file describing a Custom Mask's actual slitlet layout, an attachment of type `mos_mask`. Optional and absent by default: the mask is usually only designed during Phase 2, from pre-imaging. Its absence is the normal early state of a valid MOS observation, not an error. Carries a Mask Name and a Mask Instrument, and may only be assigned to a MOS observation whose instrument matches it.
@@ -115,8 +115,12 @@ _Avoid_: unsigned or wrapped readings of these fields.
 ### Observing Modes
 
 **MOS (Multi-Object Spectroscopy)**:
-A spectroscopy observing mode that observes many targets at once through a Custom Mask. Classifies as spectroscopy for Mode Class purposes. Distinct from long slit only in its focal plane — it shares long slit's grating, filter, central wavelength and readout, and is calibrated as a long slit.
+A spectroscopy observing mode that observes many targets at once through a Custom Mask. Classifies as spectroscopy for Mode Class purposes. Distinct from long slit only in its focal plane — it shares long slit's grating, filter, central wavelength and readout. On GMOS its spectrophotometric standard is taken as a long slit, but its twilight is a MOS Twilight through the mask itself.
 _Avoid_: multislit and multiple slit (both name the *focal plane*, not the mode), MOS mode.
+
+**MOS Twilight**:
+A system-generated per-program GMOS calibration observation with the `Twilight` calibration role, taken at dusk through a MOS science observation's own Custom Mask, so the slitlets are flat-fielded through the plate that took the science. One per Mask Attachment, Custom Slit Width and spectroscopic setup (grating, filter, central wavelength, binning, read mode, gain, ROI), shared by every MOS observation with both; never shared with long slit science, which keeps its own long slit twilight. A MOS observation without a Mask Attachment gets none. Offsets and wavelength dithers stay at their defaults, steps are unguided, and the position angle is Fixed at the Mask Design Angle. Otherwise it lives like any other twilight: in the program's Calibrations group, at the best Science Band of its science, and removed when no science needs it unless ongoing or completed. GMOS only.
+_Avoid_: mask twilight, MOS flat (the daytime flat is the MOS Mask Flat).
 
 **Pre-Imaging**:
 Imaging taken so a Custom Mask can be designed from it. A property of the *imaging* observation that produces the frames, never of the MOS observation that later consumes the mask.

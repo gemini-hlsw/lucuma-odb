@@ -32,6 +32,9 @@ sealed trait CalibrationConfigMatcher:
    */
   def normalize(config: CalibrationConfigSubset): CalibrationConfigSubset
 
+  /** Whether a science configuration takes this calibration at all. */
+  def applies(config: CalibrationConfigSubset): Boolean = true
+
 object CalibrationConfigMatcher:
   val UnknownConfig: CalibrationConfigMatcher =
     new CalibrationConfigMatcher {
@@ -53,6 +56,10 @@ object CalibrationConfigMatcher:
         SpecphotoGmosIfu
       case (GmosNorthIfu | GmosSouthIfu, CalibrationRole.Twilight)                    =>
         TwilightGmosIfu
+      case (GmosNorthMos | GmosSouthMos, CalibrationRole.SpectroPhotometric)          =>
+        SpecphotoGmosLS
+      case (GmosNorthMos | GmosSouthMos, CalibrationRole.Twilight)                    =>
+        TwilightGmosMos
       case (Flamingos2LongSlit, CalibrationRole.Telluric)                              =>
         Flamingos2LS
       case (Igrins2LongSlit, CalibrationRole.Telluric)                                =>
@@ -71,6 +78,8 @@ object CalibrationConfigMatcher:
       case _: GmosSConfigs             => GmosSouthLongSlit
       case _: GmosNIfuConfigs          => GmosNorthIfu
       case _: GmosSIfuConfigs          => GmosSouthIfu
+      case _: GmosNMosConfigs          => GmosNorthMos
+      case _: GmosSMosConfigs          => GmosSouthMos
       case _: GmosNImagingConfigs      => GmosNorthImaging
       case _: GmosSImagingConfigs      => GmosSouthImaging
       case g: GnirsSpectroscopyConfigs => g.modeType
@@ -93,6 +102,7 @@ object SpecphotoGmosLS extends CalibrationConfigMatcher:
     config match
       case gn: GmosNConfigs => gn.withRoi(GmosRoi.CentralSpectrum)
       case gs: GmosSConfigs => gs.withRoi(GmosRoi.CentralSpectrum)
+      case m: GmosMos       => normalize(m.toLongSlit)
       case other            => other
 
 /**
@@ -128,6 +138,22 @@ object TwilightGmosLS extends CalibrationConfigMatcher:
 
   def normalize(config: CalibrationConfigSubset): CalibrationConfigSubset =
     config
+
+/** A MOS Twilight goes through the science Custom Mask, so a MOS observation without a Mask Attachment takes none. */
+object TwilightGmosMos extends CalibrationConfigMatcher:
+  def extractConfig(mode: ObservingMode): CalibrationConfigSubset =
+    mode.toConfigSubset
+
+  def configsMatch(c1: CalibrationConfigSubset, c2: CalibrationConfigSubset): Boolean =
+    c1 === c2
+
+  def normalize(config: CalibrationConfigSubset): CalibrationConfigSubset =
+    config
+
+  override def applies(config: CalibrationConfigSubset): Boolean =
+    config match
+      case m: GmosMos => m.hasMaskAttachment
+      case _          => true
 
 object Flamingos2LS extends CalibrationConfigMatcher:
   def extractConfig(mode: ObservingMode): CalibrationConfigSubset =

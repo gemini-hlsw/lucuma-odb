@@ -29,6 +29,7 @@ import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.data.GroupTree
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.input.GmosLongSlitInput
+import lucuma.odb.graphql.input.GmosMosInput
 import lucuma.odb.graphql.input.GroupPropertiesInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
 import lucuma.odb.graphql.input.ObservingModeInput
@@ -153,9 +154,10 @@ object PerProgramPerConfigCalibrationsService:
         calibs: List[ObsExtract[CalibrationConfigSubset]]
       ): Map[CalibrationRole, List[CalibrationConfigSubset]] =
         ObsExtract.PerProgramPerConfigCalibrationTypes.map { calibType =>
-          val sciConfigs = uniqueSci.map(config =>
-            CalibrationConfigMatcher.matcherFor(config, calibType).normalize(config)
-          ).distinct
+          val sciConfigs = uniqueSci.flatMap: config =>
+            val matcher = CalibrationConfigMatcher.matcherFor(config, calibType)
+            Option.when(matcher.applies(config))(matcher.normalize(config))
+          .distinct
           val calibConfigs = calibs
             .filter(_.role.contains(calibType))
             .map(_.data)
@@ -179,9 +181,9 @@ object PerProgramPerConfigCalibrationsService:
             gmosSpecPhotObs(pid, gid, tid, props, c).some
           case (Site.GS, CalibrationRole.SpectroPhotometric, c: (GmosSConfigs | GmosSIfuConfigs)) =>
             gmosSpecPhotObs(pid, gid, tid, props, c).some
-          case (Site.GN, CalibrationRole.Twilight, c: (GmosNConfigs | GmosNIfuConfigs))           =>
+          case (Site.GN, CalibrationRole.Twilight, c: (GmosNConfigs | GmosNIfuConfigs | GmosNMosConfigs)) =>
             gmosTwilightObs(pid, gid, tid, props, c).some
-          case (Site.GS, CalibrationRole.Twilight, c: (GmosSConfigs | GmosSIfuConfigs))           =>
+          case (Site.GS, CalibrationRole.Twilight, c: (GmosSConfigs | GmosSIfuConfigs | GmosSMosConfigs)) =>
             gmosTwilightObs(pid, gid, tid, props, c).some
           case _                                                                                    =>
             none
@@ -220,8 +222,8 @@ object PerProgramPerConfigCalibrationsService:
                 oid      <- calibObservation(calibType, site, pid, gid, props, config, tid).sequence
               } yield oid.toList
 
-        val gnoCalibs = newCalibs(Site.GN, gnTgt, configs.collect { case g: (GmosNConfigs | GmosNIfuConfigs) => g })
-        val gsoCalibs = newCalibs(Site.GS, gsTgt, configs.collect { case g: (GmosSConfigs | GmosSIfuConfigs) => g })
+        val gnoCalibs = newCalibs(Site.GN, gnTgt, configs.collect { case g: (GmosNConfigs | GmosNIfuConfigs | GmosNMosConfigs) => g })
+        val gsoCalibs = newCalibs(Site.GS, gsTgt, configs.collect { case g: (GmosSConfigs | GmosSIfuConfigs | GmosSMosConfigs) => g })
 
         (gnoCalibs, gsoCalibs).mapN((_, _).mapN(_ ::: _)).getOrElse(List.empty.pure[F]).flatTap { oids =>
           setCalibRoleAndGroup(oids, calibType).whenA(oids.nonEmpty)
@@ -408,16 +410,21 @@ object PerProgramPerConfigCalibrationsService:
             .collect { case (oid, Some(props)) if props.band.isDefined || props.wavelengthAt.isDefined => (oid, props) }
         excludeOngoingAndCompleted(candidates, _._1)
 
-      // A partial GMOS Long Slit mode edit that touches only the science ETM
-      private def gmosLongSlitScienceEtmEdit(modeType: ObservingModeType, etm: ExposureTimeMode): ObservingModeInput.Edit =
-        val common = GmosLongSlitInput.Edit.Common.AllUndefined.copy(exposureTimeMode = etm.some)
-        val (gn, gs) = modeType match
+      // A partial GMOS Long Slit or MOS mode edit that touches only the science ETM
+      private def gmosScienceEtmEdit(modeType: ObservingModeType, etm: ExposureTimeMode): ObservingModeInput.Edit =
+        val common    = GmosLongSlitInput.Edit.Common.AllUndefined.copy(exposureTimeMode = etm.some)
+        val mosCommon = GmosMosInput.Edit.Common.AllUndefined.copy(exposureTimeMode = etm.some)
+        val (gn, gs, gnm, gsm) = modeType match
           case ObservingModeType.GmosNorthLongSlit =>
-            (GmosLongSlitInput.Edit.North(none, Nullable.Absent, none, common, none).some, none)
+            (GmosLongSlitInput.Edit.North(none, Nullable.Absent, none, common, none).some, none, none, none)
           case ObservingModeType.GmosSouthLongSlit =>
-            (none, GmosLongSlitInput.Edit.South(none, Nullable.Absent, none, common, none).some)
+            (none, GmosLongSlitInput.Edit.South(none, Nullable.Absent, none, common, none).some, none, none)
+          case ObservingModeType.GmosNorthMos      =>
+            (none, none, GmosMosInput.Edit.North(none, Nullable.Absent, none, none, none, mosCommon).some, none)
+          case ObservingModeType.GmosSouthMos      =>
+            (none, none, none, GmosMosInput.Edit.South(none, Nullable.Absent, none, none, none, mosCommon).some)
           case other =>
-            sys.error(s"gmosLongSlitScienceEtmEdit: unexpected observing mode type $other")
+            sys.error(s"gmosScienceEtmEdit: unexpected observing mode type $other")
         ObservingModeInput.Edit(
           daytimeCalibration = none,
           exchange           = none,
@@ -428,11 +435,11 @@ object PerProgramPerConfigCalibrationsService:
           gmosNorthIfu       = none,
           gmosNorthImaging   = none,
           gmosNorthLongSlit  = gn,
-          gmosNorthMos       = none,
+          gmosNorthMos       = gnm,
           gmosSouthIfu       = none,
           gmosSouthImaging   = none,
           gmosSouthLongSlit  = gs,
-          gmosSouthMos       = none,
+          gmosSouthMos       = gsm,
           gnirsImaging       = none,
           gnirsSpectroscopy  = none,
           igrins2LongSlit    = none,
@@ -496,13 +503,19 @@ object PerProgramPerConfigCalibrationsService:
                   Services.asSuperUser:
                     AccessControl.unchecked(
                       ObservationPropertiesInput.Edit.Empty.copy(
-                        observingMode = Nullable.NonNull(gmosLongSlitScienceEtmEdit(modeType, etm))
+                        observingMode = Nullable.NonNull(gmosScienceEtmEdit(modeType, etm))
                       ),
                       selection(sql" AND o.c_observing_mode_type = $observing_mode_type".apply(modeType))
                     )
                 ).void
 
-            requirementUpdate *> modeUpdate(ObservingModeType.GmosNorthLongSlit) *> modeUpdate(ObservingModeType.GmosSouthLongSlit)
+            requirementUpdate *>
+              List(
+                ObservingModeType.GmosNorthLongSlit,
+                ObservingModeType.GmosSouthLongSlit,
+                ObservingModeType.GmosNorthMos,
+                ObservingModeType.GmosSouthMos
+              ).traverse_(modeUpdate)
 
       private def deleteEmptyCalibrationGroup(pid: Program.Id)(using Transaction[F], ServiceAccess): F[Unit] =
         groupService.selectGroups(pid).flatMap:

@@ -66,6 +66,8 @@ import lucuma.odb.sequence.gmos.ifu.Config.GmosNorth as GmosNorthIfu
 import lucuma.odb.sequence.gmos.ifu.Config.GmosSouth as GmosSouthIfu
 import lucuma.odb.sequence.gmos.longslit.Config.GmosNorth as GmosNorthLongSlit
 import lucuma.odb.sequence.gmos.longslit.Config.GmosSouth as GmosSouthLongSlit
+import lucuma.odb.sequence.gmos.mos.Config.GmosNorth as GmosNorthMos
+import lucuma.odb.sequence.gmos.mos.Config.GmosSouth as GmosSouthMos
 import lucuma.odb.sequence.gnirs.spectroscopy.Config as GnirsSpectroscopyConfig
 import lucuma.odb.sequence.igrins2.longslit.Config as Igrins2Config
 import lucuma.odb.service.CalibrationConfigSubset.*
@@ -230,6 +232,8 @@ object ObsExtract:
     case d @ ObsExtract(data = _: GmosSouthLongSlit) => d
     case d @ ObsExtract(data = _: GmosNorthIfu)      => d
     case d @ ObsExtract(data = _: GmosSouthIfu)      => d
+    case d @ ObsExtract(data = _: GmosNorthMos)      => d
+    case d @ ObsExtract(data = _: GmosSouthMos)      => d
 
   def perProgramCalibrationFilter: PartialFunction[ObsExtract[CalibrationConfigSubset], ObsExtract[CalibrationConfigSubset]] =
     case d @ ObsExtract(role = Some(r)) if PerProgramPerConfigCalibrationTypes.exists(_ === r) => d
@@ -549,9 +553,13 @@ trait CalibrationObservations {
     config: CalibrationConfigSubset.Gmos
   ): F[Observation.Id] =
     val band: Option[ScienceBand] = propsForConfig(props, CalibrationRole.Twilight, config).flatMap(_.band)
-    twilightObservation(pid, gid, tid, band, config.centralWavelength, config.toInput)
+    // With no angle given, a MOS observation is created at its Mask Design Angle.
+    val angle: Option[Angle]      = config match
+      case _: CalibrationConfigSubset.GmosMos => none
+      case _                                  => Angle.Angle0.some
+    twilightObservation(pid, gid, tid, band, angle, config.centralWavelength, config.toInput)
 
-  private def twilightObservation[F[_]: Services: MonadThrow: Transaction](pid: Program.Id, gid: Group.Id, tid: Target.Id, band: Option[ScienceBand], cw: Wavelength, obsMode: ObservingModeInput.Create): F[Observation.Id] =
+  private def twilightObservation[F[_]: Services: MonadThrow: Transaction](pid: Program.Id, gid: Group.Id, tid: Target.Id, band: Option[ScienceBand], angle: Option[Angle], cw: Wavelength, obsMode: ObservingModeInput.Create): F[Observation.Id] =
       observationService.createObservation(
         Services.asSuperUser:
           AccessControl.unchecked(
@@ -570,7 +578,7 @@ trait CalibrationObservations {
               constraintSet = roleConstraints(CalibrationRole.Twilight).some,
               group = gid.some,
               posAngleConstraint = PosAngleConstraintInput(
-                mode = PosAngleConstraintMode.Fixed.some, Angle.Angle0.some
+                mode = PosAngleConstraintMode.Fixed.some, angle
               ).some,
               observingMode = obsMode.some,
               scienceRequirements =
@@ -610,6 +618,7 @@ object SpecPhotoExposureTime:
   ): ExposureTimeMode =
     val time = config match
       case _: (CalibrationConfigSubset.GmosNConfigs | CalibrationConfigSubset.GmosSConfigs)       => LongSlit
+      case _: CalibrationConfigSubset.GmosMos                                                     => LongSlit
       case _: (CalibrationConfigSubset.GmosNIfuConfigs | CalibrationConfigSubset.GmosSIfuConfigs) => Ifu
     ExposureTimeMode.TimeAndCountMode(time, Count, wavelengthAt.getOrElse(config.centralWavelength))
 

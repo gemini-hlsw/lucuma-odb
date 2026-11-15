@@ -228,9 +228,9 @@ object CalibrationsService extends CalibrationObservations {
   private object PerProgramSite:
     def unapply(mode: ObservingModeType): Option[Site] =
       mode match
-        case ObservingModeType.GmosNorthLongSlit | ObservingModeType.GmosNorthIfu => Site.GN.some
-        case ObservingModeType.GmosSouthLongSlit | ObservingModeType.GmosSouthIfu => Site.GS.some
-        case _                                                                    => none
+        case ObservingModeType.GmosNorthLongSlit | ObservingModeType.GmosNorthIfu | ObservingModeType.GmosNorthMos => Site.GN.some
+        case ObservingModeType.GmosSouthLongSlit | ObservingModeType.GmosSouthIfu | ObservingModeType.GmosSouthMos => Site.GS.some
+        case _                                                                                                    => none
 
   object Statements {
 

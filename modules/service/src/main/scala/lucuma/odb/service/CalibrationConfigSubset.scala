@@ -14,6 +14,7 @@ import lucuma.core.enums.Flamingos2Fpu
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.GmosBinning
+import lucuma.core.enums.GmosMosAcquisitionType
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosRoi
 import lucuma.core.enums.GmosSouthFilter
@@ -22,12 +23,15 @@ import lucuma.core.enums.GnirsFilter
 import lucuma.core.enums.GnirsPrism
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.math.Wavelength
+import lucuma.core.model.Defined
+import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.odb.graphql.input.Flamingos2LongSlitInput
 import lucuma.odb.graphql.input.GmosIfuInput
 import lucuma.odb.graphql.input.GmosImagingFilterInput
 import lucuma.odb.graphql.input.GmosImagingInput
 import lucuma.odb.graphql.input.GmosLongSlitInput
+import lucuma.odb.graphql.input.GmosMosInput
 import lucuma.odb.graphql.input.ImagingVariantInput
 import lucuma.odb.graphql.input.ObservingModeInput
 import lucuma.odb.sequence.ObservingMode
@@ -141,10 +145,104 @@ object CalibrationConfigSubset:
     def withRoi(roi: GmosRoi): GmosSIfuConfigs =
       GmosSIfuConfigs(input.copy(common = input.common.copy(explicitRoi = roi.some)))
 
+  /**
+   * A MOS Twilight is taken through the science observation's own Custom Mask, so the Mask
+   * Attachment and Custom Slit Width are part of the key. A spectrophotometric standard uses the
+   * equivalent long slit instead.
+   */
+  sealed trait GmosMos extends Gmos:
+    def customMask: GmosFpuMask.Custom
+    def toLongSlit: Gmos
+
+    def hasMaskAttachment: Boolean =
+      customMask.mask match
+        case Defined(_) => true
+        case _          => false
+
+  case class GmosNMosConfigs(input: GmosMosInput.Create.North) extends GmosMos derives Eq:
+    def modeType: ObservingModeType = ObservingModeType.GmosNorthMos
+
+    def centralWavelength: Wavelength =
+      input.common.centralWavelength
+
+    def toInput: ObservingModeInput.Create =
+      ObservingModeInput.Create.Empty.copy(gmosNorthMos = input.some)
+
+    def withRoi(roi: GmosRoi): GmosNMosConfigs =
+      GmosNMosConfigs(input.copy(common = input.common.copy(explicitRoi = roi.some)))
+
+    def customMask: GmosFpuMask.Custom =
+      input.customMask
+
+    def toLongSlit: GmosNConfigs =
+      GmosNConfigs(
+        GmosLongSlitInput.Create.North(
+          grating     = input.grating,
+          filter      = input.filter,
+          fpu         = input.customMask.slitWidth.northFpu,
+          common      = longSlitCommon(input.common),
+          acquisition = none
+        )
+      )
+
+  case class GmosSMosConfigs(input: GmosMosInput.Create.South) extends GmosMos derives Eq:
+    def modeType: ObservingModeType = ObservingModeType.GmosSouthMos
+
+    def centralWavelength: Wavelength =
+      input.common.centralWavelength
+
+    def toInput: ObservingModeInput.Create =
+      ObservingModeInput.Create.Empty.copy(gmosSouthMos = input.some)
+
+    def withRoi(roi: GmosRoi): GmosSMosConfigs =
+      GmosSMosConfigs(input.copy(common = input.common.copy(explicitRoi = roi.some)))
+
+    def customMask: GmosFpuMask.Custom =
+      input.customMask
+
+    def toLongSlit: GmosSConfigs =
+      GmosSConfigs(
+        GmosLongSlitInput.Create.South(
+          grating     = input.grating,
+          filter      = input.filter,
+          fpu         = input.customMask.slitWidth.southFpu,
+          common      = longSlitCommon(input.common),
+          acquisition = none
+        )
+      )
+
   // Every effective value is pinned explicitly so the calibration reads back exactly as written,
   // which is what lets the input double as the matching key.
   private def longSlitCommon(c: SpectroscopyConfig[?, ?, ?]): GmosLongSlitInput.Create.Common =
     GmosLongSlitInput.Create.Common(
+      centralWavelength        = c.centralWavelength,
+      exposureTimeMode         = none,
+      explicitXBin             = c.xBin.some,
+      explicitYBin             = c.yBin.some,
+      explicitAmpReadMode      = c.ampReadMode.some,
+      explicitAmpGain          = c.ampGain.some,
+      explicitRoi              = c.roi.some,
+      explicitλDithers         = none,
+      explicitTelescopeConfigs = none
+    )
+
+  private def longSlitCommon(c: GmosMosInput.Create.Common): GmosLongSlitInput.Create.Common =
+    GmosLongSlitInput.Create.Common(
+      centralWavelength        = c.centralWavelength,
+      exposureTimeMode         = none,
+      explicitXBin             = c.explicitXBin,
+      explicitYBin             = c.explicitYBin,
+      explicitAmpReadMode      = c.explicitAmpReadMode,
+      explicitAmpGain          = c.explicitAmpGain,
+      explicitRoi              = c.explicitRoi,
+      explicitλDithers         = none,
+      explicitTelescopeConfigs = none
+    )
+
+  // Offsets and dithers stay at their defaults: twilight sky is uniform, so
+  // they add nothing and would only split one Twilight into several.
+  private def mosCommon(c: SpectroscopyConfig[?, ?, ?]): GmosMosInput.Create.Common =
+    GmosMosInput.Create.Common(
       centralWavelength        = c.centralWavelength,
       exposureTimeMode         = none,
       explicitXBin             = c.xBin.some,
@@ -371,26 +469,27 @@ object CalibrationConfigSubset:
             )
           )
 
-        // MOS is calibrated as a long slit
         case gnm: MosConfig.GmosNorth =>
-          GmosNConfigs(
-            GmosLongSlitInput.Create.North(
-              grating     = gnm.grating,
-              filter      = gnm.filter,
-              fpu         = gnm.equivalentFpu,
-              common      = longSlitCommon(gnm),
-              acquisition = none
+          GmosNMosConfigs(
+            GmosMosInput.Create.North(
+              grating         = gnm.grating,
+              filter          = gnm.filter,
+              customMask      = gnm.customMask,
+              acquisitionType = GmosMosAcquisitionType.MaskIn,
+              acquisition     = none,
+              common          = mosCommon(gnm)
             )
           )
 
         case gsm: MosConfig.GmosSouth =>
-          GmosSConfigs(
-            GmosLongSlitInput.Create.South(
-              grating     = gsm.grating,
-              filter      = gsm.filter,
-              fpu         = gsm.equivalentFpu,
-              common      = longSlitCommon(gsm),
-              acquisition = none
+          GmosSMosConfigs(
+            GmosMosInput.Create.South(
+              grating         = gsm.grating,
+              filter          = gsm.filter,
+              customMask      = gsm.customMask,
+              acquisitionType = GmosMosAcquisitionType.MaskIn,
+              acquisition     = none,
+              common          = mosCommon(gsm)
             )
           )
 
