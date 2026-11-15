@@ -8,6 +8,9 @@ import cats.effect.IO
 import cats.syntax.all.*
 import lucuma.core.enums.ObservationValidationCode
 import lucuma.core.model.Observation
+import lucuma.core.model.Program
+import lucuma.core.model.Target
+import lucuma.core.model.User
 import lucuma.odb.service.workflow.validator.AltairValidator
 
 /**
@@ -17,7 +20,14 @@ import lucuma.odb.service.workflow.validator.AltairValidator
  * `observation_workflow_gnirs` already establishes has no configuration
  * validations of its own, so any validation seen below comes from Altair.
  */
-class observation_workflow_altair extends ExecutionTestSupportForGnirs:
+class observation_workflow_altair extends ExecutionTestSupportForGnirs
+                                     with GuideEnvironmentSuite:
+
+  // Behind Altair obscalc picks the guide star first, so it needs AOWFS candidates.
+  override val gaiaResponseString: String = GaiaVoTables.altairCandidates
+
+  override def createObservationAs(user: User, pid: Program.Id, tids: List[Target.Id]): IO[Observation.Id] =
+    createGnirsLongSlitObservationAs(user, pid, tids*)
 
   private def centralWavelength(nm: Int): String =
     s"{ centralWavelength: { nanometers: $nm } }"
