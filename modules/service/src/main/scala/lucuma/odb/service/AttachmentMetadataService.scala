@@ -8,11 +8,17 @@ import cats.effect.Concurrent
 import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
+import lucuma.core.enums.AttachmentType
 import lucuma.core.enums.Instrument
 import lucuma.core.model.Attachment
+import lucuma.core.model.Defined
+import lucuma.core.model.MaskDefinition
+import lucuma.core.model.ToBeDefined
 import lucuma.core.model.Observation
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.Nullable
+import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.input.AttachmentPropertiesInput
 import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.service.Services.SuperUserAccess
@@ -40,9 +46,25 @@ trait AttachmentMetadataService [F[_]] {
     instrument:   Instrument,
     which:        List[Observation.Id]
   )(using Transaction[F]): F[Result[Unit]]
+
+  /**
+   * Checks the custom masks of a daytime calibration's sets or steps: each
+   * must name a MOS mask attachment cut for the instrument.  The mask may
+   * belong to any program.
+   */
+  def validateDaytimeMasks(
+    instrument: Instrument,
+    masks:      List[MaskDefinition]
+  )(using Transaction[F]): F[Result[Unit]]
 }
 
 object AttachmentMetadataService {
+
+  val DaytimeMaskRequiredMessage: String =
+    "A daytime calibration through a custom mask must name its MOS mask attachment."
+
+  def daytimeMaskNotFoundMessage(attachmentId: Attachment.Id): String =
+    s"Attachment $attachmentId does not exist or is not of type 'mos_mask'."
 
   def maskInstrumentMismatchMessage(
     maskName:       NonEmptyString,
@@ -85,6 +107,28 @@ object AttachmentMetadataService {
                   Result.unit
           case _                       =>
             Result.unit.pure[F]
+
+      override def validateDaytimeMasks(
+        instrument: Instrument,
+        masks:      List[MaskDefinition]
+      )(using Transaction[F]): F[Result[Unit]] =
+        def invalid(msg: String): Result[Unit] =
+          OdbError.InvalidArgument(msg.some).asFailure
+
+        val ids = masks.collect { case Defined(aid) => aid }.distinct
+
+        if masks.contains(ToBeDefined) then invalid(DaytimeMaskRequiredMessage).pure[F]
+        else NonEmptyList.fromList(ids).fold(Result.unit.pure[F]): nel =>
+          session.execute(Statements.selectMasks(nel))(nel.toList).map: rows =>
+            val found = rows.map((aid, name, inst) => aid -> (name, inst)).toMap
+            nel.traverse_ : aid =>
+              found.get(aid) match
+                case Some((maskName, maskInstrument)) if maskInstrument =!= instrument =>
+                  invalid(maskInstrumentMismatchMessage(maskName, maskInstrument, instrument))
+                case Some(_)                                                          =>
+                  Result.unit
+                case None                                                             =>
+                  invalid(daytimeMaskNotFoundMessage(aid))
     }
 
   object Statements {
@@ -130,6 +174,16 @@ object AttachmentMetadataService {
       """.apply(aid)                                            |+|
       which.map(sql"$observation_id".apply).intercalate(void", ") |+|
       void")"
+
+    // Every mask attachment carries a name and an instrument.
+    def selectMasks(aids: NonEmptyList[Attachment.Id]): Query[List[Attachment.Id], (Attachment.Id, NonEmptyString, Instrument)] =
+      sql"""
+        SELECT c_attachment_id, c_mask_name, c_mask_instrument
+        FROM t_attachment
+        WHERE c_attachment_type = $attachment_type
+          AND c_attachment_id IN (${attachment_id.list(aids.size)})
+      """.query(attachment_id *: MaskNameAndInstrument)
+         .contramap[List[Attachment.Id]](ids => (AttachmentType.MosMask, ids))
 
     def getUpdatedAt(aids: NonEmptyList[Attachment.Id]): Query[List[Attachment.Id], (Attachment.Id, Timestamp)] =
       sql"""

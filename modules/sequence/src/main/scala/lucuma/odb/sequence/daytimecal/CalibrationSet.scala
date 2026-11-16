@@ -7,10 +7,12 @@ import cats.Eq
 import cats.syntax.eq.*
 import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.CalibrationSetType
+import lucuma.core.model.MaskDefinition
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.model.sequence.ghost.GhostDynamicConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig
+import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.core.model.sequence.gnirs.GnirsAcquisitionMirrorMode
 import lucuma.core.model.sequence.gnirs.GnirsDynamicConfig
 import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig
@@ -67,6 +69,14 @@ enum InstrumentSetup:
       case GmosSouth(_)  => lucuma.core.enums.Instrument.GmosSouth
       case Gnirs(_)      => lucuma.core.enums.Instrument.Gnirs
       case Igrins2(_)    => lucuma.core.enums.Instrument.Igrins2
+
+  /** The mask of the setup's custom mask FPU, if it has one. */
+  def customMask: Option[MaskDefinition] =
+    this match
+      case GmosNorth(c)  => c.fpu.collect { case GmosFpuMask.Custom(m, _) => m }
+      case GmosSouth(c)  => c.fpu.collect { case GmosFpuMask.Custom(m, _) => m }
+      case Flamingos2(c) => c.fpu.custom.map(_.mask)
+      case _             => None
 
   /**
    * The set kinds this instrument may be given.  The Flamingos 2, IGRINS-2,
