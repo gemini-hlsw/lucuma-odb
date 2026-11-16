@@ -496,8 +496,9 @@ object GroupProgressEvaluator:
     // The elements completed before an earlier one: either the earlier one is
     // still incomplete or it completed later.  Every element that may count
     // is held to the order, including an ordered group's elements after its
-    // first `required`, which never count.
-    val outOfOrder: List[Element] =
+    // first `required`, which never count.  Lazy, since only an ordered
+    // group needs it.
+    lazy val outOfOrder: List[Element] =
       viable.zipWithIndex.collect:
         case (later, j) if later.completion.exists(tl => viable.take(j).exists(_.completion.forall(_ > tl))) => later
 

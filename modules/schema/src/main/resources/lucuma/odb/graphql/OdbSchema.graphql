@@ -16378,7 +16378,10 @@ type GroupElementId {
 type ObservingNight {
   site: Site!
 
-  "The local date on which the night starts."
+  """
+  The local date on which the night ends.  A night runs from 14:00 local time
+  on the day before to 14:00 on this date.
+  """
   date: Date!
 }
 
