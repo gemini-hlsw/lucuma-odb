@@ -162,6 +162,15 @@ class updateObservations_ScorpioLongSlit extends query.ExecutionTestSupportForGm
         "The SCORPIO i and z channels share a detector controller and must have the same exposure time and count.".asLeft
       )
 
+  test("cannot update to both arms"):
+    createScorpio.flatMap: o =>
+      updateObservation(
+        pi, o,
+        edit("channelSelection: VIS_IR"),
+        ModeQuery,
+        "Argument 'input.SET.observingMode.scorpioLongSlit' is invalid: SCORPIO Long Slit only supports the VIS_ONLY channel selection, not VIS_IR".asLeft
+      )
+
   test("set and clear explicit telescope configs"):
     val g = channelJson(10, 2, 469)
     val r = channelJson(10, 2, 622)

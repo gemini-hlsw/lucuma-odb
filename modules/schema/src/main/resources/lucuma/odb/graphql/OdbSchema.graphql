@@ -17281,6 +17281,15 @@ enum ScorpioFpu {
 }
 
 """
+SCORPIO arms whose channels are used for science in an observation.
+"""
+enum ScorpioChannelSelection {
+  VIS_IR
+  VIS_ONLY
+  IR_ONLY
+}
+
+"""
 SCORPIO Long Slit mode.  Only the visible arm is configured, with one exposure
 time mode for each of its channels.
 """
@@ -17290,6 +17299,11 @@ type ScorpioLongSlit {
   The long slit.
   """
   fpu: ScorpioFpu!
+
+  """
+  The arms used for science.  Only VIS_ONLY is currently supported.
+  """
+  channelSelection: ScorpioChannelSelection!
 
   """
   Exposure time mode of the g channel.  It has the same exposure time and count
@@ -17348,6 +17362,12 @@ input ScorpioLongSlitInput {
   The long slit.  Required on create.  It cannot be unset with a null value.
   """
   fpu: ScorpioFpu
+
+  """
+  The arms used for science.  Only VIS_ONLY is currently supported, and it is
+  the value used when skipped.  It cannot be unset with a null value.
+  """
+  channelSelection: ScorpioChannelSelection
 
   """
   Exposure time mode of the g channel.  It cannot be unset with a null value.

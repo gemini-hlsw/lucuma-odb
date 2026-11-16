@@ -5,10 +5,12 @@ package lucuma.odb.graphql
 package input
 
 import cats.data.NonEmptyList
+import cats.syntax.eq.*
 import cats.syntax.functor.*
 import cats.syntax.parallel.*
 import grackle.Result
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.enums.ScorpioArmSet
 import lucuma.core.enums.ScorpioFilter
 import lucuma.core.enums.ScorpioFpu
 import lucuma.core.model.ExposureTimeMode
@@ -21,6 +23,10 @@ object ScorpioLongSlitInput:
 
   private val MissingFpu: String =
     "A slit (fpu) must be supplied for SCORPIO Long Slit observations"
+
+  private def checkChannelSelection(channelSelection: Option[ScorpioArmSet]): Result[Unit] =
+    channelSelection.filterNot(_ === ScorpioArmSet.VisOnly).fold(Result.unit): a =>
+      Result.failure(s"SCORPIO Long Slit only supports the VIS_ONLY channel selection, not ${a.tag.toUpperCase}")
 
   case class Create(
     fpu:                      ScorpioFpu,
@@ -54,14 +60,17 @@ object ScorpioLongSlitInput:
       ObjectFieldsBinding.rmap:
         case List(
           ScorpioFpuBinding.NonNullable("fpu", rFpu),
+          ScorpioArmSetBinding.NonNullable("channelSelection", rChannelSelection),
           ExposureTimeModeInput.Binding.NonNullable("g", rG),
           ExposureTimeModeInput.Binding.NonNullable("r", rR),
           ExposureTimeModeInput.Binding.NonNullable("i", rI),
           ExposureTimeModeInput.Binding.NonNullable("z", rZ),
           SlitTelescopeConfigsInput.Binding.Option("explicitTelescopeConfigs", rTelescopeConfigs)
         ) =>
-          val rFpuʹ = rFpu.flatMap(Result.fromOption(_, MissingFpu))
-          (rFpuʹ, rG, rR, rI, rZ, rTelescopeConfigs).parMapN(Create.apply)
+          val rFpuʹ    = rFpu.flatMap(Result.fromOption(_, MissingFpu))
+          val rChannelSelectionʹ = rChannelSelection.flatMap(checkChannelSelection)
+          (rFpuʹ, rChannelSelectionʹ, rG, rR, rI, rZ, rTelescopeConfigs).parMapN: (fpu, _, g, r, i, z, tc) =>
+            Create(fpu, g, r, i, z, tc)
 
   case class Edit(
     fpu:                      Option[ScorpioFpu],
@@ -99,10 +108,13 @@ object ScorpioLongSlitInput:
       ObjectFieldsBinding.rmap:
         case List(
           ScorpioFpuBinding.NonNullable("fpu", rFpu),
+          ScorpioArmSetBinding.NonNullable("channelSelection", rChannelSelection),
           ExposureTimeModeInput.Binding.NonNullable("g", rG),
           ExposureTimeModeInput.Binding.NonNullable("r", rR),
           ExposureTimeModeInput.Binding.NonNullable("i", rI),
           ExposureTimeModeInput.Binding.NonNullable("z", rZ),
           SlitTelescopeConfigsInput.Binding.Nullable("explicitTelescopeConfigs", rTelescopeConfigs)
         ) =>
-          (rFpu, rG, rR, rI, rZ, rTelescopeConfigs).parMapN(Edit.apply)
+          val rChannelSelectionʹ = rChannelSelection.flatMap(checkChannelSelection)
+          (rFpu, rChannelSelectionʹ, rG, rR, rI, rZ, rTelescopeConfigs).parMapN: (fpu, _, g, r, i, z, tc) =>
+            Edit(fpu, g, r, i, z, tc)

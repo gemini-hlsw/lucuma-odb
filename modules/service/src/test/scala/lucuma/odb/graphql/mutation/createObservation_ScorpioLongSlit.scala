@@ -304,6 +304,35 @@ class createObservation_ScorpioLongSlit extends OdbSuite:
                  services.scorpioLongSlitService.select(List(oid)).map(_.get(oid))
     yield assertEquals(cfg, Some(Config(ScorpioFpu.LongSlit_0_54, g, r, i, z, Config.DefaultTelescopeConfigs)))
 
+  test("the channel selection is visible only"):
+    createProgramAs(pi).flatMap: pid =>
+      expect(
+        user     = pi,
+        query    = createMutation(
+          pid,
+          scienceRequirementsObject(GhostIfu),
+          "fpu: LONG_SLIT_0_54, channelSelection: VIS_ONLY",
+          "observingMode { scorpioLongSlit { channelSelection } }"
+        ),
+        expected =
+          json"""
+            {
+              "createObservation": {
+                "observation": {
+                  "observingMode": { "scorpioLongSlit": { "channelSelection": "VIS_ONLY" } }
+                }
+              }
+            }
+          """.asRight
+      )
+
+  test("cannot create with an infrared arm"):
+    expectRejected(
+      scienceRequirementsObject(GhostIfu),
+      "fpu: LONG_SLIT_0_54, channelSelection: IR_ONLY",
+      "Argument 'input.SET.observingMode.scorpioLongSlit' is invalid: SCORPIO Long Slit only supports the VIS_ONLY channel selection, not IR_ONLY"
+    )
+
   test("cannot create without a slit"):
     expectRejected(
       scienceRequirementsObject(GhostIfu),
