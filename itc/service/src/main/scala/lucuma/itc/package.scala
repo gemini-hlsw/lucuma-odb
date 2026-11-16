@@ -102,10 +102,12 @@ object Conversions:
 
     // Calculate the wavelengths at where the peaks happen.
     //
-    // Most modes report one S/N series per CCD, and each CCD takes the series at its own
-    // index. Two shapes report several series per CCD, and both order them with the CCD
-    // varying slowest — all of CCD 0's series, then all of CCD 1's — so each CCD takes the
-    // peak over its own contiguous run of them:
+    // Results come in two layouts.
+    //
+    // Most modes put every CCD's series in a single S/N graph, and each CCD takes the series
+    // at its own index. Two shapes report several series per CCD, and both order them with
+    // the CCD varying slowest — all of CCD 0's series, then all of CCD 1's — so each CCD
+    // takes the peak over its own contiguous run of them:
     //   - GNIRS cross-dispersed reports a single CCD with one series per spectral order, so
     //     that run is the whole list and the one CCD aggregates the peak across every order.
     //   - The GMOS two-slit IFU reports a blue and a red slit series per CCD, so each CCD
@@ -113,25 +115,69 @@ object Conversions:
     //     slightly shifted wavelength windows, so the higher of the two is the peak for
     //     that CCD.
     //
-    // Only those two shapes have a surplus of series. Measured against the ocslib jars, this
-    // is every spectroscopy mode that reaches here — recheck it after a jar refresh, since
-    // the counts are upstream behaviour and do change (cross-dispersed gained its
-    // single-exposure series that way):
+    // GHOST and IGRINS-2 instead report one graph group per detector, in CCD order, each
+    // with a single S/N series. There CCD i takes the peak of group i. Pairing by index
+    // within each group instead would match every group to CCD 0, reporting the first arm
+    // twice and dropping the second arm's data and warnings.
     //
-    //   mode                 ccds  series per graph  pairing
-    //   GMOS longslit          3          3          by index
-    //   GMOS one-slit IFU      3          3          by index
-    //   GMOS two-slit IFU      3          6          2 per CCD
-    //   GHOST                  2          1          by index, one group per detector
-    //   IGRINS-2               2          1          by index, one group per detector
-    //   Flamingos 2            1          1          by index
-    //   GNIRS longslit         1          1          by index
-    //   GNIRS cross-dispersed  1          6          6 per CCD, i.e. the whole list
+    // Measured against the ocslib jars, this is every spectroscopy mode that reaches here —
+    // recheck it after a jar refresh, since the counts are upstream behaviour and do change
+    // (cross-dispersed gained its single-exposure series that way):
+    //
+    //   mode                 ccds  S/N graphs  series per graph  pairing
+    //   GMOS longslit          3        1             3          by index
+    //   GMOS one-slit IFU      3        1             3          by index
+    //   GMOS two-slit IFU      3        1             6          2 per CCD
+    //   GHOST                  2        2             1          graph i to CCD i
+    //   IGRINS-2               2        2             1          graph i to CCD i
+    //   Flamingos 2            1        1             1          by index
+    //   GNIRS longslit         1        1             1          by index
+    //   GNIRS cross-dispersed  1        1             6          6 per CCD, i.e. the whole list
+    val s2nGraphs: Chain[ItcGraph] =
+      graphs.flatMap(_.graphs).filter(_.graphType === GraphType.S2NGraph)
+
+    val ccdCount: Int = ccds.length.toInt
+
+    def toCcd(
+      ccd:        ItcRemoteCcd,
+      finalPeak:  Option[(Wavelength, Double)],
+      singlePeak: Option[(Wavelength, Double)]
+    ): Option[ItcCcd] =
+      finalPeak.flatMap: (maxFinalAt, maxFinalValue) =>
+        for
+          single <- SignalToNoise.FromBigDecimalRounding.getOption(ccd.singleSNRatio)
+          total  <- SignalToNoise.FromBigDecimalRounding.getOption(ccd.totalSNRatio)
+        yield ItcCcd(
+          SingleSN(single),
+          singlePeak.map(_._2),
+          TotalSN(total),
+          Some(maxFinalValue),
+          Some(maxFinalAt),
+          singlePeak.map(_._1),
+          ccd.peakPixelFlux,
+          ccd.wellDepth,
+          ccd.ampGain,
+          ccd.warnings
+        )
+
+    // One S/N graph per detector, each with a single final S/N series (GHOST, IGRINS-2).
+    val oneGraphPerCcd: Boolean =
+      ccdCount > 1 &&
+        s2nGraphs.length === ccds.length &&
+        s2nGraphs.forall(_.series.count(_.seriesType === SeriesDataType.FinalS2NData) === 1)
+
     val calculatedCCDs: Chain[ItcCcd] =
-      graphs
-        .flatMap(_.graphs)
-        .filter(_.graphType === GraphType.S2NGraph)
-        .flatMap: graph =>
+      if oneGraphPerCcd then
+        ccds.toChain
+          .zipWith(s2nGraphs): (ccd, graph) =>
+            toCcd(
+              ccd,
+              wavelengthAtMaxSN(graph, SeriesDataType.FinalS2NData).maxByOption(_._2),
+              wavelengthAtMaxSN(graph, SeriesDataType.SingleS2NData).maxByOption(_._2)
+            )
+          .flattenOption
+      else
+        s2nGraphs.flatMap: graph =>
           val finalSN  = wavelengthAtMaxSN(graph, SeriesDataType.FinalS2NData)
           val singleSN = wavelengthAtMaxSN(graph, SeriesDataType.SingleS2NData)
 
@@ -139,8 +185,6 @@ object Conversions:
           // series is taken as one run per CCD only when it divides evenly; a surplus that
           // does not is left to pair by index, since without knowing its layout there is
           // nothing better to do than what we did before.
-          val ccdCount: Int = ccds.length.toInt
-
           def peakFor(series: List[(Wavelength, Double)], i: Int): Option[(Wavelength, Double)] =
             val seriesPerCcd: Int = series.size / ccdCount
             if series.sizeIs > ccdCount && series.size % ccdCount === 0 then
@@ -149,25 +193,7 @@ object Conversions:
 
           ccds.zipWithIndex
             .map: (ccd, i) =>
-              val finalPeak  = peakFor(finalSN, i)
-              val singlePeak = peakFor(singleSN, i)
-
-              finalPeak.flatMap: (maxFinalAt, maxFinalValue) =>
-                for
-                  single <- SignalToNoise.FromBigDecimalRounding.getOption(ccd.singleSNRatio)
-                  total  <- SignalToNoise.FromBigDecimalRounding.getOption(ccd.totalSNRatio)
-                yield ItcCcd(
-                  SingleSN(single),
-                  singlePeak.map(_._2),
-                  TotalSN(total),
-                  Some(maxFinalValue),
-                  Some(maxFinalAt),
-                  singlePeak.map(_._1),
-                  ccd.peakPixelFlux,
-                  ccd.wellDepth,
-                  ccd.ampGain,
-                  ccd.warnings
-                )
+              toCcd(ccd, peakFor(finalSN, i), peakFor(singleSN, i))
             .toChain
             .flattenOption
 

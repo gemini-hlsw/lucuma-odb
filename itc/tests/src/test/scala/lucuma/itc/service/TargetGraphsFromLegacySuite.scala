@@ -14,6 +14,7 @@ import lucuma.itc.GraphType
 import lucuma.itc.ItcGraph
 import lucuma.itc.ItcGraphGroup
 import lucuma.itc.ItcSeries
+import lucuma.itc.ItcWarning
 import lucuma.itc.ItcXAxis
 import lucuma.itc.SeriesDataType
 import lucuma.itc.TargetGraphs
@@ -126,6 +127,53 @@ class TargetGraphsFromLegacySuite extends munit.FunSuite:
     assertEquals(result.ccds.last.maxSingleSNRatio, Some(7.0))
     assertEquals(result.peakFinalSNRatio, TotalSN(SignalToNoise.unsafeFromBigDecimalExact(70.0)))
     assertEquals(result.peakSingleSNRatio, SingleSN(SignalToNoise.unsafeFromBigDecimalExact(7.0)))
+  }
+
+  // GHOST and IGRINS-2 report one graph group per detector, each with its own signal and S/N
+  // graphs holding a single series. Pairing by index within each group used to give every group
+  // CCD 0, so the first arm was reported twice and the second arm's data and warnings were lost.
+  test("one graph group per detector pairs group i with CCD i") {
+    def arm(singlePeak: Double, finalPeak: Double): ItcGraphGroup =
+      ItcGraphGroup(
+        NonEmptyChain.of(
+          ItcGraph(
+            GraphType.SignalGraph,
+            List(
+              ItcSeries
+                .from("Signal",
+                      SeriesDataType.SignalData,
+                      IArray(0.0, 1.0),
+                      ItcXAxis(1000.0, 1001.0, 2)
+                )
+                .get
+            )
+          ),
+          ItcGraph(GraphType.S2NGraph, List(singleSeries(0, singlePeak), finalSeries(0, finalPeak)))
+        )
+      )
+
+    val blue: ItcRemoteCcd =
+      ItcRemoteCcd(9.0, 90.0, 1000.0, 350000.0, 0.56, List(ItcWarning("Blue saturated")))
+    val red: ItcRemoteCcd  =
+      ItcRemoteCcd(9.0, 90.0, 2000.0, 350000.0, 0.52, List(ItcWarning("Red saturated")))
+
+    val result =
+      Conversions.targetGraphsFromLegacy(
+        NonEmptyChain.of(blue, red),
+        NonEmptyChain.of(arm(4.0, 40.0), arm(9.0, 90.0)),
+        at
+      )
+
+    assertEquals(result.ccds.length.toInt, 2)
+    assertEquals(result.ccds.toList.map(_.peakPixelFlux), List(1000.0, 2000.0))
+    assertEquals(result.ccds.toList.map(_.ampGain), List(0.56, 0.52))
+    assertEquals(result.ccds.toList.map(_.warnings),
+                 List(List(ItcWarning("Blue saturated")), List(ItcWarning("Red saturated")))
+    )
+    assertEquals(result.ccds.toList.map(_.maxTotalSNRatio), List(Some(40.0), Some(90.0)))
+    assertEquals(result.ccds.toList.map(_.maxSingleSNRatio), List(Some(4.0), Some(9.0)))
+    assertEquals(result.peakFinalSNRatio, TotalSN(SignalToNoise.unsafeFromBigDecimalExact(90.0)))
+    assertEquals(result.peakSingleSNRatio, SingleSN(SignalToNoise.unsafeFromBigDecimalExact(9.0)))
   }
 
   private def slitSeries(slit: String, tpe: SeriesDataType, peak: Double): ItcSeries =
