@@ -22,13 +22,16 @@ import grackle.syntax.*
 import io.circe.syntax.*
 import lucuma.core.model.Group
 import lucuma.core.model.User
+import lucuma.core.model.group.GroupConstraintWaiver
 import lucuma.core.model.group.GroupProgress
 import lucuma.core.model.sequence.BandedTime
 import lucuma.core.util.CalculatedValue
+import lucuma.core.util.Timestamp
 import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
 import lucuma.odb.graphql.binding.BooleanBinding
 import lucuma.odb.graphql.predicate.Predicates
+import lucuma.odb.graphql.table.GroupConstraintWaiverView
 import lucuma.odb.graphql.table.GroupElementView
 import lucuma.odb.graphql.table.GroupStandingView
 import lucuma.odb.graphql.table.GroupView
@@ -46,7 +49,7 @@ import org.http4s.client.Client
 import Services.Syntax.*
 
 
-trait GroupMapping[F[_]] extends GroupView[F] with ProgramView[F] with GroupElementView[F] with GroupStandingView[F] with KeyValueEffectHandler[F] with Predicates[F]:
+trait GroupMapping[F[_]] extends GroupView[F] with ProgramView[F] with GroupElementView[F] with GroupStandingView[F] with GroupConstraintWaiverView[F] with KeyValueEffectHandler[F] with Predicates[F]:
 
   def itcClient: ItcClient[F]
   def services(using User): Resource[F, Services[F]]
@@ -76,6 +79,7 @@ trait GroupMapping[F[_]] extends GroupView[F] with ProgramView[F] with GroupElem
       EffectField(BandedField,   groupHandler, List("id")),
       EffectField(ProgressField, groupHandler, List("id")),
       SqlObject("standing", Join(GroupView.Id, GroupStandingView.GroupId)),
+      SqlObject("waivers", Join(GroupView.Id, GroupConstraintWaiverView.GroupId)),
 
       SqlField("existence", GroupView.Existence),
       SqlField("system", GroupView.System),
@@ -91,6 +95,25 @@ trait GroupMapping[F[_]] extends GroupView[F] with ProgramView[F] with GroupElem
           FilterOrderByOffsetLimit(
             pred = Some(Predicates.groupElement.existence.includeDeleted(includeDeleted)),
             oss = Some(List(OrderSelection[NonNegShort](GroupElementType / "parentIndex"))),
+            offset = None,
+            limit = None,
+            child = child
+          )
+      }
+
+    // In the order granted.  Waivers granted together are ordered by id, which
+    // is in the order created only among ids of the same length.
+    case (GroupType, "waivers", List(
+      BooleanBinding("includeRevoked", rIncludeRevoked)
+    )) =>
+      Elab.transformChild { child =>
+        rIncludeRevoked.map: includeRevoked =>
+          FilterOrderByOffsetLimit(
+            pred = Option.unless(includeRevoked)(Predicates.groupConstraintWaiver.active.eql(true)),
+            oss = Some(List(
+              OrderSelection[Timestamp](GroupConstraintWaiverType / "grantedAt"),
+              OrderSelection[GroupConstraintWaiver.Id](GroupConstraintWaiverType / "id")
+            )),
             offset = None,
             limit = None,
             child = child

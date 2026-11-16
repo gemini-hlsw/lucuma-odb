@@ -48,6 +48,7 @@ trait Predicates[F[_]] extends BaseMapping[F]:
     val group                           = GroupPredicates(Path.from(GroupType))
     val groupEdit                       = GroupEditPredicates(Path.from(GroupEditType))
     val groupElement                    = GroupElementPredicates(Path.from(GroupElementType))
+    val groupConstraintWaiver           = GroupConstraintWaiverPredicates(Path.from(GroupConstraintWaiverType))
     val createGroupResult               = CreateGroupResultPredicates(Path.from(CreateGroupResultType))
     val linkUserResult                  = LinkUserResultPredicates(Path.from(LinkUserResultType))
     val obscalcUpdate                   = ObscalcUpdatePredicates(Path.from(ObscalcUpdateType))

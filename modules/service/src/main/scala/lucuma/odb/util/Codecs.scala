@@ -34,6 +34,7 @@ import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
 import lucuma.core.model.*
 import lucuma.core.model.IsUserDefinedTelluric
+import lucuma.core.model.group.GroupConstraintWaiver
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.CalibrationDigest
 import lucuma.core.model.sequence.CalibrationEstimate
@@ -571,6 +572,12 @@ trait Codecs extends CoreCodecs {
 
   val group_id: Codec[Group.Id] =
     gid[Group.Id]
+
+  val group_constraint_violation_code: Codec[GroupConstraintViolationCode] =
+    enumerated(Type("e_group_constraint_violation_code"))
+
+  val group_constraint_waiver_id: Codec[GroupConstraintWaiver.Id] =
+    gid[GroupConstraintWaiver.Id]
 
   val group_standing_status: Codec[GroupStandingStatus] =
     enumerated(Type("e_group_standing"))

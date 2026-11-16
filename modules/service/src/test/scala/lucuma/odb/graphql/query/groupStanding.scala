@@ -18,12 +18,14 @@ import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.model.User
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.Timestamp
 import lucuma.odb.graphql.ACursorOps
 import lucuma.odb.util.Codecs.core_timestamp
 import lucuma.odb.util.Codecs.group_id
 import lucuma.odb.util.Codecs.observation_id
+import lucuma.odb.util.Codecs.user_id
 import org.typelevel.log4cats.Logger
 import skunk.Command
 import skunk.codec.boolean.bool
@@ -323,6 +325,45 @@ class groupStanding extends GroupTestSupport:
       assertEquals(c, standingJson("READY", "COMPLETE", Some(g)))
       assertEquals(b, standingJson("PENDING", "COMPLETE", Some(g)))
       assertEquals(a, viable())
+
+  // There is no waiver mutation yet, so these write the table directly.
+  val WaiveOrder: Command[(Group.Id, Observation.Id, User.Id)] =
+    sql"""
+      INSERT INTO t_group_constraint_waiver (c_group_id, c_code, c_element_observation_id, c_granted_by)
+      VALUES ($group_id, 'order', $observation_id, $user_id)
+    """.command
+
+  val RevokeWaivers: Command[Group.Id] =
+    sql"""
+      UPDATE t_group_constraint_waiver
+         SET c_revoked_by = c_granted_by, c_revoked_at = now()
+       WHERE c_group_id = $group_id
+    """.command
+
+  test("granting or revoking a waiver marks the tree"):
+    for
+      p  <- createProgram
+      o1 <- newObservation(p)
+      o2 <- newObservation(p)
+      g  <- group(p, List(o1, o2))
+      _  <- query(pi, s"""mutation { updateGroups(input: { SET: { ordered: true }, WHERE: { id: { EQ: "$g" } } }) { groups { id } } }""")
+      _  <- completeObservation(o2)
+      _  <- refresh
+      u  <- groupStanding(g)
+      _  <- withSession(_.execute(WaiveOrder)((g, o2, pi.id)))
+      wp <- groupStanding(g)
+      _  <- refresh
+      w  <- groupStanding(g)
+      _  <- withSession(_.execute(RevokeWaivers)(g))
+      rp <- groupStanding(g)
+      _  <- refresh
+      r  <- groupStanding(g)
+    yield
+      assertEquals(u,  standingJson("READY", "UNSCHEDULABLE", Some(g)))
+      assertEquals(wp, standingJson("PENDING", "UNSCHEDULABLE", Some(g)))
+      assertEquals(w,  viable())
+      assertEquals(rp, viable("PENDING"))
+      assertEquals(r,  standingJson("READY", "UNSCHEDULABLE", Some(g)))
 
   test("a suspension marks the tree"):
     for

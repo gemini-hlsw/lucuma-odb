@@ -143,6 +143,7 @@ object OdbMapping {
           with AtomRecordSelectResultMapping[F]
           with CalculatedObservationWorkflowMapping[F]
           with GroupStandingMapping[F]
+          with GroupConstraintWaiverMapping[F]
           with CallForProposalsMapping[F]
           with CallsForProposalsSelectResultMapping[F]
           with CatalogInfoMapping[F]
@@ -658,6 +659,7 @@ object OdbMapping {
                 AtomRecordSelectResultMappings,
                 CalculatedObservationWorkflowMappings,
                 GroupStandingMappings,
+                GroupConstraintWaiverMappings,
                 CallForProposalsMappings,
                 CategorizedTimeMappings,
                 ConfigurationMappings,
