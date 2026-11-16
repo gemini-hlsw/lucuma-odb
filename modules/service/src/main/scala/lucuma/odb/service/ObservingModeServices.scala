@@ -4,7 +4,6 @@
 package lucuma.odb.service
 
 import cats.effect.MonadCancelThrow
-import cats.syntax.applicative.*
 import cats.syntax.apply.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
@@ -320,7 +319,7 @@ object ObservingModeServices:
             case ObservingModeType.GnirsImaging         => gnirsImagingService.clone(origOid, newOid, etms)
             case ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu => gnirsSpectroscopyService.clone(origOid, newOid, etms)
             case ObservingModeType.Igrins2LongSlit      => igrins2LongSlitService.clone(origOid, newOid)
-            case ObservingModeType.ScorpioLongSlit      => ().pure[F]
+            case ObservingModeType.ScorpioLongSlit      => scorpioLongSlitService.clone(origOid, newOid, etms)
             case _: VisitorObservingModeType            => visitorService.clone(origOid, newOid)
 
         exposureTimeModeService
