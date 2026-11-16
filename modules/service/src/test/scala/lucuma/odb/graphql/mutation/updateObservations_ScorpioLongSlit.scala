@@ -10,12 +10,8 @@ import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.model.Observation
 import lucuma.core.model.User
-import lucuma.odb.graphql.query.ObservingModeSetupOperations
 
-class updateObservations_ScorpioLongSlit extends OdbSuite with UpdateObservationsOps with ObservingModeSetupOperations:
-
-  val pi: User = TestUsers.Standard.pi(nextId, nextId)
-  override lazy val validUsers: List[User] = List(pi)
+class updateObservations_ScorpioLongSlit extends query.ExecutionTestSupportForGmos with UpdateObservationsOps:
 
   private def timeAndCount(seconds: Int, count: Int, nm: Int): String =
     s"{ timeAndCount: { time: { seconds: $seconds }, count: $count, at: { nanometers: $nm } } }"
@@ -211,3 +207,28 @@ class updateObservations_ScorpioLongSlit extends OdbSuite with UpdateObservation
              "A slit (fpu) must be supplied for SCORPIO Long Slit observations".asLeft
            )
     yield ()
+
+  // SCORPIO has no sequence yet, so it cannot be ongoing itself.  An ongoing
+  // observation of another mode pins the rule: no SCORPIO edit once executing.
+  private val ongoingObservation: IO[Observation.Id] =
+    for
+      p <- createProgramAs(pi)
+      t <- createTargetWithProfileAs(pi, p)
+      o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      v <- recordVisitAs(serviceUser, o)
+      s <- firstAcquisitionStepId(serviceUser, o)
+      _ <- addEndStepEvent(s, v)
+    yield o
+
+  List[(String, User, String)](
+    ("pi",    pi,    "Completed"),
+    ("staff", staff, "Suspended/Completed")
+  ).foreach: (name, user, transitions) =>
+    test(s"$name cannot set a SCORPIO mode on an ongoing observation"):
+      ongoingObservation.flatMap: o =>
+        updateObservation(
+          user, o,
+          s"observingMode: { $ScorpioInput }",
+          ModeQuery,
+          s"Observation $o is ineligible for this operation due to its workflow state (Ongoing with allowed transition to $transitions).".asLeft
+        )
