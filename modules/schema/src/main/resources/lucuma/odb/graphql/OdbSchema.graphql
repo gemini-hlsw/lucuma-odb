@@ -19777,6 +19777,17 @@ type ProgramNoteSelectResult {
 }
 
 """
+The matching MOS mask attachments, limited to a maximum of 1000 entries.
+"""
+type MosMaskSelectResult {
+  "Matching MOS mask attachments up to the return size limit of 1000."
+  matches: [Attachment!]!
+
+  "`true` when there were additional matches that were not returned."
+  hasMore: Boolean!
+}
+
+"""
 The matching program results, limited to a maximum of 1000 entries.
 """
 type ProgramSelectResult {
@@ -20422,6 +20433,28 @@ type Query {
     "Set to true to include deleted values."
     includeDeleted: Boolean! = false
   ): ProgramNoteSelectResult!
+
+  """
+  Selects the first `LIMIT` MOS mask attachments cut for the given instrument,
+  from every program, in attachment id order.  Staff only: other users get no
+  matches.  Use it to choose the mask of a daytime calibration.
+  """
+  mosMasks(
+    "The instrument the masks were cut for: GMOS_NORTH, GMOS_SOUTH or FLAMINGOS2."
+    instrument: Instrument!
+
+    "Filters the selection of masks, for example by `maskName` or `program`."
+    WHERE: WhereAttachment
+
+    "Starts the result set at the given attachment id, or at the next one if it does not exist."
+    OFFSET_AT: AttachmentId
+
+    "Starts the result set after the given attachment id."
+    OFFSET_AFTER: AttachmentId
+
+    "Limits the result to at most this number of matches (but never more than 1000)."
+    LIMIT: NonNegInt
+  ): MosMaskSelectResult!
 
   "Selects the Target-of-Opportunity trigger with the given id, if found and readable."
   tooTrigger(tooTriggerId: TooTriggerId!): TooTrigger

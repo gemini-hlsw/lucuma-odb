@@ -23,6 +23,7 @@ trait AttachmentMapping[F[_]]
       SqlField("fileName", AttachmentTable.FileName),
       SqlField("maskName", AttachmentTable.MaskName),
       SqlJson("mask", AttachmentTable.MaskDefinition),
+      SqlField("maskInstrument", AttachmentTable.MaskInstrument, hidden = true),
       SqlField("description", AttachmentTable.Description),
       SqlField("checked", AttachmentTable.Checked),
       SqlField("fileSize", AttachmentTable.FileSize),

@@ -280,6 +280,7 @@ object OdbMapping {
           with ProgramEditMapping[F]
           with ProgramMapping[F]
           with ProgramNoteMapping[F]
+          with MosMaskSelectResultMapping[F]
           with ProgramNoteSelectResultMapping[F]
           with GroupSelectResultMapping[F]
           with ProgramReferenceMapping[F]
@@ -552,6 +553,7 @@ object OdbMapping {
                 ProgramMapping,
                 ProgramEditMapping,
                 ProgramNoteMapping,
+                MosMaskSelectResultMapping,
                 ProgramNoteSelectResultMapping,
                 GroupSelectResultMapping,
                 ProgramReferenceMapping,

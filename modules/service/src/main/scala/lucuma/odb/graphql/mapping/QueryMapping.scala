@@ -53,6 +53,7 @@ import lucuma.odb.graphql.input.WhereGroup
 import lucuma.odb.graphql.input.WhereImagingConfigOption
 import lucuma.odb.graphql.input.WhereObservation
 import lucuma.odb.graphql.input.WhereProgram
+import lucuma.odb.graphql.input.WhereAttachment
 import lucuma.odb.graphql.input.WhereProgramNote
 import lucuma.odb.graphql.input.WhereProgramUser
 import lucuma.odb.graphql.input.WhereSpectroscopyConfigOption
@@ -106,6 +107,7 @@ trait QueryMapping[F[_]] extends Predicates[F] with UserEnv {
       SqlObject("program"),
       SqlObject("programs"),
       SqlObject("programNote"),
+      SqlObject("mosMasks"),
       SqlObject("programNotes"),
       SqlObject("programUsers"),
       SqlObject("spectroscopyConfigOptions"),
@@ -141,6 +143,7 @@ trait QueryMapping[F[_]] extends Predicates[F] with UserEnv {
       Programs,
       ProgramNote,
       ProgramNotes,
+      MosMasks,
       ProgramUsers,
       SpectroscopyConfigOptions,
       Target,
@@ -812,6 +815,40 @@ trait QueryMapping[F[_]] extends Predicates[F] with UserEnv {
                   ),
                   oss = Some(List(
                     OrderSelection[lucuma.core.model.ProgramNote.Id](ProgramNoteType / "id")
+                  )),
+                  offset = None,
+                  limit = Some(limit + 1), // Select one extra row here.
+                  child = q
+                )
+    }
+
+  private lazy val MosMasks: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
+    val WhereAttachmentBinding = WhereAttachment.binding(Path.from(AttachmentType))
+    {
+      case (QueryType, "mosMasks", List(
+        InstrumentBinding("instrument", rInstrument),
+        WhereAttachmentBinding.Option("WHERE", rWHERE),
+        AttachmentIdBinding.Option("OFFSET_AT", rOFFSET_AT),
+        AttachmentIdBinding.Option("OFFSET_AFTER", rOFFSET_AFTER),
+        NonNegIntBinding.Option("LIMIT", rLIMIT)
+      )) =>
+        withUser:
+          Elab.transformChild: child =>
+            val rOffset: Result[Predicate] = PagingOffset.predicate(Predicates.attachment.id, Result(none), rOFFSET_AT, rOFFSET_AFTER)
+            (rInstrument, rWHERE, rOffset, rLIMIT).parFlatMapN: (instrument, WHERE, offset, LIMIT) =>
+              val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
+              ResultMapping.selectResult(child, limit): q =>
+                FilterOrderByOffsetLimit(
+                  pred = Some(
+                    and(List(
+                      offset,
+                      Predicates.attachment.isMaskFor(instrument),
+                      Predicates.attachment.isListableBy(user),
+                      WHERE.getOrElse(True)
+                    ))
+                  ),
+                  oss = Some(List(
+                    OrderSelection[lucuma.core.model.Attachment.Id](AttachmentType / "id")
                   )),
                   offset = None,
                   limit = Some(limit + 1), // Select one extra row here.

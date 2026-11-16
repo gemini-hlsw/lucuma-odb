@@ -385,6 +385,7 @@ trait BaseMapping[F[_]]
   lazy val ProgramEditType                         = schema.ref("ProgramEdit")
   lazy val ProgramIdType                           = schema.ref("ProgramId")
   lazy val ProgramNoteIdType                       = schema.ref("ProgramNoteId")
+  lazy val MosMaskSelectResultType                 = schema.ref("MosMaskSelectResult")
   lazy val ProgramNoteSelectResultType             = schema.ref("ProgramNoteSelectResult")
   lazy val ProgramNoteType                         = schema.ref("ProgramNote")
   lazy val ProgramReferenceType                    = schema.ref("ProgramReference")
