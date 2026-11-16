@@ -17,16 +17,20 @@ import lucuma.core.model.Program
 import lucuma.core.syntax.string.*
 import lucuma.odb.data.OdbError
 import lucuma.odb.service.AttachmentMetadataService
+import lucuma.odb.service.workflow.validator.DaytimeCalibrationValidator
+import lucuma.odb.util.Codecs.*
+import skunk.syntax.all.*
 
 class daytimeCalibrationSets_mask extends OdbSuite
   with DatabaseOperations
   with DaytimeCalibrationOps
   with MosMaskSupport:
 
-  val pi    = TestUsers.Standard.pi(1, 101)
-  val staff = TestUsers.Standard.staff(3, 103)
+  val pi          = TestUsers.Standard.pi(1, 101)
+  val staff       = TestUsers.Standard.staff(3, 103)
+  val serviceUser = TestUsers.service(4)
 
-  override val validUsers = List(pi, staff)
+  override val validUsers = List(pi, staff, serviceUser)
 
   private def maskFpu(aid: Option[Attachment.Id], slitWidth: String): String =
     s"fpu: { customMask: { slitWidth: $slitWidth${aid.fold("")(a => s", attachmentId: ${a.asJson}")} } }"
@@ -257,3 +261,34 @@ class daytimeCalibrationSets_mask extends OdbSuite
       _   <- expectRejected(replaceQuery(oid, maskStep(None)), AttachmentMetadataService.DaytimeMaskRequiredMessage)
       _   <- expectRejected(replaceQuery(oid, maskStep(Some(bad))), "is designed for GMOS South")
     yield ()
+
+  private def deleteMask(aid: Attachment.Id): IO[Unit] =
+    withSession(_.execute(sql"DELETE FROM t_attachment WHERE c_attachment_id = $attachment_id".command)(aid)).void
+
+  private def workflow(pid: Program.Id, oid: Observation.Id): IO[(String, List[String])] =
+    runObscalcUpdateAs(serviceUser, pid, oid) *>
+      query(staff, workflowQuery(oid)).map: json =>
+        val w = json.hcursor.downFields("observation", "workflow", "value")
+        (
+          w.downField("state").require[String],
+          w.downField("validationErrors").require[List[Json]].flatMap(_.hcursor.downField("messages").require[List[String]])
+        )
+
+  test("a set whose mask was deleted is reported until another mask is chosen"):
+    for
+      sci <- createProgramAs(pi)
+      cal <- createProgramAs(staff)
+      aid <- insertMosMaskAttachment(sci, "gone_ODF.fits", Instrument.GmosNorth)
+      oid <- createDaytimeCalibrationAs(staff, cal)
+      _   <- query(staff, updateQuery(oid, dark(setupFor(Instrument.GmosNorth, Some(aid)))))
+      w0  <- workflow(cal, oid)
+      _   <- deleteMask(aid)
+      w1  <- workflow(cal, oid)
+      aid2 <- insertMosMaskAttachment(sci, "new_ODF.fits", Instrument.GmosNorth)
+      _   <- query(staff, updateQuery(oid, dark(setupFor(Instrument.GmosNorth, Some(aid2)))))
+      w2  <- workflow(cal, oid)
+    yield
+      assertEquals(w0, ("DEFINED", Nil))
+      assertEquals(w1, ("UNDEFINED", List(DaytimeCalibrationValidator.maskMissing)))
+      assertEquals(w2, ("DEFINED", Nil))
+

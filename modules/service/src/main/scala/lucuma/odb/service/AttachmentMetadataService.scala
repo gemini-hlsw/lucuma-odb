@@ -13,8 +13,8 @@ import lucuma.core.enums.Instrument
 import lucuma.core.model.Attachment
 import lucuma.core.model.Defined
 import lucuma.core.model.MaskDefinition
-import lucuma.core.model.ToBeDefined
 import lucuma.core.model.Observation
+import lucuma.core.model.ToBeDefined
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.OdbError
