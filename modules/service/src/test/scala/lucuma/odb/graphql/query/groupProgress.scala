@@ -11,8 +11,8 @@ import io.circe.syntax.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ObservationQaState
 import lucuma.core.enums.ObservationWorkflowState
-import lucuma.core.enums.SlewStage
 import lucuma.core.enums.Site
+import lucuma.core.enums.SlewStage
 import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.model.Group
 import lucuma.core.model.LocalObservingNight

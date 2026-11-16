@@ -1151,6 +1151,42 @@ class GroupProgressEvaluatorSuite extends FunSuite:
     // The window no longer ends with the night.
     assertEquals(summary(p).window.map(_.end), Some(Timestamp.Max))
 
+  test("waivers: a night in progress that waiving the minimum interval makes up is still waited on, with both waived"):
+    // The second observation started too soon, so with the minimum interval as
+    // written the night can't be made up.  Waiving that interval lets it
+    // complete tonight, so the night's shortfall is no longer a violation and
+    // its waiver has no effect: the night still ends the window.
+    val g   = branch(1, List(done(1, t0), leaf(2, ExecutionState.Ongoing, start = Some(t0 +| minutes(10))), leaf(3)), minI = Some(hours(20)), minN = Some(2))
+    val now = t0 +| minutes(20)
+    val wi  = waiver(Violation.Waivable.MinimumInterval(oid(1).asRight))
+    val wn  = waiver(Violation.Waivable.ObservationsPerNightMinimum(nightAt(t0)))
+    assertEquals(full(g, now).located, List(Violation.Waivable.MinimumInterval(oid(1).asRight), Violation.Waivable.ObservationsPerNightMinimum(nightAt(t0))))
+    val p = full(g, now, List(wi, wn))
+    assertEquals(p.status, GroupStatus.Ongoing)
+    assertEquals(p.waived, List(wi))
+    assertEquals(summary(p).window, Some(TimestampInterval.between(t0, ts("2026-10-17T00:00:00Z")))) // 14:00 HST
+    assertEquals(p, full(g, now, List(wi)))
+
+  test("waivers: once a night's shortfall is waived, the extra it needed isn't held to the minimum interval"):
+    // The group has the one completion it needs, but its night needs an extra,
+    // which started too soon.
+    val g   = branch(1, List(done(1, t0), leaf(2, ExecutionState.Ongoing, start = Some(t0 +| minutes(10))), leaf(3)), min = Some(1), minI = Some(hours(20)), minN = Some(2))
+    val now = t0 +| minutes(20)
+    val wi  = waiver(Violation.Waivable.MinimumInterval(oid(1).asRight))
+    val wn  = waiver(Violation.Waivable.ObservationsPerNightMinimum(nightAt(t0)))
+    assertEquals(full(g, now).located, List(Violation.Waivable.MinimumInterval(oid(1).asRight), Violation.Waivable.ObservationsPerNightMinimum(nightAt(t0))))
+    // Accepting the short night completes the group, and the extra no longer
+    // matters.
+    val p = full(g, now, List(wn))
+    assertEquals(summary(p), complete(1, 1))
+    assertEquals(p.waived, List(wn))
+    // Waiving the interval as well lets the extra make up the night, which is
+    // then waited on.
+    val q = full(g, now, List(wi, wn))
+    assertEquals(q.status, GroupStatus.Ongoing)
+    assertEquals(q.waived, List(wi))
+    assertEquals(summary(q).window, Some(TimestampInterval.between(t0, ts("2026-10-17T00:00:00Z"))))
+
   test("waivers: a waived night over the per-night maximum no longer counts"):
     val g = branch(1, List(done(1, t0), done(2, t0 +| hours(1)), done(3, t0 +| hours(2))), maxN = Some(2))
     assertEquals(full(g, t0 +| hours(3)).located, List(Violation.Waivable.ObservationsPerNightMaximum(nightAt(t0))))

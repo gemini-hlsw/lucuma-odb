@@ -326,12 +326,16 @@ object GroupProgressEvaluator:
     val multipleSites: Boolean =
       allSites.size > 1
 
+    // The night in progress is short of the minimum.
+    val openNightBelowMinimum: Boolean =
+      openNight.isDefined && openCount < min
+
     // The night in progress is short of the minimum, and so must take more,
     // unless a waiver accepts its shortfall, which it does only once the
     // shortfall is a violation (with `nextStart` as for `minimumViolations`).
     def openNightShort(nextStart: Option[Timestamp]): Boolean =
-      openNight.exists: (n, _) =>
-        openCount < min && !site.exists: s =>
+      openNightBelowMinimum && !openNight.exists: (n, _) =>
+        site.exists: s =>
           val night = n.atSite(s)
           minimumWaived(night) && minimumViolations(nextStart).contains(night)
 
@@ -534,28 +538,44 @@ object GroupProgressEvaluator:
     // A waiver takes effect only when the violation it names is found, so
     // that `waived` (below) lists every waiver that shaped the progress.  The
     // waivers of intervals measured from the last completion, and of a short
-    // night in progress, also lift those limits on the next window, so they
-    // are checked against the violations as the constraints are written.
-
-    // A night in progress short of the per-night minimum, which must take an
-    // extra even though the group has enough completions, unless a waiver
-    // accepts its shortfall.
-    val nightShort: Boolean =
-      perNight.exists(_.openNightShort(last.map((t, _) => minInterval.fold(t)(t +| _))))
+    // night in progress, also lift those limits on the next window.
 
     // The elements still to observe that the intervals check: those that
     // count toward the group, or once it has enough, any that could be the
-    // extra a short night in progress needs.
-    val unpaced: List[Element] =
+    // extra a short night in progress needs (`short`).
+    def unpaced(short: Boolean): List[Element] =
       if !countMet then remaining
-      else if nightShort then viable.filter(_.isRemaining)
+      else if short then viable.filter(_.isRemaining)
       else Nil
 
-    // An element still to do started too soon after the last completion, and
-    // the maximum interval since it has passed while the group still needs
-    // more: the violations of the intervals measured from the last completion.
+    // An element still to do started too soon after the last completion: the
+    // violation of the minimum interval measured from it.
+    def minimumAfterLastFor(short: Boolean): Option[GroupConstraintViolation] =
+      last.collect { case (t, e) if unpaced(short).exists(startedTooSoon(t, _)) => MinimumInterval(e.id) }
+
+    // The earliest the next element may start, per the minimum interval,
+    // lifted when its violation after the last completion is waived.
+    def nextStartFor(afterLast: Option[GroupConstraintViolation]): Option[Timestamp] =
+      last.map((t, _) => minInterval.filterNot(_ => afterLast.exists(isWaived)).fold(t)(t +| _))
+
+    // A night in progress short of the per-night minimum must take an extra
+    // even though the group has enough completions, unless a waiver accepts
+    // its shortfall.  The waiver applies only if the shortfall is a violation
+    // with the minimum interval as it applies to that extra, which is the
+    // interval the violations (below) are found with.  Once the shortfall is
+    // accepted no extra is needed, and the interval no longer checks one; it
+    // is then no shorter, so the shortfall is still a violation.
+    val nightShortBeforeWaivers: Boolean =
+      perNight.exists(_.openNightBelowMinimum)
+
+    val nightShort: Boolean =
+      perNight.exists(_.openNightShort(nextStartFor(minimumAfterLastFor(nightShortBeforeWaivers))))
+
+    // The violations of the intervals measured from the last completion: an
+    // element still to do started too soon after it, and the maximum interval
+    // since it has passed while the group still needs more.
     val minimumAfterLast: Option[GroupConstraintViolation] =
-      last.collect { case (t, e) if unpaced.exists(startedTooSoon(t, _)) => MinimumInterval(e.id) }
+      minimumAfterLastFor(nightShort)
 
     val maximumAfterLast: Option[GroupConstraintViolation] =
       for
@@ -564,15 +584,12 @@ object GroupProgressEvaluator:
         if (!countMet || nightShort) && now > (t +| max)
       yield MaximumInterval(e.id)
 
-    val lastMinimum: Option[TimeSpan] =
-      minInterval.filterNot(_ => minimumAfterLast.exists(isWaived))
-
     val lastMaximum: Option[TimeSpan] =
       maxInterval.filterNot(_ => maximumAfterLast.exists(isWaived))
 
     // The earliest the next element may start, per the minimum interval.
     val nextStart: Option[Timestamp] =
-      last.map((t, _) => lastMinimum.fold(t)(t +| _))
+      nextStartFor(minimumAfterLast)
 
     // The completions' nights, in the order they fall (by date, which
     // ObservingNight's own order puts after the site).  Nights at different
