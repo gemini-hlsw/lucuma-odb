@@ -74,18 +74,6 @@ ThisBuild / libraryDependencySchemes ++= Seq(
   "org.tpolecat" %% "skunk-circe" % VersionScheme.Always
 )
 
-// ---------------------------------------------------------------------------
-// TEMPORARY: clue 0.60 vs. lucuma-graphql-routes
-//
-// lucuma-core 0.254.0 brings clue 0.60.0, while lucuma-graphql-routes 0.16.0
-// still declares clue-model 0.59.0, which early-semver treats as breaking.
-// clue-model is unchanged between the two releases (only clue-core and
-// clue-http4s changed), so it is safe.  Remove once graphql-routes publishes
-// against clue 0.60.
-// ---------------------------------------------------------------------------
-ThisBuild / libraryDependencySchemes +=
-  "edu.gemini" %% "clue-model" % VersionScheme.Always
-
 ThisBuild / tlBaseVersion      := "0.112"
 ThisBuild / scalaVersion       := "3.9.0"
 ThisBuild / crossScalaVersions := Seq("3.9.0")
@@ -177,16 +165,6 @@ ThisBuild / githubWorkflowBuildPreamble ++= Seq(
   prebuildTestDbImage("lucuma-sso-test-db", "modules/sso-service/src"),
   prebuildTestDbImage("lucuma-resource-test-db", "resource/service/src")
 )
-
-
-// Temporary disable to ignore the change from v119 to V119
-//ThisBuild / githubWorkflowBuildPreamble +=
-//  WorkflowStep.Use(
-//    UseRef.Public("gemini-hlsw", "migration-validator-action", "main"),
-//    name = Some("Validate Migrations"),
-//    params = Map("path" -> "modules/service/src/main/resources/db/migration/"),
-//    cond = Some("github.event_name == 'pull_request'  && matrix.shard == '1'")
-//  )
 
 val nTestJobShards = 8
 
