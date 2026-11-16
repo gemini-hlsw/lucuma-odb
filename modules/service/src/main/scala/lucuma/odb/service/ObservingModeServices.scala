@@ -278,7 +278,7 @@ object ObservingModeServices:
           input.gmosSouthLongSlit.map(m => gmosLongSlitService.updateSouth(m, which).map(_.success)),
           input.gmosSouthMos.map(m => gmosMosService.updateSouth(m, which)),
           input.igrins2LongSlit.map(m => igrins2LongSlitService.update(m, which)),
-          input.scorpioLongSlit.map(_ => OdbError.InvalidArgument(s"${ObservingMode.ScorpioLongSlitName} observing modes cannot be edited yet.".some).asFailureF[F, Unit]),
+          input.scorpioLongSlit.map(m => scorpioLongSlitService.update(m, which)),
           input.gnirsImaging.map(m => gnirsImagingService.update(m, which)),
           input.gnirsSpectroscopy.map(m => gnirsSpectroscopyService.update(m, which)),
           input.visitor.map(m => visitorService.update(m, which).map(_.success))
