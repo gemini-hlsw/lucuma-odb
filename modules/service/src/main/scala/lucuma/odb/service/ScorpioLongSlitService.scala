@@ -25,6 +25,7 @@ import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.ScorpioCodecs.*
 import skunk.*
 import skunk.codec.text.text
+import skunk.data.Completion
 import skunk.implicits.*
 
 import Services.Syntax.*
@@ -48,6 +49,12 @@ trait ScorpioLongSlitService[F[_]]:
     SET:   ScorpioLongSlitInput.Edit,
     which: List[Observation.Id]
   )(using Transaction[F]): F[Result[Unit]]
+
+  def clone(
+    originalId: Observation.Id,
+    newId:      Observation.Id,
+    etms:       List[(ExposureTimeModeId, ExposureTimeModeId)]
+  )(using Transaction[F]): F[Unit]
 
 object ScorpioLongSlitService:
 
@@ -148,6 +155,19 @@ object ScorpioLongSlitService:
               _ <- ResultT.liftF(partners.traverse_((c, etm) => session.exec(Statements.updateExposure(oids, c, etm))))
             yield ()
           .value
+
+      override def clone(
+        originalId: Observation.Id,
+        newId:      Observation.Id,
+        etms:       List[(ExposureTimeModeId, ExposureTimeModeId)]
+      )(using Transaction[F]): F[Unit] =
+        session
+          .executeCommand(Statements.clone(originalId, newId, etms))
+          .flatMap:
+            case Completion.Insert(1) =>
+              F.unit
+            case _                    =>
+              F.raiseError(new RuntimeException(s"Could not clone ${ObservingMode.ScorpioLongSlitName} observing mode $originalId, $newId"))
 
   object Statements:
 
@@ -313,6 +333,47 @@ object ScorpioLongSlitService:
         update.exposureTime,
         update.frameCount
       ) |+| observationIdIn(which, "e".some)
+
+    def clone(
+      originalId: Observation.Id,
+      newId:      Observation.Id,
+      etms:       List[(ExposureTimeModeId, ExposureTimeModeId)]
+    ): AppliedFragment =
+      val channels = ScorpioFilter.visible.toList
+
+      val mappingValues: AppliedFragment =
+        etms
+          .map: (oldEtm, newEtm) =>
+            sql"($exposure_time_mode_id, $exposure_time_mode_id)"(oldEtm, newEtm)
+          .intercalate(void", ")
+
+      def alias(channel: ScorpioFilter): String =
+        s"${channel.tag.toLowerCase}_map"
+
+      val joins: AppliedFragment =
+        channels.foldMap: channel =>
+          void" JOIN (VALUES " |+| mappingValues |+|
+            sql") AS #${alias(channel)}(old_id, new_id) ON #${alias(channel)}.old_id = src.#${etmIdColumn(channel)}"(Void)
+
+      sql"""
+        INSERT INTO t_scorpio_long_slit (
+          c_observation_id,
+          c_program_id,
+          c_fpu,
+          #${channels.map(etmIdColumn).mkString(",\n")},
+          c_slit_offset_mode,
+          c_telescope_configs
+        )
+        SELECT
+          $observation_id,
+          src.c_program_id,
+          src.c_fpu,
+          #${channels.map(c => s"${alias(c)}.new_id").mkString(",\n")},
+          src.c_slit_offset_mode,
+          src.c_telescope_configs
+        FROM t_scorpio_long_slit src"""(newId) |+|
+        joins |+|
+        sql" WHERE src.c_observation_id = $observation_id"(originalId)
 
     def delete(
       which: List[Observation.Id]
