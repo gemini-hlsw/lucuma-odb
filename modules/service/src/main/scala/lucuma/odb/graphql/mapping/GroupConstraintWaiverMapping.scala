@@ -38,7 +38,9 @@ trait GroupConstraintWaiverMapping[F[_]] extends GroupConstraintWaiverView[F]:
       ObjectMapping(Path / "violation" / "element")(
         SqlField("synthetic_id",  GroupConstraintWaiverView.ElementId, key = true, hidden = true),
         SqlField("groupId",       GroupConstraintWaiverView.ElementGroupId),
-        SqlField("observationId", GroupConstraintWaiverView.ElementObservationId)
+        SqlField("observationId", GroupConstraintWaiverView.ElementObservationId),
+        SqlField("groupIdValue",       GroupConstraintWaiverView.ElementGroupIdValue, hidden = true),
+        SqlField("observationIdValue", GroupConstraintWaiverView.ElementObservationIdValue, hidden = true)
       ),
       ObjectMapping(Path / "violation" / "night")(
         SqlField("synthetic_id", GroupConstraintWaiverView.NightId, key = true, hidden = true),

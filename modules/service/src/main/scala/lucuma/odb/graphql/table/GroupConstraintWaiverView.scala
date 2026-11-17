@@ -22,6 +22,9 @@ trait GroupConstraintWaiverView[F[_]] extends BaseMapping[F]:
     val Code: ColumnRef                  = col("c_code",                   group_constraint_violation_code)
     val ElementGroupId: ColumnRef        = col("c_element_group_id",       group_id.opt)
     val ElementObservationId: ColumnRef  = col("c_element_observation_id", observation_id.opt)
+    // The element ids again, for comparing in filters (see WhereGroupElementId).
+    val ElementGroupIdValue: ColumnRef       = col("c_element_group_id",       group_id)
+    val ElementObservationIdValue: ColumnRef = col("c_element_observation_id", observation_id)
     val NightSite: ColumnRef             = col("c_night_site",             site)
     val NightDate: ColumnRef             = col("c_night_date",             date)
     val GrantedBy: ColumnRef             = col("c_granted_by",             user_id)

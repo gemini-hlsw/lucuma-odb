@@ -24912,8 +24912,9 @@ input WhereGroup {
   """
   Matches if some waiver of the group, revoked ones included, matches.  Every
   condition in the filter, `NOT` included, applies to that one waiver: so
-  `{ code: { EQ: ORDER }, active: { EQ: true } }` matches an active ORDER
-  waiver, and `{ NOT: { active: { EQ: true } } }` a waiver that isn't active.
+  `{ violation: { code: { EQ: ORDER } }, revoked: { IS_NULL: true } }` matches
+  an active ORDER waiver, and `{ NOT: { revoked: { IS_NULL: true } } }` a
+  revoked one.
   The filter can't express that no waiver matches, and negating it from
   outside (`NOT: { waivers: ... }`) has the same meaning as negating it inside.
   Use `hasWaiver` and `hasActiveWaiver` to match groups without waivers.
@@ -24955,25 +24956,109 @@ input WhereGroup {
 }
 
 """
-Matches a group constraint waiver.
+Matches a group constraint waiver, field by field as `GroupConstraintWaiver`
+has them.
 """
 input WhereGroupConstraintWaiver {
   AND: [WhereGroupConstraintWaiver!]
   OR: [WhereGroupConstraintWaiver!]
   NOT: WhereGroupConstraintWaiver
 
-  "Matches the code of the waived violation."
+  id: WhereOrderGroupConstraintWaiverId
+
+  "Matches the group whose violation is accepted."
+  groupId: WhereOrderGroupId
+
+  "Matches the violation accepted."
+  violation: WhereGroupConstraintViolation
+
+  "Matches who granted the waiver and when."
+  granted: WhereAttribution
+
+  """
+  Matches who revoked the waiver and when.  `IS_NULL: true` matches an active
+  waiver, and `IS_NULL: false` a revoked one.
+  """
+  revoked: WhereOptionAttribution
+}
+
+"""
+Matches a group constraint violation, as `GroupConstraintViolation` has it.
+Whether a violation is located by element or by night follows from its code.
+"""
+input WhereGroupConstraintViolation {
+  "Matches the kind of violation."
   code: WhereEqGroupConstraintViolationCode
 
-  "Matches whether the waiver is active, that is, not revoked."
-  active: WhereBoolean
+  "Matches the element where it happened.  Never matches a night's violation."
+  element: WhereGroupElementId
 
-  "Matches who granted the waiver."
-  grantedBy: WhereOrderUserId
-
-  "Matches when the waiver was granted."
-  grantedAt: WhereOrderTimestamp
+  "Matches the night when it happened.  Never matches an element's violation."
+  night: WhereObservingNight
 }
+
+"""
+Matches a group element id.  A condition on the id the element doesn't have
+(say `groupId` for an observation) never matches.
+"""
+input WhereGroupElementId {
+  groupId: WhereOrderGroupId
+  observationId: WhereOrderObservationId
+}
+
+"Matches an observing night."
+input WhereObservingNight {
+  site: WhereEqSite
+
+  "Matches the local date on which the night ends."
+  date: WhereOrderDate
+}
+
+"Matches who took an action and when."
+input WhereAttribution {
+  by: WhereOrderUserId
+  at: WhereOrderTimestamp
+}
+
+"Matches who took an action, if anyone did, and when."
+input WhereOptionAttribution {
+  """
+  When `true`, matches if the action hasn't been taken.  When `false` matches if
+  it has.
+  """
+  IS_NULL: Boolean
+
+  by: WhereOrderUserId
+  at: WhereOrderTimestamp
+}
+
+input WhereOrderGroupConstraintWaiverId {
+  "Matches if the property is exactly the supplied value."
+  EQ: GroupConstraintWaiverId
+
+  "Matches if the property is not the supplied value."
+  NEQ: GroupConstraintWaiverId
+
+  "Matches if the property value is any of the supplied options."
+  IN: [GroupConstraintWaiverId!]
+
+  "Matches if the property value is none of the supplied values."
+  NIN: [GroupConstraintWaiverId!]
+
+  "Matches if the property is ordered after (>) the supplied value."
+  GT: GroupConstraintWaiverId
+
+  "Matches if the property is ordered before (<) the supplied value."
+  LT: GroupConstraintWaiverId
+
+  "Matches if the property is ordered after or equal (>=) the supplied value."
+  GTE: GroupConstraintWaiverId
+
+  "Matches if the property is ordered before or equal (<=) the supplied value."
+  LTE: GroupConstraintWaiverId
+}
+
+
 
 input WhereEqGroupConstraintViolationCode {
   "Matches if the code is exactly the supplied value."

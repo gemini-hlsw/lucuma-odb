@@ -9,6 +9,7 @@ import eu.timepit.refined.types.numeric.NonNegShort
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.model.Group
+import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.syntax.timespan.*
@@ -100,10 +101,13 @@ class groups extends GroupTestSupport:
       json"""[{ "id": $g1 }]"""
     )
 
-  // A group with a revoked ORDER waiver and an active MINIMUM_INTERVAL waiver,
-  // another with none, and a third with only a revoked per-night maximum
-  // waiver, written directly since the violations needn't have happened.
-  val waived: IO[(Program.Id, Group.Id, Group.Id, Group.Id)] =
+  // A group with a revoked ORDER waiver at o1 and an active MINIMUM_INTERVAL
+  // waiver after o2, another with none, and a third with only a revoked
+  // per-night maximum waiver, written directly since the violations needn't
+  // have happened.
+  case class Waived(p: Program.Id, g: Group.Id, g2: Group.Id, g3: Group.Id, o1: Observation.Id, o2: Observation.Id)
+
+  val waived: IO[Waived] =
     for
       p  <- createProgram
       o1 <- createObservationAs(pi, p)
@@ -119,7 +123,7 @@ class groups extends GroupTestSupport:
                        ($group_id, 'observations_per_night_maximum', NULL,            'gn', '2026-10-16', $user_id, $user_id, now())
               """.command
             )((g, o1, pi.id, pi.id, g, o2, pi.id, g3, pi.id, pi.id)))
-    yield (p, g, g2, g3)
+    yield Waived(p, g, g2, g3, o1, o2)
 
   def byWaivers(pid: Program.Id, where: String): IO[List[Group.Id]] =
     byGroup(pid, s"waivers: $where")
@@ -127,54 +131,99 @@ class groups extends GroupTestSupport:
   def byGroup(pid: Program.Id, where: String): IO[List[Group.Id]] =
     groups(pi, s"WHERE: { ${inProgram(pid)}, $where }").map(_._1)
 
-  test("groups may be found by their waivers"):
+  def waiverIds(gid: Group.Id): IO[List[Json]] =
+    query(pi, s"""query { group(groupId: "$gid") { waivers(includeRevoked: true) { id } } }""")
+      .map(_.hcursor.downFields("group", "waivers").require[List[Json]].map(_.hcursor.downField("id").focus.get))
+
+  test("groups may be found by their waivers' fields"):
     for
-      (p, g, _, g3) <- waived
-      order         <- byWaivers(p, "{ code: { EQ: ORDER } }")
-      revoked       <- byWaivers(p, "{ active: { EQ: false } }")
-      by            <- byWaivers(p, s"""{ grantedBy: { EQ: "${pi.id}" } }""")
-      sameNight     <- byWaivers(p, "{ code: { EQ: SAME_NIGHT } }")
-    yield
-      assertEquals(order, List(g))
-      assertEquals(revoked, List(g, g3))
-      assertEquals(by, List(g, g3))
-      assertEquals(sameNight, Nil)
+      w   <- waived
+      ids <- waiverIds(w.g3)
+      rs  <- List(
+               s"{ id: { EQ: ${ids.head} } }",
+               s"""{ groupId: { EQ: "${w.g}" } }""",
+               "{ violation: { code: { EQ: ORDER } } }",
+               "{ violation: { code: { EQ: SAME_NIGHT } } }",
+               s"""{ violation: { element: { observationId: { EQ: "${w.o2}" } } } }""",
+               s"""{ violation: { element: { groupId: { EQ: "${w.g}" } } } }""",
+               "{ violation: { night: { site: { EQ: GN } } } }",
+               "{ violation: { night: { site: { EQ: GN }, date: { EQ: \"2026-10-16\" } } } }",
+               "{ violation: { night: { date: { GT: \"2026-10-16\" } } } }",
+               s"""{ granted: { by: { EQ: "${pi.id}" }, at: { GT: "1970-01-01 00:00:00" } } }""",
+               "{ granted: { at: { LT: \"1970-01-01 00:00:00\" } } }",
+               "{ revoked: { IS_NULL: true } }",
+               "{ revoked: { IS_NULL: false } }",
+               s"""{ revoked: { by: { EQ: "${pi.id}" } } }"""
+             ).traverse(byWaivers(w.p, _))
+    yield assertEquals(
+      rs,
+      List(
+        List(w.g3),
+        List(w.g),
+        List(w.g),
+        Nil,
+        List(w.g),
+        Nil,
+        List(w.g3),
+        List(w.g3),
+        Nil,
+        List(w.g, w.g3),
+        Nil,
+        List(w.g),
+        List(w.g, w.g3),
+        List(w.g, w.g3)
+      )
+    )
 
   test("the conditions of a waiver filter all apply to the same waiver"):
     for
-      (p, g, _, _) <- waived
-      activeOrder  <- byWaivers(p, "{ code: { EQ: ORDER }, active: { EQ: true } }")
-      activeMin    <- byWaivers(p, "{ code: { EQ: MINIMUM_INTERVAL }, active: { EQ: true } }")
-      andOrder     <- byWaivers(p, "{ AND: [{ code: { EQ: ORDER } }, { active: { EQ: true } }] }")
+      w           <- waived
+      activeOrder <- byWaivers(w.p, "{ violation: { code: { EQ: ORDER } }, revoked: { IS_NULL: true } }")
+      activeMin   <- byWaivers(w.p, "{ violation: { code: { EQ: MINIMUM_INTERVAL } }, revoked: { IS_NULL: true } }")
+      andOrder    <- byWaivers(w.p, "{ AND: [{ violation: { code: { EQ: ORDER } } }, { revoked: { IS_NULL: true } }] }")
     yield
       assertEquals(activeOrder, Nil)
-      assertEquals(activeMin, List(g))
+      assertEquals(activeMin, List(w.g))
       assertEquals(andOrder, Nil)
+
+  // A group without waivers has nulls in their place, which a test for null
+  // would match.
+  test("a group without waivers matches no waiver condition, negated or not"):
+    for
+      w   <- waived
+      rs  <- List(
+               "waivers: { revoked: { IS_NULL: true } }",
+               "waivers: { revoked: { IS_NULL: false } }",
+               "waivers: { NOT: { revoked: { IS_NULL: true } } }",
+               "NOT: { waivers: { revoked: { IS_NULL: false } } }",
+               "waivers: { NOT: { violation: { code: { EQ: ORDER } } } }"
+             ).traverse(byGroup(w.p, _))
+    yield assert(!rs.flatten.contains(w.g2), rs.toString)
 
   // As documented: a negated waiver filter matches a group with some waiver
   // that doesn't match, whether negated inside or out, and so never a group
   // without waivers.
   test("a negated waiver filter matches some waiver that doesn't match"):
     for
-      (p, g, _, g3) <- waived
-      inside        <- byWaivers(p, "{ NOT: { active: { EQ: true } } }")
-      outside       <- byGroup(p, "NOT: { waivers: { active: { EQ: true } } }")
+      w       <- waived
+      inside  <- byWaivers(w.p, "{ NOT: { revoked: { IS_NULL: true } } }")
+      outside <- byGroup(w.p, "NOT: { waivers: { revoked: { IS_NULL: true } } }")
     yield
-      assertEquals(inside, List(g, g3))
+      assertEquals(inside, List(w.g, w.g3))
       assertEquals(outside, inside)
 
   test("groups may be found by whether they have waivers, active or not"):
     for
-      (p, g, g2, g3) <- waived
-      any            <- byGroup(p, "hasWaiver: { EQ: true }")
-      none           <- byGroup(p, "hasWaiver: { EQ: false }")
-      active         <- byGroup(p, "hasActiveWaiver: { EQ: true }")
-      noActive       <- byGroup(p, "hasActiveWaiver: { EQ: false }")
+      w        <- waived
+      any      <- byGroup(w.p, "hasWaiver: { EQ: true }")
+      none     <- byGroup(w.p, "hasWaiver: { EQ: false }")
+      active   <- byGroup(w.p, "hasActiveWaiver: { EQ: true }")
+      noActive <- byGroup(w.p, "hasActiveWaiver: { EQ: false }")
     yield
-      assertEquals(any, List(g, g3))
-      assertEquals(none, List(g2))
-      assertEquals(active, List(g))
-      assertEquals(noActive, List(g2, g3))
+      assertEquals(any, List(w.g, w.g3))
+      assertEquals(none, List(w.g2))
+      assertEquals(active, List(w.g))
+      assertEquals(noActive, List(w.g2, w.g3))
 
   def setGroup(gid: Group.Id, set: String): IO[Unit] =
     query(pi, s"""mutation { updateGroups(input: { SET: { $set }, WHERE: { id: { EQ: "$gid" } } }) { groups { id } } }""").void
