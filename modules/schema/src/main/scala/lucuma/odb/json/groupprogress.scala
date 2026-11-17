@@ -29,6 +29,7 @@ import lucuma.core.model.group.GroupConstraintWaiver
 import lucuma.core.model.group.GroupProgress
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
+import lucuma.odb.syntax.groupConstraintViolation.*
 
 import java.time.LocalDate
 
@@ -82,20 +83,11 @@ trait GroupProgressCodec:
   // null.
   given Encoder_GroupConstraintViolation: Encoder[GroupConstraintViolation] =
     Encoder.instance: v =>
-      import GroupConstraintViolation.Unwaivable.*
-      import GroupConstraintViolation.Waivable.*
       val (element, night, subgroup) =
         v match
-          case Order(e)                       => (e.some, none, none)
-          case MinimumInterval(e)             => (e.some, none, none)
-          case MaximumInterval(e)             => (e.some, none, none)
-          case SameNight(n)                   => (none, n.some, none)
-          case ObservationsPerNightMinimum(n) => (none, n.some, none)
-          case ObservationsPerNightMaximum(n) => (none, n.some, none)
-          case SubgroupUnschedulable(g)       => (none, none, g.some)
-          case SameNightMultipleSites            |
-               ObservationsPerNightMultipleSites |
-               InsufficientElements              => (none, none, none)
+          case w: GroupConstraintViolation.Waivable                         => (w.element, w.night, none)
+          case GroupConstraintViolation.Unwaivable.SubgroupUnschedulable(g) => (none, none, g.some)
+          case _: GroupConstraintViolation.Unwaivable                       => (none, none, none)
       Json.obj(
         "code"       -> v.code.asJson,
         "element"    -> element.map(elementJson).asJson,
@@ -103,21 +95,30 @@ trait GroupProgressCodec:
         "subgroupId" -> subgroup.asJson
       )
 
+  // A field that is null or absent, or else decoded.
+  private def optional[A](c: ACursor)(decode: ACursor => Decoder.Result[A]): Decoder.Result[Option[A]] =
+    c.focus.filterNot(_.isNull).traverse(_ => decode(c))
+
   given Decoder_GroupConstraintViolation: Decoder[GroupConstraintViolation] =
     Decoder.instance: c =>
       import GroupConstraintViolationCode as Code
       import GroupConstraintViolation.Unwaivable
-      import GroupConstraintViolation.Waivable
-      def element = decodeElement(c.downField("element"))
-      def night   = decodeNight(c.downField("night"))
+      // A waivable violation, identified by its element or night.
+      def waivable(code: GroupConstraintViolationCode): Decoder.Result[GroupConstraintViolation] =
+        for
+          e <- optional(c.downField("element"))(decodeElement)
+          n <- optional(c.downField("night"))(decodeNight)
+          v <- GroupConstraintViolation.Waivable.fromLocation(code, e, n).leftMap(DecodingFailure(_, c.history))
+        yield v
+
       c.downField("code").as[GroupConstraintViolationCode].flatMap:
-        case Code.Order                             => element.map(Waivable.Order(_))
-        case Code.MinimumInterval                   => element.map(Waivable.MinimumInterval(_))
-        case Code.MaximumInterval                   => element.map(Waivable.MaximumInterval(_))
-        case Code.SameNight                         => night.map(Waivable.SameNight(_))
+        case code @ (Code.Order                       |
+                     Code.MinimumInterval             |
+                     Code.MaximumInterval             |
+                     Code.SameNight                   |
+                     Code.ObservationsPerNightMinimum |
+                     Code.ObservationsPerNightMaximum) => waivable(code)
         case Code.SameNightMultipleSites            => Unwaivable.SameNightMultipleSites.asRight
-        case Code.ObservationsPerNightMinimum       => night.map(Waivable.ObservationsPerNightMinimum(_))
-        case Code.ObservationsPerNightMaximum       => night.map(Waivable.ObservationsPerNightMaximum(_))
         case Code.ObservationsPerNightMultipleSites => Unwaivable.ObservationsPerNightMultipleSites.asRight
         case Code.InsufficientElements              => Unwaivable.InsufficientElements.asRight
         case Code.SubgroupUnschedulable             => c.downField("subgroupId").as[Group.Id].map(Unwaivable.SubgroupUnschedulable(_))

@@ -17,6 +17,7 @@ import lucuma.core.model.Access
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.model.User
 import lucuma.odb.data.Existence
 import lucuma.odb.data.GroupTree
 import lucuma.odb.data.GroupTree.Branch
@@ -61,6 +62,13 @@ trait GroupService[F[_]] {
 }
 
 object GroupService {
+
+  /**
+   * Whether the user may edit a system group as any other.  Only the service
+   * may: others may only move a per-observation calibration group.
+   */
+  def mayEditSystemGroups(user: User): Boolean =
+    user.role.access === Access.Service
 
   object GroupElement:
     type Id = Either[Group.Id, Observation.Id]
@@ -293,16 +301,16 @@ object GroupService {
       def updateGroups(SET: GroupPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F]): F[Result[List[Group.Id]]] =
         // Only per-observation calibration system groups can move, and not
         // those nested in a system group, such as a standard's daytime arc group
-        val movePredicate = user.role.access match
-          case Access.Service => AppliedFragment.empty
-          case _              =>
+        val movePredicate =
+          if mayEditSystemGroups(user) then AppliedFragment.empty
+          else
             sql""" AND (c_system = FALSE OR (
                     c_calibration_roles && $_calibration_role
                     AND (c_parent_id IS NULL OR c_parent_id <> ALL (SELECT p.c_group_id FROM t_group p WHERE p.c_system))
                   ))"""(ObsExtract.PerObservationCalibrationRoles)
-        val accessPredicate = user.role.access match
-          case Access.Service => void""
-          case _              => void" AND c_system = FALSE"
+        val accessPredicate =
+          if mayEditSystemGroups(user) then void""
+          else void" AND c_system = FALSE"
 
         val update: F[Result[List[Group.Id]]] =
           session.execute(sql"SET CONSTRAINTS ALL DEFERRED".command) >>

@@ -55,10 +55,11 @@ object GroupProgressService:
         if subtrees.isEmpty then Map.empty[Group.Id, GroupProgress].pure[F]
         else
           for
-            now   <- timeService.transactionTime
-            facts <- selectFacts(subtrees.flatMap(_._2.flatMap(_.allObservations)))
+            now     <- timeService.transactionTime
+            facts   <- selectFacts(subtrees.flatMap(_._2.flatMap(_.allObservations)))
+            waivers <- groupConstraintWaiverService.selectActive(subtrees.flatMap(_._2.flatMap(_.allGroupIds)))
           yield subtrees.flatMap: (pt, branches) =>
-            val all = GroupProgressEvaluator.evaluate(branches, facts, Map.empty, now)
+            val all = GroupProgressEvaluator.evaluate(branches, facts, waivers, now)
             pt.groupIds.flatMap(gid => all.get(gid).tupleLeft(gid))
           .toMap
 

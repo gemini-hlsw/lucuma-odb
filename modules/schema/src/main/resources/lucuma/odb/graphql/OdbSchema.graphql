@@ -4334,6 +4334,21 @@ type Mutation {
   ): UpdateGroupsResult!
 
   """
+  Accepts one violation of a group's constraints, so that it no longer counts
+  against the group.  The violation must have happened: it must be one the
+  group's progress lists among its `violations`.  Anyone who may edit the
+  group may waive its violations.
+  """
+  waiveGroupConstraint(input: WaiveGroupConstraintInput!): WaiveGroupConstraintResult!
+
+  """
+  Revokes a waiver, so that its violation counts against the group again.  The
+  waiver is kept, recording who revoked it, when and why.  Anyone who may edit
+  the group may revoke its waivers.
+  """
+  revokeGroupConstraintWaiver(input: RevokeGroupConstraintWaiverInput!): RevokeGroupConstraintWaiverResult!
+
+  """
   Updates existing observations
   """
   updateObservations(
@@ -16135,6 +16150,14 @@ type Group {
   """
   standing: CalculatedGroupStanding
 
+  """
+  The waivers granted for violations of the group's constraints, by
+  `waiveGroupConstraint`, in the order granted.  Revoked waivers are left out
+  unless `includeRevoked` is set.  A waiver applies only while its violation is
+  found, when it is listed in the progress's `waived`.
+  """
+  waivers(includeRevoked: Boolean! = false): [GroupConstraintWaiver!]!
+
   existence: Existence!
 
   """
@@ -16406,6 +16429,55 @@ type GroupConstraintWaiver {
 
   "Who revoked the waiver, when and why, if it has been revoked."
   revoked: Attribution
+}
+
+"""
+A violation of a group's constraints to waive, identified as
+`GroupConstraintViolation` identifies it: its kind and where in the group it
+happened.  `element` is required for `ORDER`, `MINIMUM_INTERVAL` and
+`MAXIMUM_INTERVAL`, and `night` for `SAME_NIGHT`,
+`OBSERVATIONS_PER_NIGHT_MINIMUM` and `OBSERVATIONS_PER_NIGHT_MAXIMUM`.  Other
+kinds can't be waived.
+"""
+input GroupConstraintViolationInput {
+  code: GroupConstraintViolationCode!
+  element: GroupElementInput
+  night: ObservingNightInput
+}
+
+"An observing night at a site, as `ObservingNight` describes it."
+input ObservingNightInput {
+  site: Site!
+  date: Date!
+}
+
+input WaiveGroupConstraintInput {
+  "The group whose violation is accepted."
+  groupId: GroupId!
+
+  "The violation accepted."
+  violation: GroupConstraintViolationInput!
+
+  "Why the violation is accepted, recorded with the waiver."
+  reason: NonEmptyString
+}
+
+type WaiveGroupConstraintResult {
+  "The new waiver."
+  waiver: GroupConstraintWaiver!
+}
+
+input RevokeGroupConstraintWaiverInput {
+  "The waiver to revoke.  It must not have been revoked already."
+  waiverId: GroupConstraintWaiverId!
+
+  "Why the waiver is revoked, recorded with it."
+  reason: NonEmptyString
+}
+
+type RevokeGroupConstraintWaiverResult {
+  "The revoked waiver."
+  waiver: GroupConstraintWaiver!
 }
 
 "Who took an action, when, and why, if they said."

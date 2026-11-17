@@ -198,6 +198,9 @@ trait Services[F[_]]:
   /** The `GroupProgressService`. */
   def groupProgressService: GroupProgressService[F]
 
+  /** The `GroupConstraintWaiverService`. */
+  def groupConstraintWaiverService: GroupConstraintWaiverService[F]
+
   /** The `GroupStandingService`. */
   def groupStandingService: GroupStandingService[F]
 
@@ -443,6 +446,7 @@ object Services:
       lazy val calibrationCalcService = CalibrationCalcService.instantiate
       lazy val groupService = GroupService.instantiate
       lazy val groupProgressService = GroupProgressService.instantiate
+      lazy val groupConstraintWaiverService = GroupConstraintWaiverService.instantiate
       lazy val groupStandingService = GroupStandingService.instantiate
       lazy val programService = ProgramService.instantiate
       lazy val observationWorkflowService = ObservationWorkflowService.instantiate(emailConfig)
@@ -508,6 +512,7 @@ object Services:
     def archiveDuplicationSearchService[F[_]](using Services[F]): ArchiveDuplicationSearchService[F] = summon[Services[F]].archiveDuplicationSearchService
     def groupService[F[_]](using Services[F]): GroupService[F] = summon[Services[F]].groupService
     def groupProgressService[F[_]](using Services[F]): GroupProgressService[F] = summon[Services[F]].groupProgressService
+    def groupConstraintWaiverService[F[_]](using Services[F]): GroupConstraintWaiverService[F] = summon[Services[F]].groupConstraintWaiverService
     def groupStandingService[F[_]](using Services[F]): GroupStandingService[F] = summon[Services[F]].groupStandingService
     def igrins2LongSlitService[F[_]](using Services[F]): Igrins2LongSlitService[F] = summon[Services[F]].igrins2LongSlitService
     def scorpioLongSlitService[F[_]](using Services[F]): ScorpioLongSlitService[F] = summon[Services[F]].scorpioLongSlitService

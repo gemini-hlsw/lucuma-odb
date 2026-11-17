@@ -119,6 +119,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] with UserEnv {
       ReplaceGhostSequence,
       RequestWarningDismissal,
       ResetAcquisition,
+      RevokeGroupConstraintWaiver,
       RevokeUserInvitation,
       SetAllocations,
       SetGuideTargetName,
@@ -142,6 +143,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] with UserEnv {
       UpdateProgramUsers,
       UpdateProposal,
       UpdateTargets,
+      WaiveGroupConstraint,
     )
 
   lazy val MutationMapping: ObjectMapping =
@@ -1179,5 +1181,31 @@ trait MutationMapping[F[_]] extends AccessControl[F] with UserEnv {
         .recover: // need to recover here due to deferred constraints; nothing bad happens until we commit
           case SqlState.RaiseException(ex) =>
             OdbError.InconsistentGroupError(Some(ex.message)).asFailure
+
+  // Anyone who may edit the group may waive its violations and revoke its
+  // waivers.
+  private lazy val WaiveGroupConstraint =
+    MutationField("waiveGroupConstraint", WaiveGroupConstraintInput.Binding): (input, child) =>
+      services
+        .useTransactionally:
+          idSelectFromPredicate(
+            GroupType,
+            and(List(
+              Predicates.group.id.eql(input.groupId),
+              Predicates.group.isEditableBy(user)
+            ))
+          ).flatTraverse: which =>
+            groupConstraintWaiverService.waive(input, which).nestMap: wid =>
+              Unique(Filter(Predicates.groupConstraintWaiver.id.eql(wid), child))
+        .recover: // the active waiver index, when the same violation is waived concurrently
+          case SqlState.UniqueViolation(_) =>
+            OdbError.InvalidArgument(s"Group ${input.groupId}'s violation is already waived.".some).asFailure
+
+  private lazy val RevokeGroupConstraintWaiver =
+    MutationField("revokeGroupConstraintWaiver", RevokeGroupConstraintWaiverInput.Binding): (input, child) =>
+      services.useTransactionally:
+        idSelectFromPredicate(GroupType, Predicates.group.isEditableBy(user)).flatTraverse: which =>
+          groupConstraintWaiverService.revoke(input, which).nestMap: wid =>
+            Unique(Filter(Predicates.groupConstraintWaiver.id.eql(wid), child))
 
 }

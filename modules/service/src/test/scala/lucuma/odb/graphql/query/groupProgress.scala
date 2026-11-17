@@ -17,12 +17,20 @@ import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.model.Group
 import lucuma.core.model.LocalObservingNight
 import lucuma.core.model.Observation
+import lucuma.core.model.group.GroupConstraintWaiver
 import lucuma.core.syntax.string.*
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.odb.graphql.ACursorOps
+import lucuma.odb.util.Codecs.core_timestamp
+import lucuma.odb.util.Codecs.group_constraint_waiver_id
+import lucuma.odb.util.Codecs.group_id
 import lucuma.odb.util.Codecs.observation_id
+import lucuma.odb.util.Codecs.user_id
+import skunk.codec.boolean.bool
+import skunk.codec.temporal.date
+import skunk.codec.text.text
 import skunk.syntax.all.*
 
 // The rules are tested in lucuma.odb.logic.GroupProgressEvaluatorSuite.  These
@@ -443,6 +451,116 @@ class groupProgress extends GroupTestSupport:
         js.hcursor.downFields("group", "progress", "violations").focus.get,
         json"""[{ "code": "OBSERVATIONS_PER_NIGHT_MAXIMUM", "night": { "site": "GN", "date": ${date.toString} } }]"""
       )
+
+  // Grants a waiver as the PI directly, there being no mutation yet, and
+  // returns its id and the time it was granted.
+  def waiveOrderDirectly(gid: Group.Id, oid: Observation.Id, reason: String): IO[(GroupConstraintWaiver.Id, Timestamp)] =
+    withFreshSession: s =>
+      s.unique(
+        sql"""
+          INSERT INTO t_group_constraint_waiver (c_group_id, c_code, c_element_observation_id, c_granted_by, c_granted_reason)
+          VALUES ($group_id, 'order', $observation_id, $user_id, $text)
+          RETURNING c_waiver_id, c_granted_at
+        """.query(group_constraint_waiver_id *: core_timestamp)
+      )((gid, oid, pi.id, reason))
+
+  def waiveNightMaximumDirectly(gid: Group.Id, site: Site, night: java.time.LocalDate, revoked: Boolean): IO[Unit] =
+    withFreshSession: s =>
+      s.execute(
+        sql"""
+          INSERT INTO t_group_constraint_waiver (c_group_id, c_code, c_night_site, c_night_date, c_granted_by, c_revoked_by, c_revoked_at)
+          VALUES ($group_id, 'observations_per_night_maximum', ${lucuma.odb.util.Codecs.site}, $date, $user_id, ${user_id.opt}, CASE WHEN $bool THEN now() END)
+        """.command
+      )((gid, site, night, pi.id, Option.when(revoked)(pi.id), revoked)).void
+
+  test("a waiver lifts its violation and is reported as waived"):
+    for
+      p       <- createProgram
+      o1      <- newObservation(p)
+      o2      <- newObservation(p)
+      g       <- group(p, List(o1, o2))
+      _       <- setOrdered(g)
+      _       <- completeObservation(o2)
+      (w, at) <- waiveOrderDirectly(g, o2, "Usable anyway")
+      js      <- query(pi, s"""
+                   query {
+                     group(groupId: "$g") {
+                       progress {
+                         status
+                         violations { code }
+                         waived {
+                           id
+                           groupId
+                           violation {
+                             code
+                             element { groupId observationId }
+                             night { site date }
+                             subgroupId
+                           }
+                           granted { by at reason }
+                           revoked { by }
+                         }
+                       }
+                     }
+                   }
+                 """)
+    yield
+      val c = js.hcursor.downFields("group", "progress")
+      assertEquals(c.downField("status").require[String], "ONGOING")
+      assertEquals(c.downField("violations").focus.get, json"""[]""")
+      val waived = c.downField("waived").downN(0)
+      assertEquals(waived.downFields("granted", "at").require[Timestamp], at)
+      assertEquals(
+        c.downField("waived").focus.get.mapArray(_.map(_.hcursor.downFields("granted", "at").delete.top.get)),
+        json"""
+          [
+            {
+              "id": $w,
+              "groupId": $g,
+              "violation": {
+                "code": "ORDER",
+                "element": { "groupId": null, "observationId": $o2 },
+                "night": null,
+                "subgroupId": null
+              },
+              "granted": { "by": ${pi.id}, "reason": "Usable anyway" },
+              "revoked": null
+            }
+          ]
+        """
+      )
+
+  test("a revoked waiver no longer applies, and an active one for the same night does"):
+    for
+      p  <- createProgram
+      o1 <- newObservation(p)
+      o2 <- newObservation(p)
+      g  <- group(p, List(o1, o2))
+      _  <- query(pi, s"""mutation { updateGroups(input: { SET: { maximumObservationsPerNight: 1 }, WHERE: { id: { EQ: "$g" } } }) { groups { id } } }""")
+      _  <- completeObservation(o1)
+      _  <- completeObservation(o2)
+      c  <- completionTime(o1)
+      d   = LocalObservingNight.fromSiteAndInstant(Site.GN, c.toInstant).toLocalDate
+      q   = s"""query { group(groupId: "$g") { progress { violations { code } waived { violation { code night { site date } } } } } }"""
+      _  <- waiveNightMaximumDirectly(g, Site.GN, d, revoked = true)
+      js <- query(pi, q)
+      _   = assertEquals(
+              js.hcursor.downFields("group", "progress").focus.get,
+              json"""{ "violations": [{ "code": "OBSERVATIONS_PER_NIGHT_MAXIMUM" }], "waived": [] }"""
+            )
+      _  <- waiveNightMaximumDirectly(g, Site.GN, d, revoked = false)
+      js <- query(pi, q)
+    yield assertEquals(
+      js.hcursor.downFields("group", "progress").focus.get,
+      json"""
+        {
+          "violations": [],
+          "waived": [
+            { "violation": { "code": "OBSERVATIONS_PER_NIGHT_MAXIMUM", "night": { "site": "GN", "date": ${d.toString} } } }
+          ]
+        }
+      """
+    )
 
   test("an ordered group's observation past its minimum, completed after the first, is extra"):
     orderedOneOfTwo((o1, o2) => List(o1, o2)).map: js =>
