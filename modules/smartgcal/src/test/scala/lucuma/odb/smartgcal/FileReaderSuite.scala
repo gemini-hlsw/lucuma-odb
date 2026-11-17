@@ -5,101 +5,85 @@ package lucuma.odb.smartgcal
 
 import cats.effect.IO
 import cats.effect.unsafe.implicits.global
-import cats.parse.Parser
-import cats.syntax.show.*
+import eu.timepit.refined.types.numeric.PosLong
+import fs2.Pipe
 import fs2.Stream
-import lucuma.odb.smartgcal.data.Gmos.FileEntry as GmosFileEntry
-import lucuma.odb.smartgcal.parsers.Availability
 
 final class FileReaderSuite extends munit.FunSuite:
 
-  private def loadInstrument[A](
-    filename:        String,
-    entryParser:     String => Either[Parser.Error, Availability[A]],
-    headerLineCount: Int = 2
-  ): Unit =
-
-    val r  = s"smartgcal/$filename.csv"
-    val is = IO(this.getClass.getClassLoader.getResourceAsStream(r))
-    val s  = fs2.io.readInputStream[IO](is,8192)
-
-    val (obsolete, current) =
-       s.through(FileReader.entryLines(headerLineCount))
-        .flatMap: (lineNumber, s) =>
-          entryParser(s) match
-            case Left(e)  => Stream.raiseError[IO](new RuntimeException(s"$filename $lineNumber:\n${e.show}"))
-            case Right(a) => Stream.emit(a)
-        .fold((0L, 0L)) { case ((o, c), a) =>
-          a.fold((o+1, c), _ => (o, c+1))
-        }
-        .compile
-        .onlyOrError
-        .unsafeRunSync()
-
-    val rawLineCount     = s.through(FileReader.entryLines(headerLineCount)).compile.count.unsafeRunSync()
-
-    // In reality, the test is just that the parsing doesn't fail.  Assuming
-    // there are no parse errors the parsed entry count should be the same as
-    // the number of entry lines.
-    assertEquals((obsolete + current), rawLineCount)
-
-  private def loadF2(filename: String): Unit =
-    loadInstrument(filename, parsers.flamingos2.fileEntry.map(Availability.Current.apply).parseAll)
-
-  private def loadGhost(filename: String): Unit =
-    loadInstrument(filename, parsers.ghost.row.map(Availability.Current.apply).parseAll, headerLineCount = 1)
-
-  private def loadGmos[G, L, U](
-    filename:    String,
-    entryParser: Parser[Availability[GmosFileEntry[G, L, U]]]
-  ): Unit =
-    loadInstrument(filename, entryParser.parseAll)
-
-  private def loadGnirs(filename: String): Unit =
-    loadInstrument(filename, parsers.gnirs.fileEntry.map(Availability.Current.apply).parseAll)
+  // Reads a file through the same pipe its migration uses, so a parse error or
+  // a misread header fails here rather than at deploy time.
+  private def load[A](filename: String, reader: String => Pipe[IO, Byte, (PosLong, A)]): Unit =
+    val is   = IO(this.getClass.getClassLoader.getResourceAsStream(s"smartgcal/$filename.csv"))
+    val rows = fs2.io.readInputStream[IO](is, 8192).through(reader(filename)).compile.count.unsafeRunSync()
+    assert(rows > 0, s"$filename produced no rows")
 
   test("Flamingos2_ARC"):
-    loadF2("Flamingos2_ARC")
+    load("Flamingos2_ARC", FileReader.flamingos2[IO])
 
   test("Flamingos2_FLAT"):
-    loadF2("Flamingos2_FLAT")
+    load("Flamingos2_FLAT", FileReader.flamingos2[IO])
 
   test("GHOST_ARC"):
-    loadGhost("GHOST_ARC")
+    load("GHOST_ARC", FileReader.ghost[IO])
 
   test("GHOST_FLAT"):
-    loadGhost("GHOST_FLAT")
+    load("GHOST_FLAT", FileReader.ghost[IO])
 
   test("GMOS-N_ARC"):
-    loadGmos("GMOS-N_ARC", parsers.gmosNorth.fileEntry)
+    load("GMOS-N_ARC", FileReader.gmosNorth[IO])
 
   test("GMOS-N_FLAT"):
-    loadGmos("GMOS-N_FLAT", parsers.gmosNorth.fileEntry)
+    load("GMOS-N_FLAT", FileReader.gmosNorth[IO])
 
   test("GMOS-S_ARC"):
-    loadGmos("GMOS-S_ARC", parsers.gmosSouth.fileEntry)
+    load("GMOS-S_ARC", FileReader.gmosSouth[IO])
 
   test("GMOS-S_FLAT"):
-    loadGmos("GMOS-S_FLAT", parsers.gmosSouth.fileEntry)
+    load("GMOS-S_FLAT", FileReader.gmosSouth[IO])
 
   test("GNIRS_ARC"):
-    loadGnirs("GNIRS_ARC")
+    load("GNIRS_ARC", FileReader.gnirs[IO])
 
   test("GNIRS_FLAT"):
-    loadGnirs("GNIRS_FLAT")
+    load("GNIRS_FLAT", FileReader.gnirs[IO])
 
-  // IGRINS-2 files have no version line, so a wrong header count drops a real row.
-  private def igrins2Rows(filename: String): List[data.Igrins2.FileEntry] =
-    val is = IO(this.getClass.getClassLoader.getResourceAsStream(s"smartgcal/$filename.csv"))
-    fs2.io.readInputStream[IO](is, 8192)
-      .through(FileReader.igrins2[IO](filename))
-      .map(_._2)
+  test("IGRINS-2_ARC"):
+    load("IGRINS-2_ARC", FileReader.igrins2[IO])
+
+  test("IGRINS-2_FLAT"):
+    load("IGRINS-2_FLAT", FileReader.igrins2[IO])
+
+  private def entryLines(content: String): Either[Throwable, List[(Long, String)]] =
+    Stream.emit(content)
+      .through(fs2.text.utf8.encode)
+      .through(FileReader.entryLines[IO]("test.csv"))
+      .map((n, s) => (n.value, s))
       .compile
       .toList
+      .attempt
       .unsafeRunSync()
 
-  test("IGRINS-2_ARC loads every row"):
-    assertEquals(igrins2Rows("IGRINS-2_ARC").size, 1)
+  private val Header = "Mode,Calibration Observe,Calibration Lamps"
 
-  test("IGRINS-2_FLAT loads every row"):
-    assertEquals(igrins2Rows("IGRINS-2_FLAT").size, 3)
+  test("entryLines skips a version line and the header"):
+    assertEquals(
+      entryLines(s"525,2025/05/30 05:58:27 HST\n$Header\nrow1\nrow2"),
+      Right(List(3L -> "row1", 4L -> "row2"))
+    )
+
+  test("entryLines keeps the first row when there is no version line"):
+    assertEquals(
+      entryLines(s"# comment\n#\n$Header\n#\nrow1\nrow2"),
+      Right(List(5L -> "row1", 6L -> "row2"))
+    )
+
+  test("entryLines rejects a file whose header is missing"):
+    entryLines("525,2025/05/30 05:58:27 HST\nrow1\nrow2") match
+      case Left(e: FileReader.HeaderException) => assert(e.reason.contains("expected the column header"))
+      case other                               => fail(s"expected a HeaderException, got $other")
+
+  test("entryLines rejects an empty file"):
+    entryLines("# only a comment\n") match
+      case Left(e: FileReader.HeaderException) => assertEquals(e.reason, "no column header found")
+      case other                               => fail(s"expected a HeaderException, got $other")
