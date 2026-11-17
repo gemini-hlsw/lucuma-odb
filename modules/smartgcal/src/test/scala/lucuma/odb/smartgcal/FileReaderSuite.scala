@@ -87,3 +87,19 @@ final class FileReaderSuite extends munit.FunSuite:
 
   test("GNIRS_FLAT"):
     loadGnirs("GNIRS_FLAT")
+
+  // IGRINS-2 files have no version line, so a wrong header count drops a real row.
+  private def igrins2Rows(filename: String): List[data.Igrins2.FileEntry] =
+    val is = IO(this.getClass.getClassLoader.getResourceAsStream(s"smartgcal/$filename.csv"))
+    fs2.io.readInputStream[IO](is, 8192)
+      .through(FileReader.igrins2[IO](filename))
+      .map(_._2)
+      .compile
+      .toList
+      .unsafeRunSync()
+
+  test("IGRINS-2_ARC loads every row"):
+    assertEquals(igrins2Rows("IGRINS-2_ARC").size, 1)
+
+  test("IGRINS-2_FLAT loads every row"):
+    assertEquals(igrins2Rows("IGRINS-2_FLAT").size, 3)

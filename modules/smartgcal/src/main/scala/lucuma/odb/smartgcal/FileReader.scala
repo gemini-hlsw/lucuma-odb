@@ -60,7 +60,7 @@ object FileReader {
     read(fileName, parsers.flamingos2.fileEntry.map(Current.apply))
 
   def igrins2[F[_]](fileName: String)(using ApplicativeError[F, Throwable]): Pipe[F, Byte, (PosLong, data.Igrins2.FileEntry)] =
-    read(fileName, parsers.igrins2.fileEntry.map(Current.apply))
+    read(fileName, parsers.igrins2.fileEntry.map(Current.apply), headerLineCount = 1)
 
   def gnirs[F[_]](fileName: String)(using ApplicativeError[F, Throwable]): Pipe[F, Byte, (PosLong, data.Gnirs.FileEntry)] =
     read(fileName, parsers.gnirs.fileEntry.map(Current.apply))
