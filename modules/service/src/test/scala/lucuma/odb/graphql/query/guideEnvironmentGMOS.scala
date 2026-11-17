@@ -545,7 +545,7 @@ class guideEnvironmentGMOS extends ExecutionTestSupportForGmos with GuideEnviron
       expect(
         pi,
         guideEnvironmentQuery(oid),
-        expected = List(GuideService.selectedStarUnusableMessage(GuideStarId.gaia(defaultTargetId))).asLeft
+        expected = List(GuideService.selectedStarUnusableMessage(GuideStarId.GaiaDr3(defaultTargetId))).asLeft
       )
 
   // Only probes that guide on axis can use the observation target, so with GMOS it is not usable.

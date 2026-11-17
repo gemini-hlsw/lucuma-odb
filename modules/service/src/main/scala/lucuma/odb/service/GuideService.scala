@@ -350,15 +350,14 @@ object GuideService {
     GuideStarName
       .from(name.value)
       .toOption
-      .filter(_.toGaiaSourceId.isDefined)
-      .map(GuideStarId.Catalog(_))
+      .flatMap(GuideStarId.fromCatalogName)
       .toResult(guideStarNameError(name.value).asProblem)
 
   def selectedStarUnusableMessage(selection: GuideStarId): String =
     val star: String =
       selection match
-        case GuideStarId.Catalog(name = name)             =>
-          s"The selected guide star ${name.value.value}"
+        case GuideStarId.GaiaDr3(sourceId = _)            =>
+          s"The selected guide star ${selection.catalogName.foldMap(_.value.value)}"
         case GuideStarId.ObservationTarget(targetId = id) =>
           s"The observation target${id.foldMap(targetId => s" $targetId")} selected as guide star"
     s"$star is not usable; select another guide star or return to automatic selection."
@@ -376,7 +375,7 @@ object GuideService {
     observationTargetId: Option[Target.Id]
   ): Option[GuideStarId] =
     catalogName
-      .map(GuideStarId.Catalog(_))
+      .flatMap(GuideStarId.fromCatalogName)
       .orElse(Option.when(observationTarget)(GuideStarId.ObservationTarget(observationTargetId)))
 
   case class ObservationInfo(
@@ -987,9 +986,6 @@ object GuideService {
         } yield all).value
 
       // Gaia DR3 is the only catalog there is; its source id is the number in the name.
-      def getGuideStarFromCatalog(name: GuideStarName): F[Result[(Target.Sidereal, GuideStarCandidate)]] =
-        name.toGaiaSourceId.fold(guideStarNameError(name.value.value).asFailure.pure[F])(getGuideStarFromGaia)
-
       def getGuideStarFromGaia(id: Long): F[Result[(Target.Sidereal, GuideStarCandidate)]] =
         gaiaClient.queryById(id)
           .map:
@@ -1365,12 +1361,12 @@ object GuideService {
                                .toResult(generalError("No guide probe available for this observing mode.").asProblem)
                            )
           science: List[(Target, GuideStarCandidate)] =
-                           observationTargetCandidates(targets.asterism, coordinatesAt(tracking.asterism, obsTime.toInstant))
-          // A science target needs no catalog; whatever the probe, AGS judges whether it is usable.
+                           observationTargetCandidatesFor(agsParams.probe, targets.asterism, coordinatesAt(tracking.asterism, obsTime.toInstant))
+          // A science target needs no catalog. Only a probe that guides on axis has any.
           original      <- ResultT(
                              selection match
                                case None                                                                 => getAllCandidatesNonEmpty(oid, obsTime, visitEnd, obsInfo.explicitBase, baseTracking, genInfo.agsWavelength, agsParams.probe, obsInfo.constraints, obsInfo.altair, science)
-                               case Some(GuideStarId.Catalog(name = name))                               => getGuideStarFromCatalog(name).map(_.map(List(_)))
+                               case Some(GuideStarId.GaiaDr3(sourceId = sourceId))                       => getGuideStarFromGaia(sourceId).map(_.map(List(_)))
                                case Some(observationSelection @ GuideStarId.ObservationTarget(targetId = _)) => selectObservationTargetCandidates(oid, observationSelection, science).pure[F]
                            )
           corrected: List[(Target, GuideStarCandidate)] =
@@ -1744,7 +1740,7 @@ object GuideService {
           guideStarSelection(catalogName, observationTarget, observationTargetId)
       ):
         case None                                               => (none, false, none)
-        case Some(GuideStarId.Catalog(name = name))             => (name.some, false, none)
+        case Some(star @ GuideStarId.GaiaDr3(sourceId = _))     => (star.catalogName, false, none)
         case Some(GuideStarId.ObservationTarget(targetId = id)) => (none, true, id)
 
     val obsInfoDecoder: Decoder[ObservationInfo] =

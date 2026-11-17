@@ -370,7 +370,7 @@ class guideEnvironmentGnirsAltair extends ExecutionTestSupportForGnirs
     yield assertEquals(
       resolution,
       GuideService.GuideStarResolution.SelectedStarUnusable(
-        GuideStarId.gaia(GuideStarName.gaiaSourceId.getOption(GuideStarName.unsafeFrom(aowfsStarName)).get)
+        GuideStarId.GaiaDr3(GuideStarName.gaiaSourceId.getOption(GuideStarName.unsafeFrom(aowfsStarName)).get)
       )
     )
 
