@@ -90,7 +90,7 @@ class daytimeCalibrationSets_generation extends OdbSuite with DatabaseOperations
       }
     """
 
-  private def atom(kind: String, count: Int, stepType: String, seconds: Int, xBin: String = "TWO"): Json =
+  private def steps(count: Int, stepType: String, seconds: Int, xBin: String = "TWO"): List[Json] =
     val step = json"""
       {
         "observeClass": "DAY_CAL",
@@ -99,16 +99,21 @@ class daytimeCalibrationSets_generation extends OdbSuite with DatabaseOperations
         "instrumentConfig": { "exposure": { "seconds": ${BigDecimal(seconds).setScale(6)} }, "readout": { "xBin": $xBin } }
       }
     """
-    json"""{ "description": ${s"$kind x$count"}, "steps": ${List.fill(count)(step)} }"""
+    List.fill(count)(step)
+
+  private def atom(steps: List[Json]): Json =
+    json"""{ "description": "Daytime Calibration", "steps": $steps }"""
 
   private val mockupAtoms: List[Json] =
     List(
-      atom("Flat", 3,  "GCAL", 15),
-      atom("Arc",  5,  "GCAL", 10),
-      atom("Dark", 10, "DARK", 1),
-      atom("Dark", 10, "DARK", 60),
-      atom("Bias", 5,  "BIAS", 0, "ONE"),
-      atom("Bias", 5,  "BIAS", 0)
+      atom(
+        steps(3,  "GCAL", 15) ++
+        steps(5,  "GCAL", 10) ++
+        steps(10, "DARK", 1)  ++
+        steps(10, "DARK", 60) ++
+        steps(5,  "BIAS", 0, "ONE") ++
+        steps(5,  "BIAS", 0)
+      )
     )
 
   private def expectedExecution(atoms: List[Json]): Json =
@@ -126,7 +131,7 @@ class daytimeCalibrationSets_generation extends OdbSuite with DatabaseOperations
       }
     """
 
-  test("one atom per set, count steps each, in row order"):
+  test("all the sets in one atom, count steps each, in row order"):
     for
       pid <- createProgramAs(staff)
       oid <- createWithSets(pid, mockupSets)
@@ -163,7 +168,7 @@ class daytimeCalibrationSets_generation extends OdbSuite with DatabaseOperations
       )
     yield ()
 
-  test("defined with sets, six atoms in the digest"):
+  test("defined with sets, one atom in the digest"):
     for
       pid <- createProgramAs(staff)
       oid <- createWithSets(pid, mockupSets)
@@ -182,7 +187,7 @@ class daytimeCalibrationSets_generation extends OdbSuite with DatabaseOperations
           {
             "observation": {
               "workflow": { "value": { "state": "DEFINED", "validationErrors": [] } },
-              "execution": { "digest": { "value": { "science": { "atomCount": 6, "observeClass": "DAY_CAL" } } } }
+              "execution": { "digest": { "value": { "science": { "atomCount": 1, "observeClass": "DAY_CAL" } } } }
             }
           }
         """.asRight
@@ -235,6 +240,29 @@ class daytimeCalibrationSets_generation extends OdbSuite with DatabaseOperations
       oid <- createWithSets(pid, mockupSets)
       _   <- recordVisitAs(serviceUser, oid)
       _   <- expect(staff, executionQuery(oid), expectedExecution(mockupAtoms).asRight)
+      _   <- expect(
+        user     = staff,
+        query    = s"""
+          query {
+            executionConfig(observationId: ${oid.asJson}, futureLimit: 0) {
+              gmosNorth { science { nextAtom { description } possibleFuture { description } hasMore } }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "executionConfig": {
+              "gmosNorth": {
+                "science": {
+                  "nextAtom": { "description": "Daytime Calibration" },
+                  "possibleFuture": [],
+                  "hasMore": false
+                }
+              }
+            }
+          }
+        """.asRight
+      )
       _   <- expectOdbError(
         user     = staff,
         query    = s"""
@@ -297,7 +325,7 @@ class daytimeCalibrationSets_generation extends OdbSuite with DatabaseOperations
               "gmosSouth": {
                 "science": {
                   "nextAtom": {
-                    "description": "Dark x2",
+                    "description": "Daytime Calibration",
                     "steps": [
                       { "observeClass": "DAY_CAL", "stepConfig": { "stepType": "DARK" }, "instrumentConfig": { "exposure": { "seconds": 5.000000 } } },
                       { "observeClass": "DAY_CAL", "stepConfig": { "stepType": "DARK" }, "instrumentConfig": { "exposure": { "seconds": 5.000000 } } }
@@ -325,6 +353,45 @@ class daytimeCalibrationSets_generation extends OdbSuite with DatabaseOperations
                  }) { observations { id } }
                }
              """)
+    yield ()
+
+  test("more than a hundred sets still make one atom, with nothing more"):
+    val manySets: String = List.fill(102)(s"{ kind: DARK, explicitCount: 1, ${setup(1)} }").mkString(", ")
+    for
+      pid <- createProgramAs(staff)
+      oid <- createWithSets(pid, manySets)
+      _   <- expect(
+        user     = staff,
+        query    = s"""
+          query {
+            executionConfig(observationId: ${oid.asJson}) {
+              gmosNorth {
+                science {
+                  nextAtom { description steps { observeClass } }
+                  possibleFuture { description }
+                  hasMore
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "executionConfig": {
+              "gmosNorth": {
+                "science": {
+                  "nextAtom": {
+                    "description": "Daytime Calibration",
+                    "steps": ${List.fill(102)(json"""{ "observeClass": "DAY_CAL" }""")}
+                  },
+                  "possibleFuture": [],
+                  "hasMore": false
+                }
+              }
+            }
+          }
+        """.asRight
+      )
     yield ()
 
   test("count is capped"):

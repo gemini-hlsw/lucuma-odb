@@ -346,7 +346,7 @@ class calibrations_mosMaskFlat
       val atom  = sci.downField("nextAtom")
       val step  = atom.downField("steps").downArray
       val inst  = step.downField("instrumentConfig")
-      assertEquals(atom.downField("description").as[String].toOption, "MOS Mask Flat".some)
+      assertEquals(atom.downField("description").as[String].toOption, "Daytime Calibration".some)
       assertEquals(sci.downField("possibleFuture").as[List[Json]].toOption, List.empty[Json].some)
       assertEquals(step.downField("observeClass").as[String].toOption, "DAY_CAL".some)
       assertEquals(step.downFields("stepConfig", "stepType").as[String].toOption, "GCAL".some)

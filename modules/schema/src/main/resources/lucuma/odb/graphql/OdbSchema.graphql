@@ -6451,8 +6451,9 @@ enum CalibrationSetType {
 """
 One row of a daytime calibration: a kind, an exposure count, the GCAL
 configuration (flats and arcs only) and one instrument setup.  The generator
-expands it into one atom: `count` identical DAY_CAL steps for a manual kind,
-the steps the Smart GCAL lookup returns for a smart kind.  A smart kind whose
+expands it into steps of the daytime calibration's single atom: `count`
+identical DAY_CAL steps for a manual kind, the steps the Smart GCAL lookup
+returns for a smart kind.  A smart kind whose
 lookup finds no mapping is left out and reported as MISSING_SMART_GCAL.
 """
 type CalibrationSet {

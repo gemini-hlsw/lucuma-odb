@@ -66,7 +66,10 @@ object DaytimeCalibrationExpansion:
         val missing = es.flatMap(_.missing)
         val atoms   = es.flatMap(_.atom)
         if sets.isEmpty then (missing, atoms).asRight
-        else SmartGcalExpander.remaining(missing, atoms).leftMap(m => OdbError.SequenceUnavailable(oid, m.some))
+        else
+          SmartGcalExpander
+            .remaining(missing, atoms)
+            .bimap(m => OdbError.SequenceUnavailable(oid, m.some), (m, as) => (m, DaytimeCalibration.singleAtom(as)))
       .value
 
   /**

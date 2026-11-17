@@ -140,11 +140,17 @@ class daytimeCalibrationSets_igrins2 extends OdbSuite with DatabaseOperations wi
     """
     json"""{ "description": ${s"$kind x$count"}, "steps": ${List.fill(count)(step)} }"""
 
+  private def merged(atoms: Json*): Json =
+    val steps: List[Json] = atoms.toList.flatMap(_.hcursor.downField("steps").focus.flatMap(_.asArray).toList.flatten)
+    json"""{ "description": "Daytime Calibration", "steps": $steps }"""
+
   private val mockupAtoms: List[Json] =
     List(
-      atom("Dark", 10, "DARK", 60),
-      atom("Flat", 3,  "GCAL", 30),
-      atom("Arc",  2,  "GCAL", 10)
+      merged(
+        atom("Dark", 10, "DARK", 60),
+        atom("Flat", 3,  "GCAL", 30),
+        atom("Arc",  2,  "GCAL", 10)
+      )
     )
 
   private def expectedExecution(atoms: List[Json]): Json =
@@ -162,7 +168,7 @@ class daytimeCalibrationSets_igrins2 extends OdbSuite with DatabaseOperations wi
       }
     """
 
-  test("one atom per set, count steps each, in row order"):
+  test("all the sets in one atom, count steps each, in row order"):
     for
       pid <- createProgramAs(staff)
       oid <- createWithSets(pid, mockupSets)
@@ -229,7 +235,7 @@ class daytimeCalibrationSets_igrins2 extends OdbSuite with DatabaseOperations wi
       )
     yield ()
 
-  test("defined with sets, three atoms in the digest"):
+  test("defined with sets, one atom in the digest"):
     for
       pid <- createProgramAs(staff)
       oid <- createWithSets(pid, mockupSets)
@@ -248,7 +254,7 @@ class daytimeCalibrationSets_igrins2 extends OdbSuite with DatabaseOperations wi
           {
             "observation": {
               "workflow": { "value": { "state": "DEFINED", "validationErrors": [] } },
-              "execution": { "digest": { "value": { "science": { "atomCount": 3, "observeClass": "DAY_CAL" } } } }
+              "execution": { "digest": { "value": { "science": { "atomCount": 1, "observeClass": "DAY_CAL" } } } }
             }
           }
         """.asRight
@@ -435,11 +441,8 @@ class daytimeCalibrationSets_igrins2 extends OdbSuite with DatabaseOperations wi
             "executionConfig": {
               "igrins2": {
                 "science": {
-                  "nextAtom": { "description": "Smart Flat", "steps": [ $smartFlatStep, $smartFlatStep ] },
-                  "possibleFuture": [
-                    { "description": "Smart Arc",    "steps": [ $smartArcStep ] },
-                    { "description": "Day Baseline", "steps": [ $smartArcStep ] }
-                  ]
+                  "nextAtom": { "description": "Daytime Calibration", "steps": [ $smartFlatStep, $smartFlatStep, $smartArcStep, $smartArcStep ] },
+                  "possibleFuture": []
                 }
               }
             }
