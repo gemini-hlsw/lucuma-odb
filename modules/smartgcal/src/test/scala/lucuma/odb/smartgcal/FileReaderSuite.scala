@@ -14,45 +14,33 @@ final class FileReaderSuite extends munit.FunSuite:
   // Reads a file through the same pipe its migration uses, so a parse error or
   // a misread header fails here rather than at deploy time.
   private def load[A](filename: String, reader: String => Pipe[IO, Byte, (PosLong, A)]): Unit =
-    val is   = IO(this.getClass.getClassLoader.getResourceAsStream(s"smartgcal/$filename.csv"))
-    val rows = fs2.io.readInputStream[IO](is, 8192).through(reader(filename)).compile.count.unsafeRunSync()
+    val rows =
+      fs2.io.readClassLoaderResource[IO](s"smartgcal/$filename.csv")
+        .through(reader(filename))
+        .compile
+        .count
+        .unsafeRunSync()
     assert(rows > 0, s"$filename produced no rows")
 
-  test("Flamingos2_ARC"):
-    load("Flamingos2_ARC", FileReader.flamingos2[IO])
+  private val readers: List[(String, String => Unit)] =
+    List(
+      "Flamingos2_" -> (load(_, FileReader.flamingos2[IO])),
+      "GHOST_"      -> (load(_, FileReader.ghost[IO])),
+      "GMOS-N_"     -> (load(_, FileReader.gmosNorth[IO])),
+      "GMOS-S_"     -> (load(_, FileReader.gmosSouth[IO])),
+      "GNIRS_"      -> (load(_, FileReader.gnirs[IO])),
+      "IGRINS-2_"   -> (load(_, FileReader.igrins2[IO]))
+    )
 
-  test("Flamingos2_FLAT"):
-    load("Flamingos2_FLAT", FileReader.flamingos2[IO])
+  // Every file present gets a test, so a new or renamed file cannot go untested.
+  SmartGcalFiles.names.foreach: name =>
+    test(name):
+      readers.find((prefix, _) => name.startsWith(prefix)) match
+        case Some((_, check)) => check(name)
+        case None             => fail(s"No reader for smartgcal/$name.csv; add its prefix to FileReaderSuite.readers")
 
-  test("GHOST_ARC"):
-    load("GHOST_ARC", FileReader.ghost[IO])
-
-  test("GHOST_FLAT"):
-    load("GHOST_FLAT", FileReader.ghost[IO])
-
-  test("GMOS-N_ARC"):
-    load("GMOS-N_ARC", FileReader.gmosNorth[IO])
-
-  test("GMOS-N_FLAT"):
-    load("GMOS-N_FLAT", FileReader.gmosNorth[IO])
-
-  test("GMOS-S_ARC"):
-    load("GMOS-S_ARC", FileReader.gmosSouth[IO])
-
-  test("GMOS-S_FLAT"):
-    load("GMOS-S_FLAT", FileReader.gmosSouth[IO])
-
-  test("GNIRS_ARC"):
-    load("GNIRS_ARC", FileReader.gnirs[IO])
-
-  test("GNIRS_FLAT"):
-    load("GNIRS_FLAT", FileReader.gnirs[IO])
-
-  test("IGRINS-2_ARC"):
-    load("IGRINS-2_ARC", FileReader.igrins2[IO])
-
-  test("IGRINS-2_FLAT"):
-    load("IGRINS-2_FLAT", FileReader.igrins2[IO])
+  test("smartgcal files are discovered"):
+    assert(SmartGcalFiles.names.nonEmpty)
 
   private def entryLines(content: String): Either[Throwable, List[(Long, String)]] =
     Stream.emit(content)
