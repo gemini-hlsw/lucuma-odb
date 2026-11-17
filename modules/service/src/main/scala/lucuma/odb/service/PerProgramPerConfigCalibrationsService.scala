@@ -72,12 +72,18 @@ object PerProgramPerConfigCalibrationsService:
     new PerProgramPerConfigCalibrationsService[F] with CalibrationObservations with ObsCalibrationOperations with WorkflowStateQueries[F]:
       given Logger[F] = LF.getLoggerFromName("per-program-calibrations")
 
+      // MOS science has no GPP acquisition, so its ITC input is science-only.
+      private def scienceEtmAt(itc: ItcInput): Option[Wavelength] =
+        ItcInput.spectroscopy.getOption(itc).map(_.science)
+          .orElse(ItcInput.scienceOnlySpectroscopy.getOption(itc).map(_.science))
+          .map(_.mode.exposureTimeMode.at)
+
       private def calObsProps(
         calibConfigs: List[ObsExtract[CalibrationConfigSubset]],
         calibType:    CalibrationRole
       ): Map[CalibrationConfigSubset, CalObsProps] =
         calibConfigs.groupBy(ex => CalibrationConfigMatcher.matcherFor(ex.data, calibType).normalize(ex.data)).map: (k, v) =>
-          val w = v.map(ex => ex.itc.flatMap(ItcInput.spectroscopy.getOption).map(_.science.mode.exposureTimeMode.at)).flattenOption match
+          val w = v.flatMap(_.itc.flatMap(scienceEtmAt)) match
             case Nil =>
                none[Wavelength]
             case ws  =>
@@ -142,22 +148,31 @@ object PerProgramPerConfigCalibrationsService:
        * Check if a calibration is actually needed by any science observation.
        */
       private def isCalibrationNeeded(
-        scienceConfigs: List[CalibrationConfigSubset],
+        sciPerRole:  Map[CalibrationRole, List[CalibrationConfigSubset]],
         calibConfig: CalibrationConfigSubset,
-        calibRole: CalibrationRole
+        calibRole:   CalibrationRole
       ): Boolean =
-        scienceConfigs.exists: sciConfig =>
+        sciPerRole.getOrElse(calibRole, Nil).exists: sciConfig =>
           CalibrationConfigMatcher.matcherFor(sciConfig, calibRole).configsMatch(sciConfig, calibConfig)
 
+      // The science configurations that take each calibration role.  Every
+      // per-role step reads from this, so `applies` is decided in one place.
+      private def sciencePerRole(
+        uniqueSci: List[CalibrationConfigSubset]
+      ): Map[CalibrationRole, List[CalibrationConfigSubset]] =
+        ObsExtract.PerProgramPerConfigCalibrationTypes.map: calibrationRole =>
+          calibrationRole -> uniqueSci.filter: config =>
+            CalibrationConfigMatcher.matcherFor(config, calibrationRole).applies(config)
+        .toMap
+
       private def calculateConfigurationsPerRole(
-        uniqueSci: List[CalibrationConfigSubset],
-        calibs: List[ObsExtract[CalibrationConfigSubset]]
+        sciPerRole: Map[CalibrationRole, List[CalibrationConfigSubset]],
+        calibs:     List[ObsExtract[CalibrationConfigSubset]]
       ): Map[CalibrationRole, List[CalibrationConfigSubset]] =
         ObsExtract.PerProgramPerConfigCalibrationTypes.map { calibType =>
-          val sciConfigs = uniqueSci.flatMap: config =>
-            val matcher = CalibrationConfigMatcher.matcherFor(config, calibType)
-            Option.when(matcher.applies(config))(matcher.normalize(config))
-          .distinct
+          val sciConfigs = sciPerRole.getOrElse(calibType, Nil)
+            .map(config => CalibrationConfigMatcher.matcherFor(config, calibType).normalize(config))
+            .distinct
           val calibConfigs = calibs
             .filter(_.role.contains(calibType))
             .map(_.data)
@@ -231,13 +246,13 @@ object PerProgramPerConfigCalibrationsService:
       }
 
       private def removeUnnecessaryCalibrations(
-        pid:            Program.Id,
-        scienceConfigs: List[CalibrationConfigSubset],
-        calibrations:   List[ObsExtract[CalibrationConfigSubset]]
+        pid:          Program.Id,
+        sciPerRole:   Map[CalibrationRole, List[CalibrationConfigSubset]],
+        calibrations: List[ObsExtract[CalibrationConfigSubset]]
       )(using Transaction[F], ServiceAccess): F[List[Observation.Id]] = {
         val candidates = calibrations.collect {
           case ObsExtract(id = oid, role = Some(role), data = config)
-            if !isCalibrationNeeded(scienceConfigs, config, role) => oid
+            if !isCalibrationNeeded(sciPerRole, config, role) => oid
         }
 
         for
@@ -543,17 +558,18 @@ object PerProgramPerConfigCalibrationsService:
           activeGmosSci   <- onlyCalibrationRelevant(allSci, _.id)
           // unique GMOS configurations
           uniqueSci       = uniqueConfiguration(activeGmosSci)
+          sciPerRole      = sciencePerRole(uniqueSci)
           // Extract props from all science observations, normalized per calibration type.
           propsByRole     = ObsExtract.PerProgramPerConfigCalibrationTypes
                               .map(role => role -> calObsProps(toConfigForCalibration(allSci), role)).toMap
           // Create ideal targets for each site
           gnTgt           = CalibrationIdealTargets(Site.GN, when, calibTargets)
           gsTgt           = CalibrationIdealTargets(Site.GS, when, calibTargets)
-          configsPerRole  = calculateConfigurationsPerRole(uniqueSci, gmosCalibs)
+          configsPerRole  = calculateConfigurationsPerRole(sciPerRole, gmosCalibs)
           _              <- info"===== Recalculating shared calibrations for program ID: $pid, instant $when ====="
           _              <- info"Program $pid has ${uniqueSci.length} science configurations"
           // Remove calibrations that are not needed, basically when a config is removed
-          removedOids    <- removeUnnecessaryCalibrations(pid, uniqueSci, gmosCalibs)
+          removedOids    <- removeUnnecessaryCalibrations(pid, sciPerRole, gmosCalibs)
           _              <- (info"Program $pid will remove unnecessary calibrations $removedOids").whenA(removedOids.nonEmpty)
           // Generate new calibrations for each unique configuration
           addedOids      <- generateGMOSLSCalibrations(pid, propsByRole, configsPerRole, gnTgt, gsTgt)

@@ -81,6 +81,32 @@ class calibrations_gmosMosTwilight
   private def replaceFile(aid: Attachment.Id, path: String): IO[Unit] =
     withSession(_.execute(sql"UPDATE t_attachment SET c_remote_path = $text WHERE c_attachment_id = $attachment_id".command)((path, aid)).void)
 
+  private def deleteAttachmentRow(aid: Attachment.Id): IO[Unit] =
+    withSession(_.execute(sql"DELETE FROM t_attachment WHERE c_attachment_id = $attachment_id".command)(aid).void)
+
+  private def setScienceSnAt(oid: Observation.Id, nm: Int): IO[Unit] =
+    query(
+      pi,
+      s"""mutation {
+            updateObservations(input: {
+              WHERE: { id: { EQ: "$oid" } }
+              SET: { observingMode: { gmosNorthMos: { exposureTimeMode: { signalToNoise: { value: 75, at: { nanometers: $nm } } } } } }
+            }) {
+              observations { id }
+            }
+          }"""
+    ).void
+
+  private def twilightSnAt(oid: Observation.Id): IO[Option[Int]] =
+    query(
+      serviceUser,
+      s"""query {
+            observation(observationId: "$oid") {
+              observingMode { gmosNorthMos { exposureTimeMode { signalToNoise { at { nanometers } } } } }
+            }
+          }"""
+    ).map(_.hcursor.downFields("observation", "observingMode", "gmosNorthMos", "exposureTimeMode", "signalToNoise", "at", "nanometers").as[BigDecimal].toOption.map(_.toInt))
+
   private def start(oid: Observation.Id): IO[Unit] =
     recordVisitAs(serviceUser, oid).flatMap(addSequenceEventAs(serviceUser, _, SequenceCommand.Start)).void
 
@@ -229,22 +255,57 @@ class calibrations_gmosMosTwilight
       assertEquals(before.size, 1)
       assertEquals(after, Nil)
 
-  test("replacing the attachment's file keeps an untaken Twilight and adds a new one beside a started Twilight"):
+  test("deleting the Mask Attachment removes an untaken MOS Twilight"):
+    for
+      (pid, _, aid, oid) <- gnMosWithMask()
+      _                  <- recalculateCalibrations(pid, when, oid)
+      before             <- twilightsOf(pid)
+      _                  <- deleteAttachmentRow(aid)
+      _                  <- recalculateCalibrations(pid, when, oid)
+      after              <- twilightsOf(pid)
+    yield
+      assertEquals(before.size, 1)
+      assertEquals(after, Nil)
+
+  test("replacing the attachment's file keeps an untaken MOS Twilight"):
     for
       (pid, _, aid, oid) <- gnMosWithMask()
       _                  <- recalculateCalibrations(pid, when, oid)
       first              <- twilightsOf(pid)
       _                  <- replaceFile(aid, "second")
-      _                  <- recalculateCalibrations(pid, when, oid)
-      same               <- twilightsOf(pid)
-      _                  <- start(first.head)
-      _                  <- replaceFile(aid, "third")
-      _                  <- recalculateCalibrations(pid, when, oid)
-      both               <- twilightsOf(pid)
+      (added, removed)   <- recalculateCalibrations(pid, when, oid)
+      after              <- twilightsOf(pid)
     yield
-      assertEquals(same, first)
+      assertEquals(after, first)
+      assertEquals(added, Nil)
+      assertEquals(removed, Nil)
+
+  test("a started MOS Twilight is kept and a new one is made beside it"):
+    for
+      (pid, _, _, oid) <- gnMosWithMask()
+      _                <- recalculateCalibrations(pid, when, oid)
+      first            <- twilightsOf(pid)
+      _                <- start(first.head)
+      _                <- recalculateCalibrations(pid, when, oid)
+      both             <- twilightsOf(pid)
+    yield
       assertEquals(both.size, 2)
       assert(both.contains(first.head))
+
+  test("the MOS Twilight's science S/N wavelength follows its science"):
+    for
+      (pid, _, _, oid) <- gnMosWithMask()
+      _                <- setScienceSnAt(oid, 520)
+      _                <- recalculateCalibrations(pid, when, oid)
+      twilight         <- twilightsOf(pid).map(_.head)
+      _                <- recalculateCalibrations(pid, when, oid)
+      before           <- twilightSnAt(twilight)
+      _                <- setScienceSnAt(oid, 540)
+      _                <- recalculateCalibrations(pid, when, oid)
+      after            <- twilightSnAt(twilight)
+    yield
+      assertEquals(before, 520.some)
+      assertEquals(after, 540.some)
 
   test("GMOS South MOS science gets a MOS Twilight through its Custom Mask"):
     for
