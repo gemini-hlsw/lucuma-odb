@@ -20224,6 +20224,27 @@ type Query {
   group(groupId: GroupId!): Group
 
   """
+  Selects the first `LIMIT` matching groups based on the provided `WHERE`
+  parameter, if any, ordered by id.
+  """
+  groups(
+    "Filters the selection of groups."
+    WHERE: WhereGroup
+
+    "Starts the result set at the given group id, or at the next one if it does not exist."
+    OFFSET_AT: GroupId
+
+    "Starts the result set after the given group id."
+    OFFSET_AFTER: GroupId
+
+    "Limits the result to at most this number of matches (but never more than 1000)."
+    LIMIT: NonNegInt
+
+    "Set to true to include deleted groups."
+    includeDeleted: Boolean! = false
+  ): GroupSelectResult!
+
+  """
   Returns the observation with the given id or reference, if any.  Identify the
   observation by specifying only one of observationId or observationReference.
   If more than one is provided, all must match.  If neither are set, nothing
@@ -24878,6 +24899,187 @@ input WhereGroup {
   name: WhereOptionString
 
   description: WhereOptionString
+
+  "Matches the program containing the group."
+  program: WhereProgram
+
+  """
+  Matches the group's standing (`Group.standing`).  A deleted group has no
+  standing, so it matches no standing filter.
+  """
+  standing: WhereCalculatedGroupStanding
+
+  """
+  Matches if some waiver of the group, revoked ones included, matches.  Every
+  condition in the filter, `NOT` included, applies to that one waiver: so
+  `{ violation: { code: { EQ: ORDER } }, revoked: { IS_NULL: true } }` matches
+  an active ORDER waiver, and `{ NOT: { revoked: { IS_NULL: true } } }` a
+  revoked one.
+  The filter can't express that no waiver matches, and negating it from
+  outside (`NOT: { waivers: ... }`) has the same meaning as negating it inside.
+  Use `hasWaiver` and `hasActiveWaiver` to match groups without waivers.
+  """
+  waivers: WhereGroupConstraintWaiver
+
+  "Matches whether the group has any waiver, revoked ones included."
+  hasWaiver: WhereBoolean
+
+  "Matches whether the group has an active (unrevoked) waiver."
+  hasActiveWaiver: WhereBoolean
+
+  "Matches whether the group is managed by the system."
+  system: WhereBoolean
+
+  """
+  Matches how many of the group's elements must be observed.  Null means all
+  of them, so `IS_NULL: true` matches groups that require every element.
+  """
+  minimumRequired: WhereOptionOrderNonNegShort
+
+  "Matches whether the group's elements must be observed in order."
+  ordered: WhereBoolean
+
+  "Matches the group's minimum interval between elements, if any."
+  minimumInterval: WhereOptionOrderTimeSpan
+
+  "Matches the group's maximum interval between elements, if any."
+  maximumInterval: WhereOptionOrderTimeSpan
+
+  "Matches whether the group's elements must all be observed in one night."
+  sameNight: WhereBoolean
+
+  "Matches the group's minimum number of observations per night, if any."
+  minimumObservationsPerNight: WhereOptionOrderPosShort
+
+  "Matches the group's maximum number of observations per night, if any."
+  maximumObservationsPerNight: WhereOptionOrderPosShort
+}
+
+"""
+Matches a group constraint waiver, field by field as `GroupConstraintWaiver`
+has them, except its `groupId`: it is matched as one of the group's waivers.
+"""
+input WhereGroupConstraintWaiver {
+  AND: [WhereGroupConstraintWaiver!]
+  OR: [WhereGroupConstraintWaiver!]
+  NOT: WhereGroupConstraintWaiver
+
+  id: WhereOrderGroupConstraintWaiverId
+
+  "Matches the violation accepted."
+  violation: WhereGroupConstraintViolation
+
+  "Matches who granted the waiver and when."
+  granted: WhereAttribution
+
+  """
+  Matches who revoked the waiver and when.  `IS_NULL: true` matches an active
+  waiver, and `IS_NULL: false` a revoked one.
+  """
+  revoked: WhereOptionAttribution
+}
+
+"""
+Matches a group constraint violation, as `GroupConstraintViolation` has it.
+Whether a violation is located by element or by night follows from its code.
+"""
+input WhereGroupConstraintViolation {
+  "Matches the kind of violation."
+  code: WhereEqGroupConstraintViolationCode
+
+  "Matches the element where it happened.  Never matches a night's violation."
+  element: WhereGroupElementId
+
+  "Matches the night when it happened.  Never matches an element's violation."
+  night: WhereObservingNight
+}
+
+"""
+Matches a group element id.  A condition on the id the element doesn't have
+(say `groupId` for an observation) never matches.
+"""
+input WhereGroupElementId {
+  groupId: WhereOrderGroupId
+  observationId: WhereOrderObservationId
+}
+
+"Matches an observing night."
+input WhereObservingNight {
+  site: WhereEqSite
+
+  "Matches the local date on which the night ends."
+  date: WhereOrderDate
+}
+
+"Matches who took an action and when."
+input WhereAttribution {
+  by: WhereOrderUserId
+  at: WhereOrderTimestamp
+}
+
+"Matches who took an action, if anyone did, and when."
+input WhereOptionAttribution {
+  """
+  When `true`, matches if the action hasn't been taken.  When `false` matches if
+  it has.
+  """
+  IS_NULL: Boolean
+
+  by: WhereOrderUserId
+  at: WhereOrderTimestamp
+}
+
+input WhereOrderGroupConstraintWaiverId {
+  "Matches if the property is exactly the supplied value."
+  EQ: GroupConstraintWaiverId
+
+  "Matches if the property is not the supplied value."
+  NEQ: GroupConstraintWaiverId
+
+  "Matches if the property value is any of the supplied options."
+  IN: [GroupConstraintWaiverId!]
+
+  "Matches if the property value is none of the supplied values."
+  NIN: [GroupConstraintWaiverId!]
+
+  "Matches if the property is ordered after (>) the supplied value."
+  GT: GroupConstraintWaiverId
+
+  "Matches if the property is ordered before (<) the supplied value."
+  LT: GroupConstraintWaiverId
+
+  "Matches if the property is ordered after or equal (>=) the supplied value."
+  GTE: GroupConstraintWaiverId
+
+  "Matches if the property is ordered before or equal (<=) the supplied value."
+  LTE: GroupConstraintWaiverId
+}
+
+
+
+input WhereEqGroupConstraintViolationCode {
+  "Matches if the code is exactly the supplied value."
+  EQ: GroupConstraintViolationCode
+
+  "Matches if the code is not the supplied value."
+  NEQ: GroupConstraintViolationCode
+
+  "Matches if the code is any of the supplied options."
+  IN: [GroupConstraintViolationCode!]
+
+  "Matches if the code is none of the supplied values."
+  NIN: [GroupConstraintViolationCode!]
+}
+
+"""
+The matching groups, limited to a maximum of 1000 entries.
+"""
+type GroupSelectResult {
+  "Matching groups up to the return size limit of 1000."
+  matches: [Group!]!
+
+  "`true` when there were additional matches that were not returned."
+  hasMore: Boolean!
 }
 
 input WhereOrderGroupId {
@@ -25789,6 +25991,114 @@ input WhereOptionOrderTimestamp {
   Matches if the timestamp is ordered before or equal (<=) the supplied value.
   """
   LTE: Timestamp
+}
+
+"""
+Filters on equality or order comparisons of an optional count property.  All
+supplied criteria must match, but usually only one is selected.
+"""
+input WhereOptionOrderNonNegShort {
+  """
+  When `true`, matches if the count is not defined.  When `false` matches if
+  the count is defined.
+  """
+  IS_NULL: Boolean
+
+  "Matches if the count is exactly the supplied value."
+  EQ: NonNegShort
+
+  "Matches if the count is not the supplied value."
+  NEQ: NonNegShort
+
+  "Matches if the count is any of the supplied options."
+  IN: [NonNegShort!]
+
+  "Matches if the count is none of the supplied values."
+  NIN: [NonNegShort!]
+
+  "Matches if the count is ordered after (>) the supplied value."
+  GT: NonNegShort
+
+  "Matches if the count is ordered before (<) the supplied value."
+  LT: NonNegShort
+
+  "Matches if the count is ordered after or equal (>=) the supplied value."
+  GTE: NonNegShort
+
+  "Matches if the count is ordered before or equal (<=) the supplied value."
+  LTE: NonNegShort
+}
+
+"""
+Filters on equality or order comparisons of an optional count property.  All
+supplied criteria must match, but usually only one is selected.
+"""
+input WhereOptionOrderPosShort {
+  """
+  When `true`, matches if the count is not defined.  When `false` matches if
+  the count is defined.
+  """
+  IS_NULL: Boolean
+
+  "Matches if the count is exactly the supplied value."
+  EQ: PosShort
+
+  "Matches if the count is not the supplied value."
+  NEQ: PosShort
+
+  "Matches if the count is any of the supplied options."
+  IN: [PosShort!]
+
+  "Matches if the count is none of the supplied values."
+  NIN: [PosShort!]
+
+  "Matches if the count is ordered after (>) the supplied value."
+  GT: PosShort
+
+  "Matches if the count is ordered before (<) the supplied value."
+  LT: PosShort
+
+  "Matches if the count is ordered after or equal (>=) the supplied value."
+  GTE: PosShort
+
+  "Matches if the count is ordered before or equal (<=) the supplied value."
+  LTE: PosShort
+}
+
+"""
+Filters on equality or order comparisons of an optional time span property.  All
+supplied criteria must match, but usually only one is selected.
+"""
+input WhereOptionOrderTimeSpan {
+  """
+  When `true`, matches if the time span is not defined.  When `false` matches if
+  the time span is defined.
+  """
+  IS_NULL: Boolean
+
+  "Matches if the time span is exactly the supplied value."
+  EQ: TimeSpanInput
+
+  "Matches if the time span is not the supplied value."
+  NEQ: TimeSpanInput
+
+  "Matches if the time span is any of the supplied options."
+  IN: [TimeSpanInput!]
+
+  "Matches if the time span is none of the supplied values."
+  NIN: [TimeSpanInput!]
+
+  "Matches if the time span is ordered after (>) the supplied value."
+  GT: TimeSpanInput
+
+  "Matches if the time span is ordered before (<) the supplied value."
+  LT: TimeSpanInput
+
+  "Matches if the time span is ordered after or equal (>=) the supplied value."
+  GTE: TimeSpanInput
+
+  "Matches if the time span is ordered before or equal (<=) the supplied value."
+  LTE: TimeSpanInput
 }
 
 """

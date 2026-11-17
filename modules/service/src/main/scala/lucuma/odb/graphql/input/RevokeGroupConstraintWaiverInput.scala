@@ -16,12 +16,10 @@ case class RevokeGroupConstraintWaiverInput(
 
 object RevokeGroupConstraintWaiverInput:
 
-  private val WaiverIdBinding = gidBinding[GroupConstraintWaiver.Id]("group constraint waiver")
-
   val Binding: Matcher[RevokeGroupConstraintWaiverInput] =
     ObjectFieldsBinding.rmap:
       case List(
-        WaiverIdBinding("waiverId", rId),
+        GroupConstraintWaiverIdBinding("waiverId", rId),
         NonEmptyStringBinding.Option("reason", rReason)
       ) =>
         (rId, rReason).parMapN(apply)

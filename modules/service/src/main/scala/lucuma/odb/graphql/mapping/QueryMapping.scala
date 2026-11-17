@@ -49,6 +49,7 @@ import lucuma.odb.graphql.input.WhereConfigurationRequest
 import lucuma.odb.graphql.input.WhereDataset
 import lucuma.odb.graphql.input.WhereDatasetChronicleEntry
 import lucuma.odb.graphql.input.WhereExecutionEvent
+import lucuma.odb.graphql.input.WhereGroup
 import lucuma.odb.graphql.input.WhereImagingConfigOption
 import lucuma.odb.graphql.input.WhereObservation
 import lucuma.odb.graphql.input.WhereProgram
@@ -98,6 +99,7 @@ trait QueryMapping[F[_]] extends Predicates[F] with UserEnv {
       RootEffect.computeJson("executionConfig")(executionConfig),
       RootEffect.computeJson("goaDataDownloadAccess")(goaDataDownloadAccess),
       SqlObject("group"),
+      SqlObject("groups"),
       SqlObject("observation"),
       SqlObject("observations"),
       SqlObject("observingModeGroup"),
@@ -130,6 +132,7 @@ trait QueryMapping[F[_]] extends Predicates[F] with UserEnv {
       ExecutionConfig,
       GoaDataDownloadAccess,
       Group,
+      Groups,
       ImagingConfigOptions,
       Observation_,
       Observations,
@@ -535,6 +538,39 @@ trait QueryMapping[F[_]] extends Predicates[F] with UserEnv {
             )
           }
         }
+
+  private lazy val Groups: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
+    val WhereGroupBinding = WhereGroup.binding(Path.from(GroupType))
+    {
+      case (QueryType, "groups", List(
+        WhereGroupBinding.Option("WHERE", rWHERE),
+        GroupIdBinding.Option("OFFSET_AT", rOFFSET_AT),
+        GroupIdBinding.Option("OFFSET_AFTER", rOFFSET_AFTER),
+        NonNegIntBinding.Option("LIMIT", rLIMIT),
+        BooleanBinding("includeDeleted", rIncludeDeleted)
+      )) =>
+        withUser:
+          Elab.transformChild: child =>
+            val rOffset: Result[Predicate] = PagingOffset.predicate(Predicates.group.id, Result(None), rOFFSET_AT, rOFFSET_AFTER)
+            (rWHERE, rOffset, rLIMIT, rIncludeDeleted).parFlatMapN: (WHERE, offset, LIMIT, includeDeleted) =>
+              val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
+              ResultMapping.selectResult(child, limit): q =>
+                FilterOrderByOffsetLimit(
+                  pred = Some(and(List(
+                    offset,
+                    Predicates.group.existence.includeDeleted(includeDeleted),
+                    Predicates.group.program.existence.includeDeleted(includeDeleted),
+                    Predicates.group.program.isVisibleTo(user),
+                    WHERE.getOrElse(True)
+                  ))),
+                  oss = Some(List(
+                    OrderSelection[model.Group.Id](GroupType / "id")
+                  )),
+                  offset = None,
+                  limit = Some(limit + 1), // Select one extra row here.
+                  child = q
+                )
+    }
 
   private def observationPredicate(
     rOid: Result[Option[model.Observation.Id]],

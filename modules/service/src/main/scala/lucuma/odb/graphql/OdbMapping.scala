@@ -281,6 +281,7 @@ object OdbMapping {
           with ProgramMapping[F]
           with ProgramNoteMapping[F]
           with ProgramNoteSelectResultMapping[F]
+          with GroupSelectResultMapping[F]
           with ProgramReferenceMapping[F]
           with ProgramSelectResultMapping[F]
           with ProgramUserMapping[F]
@@ -552,6 +553,7 @@ object OdbMapping {
                 ProgramEditMapping,
                 ProgramNoteMapping,
                 ProgramNoteSelectResultMapping,
+                GroupSelectResultMapping,
                 ProgramReferenceMapping,
                 ProgramSelectResultMapping,
                 ProgramUserMapping,
