@@ -20435,13 +20435,13 @@ type Query {
   ): ProgramNoteSelectResult!
 
   """
-  Selects the first `LIMIT` MOS mask attachments cut for the given instrument,
-  from every program, in attachment id order.  Staff only: other users get no
+  Selects the first `LIMIT` MOS mask attachments cut for any of the given
+  instruments, from every program, in attachment id order.  Staff only: other users get no
   matches.  Use it to choose the mask of a daytime calibration.
   """
   mosMasks(
-    "The instrument the masks were cut for: GMOS_NORTH, GMOS_SOUTH or FLAMINGOS2."
-    instrument: Instrument!
+    "The instruments the masks were cut for: GMOS_NORTH, GMOS_SOUTH or FLAMINGOS2."
+    instruments: [Instrument!]!
 
     "Filters the selection of masks, for example by `maskName` or `program`."
     WHERE: WhereAttachment

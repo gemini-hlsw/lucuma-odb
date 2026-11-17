@@ -24,16 +24,16 @@ class mosMasks extends OdbSuite with DatabaseOperations with MosMaskSupport:
 
   // Scoped to the fixture's programs so that tests do not see each other's masks.
   private def select(
-    user:       User,
-    instrument: Instrument,
-    f:          Fixture,
-    where:      Option[String]        = None,
-    after:      Option[Attachment.Id] = None,
-    limit:      Option[Int]           = None
+    user:        User,
+    instruments: List[Instrument],
+    f:           Fixture,
+    where:       Option[String]        = None,
+    after:       Option[Attachment.Id] = None,
+    limit:       Option[Int]           = None
   ): IO[(List[Attachment.Id], Boolean)] =
     val scope = s"{ program: { id: { IN: [${f.p1.asJson}, ${f.p2.asJson}] } } }"
     val args  = List(
-      s"instrument: ${instrument.tag.toScreamingSnakeCase}".some,
+      s"instruments: [${instruments.map(_.tag.toScreamingSnakeCase).mkString(", ")}]".some,
       s"WHERE: { AND: [${(scope :: where.toList).mkString(", ")}] }".some,
       after.map(a => s"OFFSET_AFTER: ${a.asJson}"),
       limit.map(l => s"LIMIT: $l")
@@ -62,37 +62,65 @@ class mosMasks extends OdbSuite with DatabaseOperations with MosMaskSupport:
   test("staff see every mask for the instrument, across programs"):
     for
       f <- fixture
-      n <- select(staff, Instrument.GmosNorth, f)
-      s <- select(staff, Instrument.Flamingos2, f)
-      g <- select(staff, Instrument.GmosSouth, f)
+      n <- select(staff, List(Instrument.GmosNorth), f)
+      s <- select(staff, List(Instrument.Flamingos2), f)
+      g <- select(staff, List(Instrument.GmosSouth), f)
     yield
       assertEquals(n, (List(f.n1, f.n2, f.n3), false))
       assertEquals(s, (List(f.f2), false))
       assertEquals(g, (Nil, false))
 
+  test("several instruments are listed together, none lists nothing"):
+    for
+      f <- fixture
+      b <- select(staff, List(Instrument.GmosNorth, Instrument.Flamingos2), f)
+      s <- select(staff, List(Instrument.GmosSouth, Instrument.Flamingos2), f)
+      e <- select(staff, Nil, f)
+    yield
+      assertEquals(b, (List(f.n1, f.n2, f.n3, f.f2), false))
+      assertEquals(s, (List(f.f2), false))
+      assertEquals(e, (Nil, false))
+
+  test("each match tells which instrument it was cut for"):
+    for
+      f <- fixture
+      j <- query(staff, s"""
+             query {
+               mosMasks(
+                 instruments: [GMOS_NORTH, FLAMINGOS2]
+                 WHERE: { program: { id: { EQ: ${f.p2.asJson} } } }
+               ) { matches { id mask { instrument } } }
+             }
+           """)
+    yield assertEquals(
+      j.hcursor.downFields("mosMasks", "matches").require[List[Json]].map: m =>
+        (m.hcursor.downField("id").require[Attachment.Id], m.hcursor.downFields("mask", "instrument").require[String]),
+      List((f.n3, "GMOS_NORTH"), (f.f2, "FLAMINGOS2"))
+    )
+
   test("a PI sees nothing, not even their own masks"):
     for
       f <- fixture
-      r <- select(pi, Instrument.GmosNorth, f)
+      r <- select(pi, List(Instrument.GmosNorth), f)
     yield assertEquals(r, (Nil, false))
 
   test("masks can be narrowed by mask name"):
     for
       f <- fixture
-      r <- select(staff, Instrument.GmosNorth, f, where = """{ maskName: { LIKE: "GN2026AQ001-%" } }""".some)
+      r <- select(staff, List(Instrument.GmosNorth), f, where = """{ maskName: { LIKE: "GN2026AQ001-%" } }""".some)
     yield assertEquals(r, (List(f.n1, f.n2), false))
 
   test("masks can be narrowed by program"):
     for
       f <- fixture
-      r <- select(staff, Instrument.GmosNorth, f, where = s"""{ program: { id: { EQ: ${f.p2.asJson} } } }""".some)
+      r <- select(staff, List(Instrument.GmosNorth), f, where = s"""{ program: { id: { EQ: ${f.p2.asJson} } } }""".some)
     yield assertEquals(r, (List(f.n3), false))
 
   test("results are paged"):
     for
       f  <- fixture
-      r0 <- select(staff, Instrument.GmosNorth, f, limit = 2.some)
-      r1 <- select(staff, Instrument.GmosNorth, f, after = f.n2.some, limit = 2.some)
+      r0 <- select(staff, List(Instrument.GmosNorth), f, limit = 2.some)
+      r1 <- select(staff, List(Instrument.GmosNorth), f, after = f.n2.some, limit = 2.some)
     yield
       assertEquals(r0, (List(f.n1, f.n2), true))
       assertEquals(r1, (List(f.n3), false))

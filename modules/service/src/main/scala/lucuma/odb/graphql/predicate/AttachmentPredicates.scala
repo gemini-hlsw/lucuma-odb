@@ -18,8 +18,9 @@ class AttachmentPredicates(path: Path) {
   lazy val program   = new ProgramPredicates(path / "program")
 
   // Only MOS mask attachments carry an instrument.
-  def isMaskFor(instrument: Instrument): Predicate =
-    Eql(path / "maskInstrument", Const(instrument.some))
+  def isMaskFor(instruments: List[Instrument]): Predicate =
+    if instruments.isEmpty then False
+    else In(path / "maskInstrument", instruments.distinct.map(_.some))
 
   // The cross-program mask listing is for staff.
   def isListableBy(user: User): Predicate =

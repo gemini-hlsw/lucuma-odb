@@ -44,6 +44,7 @@ import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.TooTrigger
 import lucuma.odb.graphql.binding.*
+import lucuma.odb.graphql.input.WhereAttachment
 import lucuma.odb.graphql.input.WhereCallForProposals
 import lucuma.odb.graphql.input.WhereConfigurationRequest
 import lucuma.odb.graphql.input.WhereDataset
@@ -53,7 +54,6 @@ import lucuma.odb.graphql.input.WhereGroup
 import lucuma.odb.graphql.input.WhereImagingConfigOption
 import lucuma.odb.graphql.input.WhereObservation
 import lucuma.odb.graphql.input.WhereProgram
-import lucuma.odb.graphql.input.WhereAttachment
 import lucuma.odb.graphql.input.WhereProgramNote
 import lucuma.odb.graphql.input.WhereProgramUser
 import lucuma.odb.graphql.input.WhereSpectroscopyConfigOption
@@ -826,7 +826,7 @@ trait QueryMapping[F[_]] extends Predicates[F] with UserEnv {
     val WhereAttachmentBinding = WhereAttachment.binding(Path.from(AttachmentType))
     {
       case (QueryType, "mosMasks", List(
-        InstrumentBinding("instrument", rInstrument),
+        InstrumentBinding.List("instruments", rInstruments),
         WhereAttachmentBinding.Option("WHERE", rWHERE),
         AttachmentIdBinding.Option("OFFSET_AT", rOFFSET_AT),
         AttachmentIdBinding.Option("OFFSET_AFTER", rOFFSET_AFTER),
@@ -835,14 +835,14 @@ trait QueryMapping[F[_]] extends Predicates[F] with UserEnv {
         withUser:
           Elab.transformChild: child =>
             val rOffset: Result[Predicate] = PagingOffset.predicate(Predicates.attachment.id, Result(none), rOFFSET_AT, rOFFSET_AFTER)
-            (rInstrument, rWHERE, rOffset, rLIMIT).parFlatMapN: (instrument, WHERE, offset, LIMIT) =>
+            (rInstruments, rWHERE, rOffset, rLIMIT).parFlatMapN: (instruments, WHERE, offset, LIMIT) =>
               val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
               ResultMapping.selectResult(child, limit): q =>
                 FilterOrderByOffsetLimit(
                   pred = Some(
                     and(List(
                       offset,
-                      Predicates.attachment.isMaskFor(instrument),
+                      Predicates.attachment.isMaskFor(instruments),
                       Predicates.attachment.isListableBy(user),
                       WHERE.getOrElse(True)
                     ))
