@@ -28,6 +28,7 @@ import io.circe.syntax.*
 import lucuma.core.enums.Instrument
 import lucuma.core.model
 import lucuma.core.model.Access
+import lucuma.core.model.Attachment
 import lucuma.core.model.CallForProposals
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.Observation
@@ -849,7 +850,7 @@ trait QueryMapping[F[_]] extends Predicates[F] with UserEnv {
                     ))
                   ),
                   oss = Some(List(
-                    OrderSelection[lucuma.core.model.Attachment.Id](AttachmentType / "id")
+                    OrderSelection[Attachment.Id](AttachmentType / "id")
                   )),
                   offset = None,
                   limit = Some(limit + 1), // Select one extra row here.
