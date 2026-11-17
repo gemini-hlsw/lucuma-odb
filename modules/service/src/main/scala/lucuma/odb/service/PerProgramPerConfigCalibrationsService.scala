@@ -414,15 +414,15 @@ object PerProgramPerConfigCalibrationsService:
         calibrations: List[ObsExtract[CalibrationConfigSubset]],
         removedOids:  List[Observation.Id],
         propsByRole:  Map[CalibrationRole, Map[CalibrationConfigSubset, CalObsProps]]
-      ): F[List[(Observation.Id, CalObsProps)]] =
+      ): F[List[(Observation.Id, ObservingModeType, CalObsProps)]] =
         val candidates =
           calibrations
             .filterNot { o => removedOids.contains(o.id) }
-            .map { o => (o.id, o.role.flatMap(calibrationRole =>
+            .map { o => (o.id, o.data.modeType, o.role.flatMap(calibrationRole =>
               propsByRole.get(calibrationRole).flatMap(_.get(o.data)).map: props =>
                 if calibrationRole === CalibrationRole.SpectroPhotometric then props.copy(wavelengthAt = none) else props
             )) }
-            .collect { case (oid, Some(props)) if props.band.isDefined || props.wavelengthAt.isDefined => (oid, props) }
+            .collect { case (oid, modeType, Some(props)) if props.band.isDefined || props.wavelengthAt.isDefined => (oid, modeType, props) }
         excludeOngoingAndCompleted(candidates, _._1)
 
       // A partial GMOS Long Slit or MOS mode edit that touches only the science ETM
@@ -462,10 +462,18 @@ object PerProgramPerConfigCalibrationsService:
           visitor            = none
         )
 
+      private val EtmSyncedModes: Set[ObservingModeType] =
+        Set(
+          ObservingModeType.GmosNorthLongSlit,
+          ObservingModeType.GmosSouthLongSlit,
+          ObservingModeType.GmosNorthMos,
+          ObservingModeType.GmosSouthMos
+        )
+
       private def updatePropsAt(
-        calibrationUpdates: List[(Observation.Id, CalObsProps)]
+        calibrationUpdates: List[(Observation.Id, ObservingModeType, CalObsProps)]
       )(using Transaction[F]): F[Unit] =
-        calibrationUpdates.groupBy(_._2).toList
+        calibrationUpdates.groupBy(_._3).toList
           .traverse_ : (props, entries) =>
             val oids = entries.map(_._1)
 
@@ -525,12 +533,7 @@ object PerProgramPerConfigCalibrationsService:
                 ).void
 
             requirementUpdate *>
-              List(
-                ObservingModeType.GmosNorthLongSlit,
-                ObservingModeType.GmosSouthLongSlit,
-                ObservingModeType.GmosNorthMos,
-                ObservingModeType.GmosSouthMos
-              ).traverse_(modeUpdate)
+              entries.map(_._2).distinct.filter(EtmSyncedModes.contains).traverse_(modeUpdate)
 
       private def deleteEmptyCalibrationGroup(pid: Program.Id)(using Transaction[F], ServiceAccess): F[Unit] =
         groupService.selectGroups(pid).flatMap:

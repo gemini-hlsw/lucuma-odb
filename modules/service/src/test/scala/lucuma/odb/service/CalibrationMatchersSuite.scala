@@ -17,6 +17,7 @@ import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.core.model.sequence.gmos.longslit.DefaultSlitTelescopeConfigs
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.arb.ArbEnumerated.given
+import lucuma.odb.graphql.input.GmosLongSlitInput
 import lucuma.odb.graphql.input.GmosMosInput
 import lucuma.odb.sequence.gmos.longslit.AcquisitionConfig
 import lucuma.odb.sequence.gmos.longslit.Config
@@ -202,6 +203,7 @@ class CalibrationMatchersSuite extends ScalaCheckSuite:
       normalized === doubleNormalized
 
   def gnMos(mask: MaskDefinition, roi: GmosRoi = GmosRoi.FullFrame): GmosNMosConfigs =
+    val cw = Wavelength.fromIntNanometers(500).get
     GmosNMosConfigs(
       GmosMosInput.Create.North(
         grating         = GmosNorthGrating.B1200_G5301,
@@ -210,8 +212,20 @@ class CalibrationMatchersSuite extends ScalaCheckSuite:
         acquisitionType = GmosMosAcquisitionType.MaskIn,
         acquisition     = none,
         common          = GmosMosInput.Create.Common(
-          Wavelength.fromIntNanometers(500).get, none, GmosXBinning.One.some, GmosYBinning.One.some,
+          cw, none, GmosXBinning.One.some, GmosYBinning.One.some,
           GmosAmpReadMode.Slow.some, GmosAmpGain.Low.some, roi.some, none, none
+        )
+      ),
+      GmosNConfigs(
+        GmosLongSlitInput.Create.North(
+          grating     = GmosNorthGrating.B1200_G5301,
+          filter      = GmosNorthFilter.GPrime.some,
+          fpu         = GmosNorthFpu.LongSlit_1_00,
+          common      = GmosLongSlitInput.Create.Common(
+            cw, none, GmosXBinning.One.some, GmosYBinning.One.some,
+            GmosAmpReadMode.Slow.some, GmosAmpGain.Low.some, roi.some, none, none
+          ),
+          acquisition = none
         )
       )
     )

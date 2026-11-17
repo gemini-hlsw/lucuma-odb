@@ -618,6 +618,7 @@ object SpecPhotoExposureTime:
   ): ExposureTimeMode =
     val time = config match
       case _: (CalibrationConfigSubset.GmosNConfigs | CalibrationConfigSubset.GmosSConfigs)       => LongSlit
+      // Never reached: a MOS specphot is created from the equivalent long slit.
       case _: CalibrationConfigSubset.GmosMos                                                     => LongSlit
       case _: (CalibrationConfigSubset.GmosNIfuConfigs | CalibrationConfigSubset.GmosSIfuConfigs) => Ifu
     ExposureTimeMode.TimeAndCountMode(time, Count, wavelengthAt.getOrElse(config.centralWavelength))
