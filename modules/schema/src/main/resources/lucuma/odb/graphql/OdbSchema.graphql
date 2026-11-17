@@ -24957,7 +24957,7 @@ input WhereGroup {
 
 """
 Matches a group constraint waiver, field by field as `GroupConstraintWaiver`
-has them.
+has them, except its `groupId`: it is matched as one of the group's waivers.
 """
 input WhereGroupConstraintWaiver {
   AND: [WhereGroupConstraintWaiver!]
@@ -24965,9 +24965,6 @@ input WhereGroupConstraintWaiver {
   NOT: WhereGroupConstraintWaiver
 
   id: WhereOrderGroupConstraintWaiverId
-
-  "Matches the group whose violation is accepted."
-  groupId: WhereOrderGroupId
 
   "Matches the violation accepted."
   violation: WhereGroupConstraintViolation

@@ -152,7 +152,6 @@ class groups extends GroupTestSupport:
       ids <- waiverIds(w.g3)
       rs  <- List(
                s"{ id: { EQ: ${ids.head} } }",
-               s"""{ groupId: { EQ: "${w.g}" } }""",
                "{ violation: { code: { EQ: ORDER } } }",
                "{ violation: { code: { EQ: SAME_NIGHT } } }",
                s"""{ violation: { element: { observationId: { EQ: "${w.o2}" } } } }""",
@@ -170,7 +169,6 @@ class groups extends GroupTestSupport:
       rs,
       List(
         List(w.g3),
-        List(w.g),
         List(w.g),
         Nil,
         List(w.g),

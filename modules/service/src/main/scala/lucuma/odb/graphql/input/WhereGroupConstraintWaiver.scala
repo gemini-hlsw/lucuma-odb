@@ -8,7 +8,6 @@ import cats.syntax.parallel.*
 import grackle.Path
 import grackle.Predicate
 import grackle.Predicate.*
-import lucuma.core.model.Group
 import lucuma.core.model.group.GroupConstraintWaiver
 import lucuma.odb.graphql.binding.*
 
@@ -22,7 +21,6 @@ object WhereGroupConstraintWaiver:
 
   def binding(path: Path): Matcher[Predicate] =
     val IdBinding        = WhereOrder.binding[GroupConstraintWaiver.Id](path / "id", GroupConstraintWaiverIdBinding)
-    val GroupIdBinding_  = WhereOrder.binding[Group.Id](path / "groupId", GroupIdBinding)
     val ViolationBinding = WhereGroupConstraintViolation.binding(path / "violation")
     val GrantedBinding   = WhereAttribution.binding(path / "granted")
     val RevokedBinding   = WhereAttribution.optionBinding(path / "revoked", isNull => Eql(path / "active", Const(isNull)))
@@ -33,19 +31,17 @@ object WhereGroupConstraintWaiver:
         WhereWaiverBinding.List.Option("OR", rOR),
         WhereWaiverBinding.Option("NOT", rNOT),
         IdBinding.Option("id", rId),
-        GroupIdBinding_.Option("groupId", rGroupId),
         ViolationBinding.Option("violation", rViolation),
         GrantedBinding.Option("granted", rGranted),
         RevokedBinding.Option("revoked", rRevoked)
       ) =>
-        (rAND, rOR, rNOT, rId, rGroupId, rViolation, rGranted, rRevoked).parMapN:
-          (all, any, not, id, groupId, violation, granted, revoked) =>
+        (rAND, rOR, rNOT, rId, rViolation, rGranted, rRevoked).parMapN:
+          (all, any, not, id, violation, granted, revoked) =>
             and(List(
               all.map(and),
               any.map(or),
               not.map(Not(_)),
               id,
-              groupId,
               violation,
               granted,
               revoked
