@@ -35,7 +35,7 @@ To run the server locally, export the variables in `resource/.env` first, for ex
 
 **Editing the GraphQL schema needs a clean build.** `GraphQlRoutes.loadSchema` calls `SchemaStitcher.load`, which is an inline macro. The macro bakes the stitched schema text into the class at compile time. The incremental compiler does not track the `.graphql` file. After you edit `resource.graphql`, run `sbt resourceService/clean` before you compile or test. Without the clean, the server runs the old schema and reports errors such as "Unknown field(s)".
 
-**Never copy ODB or SSO code into `resource/`.** If a helper exists in `modules/service`, `modules/sso-service`, or `modules/binding`, move it to `modules/schema` (cross JVM and JS, no grackle) or `modules/common-middleware` (JVM, grackle-core). Keep the original package name when you move it. `resourceService` must never depend on the ODB `service` project.
+**Never copy ODB or SSO code into `resource/`.** If a helper exists in `modules/service`, `modules/sso-service`, move it to `modules/schema` (cross JVM and JS, no grackle), `modules/binding` or `modules/common-middleware` (JVM, grackle-core). Keep the original package name when you move it. `resourceService` must never depend on the ODB `service` project.
 
 **Each enum has three spellings.** The Scala case (`TooSupport.Standard`), the Scala tag and Postgres enum label (`'Standard'`), and the GraphQL value (`STANDARD`). The migration comment says: enum members spell the Scala `Enumerated` tags. `Codecs.enumerated(Type("e_..."))` maps by tag. A new Postgres enum needs a codec in `Codecs` and a `checkPostgresEnum` line in `StartupDiagnostics`, or the server refuses to start. Test seeds insert the tag, and test queries use the GraphQL value.
 
