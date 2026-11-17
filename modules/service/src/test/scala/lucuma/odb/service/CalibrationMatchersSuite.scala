@@ -8,10 +8,17 @@ import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.*
 import lucuma.core.enums.GmosRoi
 import lucuma.core.math.Wavelength
+import lucuma.core.model.Attachment
+import lucuma.core.model.Defined
 import lucuma.core.model.ExposureTimeMode
+import lucuma.core.model.MaskDefinition
+import lucuma.core.model.ToBeDefined
+import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.core.model.sequence.gmos.longslit.DefaultSlitTelescopeConfigs
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.arb.ArbEnumerated.given
+import lucuma.odb.graphql.input.GmosLongSlitInput
+import lucuma.odb.graphql.input.GmosMosInput
 import lucuma.odb.sequence.gmos.longslit.AcquisitionConfig
 import lucuma.odb.sequence.gmos.longslit.Config
 import lucuma.odb.sequence.gmos.spectroscopy
@@ -194,3 +201,51 @@ class CalibrationMatchersSuite extends ScalaCheckSuite:
       val normalized = matcher.normalize(config)
       val doubleNormalized = matcher.normalize(normalized)
       normalized === doubleNormalized
+
+  def gnMos(mask: MaskDefinition, roi: GmosRoi = GmosRoi.FullFrame): GmosNMosConfigs =
+    val cw = Wavelength.fromIntNanometers(500).get
+    GmosNMosConfigs(
+      GmosMosInput.Create.North(
+        grating         = GmosNorthGrating.B1200_G5301,
+        filter          = GmosNorthFilter.GPrime.some,
+        customMask      = GmosFpuMask.Custom(mask, GmosCustomSlitWidth.CustomWidth_1_00),
+        acquisitionType = GmosMosAcquisitionType.MaskIn,
+        acquisition     = none,
+        common          = GmosMosInput.Create.Common(
+          cw, none, GmosXBinning.One.some, GmosYBinning.One.some,
+          GmosAmpReadMode.Slow.some, GmosAmpGain.Low.some, roi.some, none, none
+        )
+      ),
+      GmosNConfigs(
+        GmosLongSlitInput.Create.North(
+          grating     = GmosNorthGrating.B1200_G5301,
+          filter      = GmosNorthFilter.GPrime.some,
+          fpu         = GmosNorthFpu.LongSlit_1_00,
+          common      = GmosLongSlitInput.Create.Common(
+            cw, none, GmosXBinning.One.some, GmosYBinning.One.some,
+            GmosAmpReadMode.Slow.some, GmosAmpGain.Low.some, roi.some, none, none
+          ),
+          acquisition = none
+        )
+      )
+    )
+
+  private val mask1: MaskDefinition = Defined(Attachment.Id.fromLong(1).get)
+  private val mask2: MaskDefinition = Defined(Attachment.Id.fromLong(2).get)
+
+  test("MOS specphot is the equivalent long slit, ignoring ROI and mask"):
+    val matcher = CalibrationConfigMatcher.matcherFor(gnMos(mask1), CalibrationRole.SpectroPhotometric)
+    val ls      = SpecphotoGmosLS.normalize(gnMos(mask1).toLongSlit)
+    assertEquals(matcher.normalize(gnMos(mask1, GmosRoi.FullFrame)), ls)
+    assertEquals(matcher.normalize(gnMos(mask2, GmosRoi.CentralSpectrum)), ls)
+    ls match
+      case GmosNConfigs(input) => assertEquals(input.fpu, GmosNorthFpu.LongSlit_1_00)
+      case _                   => fail("Expected GmosNConfigs")
+
+  test("MOS Twilight keys on the Mask Attachment and needs one"):
+    val matcher = CalibrationConfigMatcher.matcherFor(gnMos(mask1), CalibrationRole.Twilight)
+    assertEquals(matcher, TwilightGmosMos)
+    assert(matcher.configsMatch(gnMos(mask1), gnMos(mask1)))
+    assert(!matcher.configsMatch(gnMos(mask1), gnMos(mask2)))
+    assert(matcher.applies(gnMos(mask1)))
+    assert(!matcher.applies(gnMos(ToBeDefined)))

@@ -61,7 +61,7 @@ object GmosMosInput extends AcquisitionFilterCheck:
   final case class NorthAcquisition(
     filter:           Nullable[GmosNorthFilter],
     exposureTimeMode: Option[ExposureTimeMode]
-  ):
+  ) derives Eq:
     def updatesAcquisition: Boolean =
       filter.isDefined || exposureTimeMode.isDefined
 
@@ -79,7 +79,7 @@ object GmosMosInput extends AcquisitionFilterCheck:
   final case class SouthAcquisition(
     filter:           Nullable[GmosSouthFilter],
     exposureTimeMode: Option[ExposureTimeMode]
-  ):
+  ) derives Eq:
     def updatesAcquisition: Boolean =
       filter.isDefined || exposureTimeMode.isDefined
 
@@ -113,7 +113,7 @@ object GmosMosInput extends AcquisitionFilterCheck:
       explicitRoi:         Option[GmosRoi],
       explicitλDithers:         Option[List[WavelengthDither]],
       explicitTelescopeConfigs: Option[NonEmptyList[TelescopeConfig]]
-    ):
+    ) derives Eq:
 
       // Formatted to store in a text column in the database with a regex constraint
       val formattedλDithers: Option[String] =
@@ -129,7 +129,7 @@ object GmosMosInput extends AcquisitionFilterCheck:
       acquisitionType: GmosMosAcquisitionType,
       acquisition:     Option[NorthAcquisition],
       common:          Common
-    ) extends Create[GmosNorthGrating, GmosNorthFilter]:
+    ) extends Create[GmosNorthGrating, GmosNorthFilter] derives Eq:
       def observingModeType: ObservingModeType =
         ObservingModeType.GmosNorthMos
 
@@ -150,7 +150,7 @@ object GmosMosInput extends AcquisitionFilterCheck:
       acquisitionType: GmosMosAcquisitionType,
       acquisition:     Option[SouthAcquisition],
       common:          Common
-    ) extends Create[GmosSouthGrating, GmosSouthFilter]:
+    ) extends Create[GmosSouthGrating, GmosSouthFilter] derives Eq:
       def observingModeType: ObservingModeType =
         ObservingModeType.GmosSouthMos
 
