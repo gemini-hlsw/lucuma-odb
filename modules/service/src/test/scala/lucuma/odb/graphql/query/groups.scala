@@ -14,12 +14,18 @@ import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.syntax.timespan.*
 import lucuma.odb.graphql.ACursorOps
+import lucuma.odb.graphql.TestUsers
 import lucuma.odb.util.Codecs.group_id
 import lucuma.odb.util.Codecs.observation_id
 import lucuma.odb.util.Codecs.user_id
 import skunk.syntax.all.*
 
 class groups extends GroupTestSupport:
+
+  val guest: User = TestUsers.guest(5)
+
+  override val validUsers: List[User] =
+    List(pi, pi2, serviceUser, staff, guest)
 
   // The ids of the matching groups, and whether there are more.
   def groups(user: User, args: String): IO[(List[Group.Id], Boolean)] =
@@ -46,6 +52,36 @@ class groups extends GroupTestSupport:
     yield
       assertEquals(r, (List(g1, g2), false))
       assertEquals(r2, (Nil, false))
+
+  test("staff see every program's groups, and a guest only their own"):
+    for
+      p  <- createProgram
+      g  <- createGroupAs(pi, p)
+      gp <- createProgramAs(guest)
+      gg <- createGroupAs(guest, gp)
+      s  <- groups(staff, s"WHERE: { ${inProgram(p)} }")
+      sg <- groups(staff, s"WHERE: { ${inProgram(gp)} }")
+      r  <- groups(guest, s"WHERE: { ${inProgram(p)} }")
+      rg <- groups(guest, s"WHERE: { ${inProgram(gp)} }")
+    yield
+      assertEquals(s, (List(g), false))
+      assertEquals(sg, (List(gg), false))
+      assertEquals(r, (Nil, false))
+      assertEquals(rg, (List(gg), false))
+
+  test("a deleted group has no standing, so it matches no standing filter"):
+    for
+      p   <- createProgram
+      g1  <- createGroupAs(pi, p)
+      g2  <- createGroupAs(pi, p)
+      _   <- deleteGroup(g2)
+      all <- groups(pi, s"WHERE: { ${inProgram(p)} }, includeDeleted: true")
+      v   <- groups(pi, s"WHERE: { ${inProgram(p)}, standing: { status: { EQ: VIABLE } } }, includeDeleted: true")
+      n   <- groups(pi, s"WHERE: { ${inProgram(p)}, standing: { status: { NEQ: COMPLETE } } }, includeDeleted: true")
+    yield
+      assertEquals(all, (List(g1, g2), false))
+      assertEquals(v, (List(g1), false))
+      assertEquals(n, (List(g1), false))
 
   test("deleted groups are left out unless asked for"):
     for
@@ -163,7 +199,9 @@ class groups extends GroupTestSupport:
                "{ granted: { at: { LT: \"1970-01-01 00:00:00\" } } }",
                "{ revoked: { IS_NULL: true } }",
                "{ revoked: { IS_NULL: false } }",
-               s"""{ revoked: { by: { EQ: "${pi.id}" } } }"""
+               s"""{ revoked: { by: { EQ: "${pi.id}" } } }""",
+               "{ revoked: { at: { GT: \"1970-01-01 00:00:00\" } } }",
+               "{ revoked: { at: { LT: \"1970-01-01 00:00:00\" } } }"
              ).traverse(byWaivers(w.p, _))
     yield assertEquals(
       rs,
@@ -180,7 +218,9 @@ class groups extends GroupTestSupport:
         Nil,
         List(w.g),
         List(w.g, w.g3),
-        List(w.g, w.g3)
+        List(w.g, w.g3),
+        List(w.g, w.g3),
+        Nil
       )
     )
 
@@ -261,7 +301,11 @@ class groups extends GroupTestSupport:
                     "maximumInterval: { IS_NULL: false }",
                     "minimumObservationsPerNight: { IS_NULL: false }",
                     "maximumObservationsPerNight: { LTE: 2 }",
-                    "maximumObservationsPerNight: { LTE: 3 }"
+                    "maximumObservationsPerNight: { LTE: 3 }",
+                    "minimumInterval: { IS_NULL: true }",
+                    "maximumInterval: { IS_NULL: true }",
+                    "minimumObservationsPerNight: { IS_NULL: true }",
+                    "maximumObservationsPerNight: { IS_NULL: true }"
                   ).traverse(byGroup(p, _))
     yield assertEquals(
       rs,
@@ -278,7 +322,11 @@ class groups extends GroupTestSupport:
         List(ordered),
         List(perNight),
         Nil,
-        List(perNight)
+        List(perNight),
+        List(plain, night, perNight),
+        List(plain, night, perNight),
+        List(plain, ordered, night),
+        List(plain, ordered, night)
       )
     )
 
