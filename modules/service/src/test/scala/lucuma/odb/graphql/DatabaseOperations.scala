@@ -3734,6 +3734,28 @@ trait DatabaseOperations { this: OdbSuite =>
     query(user = user, query = q).void
   }
 
+  /** Sets the guide target selection; `guideTarget` is a GraphQL `GuideTargetSelectionInput` literal. */
+  def setGuideTarget(
+    user:        User,
+    oid:         Observation.Id,
+    guideTarget: Option[String]
+  ): IO[Unit] =
+    val q: String = s"""
+      mutation {
+        setGuideTarget(
+          input: {
+            observationId: ${oid.asJson}
+            guideTarget: ${guideTarget.getOrElse("null")}
+          }
+        ) {
+          observation {
+            id
+          }
+        }
+      }
+    """
+    query(user = user, query = q).void
+
   def createConfigurationRequestAs(user: User, oid: Observation.Id, justification: Option[NonEmptyString] = None): IO[ConfigurationRequest.Id] =
     query(
       user = user,

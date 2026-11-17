@@ -169,6 +169,16 @@ class setGuideTargetName extends query.ExecutionTestSupportForGmos {
     yield ()
   }
 
+  test("a science target cannot be selected by name") {
+    val name: String = "Science Target"
+    for
+      pid <- createProgramAs(pi)
+      tid <- createTargetWithProfileAs(pi, pid)
+      oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      _   <- setName(pi, oid.some, none, name.some, expectError(s"Invalid guide target name '$name'"))
+    yield ()
+  }
+
   test("valid set as pi") {
     for
       pid <- createProgramAs(pi)

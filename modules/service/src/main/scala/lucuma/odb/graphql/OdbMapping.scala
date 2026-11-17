@@ -312,6 +312,7 @@ object OdbMapping {
           with ScienceRequirementsMapping[F]
           with SetAllocationsResultMapping[F]
           with SetGuideTargetNameResultMapping[F]
+          with SetGuideTargetResultMapping[F]
           with SetProgramReferenceResultMapping[F]
           with SetProgramResourceLimitResultMapping[F]
           with SetProposalStatusResultMapping[F]
@@ -601,6 +602,7 @@ object OdbMapping {
                 SpectroscopyScienceRequirementsMapping,
                 SetAllocationsResultMapping,
                 SetGuideTargetNameResultMapping,
+                SetGuideTargetResultMapping,
                 SetProgramReferenceResultMapping,
                 SetProgramResourceLimitResultMapping,
                 SetProposalStatusResultMapping,

@@ -122,6 +122,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] with UserEnv {
       RevokeGroupConstraintWaiver,
       RevokeUserInvitation,
       SetAllocations,
+      SetGuideTarget,
       SetGuideTargetName,
       SetObservationWorkflowState,
       SetProgramReference,
@@ -878,6 +879,20 @@ trait MutationMapping[F[_]] extends AccessControl[F] with UserEnv {
                   .setGuideTargetName(checked)
                   .nestMap: oid =>
                     Unique(Filter(Predicates.setGuideTargetNameResult.observationId.eql(oid), child))
+
+  private lazy val SetGuideTarget =
+    MutationField("setGuideTarget", SetGuideTargetInput.Binding): (input, child) =>
+      services.useNonTransactionally:
+        selectForUpdate(input, false /* ignore cals */).flatMap: r =>
+          r match
+            // This shortcuts setGuideTarget if we know it has to fail
+            case Warning(problems, AccessControl.Checked.Empty) => Failure(problems).pure[F]
+            case other                                          =>
+              other.flatTraverse: checked =>
+                guideService
+                  .setGuideTarget(checked)
+                  .nestMap: oid =>
+                    Unique(Filter(Predicates.setGuideTargetResult.observationId.eql(oid), child))
 
   private lazy val SetObservationWorkflowState =
     MutationField.json("setObservationWorkflowState", SetObservationWorkflowStateInput.Binding): input =>

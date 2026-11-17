@@ -256,6 +256,10 @@ object GaiaVoTables:
   |    </RESOURCE>
   |</VOTABLE>""".stripMargin
 
+  /** `altairCandidates` without any star: a field where Gaia finds nothing. */
+  val noCandidates: String =
+    altairCandidates.replaceAll("(?s)\\s*<TR>.*?</TR>", "")
+
   /**
    * `altairCandidates` plus a brighter star 0.36 arcseconds from the base, within the 1 arcsecond
    * radius inside which NGS takes the field lens out.

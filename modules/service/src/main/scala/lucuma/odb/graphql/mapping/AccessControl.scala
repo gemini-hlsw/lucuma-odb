@@ -59,6 +59,7 @@ import lucuma.odb.graphql.input.RefreshArchiveDuplicationInput
 import lucuma.odb.graphql.input.ReplaceSequenceInput
 import lucuma.odb.graphql.input.ResetAcquisitionInput
 import lucuma.odb.graphql.input.SetAllocationsInput
+import lucuma.odb.graphql.input.SetGuideTargetInput
 import lucuma.odb.graphql.input.SetGuideTargetNameInput
 import lucuma.odb.graphql.input.SetObservationWorkflowStateInput
 import lucuma.odb.graphql.input.SetProgramReferenceInput
@@ -541,8 +542,26 @@ trait AccessControl[F[_]] extends Predicates[F] {
   )(using Services[F],
           NoTransaction[F]
   ): F[Result[AccessControl.CheckedWithId[SetGuideTargetNameInput, Observation.Id]]] =
+    selectGuideTargetUpdate(input, input.observationId, input.observationRef, includeCalibrations)
+
+  def selectForUpdate(
+    input: SetGuideTargetInput,
+    includeCalibrations: Boolean
+  )(using Services[F],
+          NoTransaction[F]
+  ): F[Result[AccessControl.CheckedWithId[SetGuideTargetInput, Observation.Id]]] =
+    selectGuideTargetUpdate(input, input.observationId, input.observationRef, includeCalibrations)
+
+  private def selectGuideTargetUpdate[A](
+    input:               A,
+    observationId:       Option[Observation.Id],
+    observationRef:      Option[ObservationReference],
+    includeCalibrations: Boolean
+  )(using Services[F],
+          NoTransaction[F]
+  ): F[Result[AccessControl.CheckedWithId[A, Observation.Id]]] =
     Services.asSuperUser:
-      observationService.resolveOid(input.observationId, input.observationRef).flatMap: r =>
+      observationService.resolveOid(observationId, observationRef).flatMap: r =>
         r.flatTraverse: oid =>
           selectForObservationUpdateImpl(
             None,

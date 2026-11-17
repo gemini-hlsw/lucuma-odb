@@ -8,6 +8,7 @@ package mapping
 import cats.effect.Resource
 import cats.effect.Temporal
 import cats.syntax.all.*
+import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Env
 import grackle.Query
 import grackle.Query.*
@@ -16,6 +17,8 @@ import grackle.Result
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
 import grackle.syntax.*
+import io.circe.Json
+import io.circe.syntax.*
 import lucuma.catalog.clients.GaiaClient
 import lucuma.core.enums.AltairMode
 import lucuma.core.enums.CassRotator
@@ -107,8 +110,34 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
       EffectField("basePosition", basePositionQueryHandler, List("id")),
       EffectField("guideEnvironment", guideEnvironmentQueryHandler, List("id", "programId")),
       EffectField("guideAvailability", guideAvailabilityQueryHandler, List("id", "programId")),
-      SqlField("guideTargetName", ObservationView.GuideTargetName)
+      SqlField("guideTargetName", ObservationView.GuideTargetName),
+      SqlField("storedGuideTargetName", ObservationView.GuideTargetName, hidden = true),
+      SqlField("guideObservationTarget", ObservationView.GuideObservationTarget, hidden = true),
+      SqlField("guideObservationTargetId", ObservationView.GuideObservationTargetId, hidden = true),
+      CursorFieldJson(
+        "guideTargetSelection",
+        cursor =>
+          (
+            cursor.fieldAs[Option[NonEmptyString]]("storedGuideTargetName"),
+            cursor.fieldAs[Boolean]("guideObservationTarget"),
+            cursor.fieldAs[Option[Target.Id]]("guideObservationTargetId")
+          ).mapN(guideTargetSelectionJson),
+        List("storedGuideTargetName", "guideObservationTarget", "guideObservationTargetId")
+      )
     )
+
+  private def guideTargetSelectionJson(
+    catalogName:         Option[NonEmptyString],
+    observationTarget:   Boolean,
+    observationTargetId: Option[Target.Id]
+  ): Json =
+    (catalogName, observationTarget) match
+      case (Some(name), _) =>
+        Json.obj("catalogName" -> name.value.asJson, "observationTarget" -> Json.Null)
+      case (None, true)    =>
+        Json.obj("catalogName" -> Json.Null, "observationTarget" -> Json.obj("targetId" -> observationTargetId.asJson))
+      case (None, false)   =>
+        Json.Null
 
   lazy val AltairMapping: ObjectMapping =
     ObjectMapping(TargetEnvironmentType / "altair")(
