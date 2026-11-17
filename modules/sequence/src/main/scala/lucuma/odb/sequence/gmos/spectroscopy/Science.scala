@@ -60,7 +60,6 @@ import lucuma.odb.sequence.SmartGcalExpander.Calibration
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.util.AtomBuilder
 import lucuma.odb.sequence.util.DaytimeSmartGcal
-import lucuma.refined.*
 import monocle.Lens
 
 import java.util.UUID
@@ -107,10 +106,6 @@ object Science:
    */
   val TwilightExposureTime: TimeSpan =
     30.secondTimeSpan
-
-  val DaytimeArcTitle: NonEmptyString = "Daytime Arc".refined
-
-  val MosMaskFlatTitle: NonEmptyString = "MOS Mask Flat".refined
 
   extension (t: Timestamp)
     def plusCalValidityPeriod: Timestamp =
@@ -332,22 +327,17 @@ object Science:
        * The arcs of a daytime arc calibration: one smart GCAL arc per wavelength
        * dither, at that dither's wavelength.
        */
-      def daytimeArcs(config: Config[G, L, U]): NonEmptyList[(NonEmptyString, ProtoStep[D])] =
+      def daytimeArcs(config: Config[G, L, U]): NonEmptyList[ProtoStep[D]] =
         val λ       = config.centralWavelength
         val dithers = NonEmptyList.fromList(config.wavelengthDithers).getOrElse(NonEmptyList.one(WavelengthDither.Zero))
 
-        def title(Δλ: WavelengthDither): NonEmptyString =
-          if dithers.length > 1 then NonEmptyString.unsafeFrom(s"${DaytimeArcTitle.value} ${Δλ.toNanometers.value} nm")
-          else DaytimeArcTitle
-
         dithers.map: Δλ =>
-          val arc = eval:
+          eval:
             for
               _ <- setup(config, TimeSpan.Zero)
               _ <- optics.wavelength := λ.offset(Δλ).getOrElse(λ)
               a <- arcStep(TelescopeConfig(Offset.Zero, StepGuideState.Disabled), ObserveClass.DayCal)
             yield a
-          (title(Δλ), arc)
 
       def rFilter: L
 
@@ -355,7 +345,7 @@ object Science:
        * The flat of a MOS mask flat: the mask imaged through the mirror and r,
        * full frame, unbinned, fast read and low gain.
        */
-      def mosMaskFlat(config: Config[G, L, U]): NonEmptyList[(NonEmptyString, ProtoStep[D])] =
+      def mosMaskFlat(config: Config[G, L, U]): NonEmptyList[ProtoStep[D]] =
         val flat = eval:
           for
             _ <- optics.exposure    := TimeSpan.Zero
@@ -369,7 +359,7 @@ object Science:
             _ <- optics.roi         := GmosRoi.FullFrame
             f <- flatStep(TelescopeConfig(Offset.Zero, StepGuideState.Disabled), ObserveClass.DayCal)
           yield f
-        NonEmptyList.one((MosMaskFlatTitle, flat))
+        NonEmptyList.one(flat)
 
     end Computer
 

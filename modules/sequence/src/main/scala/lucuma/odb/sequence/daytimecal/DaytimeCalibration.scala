@@ -7,7 +7,6 @@ import cats.data.NonEmptyList
 import cats.syntax.apply.*
 import cats.syntax.either.*
 import cats.syntax.option.*
-import cats.syntax.traverse.*
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Pure
 import fs2.Stream
@@ -69,25 +68,18 @@ object DaytimeCalibration:
       case (false, Some(n)) => n.value.asRight
       case (false, None)    => unavailable(oid, index, set.kind, " has no exposure count.").asLeft
 
-  private def description(set: CalibrationSet[?], count: Int): Option[NonEmptyString] =
-    val s = if set.kind.isSmart then set.kind.name else s"${set.kind.name} x$count"
-    NonEmptyString.from(s).toOption
-
   /** The step a smart set looks up, or the step a manual set repeats. */
   def protoStep[D](oid: Observation.Id, index: Int, set: CalibrationSet[D]): Either[OdbError, ProtoStep[D]] =
     stepConfig(oid, index, set).map(sc => ProtoStep(set.setup, sc, Telescope, ObserveClass.DayCal))
 
+  /** The steps of one set, grouped only so they can be expanded and counted per set. */
   def protoAtom[D](oid: Observation.Id, index: Int, set: CalibrationSet[D]): Either[OdbError, ProtoAtom[ProtoStep[D]]] =
     (protoStep(oid, index, set), stepCount(oid, index, set)).mapN: (step, count) =>
-      ProtoAtom(description(set, count), NonEmptyList(step, List.fill(count - 1)(step)))
+      ProtoAtom(none, NonEmptyList(step, List.fill(count - 1)(step)))
 
-  def protoAtoms[D](oid: Observation.Id, sets: List[CalibrationSet[D]]): Either[OdbError, List[ProtoAtom[ProtoStep[D]]]] =
-    sets.zipWithIndex.traverse((s, i) => protoAtom(oid, i, s))
-
-  /** Merges the atoms into one titled `Description`, keeping the step order; no atoms stay none. */
-  def singleAtom[D](atoms: List[ProtoAtom[ProtoStep[D]]]): List[ProtoAtom[ProtoStep[D]]] =
-    NonEmptyList.fromList(atoms.flatMap(_.steps.toList)).toList.map: steps =>
-      ProtoAtom(Description.some, steps)
+  /** The one atom, titled `Description`, holding the steps in order; none when there are no steps. */
+  def singleAtom[D](steps: List[ProtoStep[D]]): List[ProtoAtom[ProtoStep[D]]] =
+    NonEmptyList.fromList(steps).toList.map(ProtoAtom(Description.some, _))
 
   def generator[S, D](
     estimator: StepTimeEstimateCalculator[S, D],

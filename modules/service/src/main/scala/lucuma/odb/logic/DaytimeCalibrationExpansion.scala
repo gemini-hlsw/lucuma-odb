@@ -21,8 +21,8 @@ import lucuma.odb.sequence.daytimecal.DaytimeCalibration
 /**
  * Resolves the smart rows of a daytime calibration through the instrument's
  * Smart GCAL expander: a smart set's single smart step becomes the steps the
- * lookup returns, inside the set's own atom.  A smart set without a Smart GCAL
- * definition is left out and reported.
+ * lookup returns.  A smart set without a Smart GCAL definition is left out and
+ * reported.  The steps of every set end up in a single atom.
  */
 object DaytimeCalibrationExpansion:
 
@@ -30,14 +30,14 @@ object DaytimeCalibrationExpansion:
    * One set's contribution to the sequence.
    *
    * @param missing the calibrations left out for want of a definition
-   * @param atom    the set's atom, absent when its lookup yields no steps
+   * @param atom    the set's steps, absent when its lookup yields none
    */
   case class Expansion[D](
     missing: List[StepViolation],
     atom:    Option[ProtoAtom[ProtoStep[D]]]
   )
 
-  /** One set's atom with its smart step resolved; an error names the set. */
+  /** One set's steps with its smart step resolved; an error names the set. */
   def expandSet[F[_]: Monad, S, D](
     expander: SmartGcalExpander[F, S, D],
     static:   S,
@@ -51,8 +51,9 @@ object DaytimeCalibrationExpansion:
         Expansion(missing.map(v => v.copy(message = s"Calibration set ${index + 1}: ${v.message}")), expanded)
 
   /**
-   * The atoms of every set, with the calibrations left out.  Sets that leave
-   * the sequence with no step at all are an error.
+   * The single atom holding the steps of every set, in order, with the
+   * calibrations left out.  Sets that leave the sequence with no step at all
+   * are an error.
    */
   def expandAtoms[F[_]: Monad, S, D](
     expander: SmartGcalExpander[F, S, D],
@@ -69,12 +70,12 @@ object DaytimeCalibrationExpansion:
         else
           SmartGcalExpander
             .remaining(missing, atoms)
-            .bimap(m => OdbError.SequenceUnavailable(oid, m.some), (m, as) => (m, DaytimeCalibration.singleAtom(as)))
+            .bimap(m => OdbError.SequenceUnavailable(oid, m.some), (m, as) => (m, DaytimeCalibration.singleAtom(as.flatMap(_.steps.toList))))
       .value
 
   /**
    * The step count of each set, in order, read off the same expansion that
-   * builds its atom: zero when its lookup defines no steps, none when the set
+   * builds its steps: zero when its lookup defines no steps, none when the set
    * cannot be expanded or has no definition.
    */
   def setCounts[F[_]: Monad, S, D](

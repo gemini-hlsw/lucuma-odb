@@ -9,8 +9,6 @@ import cats.data.NonEmptyList
 import cats.syntax.bifunctor.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
-import cats.syntax.option.*
-import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Pure
 import fs2.Stream
 import lucuma.core.enums.SequenceType
@@ -18,7 +16,6 @@ import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Atom
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.SmartGcalExpander.Calibration
-import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.daytimecal.DaytimeCalibration
 
@@ -39,16 +36,15 @@ object DaytimeSmartGcal:
     namespace:     UUID,
     expander:      SmartGcalExpander[F, S, D],
     calibration:   Calibration,
-    atoms:         NonEmptyList[(NonEmptyString, ProtoStep[D])]
+    steps:         NonEmptyList[ProtoStep[D]]
   ): F[Either[OdbError, SequenceGenerator[D]]] =
-    atoms.toList
-      .foldMapM: (title, step) =>
-        expander.expandAtom(static, ProtoAtom(title.some, NonEmptyList.one(step)), calibration).map(_.map(_.toList))
-      .map: (missing, protoAtoms) =>
-        SmartGcalExpander.remaining(missing, protoAtoms).bimap(
+    steps.toList
+      .foldMapM(expander.expandOrReport(static, _, calibration))
+      .map: (missing, expanded) =>
+        SmartGcalExpander.remaining(missing, expanded).bimap(
           definitionError(observationId, _),
-          (missing, expanded) =>
-            val protoAtoms = DaytimeCalibration.singleAtom(expanded)
+          (missing, remaining) =>
+            val protoAtoms = DaytimeCalibration.singleAtom(remaining)
             val builder = AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Science)
             val generator = new SequenceGenerator[D]:
               def generate: Stream[Pure, Atom[D]] =
