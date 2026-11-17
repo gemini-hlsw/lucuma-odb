@@ -16,6 +16,7 @@ import fs2.io.net.*
 import grackle.skunk.SkunkMonitor
 import lucuma.core.model.User
 import lucuma.graphql.routes.GraphQLService
+import lucuma.odb.StartupChecks.runChecks
 import lucuma.otel.OtelServices
 import lucuma.otel.OtelServices.given
 import lucuma.otel.OtelSetup
@@ -144,7 +145,9 @@ object ResourceMain extends IOApp.Simple {
   ): F[Unit] =
     given TracerProvider[F] = TracerProvider.noop
     given MeterProvider[F]  = MeterProvider.noop
-    sessionBuilder(config).single.use(StartupDiagnostics(_).runAllDiagnostics(fatal = true))
+    sessionBuilder(config).single.use: db =>
+      given Session[F] = db
+      runChecks(StartupDiagnostics.checks, fatal = true)
 
   private def printBanner[F[_]: {Logger as L}](conf: ResourceConfiguration): F[Unit] = {
     val runtime    = Runtime.getRuntime
