@@ -60,14 +60,14 @@ object WhereGroup {
         MinimumPerNightBinding.Option("minimumObservationsPerNight", rMinimumPerNight),
         MaximumPerNightBinding.Option("maximumObservationsPerNight", rMaximumPerNight),
       ) =>
-        (
-          (rAND, rOR, rNOT, rId, rName, rDescription, rProgram, rStanding, rWaivers, rHasWaiver, rHasActiveWaiver).parTupled,
-          (rSystem, rMinimumRequired, rOrdered, rMinimumInterval, rMaximumInterval, rSameNight, rMinimumPerNight, rMaximumPerNight).parTupled
-        ).parMapN { case ((all, any, not, id, name, description, program, standing, waivers, hasWaiver, hasActiveWaiver), (system, minimumRequired, ordered, minimumInterval, maximumInterval, sameNight, minimumPerNight, maximumPerNight)) =>
+        (rAND, rOR, rNOT, rId, rName, rDescription, rProgram, rStanding, rWaivers, rHasWaiver, rHasActiveWaiver,
+         rSystem, rMinimumRequired, rOrdered, rMinimumInterval, rMaximumInterval, rSameNight, rMinimumPerNight, rMaximumPerNight).parMapN {
+          (AND, OR, NOT, id, name, description, program, standing, waivers, hasWaiver, hasActiveWaiver,
+           system, minimumRequired, ordered, minimumInterval, maximumInterval, sameNight, minimumPerNight, maximumPerNight) =>
           and(List(
-            all.map(and),
-            any.map(or),
-            not.map(Not(_)),
+            AND.map(and),
+            OR.map(or),
+            NOT.map(Not(_)),
             id,
             name,
             description,
