@@ -59,6 +59,17 @@ class groups extends GroupTestSupport:
       assertEquals(r, (List(g1), false))
       assertEquals(rd, (List(g1, g2), false))
 
+  test("groups of deleted programs are left out unless asked for"):
+    for
+      p  <- createProgram
+      g  <- createGroupAs(pi, p)
+      _  <- query(pi, s"""mutation { updatePrograms(input: { SET: { existence: DELETED }, WHERE: { id: { EQ: "$p" } } }) { programs { id } } }""")
+      r  <- groups(pi, s"WHERE: { ${inProgram(p)} }")
+      rd <- groups(pi, s"WHERE: { ${inProgram(p)} }, includeDeleted: true")
+    yield
+      assertEquals(r, (Nil, false))
+      assertEquals(rd, (List(g), false))
+
   test("groups are paged by LIMIT, OFFSET_AT and OFFSET_AFTER"):
     for
       p  <- createProgram

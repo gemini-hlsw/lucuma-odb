@@ -559,6 +559,7 @@ trait QueryMapping[F[_]] extends Predicates[F] with UserEnv {
                   pred = Some(and(List(
                     offset,
                     Predicates.group.existence.includeDeleted(includeDeleted),
+                    Predicates.group.program.existence.includeDeleted(includeDeleted),
                     Predicates.group.program.isVisibleTo(user),
                     WHERE.getOrElse(True)
                   ))),
