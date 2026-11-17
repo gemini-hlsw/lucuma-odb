@@ -36,9 +36,7 @@ object FileReader {
 
   /**
    * The data lines of a file with their line numbers.  Comments and blank
-   * lines are skipped, then an optional version line and the column header,
-   * which must be present.  The header is recognized rather than counted, so a
-   * file that gains or loses its version line keeps every data row.
+   * lines are skipped, then an optional version line and the column header.
    */
   def entryLines[F[_]: RaiseThrowable](fileName: String): Pipe[F, Byte, (PosLong, String)] = { in =>
     def skip(s: String): Boolean =

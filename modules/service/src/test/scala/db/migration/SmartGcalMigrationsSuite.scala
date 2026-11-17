@@ -7,8 +7,7 @@ import java.nio.file.Files
 import java.nio.file.Paths
 import scala.jdk.CollectionConverters.*
 
-// A smartgcal file that no migration lists is never loaded, and nothing else
-// notices, so every file on the classpath must belong to exactly one migration.
+// Ensure all smart gcal files in the c+ass path are tested
 final class SmartGcalMigrationsSuite extends munit.FunSuite:
 
   private val migrations: List[SmartGcalMigration] =

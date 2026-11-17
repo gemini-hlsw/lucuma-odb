@@ -13,13 +13,7 @@ class Phase0LoaderSuite extends CatsEffectSuite:
 
   test("loadAll gmosNorth spectroscopy configurations"):
     val rdr = FileReader[IO](fileName)
-    val inputStream = getClass.getResourceAsStream(fileName)
-    val stream =
-      fs2.io.readInputStream(
-        IO(inputStream),
-        chunkSize = 4096,
-        closeAfterUse = true
-      )
+    val stream = fs2.io.readClassResource[IO, Phase0LoaderSuite](fileName)
 
     stream
       .through(rdr.gmosNorthSpectroscopy)
@@ -35,13 +29,7 @@ class Phase0LoaderSuite extends CatsEffectSuite:
 
   test("loadAll gmosSouth spectroscopy configurations"):
     val rdr = FileReader[IO](fileName)
-    val inputStream = getClass.getResourceAsStream(fileName)
-    val stream =
-      fs2.io.readInputStream(
-        IO(inputStream),
-        chunkSize = 4096,
-        closeAfterUse = true
-      )
+    val stream = fs2.io.readClassResource[IO, Phase0LoaderSuite](fileName)
 
     stream
       .through(rdr.gmosSouthSpectroscopy)
@@ -57,13 +45,7 @@ class Phase0LoaderSuite extends CatsEffectSuite:
 
   test("loadAll flamingos2 spectroscopy configurations"):
     val rdr = FileReader[IO](fileName)
-    val inputStream = getClass.getResourceAsStream(fileName)
-    val stream =
-      fs2.io.readInputStream(
-        IO(inputStream),
-        chunkSize = 4096,
-        closeAfterUse = true
-      )
+    val stream = fs2.io.readClassResource[IO, Phase0LoaderSuite](fileName)
 
     stream
       .through(rdr.flamingos2Spectroscopy)
@@ -91,13 +73,7 @@ class Phase0LoaderSuite extends CatsEffectSuite:
 
   test("loadAll GHOST IFU configurations"):
     val rdr = FileReader[IO](fileName)
-    val inputStream = getClass.getResourceAsStream(fileName)
-    val stream =
-      fs2.io.readInputStream(
-        IO(inputStream),
-        chunkSize = 4096,
-        closeAfterUse = true
-      )
+    val stream = fs2.io.readClassResource[IO, Phase0LoaderSuite](fileName)
 
     stream
       .through(rdr.ghostIfu)
@@ -108,13 +84,7 @@ class Phase0LoaderSuite extends CatsEffectSuite:
 
   test("loadAll igrins2 spectroscopy configurations"):
     val rdr = FileReader[IO](fileName)
-    val inputStream = getClass.getResourceAsStream(fileName)
-    val stream =
-      fs2.io.readInputStream(
-        IO(inputStream),
-        chunkSize = 4096,
-        closeAfterUse = true
-      )
+    val stream = fs2.io.readClassResource[IO, Phase0LoaderSuite](fileName)
 
     stream
       .through(rdr.igrins2Spectroscopy)
@@ -125,13 +95,7 @@ class Phase0LoaderSuite extends CatsEffectSuite:
 
   test("loadAll gnirs spectroscopy configurations"):
     val rdr = FileReader[IO](fileName)
-    val inputStream = getClass.getResourceAsStream(fileName)
-    val stream =
-      fs2.io.readInputStream(
-        IO(inputStream),
-        chunkSize = 4096,
-        closeAfterUse = true
-      )
+    val stream = fs2.io.readClassResource[IO, Phase0LoaderSuite](fileName)
 
     stream
       .through(rdr.gnirsSpectroscopy)
@@ -142,13 +106,7 @@ class Phase0LoaderSuite extends CatsEffectSuite:
 
   test("loadAll scorpio spectroscopy configurations"):
     val rdr = FileReader[IO](fileName)
-    val inputStream = getClass.getResourceAsStream(fileName)
-    val stream =
-      fs2.io.readInputStream(
-        IO(inputStream),
-        chunkSize = 4096,
-        closeAfterUse = true
-      )
+    val stream = fs2.io.readClassResource[IO, Phase0LoaderSuite](fileName)
 
     stream
       .through(rdr.scorpioSpectroscopy)
@@ -159,13 +117,7 @@ class Phase0LoaderSuite extends CatsEffectSuite:
 
   test("loadAll scorpio imaging configurations"):
     val rdr = FileReader[IO](imgFileName)
-    val inputStream = getClass.getResourceAsStream(imgFileName)
-    val stream =
-      fs2.io.readInputStream(
-        IO(inputStream),
-        chunkSize = 4096,
-        closeAfterUse = true
-      )
+    val stream = fs2.io.readClassResource[IO, Phase0LoaderSuite](imgFileName)
 
     stream
       .through(rdr.scorpioImaging)
@@ -176,13 +128,7 @@ class Phase0LoaderSuite extends CatsEffectSuite:
 
   test("loadAll gmosNorth imaging configurations"):
     val rdr = FileReader[IO](imgFileName)
-    val inputStream = getClass.getResourceAsStream(imgFileName)
-    val stream =
-      fs2.io.readInputStream(
-        IO(inputStream),
-        chunkSize = 4096,
-        closeAfterUse = true
-      )
+    val stream = fs2.io.readClassResource[IO, Phase0LoaderSuite](imgFileName)
 
     stream
       .through(rdr.gmosNorthImaging)
@@ -193,13 +139,7 @@ class Phase0LoaderSuite extends CatsEffectSuite:
 
   test("loadAll gmosSouth imaging configurations"):
     val rdr = FileReader[IO](imgFileName)
-    val inputStream = getClass.getResourceAsStream(imgFileName)
-    val stream =
-      fs2.io.readInputStream(
-        IO(inputStream),
-        chunkSize = 4096,
-        closeAfterUse = true
-      )
+    val stream = fs2.io.readClassResource[IO, Phase0LoaderSuite](imgFileName)
 
     stream
       .through(rdr.gmosSouthImaging)
@@ -210,13 +150,7 @@ class Phase0LoaderSuite extends CatsEffectSuite:
 
   test("loadAll flamingos2 imaging configurations"):
     val rdr = FileReader[IO](imgFileName)
-    val inputStream = getClass.getResourceAsStream(imgFileName)
-    val stream =
-      fs2.io.readInputStream(
-        IO(inputStream),
-        chunkSize = 4096,
-        closeAfterUse = true
-      )
+    val stream = fs2.io.readClassResource[IO, Phase0LoaderSuite](imgFileName)
 
     stream
       .through(rdr.flamingos2Imaging)
@@ -227,13 +161,7 @@ class Phase0LoaderSuite extends CatsEffectSuite:
 
   test("loadAll gnirs imaging configurations"):
     val rdr = FileReader[IO](imgFileName)
-    val inputStream = getClass.getResourceAsStream(imgFileName)
-    val stream =
-      fs2.io.readInputStream(
-        IO(inputStream),
-        chunkSize = 4096,
-        closeAfterUse = true
-      )
+    val stream = fs2.io.readClassResource[IO, Phase0LoaderSuite](imgFileName)
 
     stream
       .through(rdr.gnirsImaging)
@@ -244,13 +172,7 @@ class Phase0LoaderSuite extends CatsEffectSuite:
 
   test("load alopeke configurations"):
     val rdr = FileReader[IO](imgFileName)
-    val inputStream = getClass.getResourceAsStream(imgFileName)
-    val stream =
-      fs2.io.readInputStream(
-        IO(inputStream),
-        chunkSize = 4096,
-        closeAfterUse = true
-      )
+    val stream = fs2.io.readClassResource[IO, Phase0LoaderSuite](imgFileName)
 
     stream
       .through(rdr.alopekeImaging)
@@ -261,13 +183,7 @@ class Phase0LoaderSuite extends CatsEffectSuite:
 
   test("load zorro configurations"):
     val rdr = FileReader[IO](imgFileName)
-    val inputStream = getClass.getResourceAsStream(imgFileName)
-    val stream =
-      fs2.io.readInputStream(
-        IO(inputStream),
-        chunkSize = 4096,
-        closeAfterUse = true
-      )
+    val stream = fs2.io.readClassResource[IO, Phase0LoaderSuite](imgFileName)
 
     stream
       .through(rdr.zorroImaging)
