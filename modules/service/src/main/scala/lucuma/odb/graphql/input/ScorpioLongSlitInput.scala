@@ -10,7 +10,7 @@ import cats.syntax.functor.*
 import cats.syntax.parallel.*
 import grackle.Result
 import lucuma.core.enums.ObservingModeType
-import lucuma.core.enums.ScorpioArmSet
+import lucuma.core.enums.ScorpioChannelSelection
 import lucuma.core.enums.ScorpioFilter
 import lucuma.core.enums.ScorpioFpu
 import lucuma.core.model.ExposureTimeMode
@@ -24,8 +24,8 @@ object ScorpioLongSlitInput:
   private val MissingFpu: String =
     "A slit (fpu) must be supplied for SCORPIO Long Slit observations"
 
-  private def checkChannelSelection(channelSelection: Option[ScorpioArmSet]): Result[Unit] =
-    channelSelection.filterNot(_ === ScorpioArmSet.VisOnly).fold(Result.unit): a =>
+  private def checkChannelSelection(channelSelection: Option[ScorpioChannelSelection]): Result[Unit] =
+    channelSelection.filterNot(_ === ScorpioChannelSelection.VisOnly).fold(Result.unit): a =>
       Result.failure(s"SCORPIO Long Slit only supports the VIS_ONLY channel selection, not ${a.tag.toUpperCase}")
 
   case class Create(
@@ -60,7 +60,7 @@ object ScorpioLongSlitInput:
       ObjectFieldsBinding.rmap:
         case List(
           ScorpioFpuBinding.NonNullable("fpu", rFpu),
-          ScorpioArmSetBinding.NonNullable("channelSelection", rChannelSelection),
+          ScorpioChannelSelectionBinding.NonNullable("channelSelection", rChannelSelection),
           ExposureTimeModeInput.Binding.NonNullable("g", rG),
           ExposureTimeModeInput.Binding.NonNullable("r", rR),
           ExposureTimeModeInput.Binding.NonNullable("i", rI),
@@ -108,7 +108,7 @@ object ScorpioLongSlitInput:
       ObjectFieldsBinding.rmap:
         case List(
           ScorpioFpuBinding.NonNullable("fpu", rFpu),
-          ScorpioArmSetBinding.NonNullable("channelSelection", rChannelSelection),
+          ScorpioChannelSelectionBinding.NonNullable("channelSelection", rChannelSelection),
           ExposureTimeModeInput.Binding.NonNullable("g", rG),
           ExposureTimeModeInput.Binding.NonNullable("r", rR),
           ExposureTimeModeInput.Binding.NonNullable("i", rI),

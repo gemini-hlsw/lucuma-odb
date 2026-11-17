@@ -11,7 +11,7 @@ import grackle.QueryCompiler.Elab
 import grackle.Result
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
-import lucuma.core.enums.ScorpioArmSet
+import lucuma.core.enums.ScorpioChannelSelection
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.*
@@ -29,7 +29,7 @@ trait ScorpioLongSlitMapping[F[_]]
       SqlField("fpu", ScorpioLongSlitView.Fpu),
 
       // Only the visible arm is supported, so it is not stored.
-      CursorField("channelSelection", _ => Result(ScorpioArmSet.VisOnly), List("observationId")),
+      CursorField("channelSelection", _ => Result(ScorpioChannelSelection.VisOnly), List("observationId")),
 
       SqlObject("g", Join(ScorpioLongSlitView.ObservationId, ScorpioGExposureTimeModeView.ObservationId)),
       SqlObject("r", Join(ScorpioLongSlitView.ObservationId, ScorpioRExposureTimeModeView.ObservationId)),

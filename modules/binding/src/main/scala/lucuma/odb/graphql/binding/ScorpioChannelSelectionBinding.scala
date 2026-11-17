@@ -3,7 +3,7 @@
 
 package lucuma.odb.graphql.binding
 
-import lucuma.core.enums.ScorpioArmSet
+import lucuma.core.enums.ScorpioChannelSelection
 
-val ScorpioArmSetBinding: Matcher[ScorpioArmSet] =
+val ScorpioChannelSelectionBinding: Matcher[ScorpioChannelSelection] =
   enumeratedBinding
