@@ -20,6 +20,8 @@ object WhereGroup {
     val WhereOrderGroupIdBinding = WhereOrder.binding[Group.Id](path / "id", GroupIdBinding)
     val NameBinding = WhereOptionString.binding(path / "name")
     val DescriptionBinding = WhereOptionString.binding(path / "description")
+    val ProgramBinding = WhereProgram.binding(path / "program")
+    val StandingBinding = WhereCalculatedGroupStanding.binding(path / "standing")
     lazy val WhereGroupBinding = binding(path)
     ObjectFieldsBinding.rmap {
       case List(
@@ -29,8 +31,10 @@ object WhereGroup {
         WhereOrderGroupIdBinding.Option("id", rId),
         NameBinding.Option("name", rName),
         DescriptionBinding.Option("description", rDescription),
+        ProgramBinding.Option("program", rProgram),
+        StandingBinding.Option("standing", rStanding),
       ) =>
-        (rAND, rOR, rNOT, rId, rName, rDescription).parMapN { (AND, OR, NOT, id, name, description) =>
+        (rAND, rOR, rNOT, rId, rName, rDescription, rProgram, rStanding).parMapN { (AND, OR, NOT, id, name, description, program, standing) =>
           and(List(
             AND.map(and),
             OR.map(or),
@@ -38,6 +42,8 @@ object WhereGroup {
             id,
             name,
             description,
+            program,
+            standing,
           ).flatten)
         }
     }

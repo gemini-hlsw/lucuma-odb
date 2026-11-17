@@ -300,6 +300,7 @@ trait BaseMapping[F[_]]
   lazy val GroupConstraintWaiverType               = schema.ref("GroupConstraintWaiver")
   lazy val GroupConstraintWaiverIdType             = schema.ref("GroupConstraintWaiverId")
   lazy val GroupIdType                             = schema.ref("GroupId")
+  lazy val GroupSelectResultType                   = schema.ref("GroupSelectResult")
   lazy val GroupStatusType                         = schema.ref("GroupStatus")
   lazy val GroupStandingStatusType                 = schema.ref("GroupStandingStatus")
   lazy val GroupEditType                           = schema.ref("GroupEdit")

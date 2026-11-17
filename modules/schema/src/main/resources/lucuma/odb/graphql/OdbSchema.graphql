@@ -20224,6 +20224,27 @@ type Query {
   group(groupId: GroupId!): Group
 
   """
+  Selects the first `LIMIT` matching groups based on the provided `WHERE`
+  parameter, if any, ordered by id.
+  """
+  groups(
+    "Filters the selection of groups."
+    WHERE: WhereGroup
+
+    "Starts the result set at the given group id, or at the next one if it does not exist."
+    OFFSET_AT: GroupId
+
+    "Starts the result set after the given group id."
+    OFFSET_AFTER: GroupId
+
+    "Limits the result to at most this number of matches (but never more than 1000)."
+    LIMIT: NonNegInt
+
+    "Set to true to include deleted groups."
+    includeDeleted: Boolean! = false
+  ): GroupSelectResult!
+
+  """
   Returns the observation with the given id or reference, if any.  Identify the
   observation by specifying only one of observationId or observationReference.
   If more than one is provided, all must match.  If neither are set, nothing
@@ -24878,6 +24899,26 @@ input WhereGroup {
   name: WhereOptionString
 
   description: WhereOptionString
+
+  "Matches the program containing the group."
+  program: WhereProgram
+
+  """
+  Matches the group's standing (`Group.standing`).  A deleted group has no
+  standing, so it matches no standing filter.
+  """
+  standing: WhereCalculatedGroupStanding
+}
+
+"""
+The matching groups, limited to a maximum of 1000 entries.
+"""
+type GroupSelectResult {
+  "Matching groups up to the return size limit of 1000."
+  matches: [Group!]!
+
+  "`true` when there were additional matches that were not returned."
+  hasMore: Boolean!
 }
 
 input WhereOrderGroupId {
