@@ -19,6 +19,7 @@ trait AttachmentTable[F[_]] extends BaseMapping[F]:
     val FileName       = col("c_file_name", text_nonempty)
     val MaskName       = col("c_mask_name", text_nonempty.opt)
     val MaskDefinition = col("c_mask_definition", jsonb.opt)
+    val MaskInstrument = col("c_mask_instrument", instrument.opt)
     val Description    = col("c_description", text_nonempty.opt)
     val Checked        = col("c_checked", bool)
     val FileSize       = col("c_file_size", int8)

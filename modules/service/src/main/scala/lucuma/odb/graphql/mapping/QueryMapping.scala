@@ -28,6 +28,7 @@ import io.circe.syntax.*
 import lucuma.core.enums.Instrument
 import lucuma.core.model
 import lucuma.core.model.Access
+import lucuma.core.model.Attachment
 import lucuma.core.model.CallForProposals
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.Observation
@@ -44,6 +45,7 @@ import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.TooTrigger
 import lucuma.odb.graphql.binding.*
+import lucuma.odb.graphql.input.WhereAttachment
 import lucuma.odb.graphql.input.WhereCallForProposals
 import lucuma.odb.graphql.input.WhereConfigurationRequest
 import lucuma.odb.graphql.input.WhereDataset
@@ -106,6 +108,7 @@ trait QueryMapping[F[_]] extends Predicates[F] with UserEnv {
       SqlObject("program"),
       SqlObject("programs"),
       SqlObject("programNote"),
+      SqlObject("mosMasks"),
       SqlObject("programNotes"),
       SqlObject("programUsers"),
       SqlObject("spectroscopyConfigOptions"),
@@ -141,6 +144,7 @@ trait QueryMapping[F[_]] extends Predicates[F] with UserEnv {
       Programs,
       ProgramNote,
       ProgramNotes,
+      MosMasks,
       ProgramUsers,
       SpectroscopyConfigOptions,
       Target,
@@ -812,6 +816,41 @@ trait QueryMapping[F[_]] extends Predicates[F] with UserEnv {
                   ),
                   oss = Some(List(
                     OrderSelection[lucuma.core.model.ProgramNote.Id](ProgramNoteType / "id")
+                  )),
+                  offset = None,
+                  limit = Some(limit + 1), // Select one extra row here.
+                  child = q
+                )
+    }
+
+  private lazy val MosMasks: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
+    val WhereAttachmentBinding = WhereAttachment.binding(Path.from(AttachmentType))
+    {
+      case (QueryType, "mosMasks", List(
+        InstrumentBinding.List("instruments", rInstruments),
+        WhereAttachmentBinding.Option("WHERE", rWHERE),
+        AttachmentIdBinding.Option("OFFSET_AT", rOFFSET_AT),
+        AttachmentIdBinding.Option("OFFSET_AFTER", rOFFSET_AFTER),
+        NonNegIntBinding.Option("LIMIT", rLIMIT)
+      )) =>
+        withUser:
+          Elab.transformChild: child =>
+            val rOffset: Result[Predicate] = PagingOffset.predicate(Predicates.attachment.id, Result(none), rOFFSET_AT, rOFFSET_AFTER)
+            (rInstruments, rWHERE, rOffset, rLIMIT).parFlatMapN: (instruments, WHERE, offset, LIMIT) =>
+              val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
+              ResultMapping.selectResult(child, limit): q =>
+                FilterOrderByOffsetLimit(
+                  pred = Some(
+                    and(List(
+                      offset,
+                      Predicates.attachment.isMaskFor(instruments),
+                      Predicates.attachment.isListableBy(user),
+                      Predicates.attachment.program.existence.includeDeleted(false),
+                      WHERE.getOrElse(True)
+                    ))
+                  ),
+                  oss = Some(List(
+                    OrderSelection[Attachment.Id](AttachmentType / "id")
                   )),
                   offset = None,
                   limit = Some(limit + 1), // Select one extra row here.
