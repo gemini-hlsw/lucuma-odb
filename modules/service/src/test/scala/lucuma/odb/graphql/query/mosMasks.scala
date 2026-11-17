@@ -98,6 +98,24 @@ class mosMasks extends OdbSuite with DatabaseOperations with MosMaskSupport:
       List((f.n3, "GMOS_NORTH"), (f.f2, "FLAMINGOS2"))
     )
 
+  private def deleteProgram(pid: Program.Id): IO[Unit] =
+    query(staff, s"""
+      mutation {
+        updatePrograms(input: {
+          SET: { existence: DELETED }
+          WHERE: { id: { EQ: ${pid.asJson} } }
+        }) { programs { id } }
+      }
+    """).void
+
+  test("a mask in a deleted program is hidden, its copy in a live program is not"):
+    for
+      f <- fixture
+      c <- insertMosMaskAttachment(f.p2, "GN2026AQ001-01_ODF.fits", Instrument.GmosNorth)
+      _ <- deleteProgram(f.p1)
+      r <- select(staff, List(Instrument.GmosNorth), f)
+    yield assertEquals(r, (List(f.n3, c), false))
+
   test("a PI sees nothing, not even their own masks"):
     for
       f <- fixture

@@ -844,6 +844,7 @@ trait QueryMapping[F[_]] extends Predicates[F] with UserEnv {
                       offset,
                       Predicates.attachment.isMaskFor(instruments),
                       Predicates.attachment.isListableBy(user),
+                      Predicates.attachment.program.existence.includeDeleted(false),
                       WHERE.getOrElse(True)
                     ))
                   ),
