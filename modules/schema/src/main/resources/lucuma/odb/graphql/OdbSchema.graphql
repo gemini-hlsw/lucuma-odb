@@ -17346,6 +17346,11 @@ type ScorpioLongSlit {
   """
   explicitTelescopeConfigs: SlitTelescopeConfigs
 
+  """
+  Number of passes over the telescope configs (nod-and-read).  Defaults to 1.
+  """
+  repeats: PosInt!
+
 }
 
 """
@@ -17393,6 +17398,12 @@ input ScorpioLongSlitInput {
   Explicit telescope configs. May be unset by assigning a null value, or ignored by skipping.
   """
   explicitTelescopeConfigs: SlitTelescopeConfigsInput
+
+  """
+  Number of passes over the telescope configs (nod-and-read).  Defaults to 1
+  when skipped on create.  It cannot be unset with a null value.
+  """
+  repeats: PosInt
 
 }
 

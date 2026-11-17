@@ -302,7 +302,42 @@ class createObservation_ScorpioLongSlit extends OdbSuite:
       cfg <- withServices(serviceUser): services =>
                services.transactionally:
                  services.scorpioLongSlitService.select(List(oid)).map(_.get(oid))
-    yield assertEquals(cfg, Some(Config(ScorpioFpu.LongSlit_0_54, g, r, i, z, Config.DefaultTelescopeConfigs)))
+    yield assertEquals(cfg, Some(Config(ScorpioFpu.LongSlit_0_54, g, r, i, z, Config.DefaultTelescopeConfigs, Config.DefaultRepeats)))
+
+  private def expectRepeats(scorpio: String, repeats: Int): IO[Unit] =
+    createProgramAs(pi).flatMap: pid =>
+      expect(
+        user     = pi,
+        query    = createMutation(
+          pid,
+          scienceRequirementsObject(GhostIfu),
+          scorpio,
+          "observingMode { scorpioLongSlit { repeats } }"
+        ),
+        expected =
+          json"""
+            {
+              "createObservation": {
+                "observation": {
+                  "observingMode": { "scorpioLongSlit": { "repeats": $repeats } }
+                }
+              }
+            }
+          """.asRight
+      )
+
+  test("repeats defaults to 1"):
+    expectRepeats("fpu: LONG_SLIT_0_54", 1)
+
+  test("create with repeats"):
+    expectRepeats("fpu: LONG_SLIT_0_54, repeats: 3", 3)
+
+  test("cannot create with zero repeats"):
+    expectRejected(
+      scienceRequirementsObject(GhostIfu),
+      "fpu: LONG_SLIT_0_54, repeats: 0",
+      "Argument 'input.SET.observingMode.scorpioLongSlit.repeats' is invalid: Invalid PosInt: 0: Predicate failed: (0 > 0)."
+    )
 
   test("the channel selection is visible only"):
     createProgramAs(pi).flatMap: pid =>

@@ -45,7 +45,9 @@ trait ScorpioLongSlitMapping[F[_]]
 
       slitTelescopeConfigsField("telescopeConfigs",        "slitOffsetModeEffRaw", "tcEffRaw"),
       slitTelescopeConfigsField("defaultTelescopeConfigs", "slitOffsetModeDefRaw", "tcDefRaw"),
-      explicitSlitTelescopeConfigsField("explicitTelescopeConfigs", "slitOffsetModeExpRaw", "tcExpRaw")
+      explicitSlitTelescopeConfigsField("explicitTelescopeConfigs", "slitOffsetModeExpRaw", "tcExpRaw"),
+
+      SqlField("repeats", ScorpioLongSlitView.Repeats)
     )
 
   lazy val ScorpioLongSlitElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =

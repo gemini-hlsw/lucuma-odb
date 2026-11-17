@@ -23,3 +23,5 @@ trait ScorpioLongSlitView[F[_]] extends BaseMapping[F]:
     val TelescopeConfigs: ColumnRef          = col("c_telescope_configs", text.opt)
     val TelescopeConfigsDefault: ColumnRef   = col("c_telescope_configs_default", text)
     val TelescopeConfigsEffective: ColumnRef = col("c_telescope_configs_effective", text)
+
+    val Repeats: ColumnRef = col("c_repeats", int4_pos)

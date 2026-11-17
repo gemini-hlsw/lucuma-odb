@@ -8,6 +8,7 @@ import cats.data.NonEmptyList
 import cats.syntax.eq.*
 import cats.syntax.functor.*
 import cats.syntax.parallel.*
+import eu.timepit.refined.types.numeric.PosInt
 import grackle.Result
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ScorpioChannelSelection
@@ -34,7 +35,8 @@ object ScorpioLongSlitInput:
     r:                        Option[ExposureTimeMode],
     i:                        Option[ExposureTimeMode],
     z:                        Option[ExposureTimeMode],
-    explicitTelescopeConfigs: Option[SlitTelescopeConfigs]
+    explicitTelescopeConfigs: Option[SlitTelescopeConfigs],
+    repeats:                  Option[PosInt]
   ):
     def observingModeType: ObservingModeType =
       ObservingModeType.ScorpioLongSlit
@@ -65,12 +67,13 @@ object ScorpioLongSlitInput:
           ExposureTimeModeInput.Binding.NonNullable("r", rR),
           ExposureTimeModeInput.Binding.NonNullable("i", rI),
           ExposureTimeModeInput.Binding.NonNullable("z", rZ),
-          SlitTelescopeConfigsInput.Binding.Option("explicitTelescopeConfigs", rTelescopeConfigs)
+          SlitTelescopeConfigsInput.Binding.Option("explicitTelescopeConfigs", rTelescopeConfigs),
+          PosIntBinding.NonNullable("repeats", rRepeats)
         ) =>
-          val rFpuʹ    = rFpu.flatMap(Result.fromOption(_, MissingFpu))
+          val rFpuʹ              = rFpu.flatMap(Result.fromOption(_, MissingFpu))
           val rChannelSelectionʹ = rChannelSelection.flatMap(checkChannelSelection)
-          (rFpuʹ, rChannelSelectionʹ, rG, rR, rI, rZ, rTelescopeConfigs).parMapN: (fpu, _, g, r, i, z, tc) =>
-            Create(fpu, g, r, i, z, tc)
+          (rFpuʹ, rChannelSelectionʹ, rG, rR, rI, rZ, rTelescopeConfigs, rRepeats).parMapN: (fpu, _, g, r, i, z, tc, n) =>
+            Create(fpu, g, r, i, z, tc, n)
 
   case class Edit(
     fpu:                      Option[ScorpioFpu],
@@ -78,7 +81,8 @@ object ScorpioLongSlitInput:
     r:                        Option[ExposureTimeMode],
     i:                        Option[ExposureTimeMode],
     z:                        Option[ExposureTimeMode],
-    explicitTelescopeConfigs: Nullable[SlitTelescopeConfigs]
+    explicitTelescopeConfigs: Nullable[SlitTelescopeConfigs],
+    repeats:                  Option[PosInt]
   ):
     def observingModeType: ObservingModeType =
       ObservingModeType.ScorpioLongSlit
@@ -100,7 +104,7 @@ object ScorpioLongSlitInput:
     def toCreate: Result[Create] =
       Result
         .fromOption(fpu, MissingFpu)
-        .map(Create(_, g, r, i, z, explicitTelescopeConfigs.toOption))
+        .map(Create(_, g, r, i, z, explicitTelescopeConfigs.toOption, repeats))
 
   object Edit:
 
@@ -113,8 +117,9 @@ object ScorpioLongSlitInput:
           ExposureTimeModeInput.Binding.NonNullable("r", rR),
           ExposureTimeModeInput.Binding.NonNullable("i", rI),
           ExposureTimeModeInput.Binding.NonNullable("z", rZ),
-          SlitTelescopeConfigsInput.Binding.Nullable("explicitTelescopeConfigs", rTelescopeConfigs)
+          SlitTelescopeConfigsInput.Binding.Nullable("explicitTelescopeConfigs", rTelescopeConfigs),
+          PosIntBinding.NonNullable("repeats", rRepeats)
         ) =>
           val rChannelSelectionʹ = rChannelSelection.flatMap(checkChannelSelection)
-          (rFpu, rChannelSelectionʹ, rG, rR, rI, rZ, rTelescopeConfigs).parMapN: (fpu, _, g, r, i, z, tc) =>
-            Edit(fpu, g, r, i, z, tc)
+          (rFpu, rChannelSelectionʹ, rG, rR, rI, rZ, rTelescopeConfigs, rRepeats).parMapN: (fpu, _, g, r, i, z, tc, n) =>
+            Edit(fpu, g, r, i, z, tc, n)
