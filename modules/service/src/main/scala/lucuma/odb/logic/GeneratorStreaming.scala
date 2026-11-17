@@ -335,7 +335,7 @@ object GeneratorStreaming:
 
       // Daytime calibrations have no acquisition, so a stored science sequence
       // alone decides: generating from the sets only when none is stored.  The
-      // atoms are never collapsed; one atom per set is the documented shape.
+      // sets are merged into a single atom at generation; stored atoms are kept as they are.
       override def selectDaytime(
         instrument: DaytimeInstrument[F],
         context:    GeneratorContext

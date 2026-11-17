@@ -20,12 +20,13 @@ import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.SmartGcalExpander.Calibration
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
+import lucuma.odb.sequence.daytimecal.DaytimeCalibration
 
 import java.util.UUID
 
 /**
  * A generated daytime calibration sequence: no acquisition, no ITC, one
- * titled atom per smart GCAL step, each expanded by SmartGcal.  A step
+ * atom holding every smart GCAL step, each expanded by SmartGcal.  A step
  * without a SmartGcal definition is left out and reported; a sequence left
  * with no step at all fails.
  */
@@ -46,7 +47,8 @@ object DaytimeSmartGcal:
       .map: (missing, protoAtoms) =>
         SmartGcalExpander.remaining(missing, protoAtoms).bimap(
           definitionError(observationId, _),
-          (missing, protoAtoms) =>
+          (missing, expanded) =>
+            val protoAtoms = DaytimeCalibration.singleAtom(expanded)
             val builder = AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Science)
             val generator = new SequenceGenerator[D]:
               def generate: Stream[Pure, Atom[D]] =

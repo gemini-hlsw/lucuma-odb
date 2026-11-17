@@ -32,13 +32,17 @@ import lucuma.odb.sequence.util.AtomBuilder
 import java.util.UUID
 
 /**
- * Generates a daytime calibration sequence from its Calibration Sets: one
- * atom per set, never guided.  A manual set's atom holds `explicitCount` identical
- * DAY_CAL steps; a smart set's atom holds one smart GCAL step the caller
- * expands with the instrument's SmartGcalExpander before building atoms.
- * Nothing here is instrument-specific.
+ * Generates a daytime calibration sequence from its Calibration Sets, never
+ * guided.  A manual set yields `explicitCount` identical DAY_CAL steps; a smart
+ * set yields one smart GCAL step the caller expands with the instrument's
+ * SmartGcalExpander.  The expanded sets are merged into a single atom with
+ * `singleAtom`.  Nothing here is instrument-specific.
  */
 object DaytimeCalibration:
+
+  /** Title of the single atom holding a daytime calibration's steps. */
+  val Description: NonEmptyString =
+    NonEmptyString.unsafeFrom("Daytime Calibration")
 
   private val Telescope: TelescopeConfig =
     TelescopeConfig(Offset.Zero, StepGuideState.Disabled)
@@ -79,6 +83,11 @@ object DaytimeCalibration:
 
   def protoAtoms[D](oid: Observation.Id, sets: List[CalibrationSet[D]]): Either[OdbError, List[ProtoAtom[ProtoStep[D]]]] =
     sets.zipWithIndex.traverse((s, i) => protoAtom(oid, i, s))
+
+  /** Merges the atoms into one titled `Description`, keeping the step order; no atoms stay none. */
+  def singleAtom[D](atoms: List[ProtoAtom[ProtoStep[D]]]): List[ProtoAtom[ProtoStep[D]]] =
+    NonEmptyList.fromList(atoms.flatMap(_.steps.toList)).toList.map: steps =>
+      ProtoAtom(Description.some, steps)
 
   def generator[S, D](
     estimator: StepTimeEstimateCalculator[S, D],

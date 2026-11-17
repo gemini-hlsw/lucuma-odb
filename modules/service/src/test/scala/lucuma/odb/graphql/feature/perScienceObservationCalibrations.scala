@@ -3365,7 +3365,7 @@ class perScienceObservationCalibrations
                         "gnirs" -> Json.obj(
                           "science" -> Json.obj(
                             "nextAtom" -> Json.obj(
-                              "description"  -> "Daytime Pinhole".asJson,
+                              "description"  -> "Daytime Calibration".asJson,
                               "observeClass" -> "DAY_CAL".asJson,
                               "steps"        -> Json.arr(
                                 Json.obj(
@@ -3460,13 +3460,8 @@ class perScienceObservationCalibrations
                 )
     } yield ()
 
-  test("gnirs XD daytime pinhole names its wavelength when the science list repeats one"):
-    // One pinhole flat per *distinct* wavelength, so a [1650, 1650] observation gets a
-    // single atom -- but it is still a multi-wavelength observation, so the title has to
-    // name the wavelength, matching the science segments that read "(1650 nm #1)" and
-    // "(1650 nm #2)".  Deciding that from the distinct list instead would title this one
-    // bare "Daytime Pinhole".  No occurrence ordinal here: the pinholes are distinct by
-    // construction, so there is no second 1650 nm atom to tell this one apart from.
+  test("gnirs XD daytime pinhole flats one distinct wavelength once when the science list repeats it"):
+    // One pinhole flat per distinct wavelength: [1650, 1650] gives a single flat in the single atom.
     for {
       pid    <- createProgramAs(pi)
       tid    <- createTargetWithProfileAs(pi, pid)
@@ -3484,7 +3479,7 @@ class perScienceObservationCalibrations
                         "gnirs" -> Json.obj(
                           "science" -> Json.obj(
                             "nextAtom" -> Json.obj(
-                              "description"  -> "Daytime Pinhole (1650 nm)".asJson,
+                              "description"  -> "Daytime Calibration".asJson,
                               "observeClass" -> "DAY_CAL".asJson,
                               "steps"        -> Json.arr(
                                 Json.obj(

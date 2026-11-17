@@ -19,8 +19,8 @@ import lucuma.odb.json.ghost.transport.given
 import lucuma.odb.sequence.util.HashBytes
 
 /**
- * One generator row of a daytime calibration: the parameters that produce one
- * atom of DAY_CAL steps taken with this setup.  A manual kind takes
+ * One generator row of a daytime calibration: the parameters that produce a run
+ * of DAY_CAL steps taken with this setup.  A manual kind takes
  * `explicitCount` identical steps with its own `gcal`; a smart kind has
  * neither, since the Smart GCAL lookup supplies the steps.
  */

@@ -192,12 +192,18 @@ class daytimeCalibrationSets_gnirs extends OdbSuite with DatabaseOperations with
     """
     json"""{ "description": ${s"$kind x$count"}, "steps": ${List.fill(count)(step)} }"""
 
+  private def merged(atoms: Json*): Json =
+    val steps: List[Json] = atoms.toList.flatMap(_.hcursor.downField("steps").focus.flatMap(_.asArray).toList.flatten)
+    json"""{ "description": "Daytime Calibration", "steps": $steps }"""
+
   private val mockupAtoms: List[Json] =
     List(
-      atom("Dark",    10, "DARK",    60),
-      atom("Flat",    3,  "GCAL",    30),
-      atom("Arc",     2,  "GCAL",    10),
-      atom("Observe", 1,  "SCIENCE", 5)
+      merged(
+        atom("Dark",    10, "DARK",    60),
+        atom("Flat",    3,  "GCAL",    30),
+        atom("Arc",     2,  "GCAL",    10),
+        atom("Observe", 1,  "SCIENCE", 5)
+      )
     )
 
   private def expectedExecution(atoms: List[Json]): Json =
@@ -216,7 +222,7 @@ class daytimeCalibrationSets_gnirs extends OdbSuite with DatabaseOperations with
       }
     """
 
-  test("one atom per set, count steps each, in row order, Shallow well depth"):
+  test("all the sets in one atom, count steps each, in row order, Shallow well depth"):
     for
       pid <- createProgramAs(staff)
       oid <- createWithSets(pid, mockupSets)
@@ -340,7 +346,7 @@ class daytimeCalibrationSets_gnirs extends OdbSuite with DatabaseOperations with
       )
     yield ()
 
-  test("defined with sets, four atoms in the digest"):
+  test("defined with sets, one atom in the digest"):
     for
       pid <- createProgramAs(staff)
       oid <- createWithSets(pid, mockupSets)
@@ -359,7 +365,7 @@ class daytimeCalibrationSets_gnirs extends OdbSuite with DatabaseOperations with
           {
             "observation": {
               "workflow": { "value": { "state": "DEFINED", "validationErrors": [] } },
-              "execution": { "digest": { "value": { "science": { "atomCount": 4, "observeClass": "DAY_CAL" } } } }
+              "execution": { "digest": { "value": { "science": { "atomCount": 1, "observeClass": "DAY_CAL" } } } }
             }
           }
         """.asRight
@@ -546,11 +552,8 @@ class daytimeCalibrationSets_gnirs extends OdbSuite with DatabaseOperations with
             "executionConfig": {
               "gnirs": {
                 "science": {
-                  "nextAtom": { "description": "Smart Flat", "steps": [ $smartFlatStep, $smartFlatStep ] },
-                  "possibleFuture": [
-                    { "description": "Smart Arc",    "steps": [ $smartArcStep ] },
-                    { "description": "Day Baseline", "steps": [ $smartArcStep ] }
-                  ]
+                  "nextAtom": { "description": "Daytime Calibration", "steps": [ $smartFlatStep, $smartFlatStep, $smartArcStep, $smartArcStep ] },
+                  "possibleFuture": []
                 }
               }
             }

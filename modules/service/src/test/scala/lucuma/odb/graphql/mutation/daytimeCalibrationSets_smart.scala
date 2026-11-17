@@ -209,7 +209,7 @@ class daytimeCalibrationSets_smart extends ExecutionTestSupportForGmos with Dayt
       """
     )
 
-  test("smart rows expand to the lookup's steps, one atom each, all DAY_CAL"):
+  test("smart rows expand to the lookup's steps, all in one atom, all DAY_CAL"):
     for
       pid <- createProgramAs(staff)
       oid <- createWithSets(pid, s"{ kind: SMART_FLAT, ${setup()} }, { kind: SMART_ARC, ${setup()} }, { kind: DAY_BASELINE, ${setup()} }")
@@ -221,11 +221,8 @@ class daytimeCalibrationSets_smart extends ExecutionTestSupportForGmos with Dayt
             "executionConfig": {
               "gmosNorth": {
                 "science": {
-                  "nextAtom": ${atom("Smart Flat", List(flatStep))},
-                  "possibleFuture": [
-                    ${atom("Smart Arc", List(arcStep))},
-                    ${atom("Day Baseline", List(arcStep))}
-                  ]
+                  "nextAtom": ${atom("Daytime Calibration", List(flatStep, arcStep, arcStep))},
+                  "possibleFuture": []
                 }
               }
             }

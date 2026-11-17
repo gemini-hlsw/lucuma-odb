@@ -293,20 +293,20 @@ class calibrations_f2ImagingDaytimeFlat
   private val dayFlatSteps: List[(String, String)] =
     List(("GCAL", "DAY_CAL"), ("GCAL", "DAY_CAL"))
 
-  test("daytime flat sequence is one smart gcal flat atom per filter"):
+  test("daytime flat sequence is one atom with the smart gcal flats of every filter"):
     for
       (_, oid, flat) <- setup
       filters        <- queryImagingFilters(flat)
       atoms          <- queryScienceAtoms(flat)
-    yield assertEquals(atoms, filters.map(f => FlatAtom(s"Daytime Flat $f", "DAY_CAL", dayFlatSteps)))
+    yield assertEquals(atoms, List(FlatAtom("Daytime Calibration", "DAY_CAL", filters.flatMap(_ => dayFlatSteps))))
 
-  test("daytime flat of a one-filter science observation has a bare title"):
+  test("daytime flat of a one-filter science observation has the flats of that filter"):
     for
       (pid, oid, flat) <- setup
       _                <- setImagingFilters(oid, List("H"))
       _                <- recalculateCalibrations(pid, when, oid)
       atoms            <- queryScienceAtoms(flat)
-    yield assertEquals(atoms, List(FlatAtom("Daytime Flat", "DAY_CAL", dayFlatSteps)))
+    yield assertEquals(atoms, List(FlatAtom("Daytime Calibration", "DAY_CAL", dayFlatSteps)))
 
   test("daytime flat goes pending when a science filter edit is copied to it"):
     for

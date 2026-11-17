@@ -181,7 +181,7 @@ class calibrations_gmosSpecPhotDaytimeArc
       atoms          <- queryScienceAtoms(arc)
       acq            <- hasAcquisitionAtom(arc)
     yield
-      assertEquals(atoms, List(ArcAtom("Daytime Arc", "DAY_CAL", List(("GCAL", "DAY_CAL")))))
+      assertEquals(atoms, List(ArcAtom("Daytime Calibration", "DAY_CAL", List(("GCAL", "DAY_CAL")))))
       assert(!acq, "a daytime arc has no acquisition")
 
   test("daytime arc workflow follows its standard"):

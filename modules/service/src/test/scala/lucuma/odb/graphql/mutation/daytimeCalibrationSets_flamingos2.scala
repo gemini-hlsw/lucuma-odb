@@ -129,11 +129,17 @@ class daytimeCalibrationSets_flamingos2 extends OdbSuite with DatabaseOperations
   private val longSlit2: Json =
     json"""{ "builtin": "LONG_SLIT_2" }"""
 
+  private def merged(atoms: Json*): Json =
+    val steps: List[Json] = atoms.toList.flatMap(_.hcursor.downField("steps").focus.flatMap(_.asArray).toList.flatten)
+    json"""{ "description": "Daytime Calibration", "steps": $steps }"""
+
   private val mockupAtoms: List[Json] =
     List(
-      atom("Dark", 10, "DARK", 60, "CLOSE".asJson, Json.Null),
-      atom("Flat", 3,  "GCAL", 15, Json.Null, longSlit2),
-      atom("Arc",  2,  "GCAL", 10, Json.Null, longSlit2)
+      merged(
+        atom("Dark", 10, "DARK", 60, "CLOSE".asJson, Json.Null),
+        atom("Flat", 3,  "GCAL", 15, Json.Null, longSlit2),
+        atom("Arc",  2,  "GCAL", 10, Json.Null, longSlit2)
+      )
     )
 
   private def expectedExecution(atoms: List[Json]): Json =
@@ -151,7 +157,7 @@ class daytimeCalibrationSets_flamingos2 extends OdbSuite with DatabaseOperations
       }
     """
 
-  test("one atom per set, count steps each, in row order"):
+  test("all the sets in one atom, count steps each, in row order"):
     for
       pid <- createProgramAs(staff)
       oid <- createWithSets(pid, mockupSets)
@@ -207,7 +213,7 @@ class daytimeCalibrationSets_flamingos2 extends OdbSuite with DatabaseOperations
       _   <- expect(
         staff,
         executionQuery(oid),
-        expectedExecution(List(atom("Dark", 1, "DARK", 5, Json.Null, Json.Null))).asRight
+        expectedExecution(List(merged(atom("Dark", 1, "DARK", 5, Json.Null, Json.Null)))).asRight
       )
     yield ()
 
@@ -228,7 +234,7 @@ class daytimeCalibrationSets_flamingos2 extends OdbSuite with DatabaseOperations
       )
     yield ()
 
-  test("defined with sets, three atoms in the digest"):
+  test("defined with sets, one atom in the digest"):
     for
       pid <- createProgramAs(staff)
       oid <- createWithSets(pid, mockupSets)
@@ -247,7 +253,7 @@ class daytimeCalibrationSets_flamingos2 extends OdbSuite with DatabaseOperations
           {
             "observation": {
               "workflow": { "value": { "state": "DEFINED", "validationErrors": [] } },
-              "execution": { "digest": { "value": { "science": { "atomCount": 3, "observeClass": "DAY_CAL" } } } }
+              "execution": { "digest": { "value": { "science": { "atomCount": 1, "observeClass": "DAY_CAL" } } } }
             }
           }
         """.asRight
@@ -335,7 +341,7 @@ class daytimeCalibrationSets_flamingos2 extends OdbSuite with DatabaseOperations
     yield ()
 
   test("materializing keeps a dark's window cover unset"):
-    val atoms = List(atom("Dark", 1, "DARK", 5, Json.Null, Json.Null))
+    val atoms = List(merged(atom("Dark", 1, "DARK", 5, Json.Null, Json.Null)))
     for
       pid <- createProgramAs(staff)
       oid <- createWithSets(pid, s"{ kind: DARK, explicitCount: 1, ${setup(5)} }")
