@@ -30,3 +30,5 @@ trait GroupView[F[_]] extends BaseMapping[F]:
     val Existence        = col("c_existence", existence)
     val System           = col("c_system", bool)
     val CalibrationRoles = col("c_calibration_roles", _calibration_role)
+    val HasWaiver        = col("c_has_waiver", bool)
+    val HasActiveWaiver  = col("c_has_active_waiver", bool)

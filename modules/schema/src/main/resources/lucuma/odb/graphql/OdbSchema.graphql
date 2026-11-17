@@ -24908,6 +24908,58 @@ input WhereGroup {
   standing, so it matches no standing filter.
   """
   standing: WhereCalculatedGroupStanding
+
+  """
+  Matches if some waiver of the group, revoked ones included, matches.  Every
+  condition in the filter, `NOT` included, applies to that one waiver: so
+  `{ code: { EQ: ORDER }, active: { EQ: true } }` matches an active ORDER
+  waiver, and `{ NOT: { active: { EQ: true } } }` a waiver that isn't active.
+  The filter can't express that no waiver matches, and negating it from
+  outside (`NOT: { waivers: ... }`) has the same meaning as negating it inside.
+  Use `hasWaiver` and `hasActiveWaiver` to match groups without waivers.
+  """
+  waivers: WhereGroupConstraintWaiver
+
+  "Matches whether the group has any waiver, revoked ones included."
+  hasWaiver: WhereBoolean
+
+  "Matches whether the group has an active (unrevoked) waiver."
+  hasActiveWaiver: WhereBoolean
+}
+
+"""
+Matches a group constraint waiver.
+"""
+input WhereGroupConstraintWaiver {
+  AND: [WhereGroupConstraintWaiver!]
+  OR: [WhereGroupConstraintWaiver!]
+  NOT: WhereGroupConstraintWaiver
+
+  "Matches the code of the waived violation."
+  code: WhereEqGroupConstraintViolationCode
+
+  "Matches whether the waiver is active, that is, not revoked."
+  active: WhereBoolean
+
+  "Matches who granted the waiver."
+  grantedBy: WhereOrderUserId
+
+  "Matches when the waiver was granted."
+  grantedAt: WhereOrderTimestamp
+}
+
+input WhereEqGroupConstraintViolationCode {
+  "Matches if the code is exactly the supplied value."
+  EQ: GroupConstraintViolationCode
+
+  "Matches if the code is not the supplied value."
+  NEQ: GroupConstraintViolationCode
+
+  "Matches if the code is any of the supplied options."
+  IN: [GroupConstraintViolationCode!]
+
+  "Matches if the code is none of the supplied values."
+  NIN: [GroupConstraintViolationCode!]
 }
 
 """

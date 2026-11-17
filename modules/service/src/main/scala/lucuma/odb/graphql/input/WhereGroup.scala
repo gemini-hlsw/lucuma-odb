@@ -22,6 +22,9 @@ object WhereGroup {
     val DescriptionBinding = WhereOptionString.binding(path / "description")
     val ProgramBinding = WhereProgram.binding(path / "program")
     val StandingBinding = WhereCalculatedGroupStanding.binding(path / "standing")
+    val WaiversBinding = WhereGroupConstraintWaiver.binding(path / "waivers")
+    val HasWaiverBinding = WhereBoolean.binding(path / "hasWaiver", BooleanBinding)
+    val HasActiveWaiverBinding = WhereBoolean.binding(path / "hasActiveWaiver", BooleanBinding)
     lazy val WhereGroupBinding = binding(path)
     ObjectFieldsBinding.rmap {
       case List(
@@ -33,8 +36,11 @@ object WhereGroup {
         DescriptionBinding.Option("description", rDescription),
         ProgramBinding.Option("program", rProgram),
         StandingBinding.Option("standing", rStanding),
+        WaiversBinding.Option("waivers", rWaivers),
+        HasWaiverBinding.Option("hasWaiver", rHasWaiver),
+        HasActiveWaiverBinding.Option("hasActiveWaiver", rHasActiveWaiver),
       ) =>
-        (rAND, rOR, rNOT, rId, rName, rDescription, rProgram, rStanding).parMapN { (AND, OR, NOT, id, name, description, program, standing) =>
+        (rAND, rOR, rNOT, rId, rName, rDescription, rProgram, rStanding, rWaivers, rHasWaiver, rHasActiveWaiver).parMapN { (AND, OR, NOT, id, name, description, program, standing, waivers, hasWaiver, hasActiveWaiver) =>
           and(List(
             AND.map(and),
             OR.map(or),
@@ -44,6 +50,9 @@ object WhereGroup {
             description,
             program,
             standing,
+            waivers,
+            hasWaiver,
+            hasActiveWaiver,
           ).flatten)
         }
     }

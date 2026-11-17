@@ -80,6 +80,8 @@ trait GroupMapping[F[_]] extends GroupView[F] with ProgramView[F] with GroupElem
       EffectField(ProgressField, groupHandler, List("id")),
       SqlObject("standing", Join(GroupView.Id, GroupStandingView.GroupId)),
       SqlObject("waivers", Join(GroupView.Id, GroupConstraintWaiverView.GroupId)),
+      SqlField("hasWaiver", GroupView.HasWaiver, hidden = true),
+      SqlField("hasActiveWaiver", GroupView.HasActiveWaiver, hidden = true),
 
       SqlField("existence", GroupView.Existence),
       SqlField("system", GroupView.System),
