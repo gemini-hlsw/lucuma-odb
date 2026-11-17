@@ -4,11 +4,9 @@
 package lucuma.odb.smartgcal.parsers
 
 import cats.data.NonEmptyList
-import cats.data.NonEmptySet
 import cats.parse.Parser
 import cats.parse.Parser0
 import cats.parse.Rfc5234.digit
-import lucuma.core.enums.GcalArc
 import lucuma.core.enums.GcalBaselineType
 import lucuma.core.enums.GnirsFpuIfu
 import lucuma.core.enums.GnirsFpuOther
@@ -91,13 +89,6 @@ trait GnirsParsers:
       .mapFilter { case (lo, hi) => BoundedInterval.openUpper(lo, hi) }
       .withContext("GNIRS central wavelength range")
 
-  // GNIRS arc lamps are joined with '+' (e.g. "Ar arc+Xe arc") rather than ';'.
-  private val arcs: Parser[NonEmptySet[GcalArc]] =
-    gcal.arc.repSep(Parser.char('+')).map(_.toNes)
-
-  private val lamp: Parser[Gcal.Lamp] =
-    arcs.eitherOr(gcal.continuum).map(Gcal.Lamp.fromEither)
-
   // The source file leaves the Basecal column empty for the pinhole rows (the
   // pinhole calibrations are taken during the day, mirroring the Day pinhole
   // flats), so treat an empty baseline as Day.
@@ -108,7 +99,7 @@ trait GnirsParsers:
   // lamp, shutter, filter, diffuser, observe(count), exposure time, coadds, basecal.
   private val legacyValue: Parser[SmartGcalValue.Legacy] =
     (
-      (lamp               <* columnSep) ~
+      (gcal.gcalLamp      <* columnSep) ~
       (gcal.shutter       <* columnSep) ~
       (gcal.filter        <* columnSep) ~
       (gcal.diffuser      <* columnSep) ~

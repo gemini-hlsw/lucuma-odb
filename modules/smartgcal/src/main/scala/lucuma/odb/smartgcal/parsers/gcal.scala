@@ -29,8 +29,9 @@ trait GcalParsers:
       "Xe arc"   -> GcalArc.XeArc
     ).withContext("Gcal arc")
 
+  // Older files join arc lamps with ';', newer ones (GNIRS, IGRINS-2) with '+'.
   val arcs: Parser[NonEmptySet[GcalArc]] =
-    arc.repSep(Parser.char(';')).map(_.toNes).withContext("Gcal arcs")
+    arc.repSep(Parser.charIn(";+")).map(_.toNes).withContext("Gcal arcs")
 
   val continuum: Parser[GcalContinuum] =
     oneOf(

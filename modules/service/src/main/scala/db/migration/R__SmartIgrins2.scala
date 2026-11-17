@@ -12,7 +12,7 @@ import java.io.InputStream
 
 class R__SmartIgrins2 extends SmartGcalMigration("Igrins2"):
 
-  override val importForcingVersion: Int = 1
+  override val importForcingVersion: Int = 2
 
   lazy val definitionFiles: NonEmptyList[(String, IO[InputStream])] =
     gcalFilesFromClasspath("IGRINS-2_ARC", "IGRINS-2_FLAT")
