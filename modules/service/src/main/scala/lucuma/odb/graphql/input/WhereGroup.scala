@@ -6,10 +6,13 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.parallel.*
+import eu.timepit.refined.cats.*
+import eu.timepit.refined.types.numeric.PosShort
 import grackle.Path
 import grackle.Predicate
 import grackle.Predicate.*
 import lucuma.core.model.Group
+import lucuma.core.util.TimeSpan
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.graphql.binding.WhereOptionString
 import lucuma.odb.graphql.binding.WhereOrder
@@ -25,6 +28,15 @@ object WhereGroup {
     val WaiversBinding = WhereGroupConstraintWaiver.binding(path / "waivers")
     val HasWaiverBinding = WhereBoolean.binding(path / "hasWaiver", BooleanBinding)
     val HasActiveWaiverBinding = WhereBoolean.binding(path / "hasActiveWaiver", BooleanBinding)
+    val SystemBinding = WhereBoolean.binding(path / "system", BooleanBinding)
+    // The column holds a plain Short, so the filter compares Shorts.
+    val MinimumRequiredBinding = WhereOptionOrder.binding[Short](path / "minimumRequired", NonNegShortBinding.map(_.value))
+    val OrderedBinding = WhereBoolean.binding(path / "ordered", BooleanBinding)
+    val MinimumIntervalBinding = WhereOptionOrder.binding[TimeSpan](path / "minimumIntervalValue", TimeSpanInput.Binding)
+    val MaximumIntervalBinding = WhereOptionOrder.binding[TimeSpan](path / "maximumIntervalValue", TimeSpanInput.Binding)
+    val SameNightBinding = WhereBoolean.binding(path / "sameNight", BooleanBinding)
+    val MinimumPerNightBinding = WhereOptionOrder.binding[PosShort](path / "minimumObservationsPerNight", PosShortBinding)
+    val MaximumPerNightBinding = WhereOptionOrder.binding[PosShort](path / "maximumObservationsPerNight", PosShortBinding)
     lazy val WhereGroupBinding = binding(path)
     ObjectFieldsBinding.rmap {
       case List(
@@ -39,12 +51,23 @@ object WhereGroup {
         WaiversBinding.Option("waivers", rWaivers),
         HasWaiverBinding.Option("hasWaiver", rHasWaiver),
         HasActiveWaiverBinding.Option("hasActiveWaiver", rHasActiveWaiver),
+        SystemBinding.Option("system", rSystem),
+        MinimumRequiredBinding.Option("minimumRequired", rMinimumRequired),
+        OrderedBinding.Option("ordered", rOrdered),
+        MinimumIntervalBinding.Option("minimumInterval", rMinimumInterval),
+        MaximumIntervalBinding.Option("maximumInterval", rMaximumInterval),
+        SameNightBinding.Option("sameNight", rSameNight),
+        MinimumPerNightBinding.Option("minimumObservationsPerNight", rMinimumPerNight),
+        MaximumPerNightBinding.Option("maximumObservationsPerNight", rMaximumPerNight),
       ) =>
-        (rAND, rOR, rNOT, rId, rName, rDescription, rProgram, rStanding, rWaivers, rHasWaiver, rHasActiveWaiver).parMapN { (AND, OR, NOT, id, name, description, program, standing, waivers, hasWaiver, hasActiveWaiver) =>
+        (
+          (rAND, rOR, rNOT, rId, rName, rDescription, rProgram, rStanding, rWaivers, rHasWaiver, rHasActiveWaiver).parTupled,
+          (rSystem, rMinimumRequired, rOrdered, rMinimumInterval, rMaximumInterval, rSameNight, rMinimumPerNight, rMaximumPerNight).parTupled
+        ).parMapN { case ((all, any, not, id, name, description, program, standing, waivers, hasWaiver, hasActiveWaiver), (system, minimumRequired, ordered, minimumInterval, maximumInterval, sameNight, minimumPerNight, maximumPerNight)) =>
           and(List(
-            AND.map(and),
-            OR.map(or),
-            NOT.map(Not(_)),
+            all.map(and),
+            any.map(or),
+            not.map(Not(_)),
             id,
             name,
             description,
@@ -53,6 +76,14 @@ object WhereGroup {
             waivers,
             hasWaiver,
             hasActiveWaiver,
+            system,
+            minimumRequired,
+            ordered,
+            minimumInterval,
+            maximumInterval,
+            sameNight,
+            minimumPerNight,
+            maximumPerNight,
           ).flatten)
         }
     }

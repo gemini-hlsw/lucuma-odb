@@ -24925,6 +24925,33 @@ input WhereGroup {
 
   "Matches whether the group has an active (unrevoked) waiver."
   hasActiveWaiver: WhereBoolean
+
+  "Matches whether the group is managed by the system."
+  system: WhereBoolean
+
+  """
+  Matches how many of the group's elements must be observed.  Null means all
+  of them, so `IS_NULL: true` matches groups that require every element.
+  """
+  minimumRequired: WhereOptionOrderNonNegShort
+
+  "Matches whether the group's elements must be observed in order."
+  ordered: WhereBoolean
+
+  "Matches the group's minimum interval between elements, if any."
+  minimumInterval: WhereOptionOrderTimeSpan
+
+  "Matches the group's maximum interval between elements, if any."
+  maximumInterval: WhereOptionOrderTimeSpan
+
+  "Matches whether the group's elements must all be observed in one night."
+  sameNight: WhereBoolean
+
+  "Matches the group's minimum number of observations per night, if any."
+  minimumObservationsPerNight: WhereOptionOrderPosShort
+
+  "Matches the group's maximum number of observations per night, if any."
+  maximumObservationsPerNight: WhereOptionOrderPosShort
 }
 
 """
@@ -25882,6 +25909,114 @@ input WhereOptionOrderTimestamp {
   Matches if the timestamp is ordered before or equal (<=) the supplied value.
   """
   LTE: Timestamp
+}
+
+"""
+Filters on equality or order comparisons of an optional count property.  All
+supplied criteria must match, but usually only one is selected.
+"""
+input WhereOptionOrderNonNegShort {
+  """
+  When `true`, matches if the count is not defined.  When `false` matches if
+  the count is defined.
+  """
+  IS_NULL: Boolean
+
+  "Matches if the count is exactly the supplied value."
+  EQ: NonNegShort
+
+  "Matches if the count is not the supplied value."
+  NEQ: NonNegShort
+
+  "Matches if the count is any of the supplied options."
+  IN: [NonNegShort!]
+
+  "Matches if the count is none of the supplied values."
+  NIN: [NonNegShort!]
+
+  "Matches if the count is ordered after (>) the supplied value."
+  GT: NonNegShort
+
+  "Matches if the count is ordered before (<) the supplied value."
+  LT: NonNegShort
+
+  "Matches if the count is ordered after or equal (>=) the supplied value."
+  GTE: NonNegShort
+
+  "Matches if the count is ordered before or equal (<=) the supplied value."
+  LTE: NonNegShort
+}
+
+"""
+Filters on equality or order comparisons of an optional count property.  All
+supplied criteria must match, but usually only one is selected.
+"""
+input WhereOptionOrderPosShort {
+  """
+  When `true`, matches if the count is not defined.  When `false` matches if
+  the count is defined.
+  """
+  IS_NULL: Boolean
+
+  "Matches if the count is exactly the supplied value."
+  EQ: PosShort
+
+  "Matches if the count is not the supplied value."
+  NEQ: PosShort
+
+  "Matches if the count is any of the supplied options."
+  IN: [PosShort!]
+
+  "Matches if the count is none of the supplied values."
+  NIN: [PosShort!]
+
+  "Matches if the count is ordered after (>) the supplied value."
+  GT: PosShort
+
+  "Matches if the count is ordered before (<) the supplied value."
+  LT: PosShort
+
+  "Matches if the count is ordered after or equal (>=) the supplied value."
+  GTE: PosShort
+
+  "Matches if the count is ordered before or equal (<=) the supplied value."
+  LTE: PosShort
+}
+
+"""
+Filters on equality or order comparisons of an optional time span property.  All
+supplied criteria must match, but usually only one is selected.
+"""
+input WhereOptionOrderTimeSpan {
+  """
+  When `true`, matches if the time span is not defined.  When `false` matches if
+  the time span is defined.
+  """
+  IS_NULL: Boolean
+
+  "Matches if the time span is exactly the supplied value."
+  EQ: TimeSpanInput
+
+  "Matches if the time span is not the supplied value."
+  NEQ: TimeSpanInput
+
+  "Matches if the time span is any of the supplied options."
+  IN: [TimeSpanInput!]
+
+  "Matches if the time span is none of the supplied values."
+  NIN: [TimeSpanInput!]
+
+  "Matches if the time span is ordered after (>) the supplied value."
+  GT: TimeSpanInput
+
+  "Matches if the time span is ordered before (<) the supplied value."
+  LT: TimeSpanInput
+
+  "Matches if the time span is ordered after or equal (>=) the supplied value."
+  GTE: TimeSpanInput
+
+  "Matches if the time span is ordered before or equal (<=) the supplied value."
+  LTE: TimeSpanInput
 }
 
 """

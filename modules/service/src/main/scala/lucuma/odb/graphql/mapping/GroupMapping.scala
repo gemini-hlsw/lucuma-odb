@@ -82,6 +82,8 @@ trait GroupMapping[F[_]] extends GroupView[F] with ProgramView[F] with GroupElem
       SqlObject("waivers", Join(GroupView.Id, GroupConstraintWaiverView.GroupId)),
       SqlField("hasWaiver", GroupView.HasWaiver, hidden = true),
       SqlField("hasActiveWaiver", GroupView.HasActiveWaiver, hidden = true),
+      SqlField("minimumIntervalValue", GroupView.MinIntervalValue, hidden = true),
+      SqlField("maximumIntervalValue", GroupView.MaxIntervalValue, hidden = true),
 
       SqlField("existence", GroupView.Existence),
       SqlField("system", GroupView.System),

@@ -4,11 +4,14 @@
 package lucuma.odb.graphql.query
 
 import cats.effect.IO
+import cats.syntax.traverse.*
+import eu.timepit.refined.types.numeric.NonNegShort
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.model.Group
 import lucuma.core.model.Program
 import lucuma.core.model.User
+import lucuma.core.syntax.timespan.*
 import lucuma.odb.graphql.ACursorOps
 import lucuma.odb.util.Codecs.group_id
 import lucuma.odb.util.Codecs.observation_id
@@ -172,3 +175,52 @@ class groups extends GroupTestSupport:
       assertEquals(none, List(g2))
       assertEquals(active, List(g))
       assertEquals(noActive, List(g2, g3))
+
+  def setGroup(gid: Group.Id, set: String): IO[Unit] =
+    query(pi, s"""mutation { updateGroups(input: { SET: { $set }, WHERE: { id: { EQ: "$gid" } } }) { groups { id } } }""").void
+
+  test("groups may be found by their constraints"):
+    for
+      p        <- createProgram
+      plain    <- createGroupAs(pi, p)
+      ordered  <- createGroupAs(pi, p, minRequired = Some(NonNegShort.unsafeFrom(2)), minimumInterval = Some(1.hourTimeSpan), maximumInterval = Some(24.hourTimeSpan))
+      _        <- setGroup(ordered, "ordered: true")
+      night    <- createGroupAs(pi, p)
+      _        <- setGroup(night, "sameNight: true")
+      perNight <- createGroupAs(pi, p)
+      _        <- setGroup(perNight, "minimumObservationsPerNight: 1, maximumObservationsPerNight: 3")
+      all       = List(plain, ordered, night, perNight)
+      rs       <- List(
+                    "ordered: { EQ: true }",
+                    "sameNight: { EQ: true }",
+                    "system: { EQ: false }",
+                    "system: { EQ: true }",
+                    "minimumRequired: { IS_NULL: true }",
+                    "minimumRequired: { GTE: 2 }",
+                    "minimumInterval: { EQ: { hours: 1 } }",
+                    "maximumInterval: { LT: { hours: 48 } }",
+                    "maximumInterval: { LT: { hours: 12 } }",
+                    "maximumInterval: { IS_NULL: false }",
+                    "minimumObservationsPerNight: { IS_NULL: false }",
+                    "maximumObservationsPerNight: { LTE: 2 }",
+                    "maximumObservationsPerNight: { LTE: 3 }"
+                  ).traverse(byGroup(p, _))
+    yield assertEquals(
+      rs,
+      List(
+        List(ordered),
+        List(night),
+        all,
+        Nil,
+        List(plain, night, perNight),
+        List(ordered),
+        List(ordered),
+        List(ordered),
+        Nil,
+        List(ordered),
+        List(perNight),
+        Nil,
+        List(perNight)
+      )
+    )
+
