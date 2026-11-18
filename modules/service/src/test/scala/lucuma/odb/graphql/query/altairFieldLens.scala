@@ -52,7 +52,7 @@ class altairFieldLens extends ExecutionTestSupportForGnirs
       o <- createObservationAs(pi, p, List(t))
       _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
       _ <- setAltair(o, altair)
-      _ <- IO.whenA(guideStar)(setGuideTargetName(pi, o, aowfsStarName.some))
+      _ <- IO.whenA(guideStar)(setCatalogGuideTarget(pi, o, aowfsStarName.some))
     yield o
 
   private def fieldLensQuery(oid: Observation.Id): String =

@@ -7,20 +7,24 @@ package mutation
 
 import cats.effect.IO
 import cats.syntax.all.*
+import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.ags.GuideStarName
 import lucuma.core.model.Observation
+import lucuma.core.model.ObservationReference
 import lucuma.core.model.Target
 import lucuma.core.util.Timestamp
+import lucuma.odb.data.OdbError
 
 class setGuideTarget extends query.ExecutionTestSupportForGmos:
 
   val GaiaSourceId: Long = 1L
   val GaiaName: String   = GuideStarName.gaiaSourceId.reverseGet(GaiaSourceId).value.value
 
-  val Now: Timestamp = Timestamp.FromString.getOption("2024-08-25T00:00:00Z").get
+  val Now: Timestamp   = Timestamp.FromString.getOption("2024-08-25T00:00:00Z").get
+  val Later: Timestamp = Now.plusSecondsOption(120L).get
 
   private val OneOfError: String =
     "Exactly one key must be specified for oneOf input object GuideTargetSelectionInput in field 'setGuideTarget' of type 'Mutation'"
@@ -224,27 +228,146 @@ class setGuideTarget extends query.ExecutionTestSupportForGmos:
       _         <- setAndCheck(oid, s"""{ observationTarget: { targetId: "$spareTid" } }""", none, observationTargetSelection(spareTid.some))
     yield ()
 
-  test("a name set with the deprecated mutation shows as a catalog selection"):
-    for
-      (_, oid) <- gmosObservation
-      _        <- setGuideTargetName(pi, oid, GaiaName.some)
-      _        <- expectSelection(oid, GaiaName.some, CatalogSelection)
-    yield ()
-
-  test("a name set with the deprecated mutation replaces an observation target"):
+  test("a deleted science target is rejected"):
     for
       (tid, oid) <- gmosObservation
-      _          <- setAndCheck(oid, s"""{ observationTarget: { targetId: "$tid" } }""", none, observationTargetSelection(tid.some))
-      _          <- setGuideTargetName(pi, oid, GaiaName.some)
-      _          <- expectSelection(oid, GaiaName.some, CatalogSelection)
-      _          <- setGuideTargetName(pi, oid, none)
+      _          <- deleteTargetAs(pi, tid)
+      _          <- expect(
+                      pi,
+                      setMutation(oid, s"""{ observationTarget: { targetId: "$tid" } }"""),
+                      List(invalidTarget(tid)).asLeft
+                    )
       _          <- expectSelection(oid, none, Json.Null)
     yield ()
 
-  test("the deprecated mutation clears an observation target with null"):
+  // `guideTarget` is a GraphQL literal; none leaves the field out.
+  private def setMutationFor(
+    oid:         Option[Observation.Id],
+    oref:        Option[ObservationReference],
+    guideTarget: Option[String]
+  ): String =
+    s"""
+      mutation {
+        setGuideTarget(
+          input: {
+            observationId: ${oid.asJson}
+            observationReference: ${oref.asJson}
+            ${guideTarget.foldMap(gt => s"guideTarget: $gt")}
+          }
+        ) {
+          observation {
+            $TargetEnvironmentSelection
+          }
+        }
+      }
+    """
+
+  private val CatalogInput: String = s"""{ catalogName: "$GaiaName" }"""
+
+  private def setResult(name: Option[String], selection: Json): Either[List[String], Json] =
+    json"""{ "setGuideTarget": { "observation": ${targetEnvironmentJson(name, selection)} } }""".asRight
+
+  private val CatalogResult: Either[List[String], Json] =
+    setResult(GaiaName.some, CatalogSelection)
+
+  private def observationByReference: IO[(Observation.Id, ObservationReference)] =
     for
-      (_, oid) <- gmosObservation
-      _        <- setAndCheck(oid, "{ observationTarget: {} }", none, observationTargetSelection(none))
-      _        <- setGuideTargetName(pi, oid, none)
-      _        <- expectSelection(oid, none, Json.Null)
+      pid <- createProgramAs(pi)
+      ref <- setProgramReference(staff, pid, """calibration: { semester: "2025B", instrument: GMOS_NORTH }""")
+      tid <- createTargetWithProfileAs(pi, pid)
+      oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      _   <- setObservationTimeAndDuration(pi, oid, Now.some, none)
+    yield (oid, ObservationReference(ref.get, PosInt.unsafeFrom(1)))
+
+  test("missing target"):
+    for
+      pid <- createProgramAs(pi)
+      oid <- createObservationAs(pi, pid)
+      _   <- expect(
+               staff,
+               setMutationFor(oid.some, none, CatalogInput.some),
+               List(s"Could not generate a sequence for $oid: observation is missing target").asLeft
+             )
     yield ()
+
+  test("missing observing mode"):
+    for
+      pid <- createProgramAs(pi)
+      tid <- createTargetWithProfileAs(pi, pid)
+      oid <- createObservationAs(pi, pid, tid)
+      _   <- expect(
+               staff,
+               setMutationFor(oid.some, none, CatalogInput.some),
+               List(s"Could not generate a sequence for $oid: observation is missing observing mode").asLeft
+             )
+    yield ()
+
+  test("can set without an observation time"):
+    for
+      pid <- createProgramAs(pi)
+      tid <- createTargetWithProfileAs(pi, pid)
+      oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      _   <- expect(staff, setMutationFor(oid.some, none, CatalogInput.some), CatalogResult)
+    yield ()
+
+  test("valid set as staff"):
+    gmosObservation.flatMap: (_, oid) =>
+      expect(staff, setMutationFor(oid.some, none, CatalogInput.some), CatalogResult)
+
+  test("user must have access to the program"):
+    gmosObservation.flatMap: (_, oid) =>
+      expect(
+        pi2,
+        setMutationFor(oid.some, none, CatalogInput.some),
+        List(OdbError.InvalidArgument().message).asLeft
+      )
+
+  test("can specify observation by reference"):
+    observationByReference.flatMap: (_, oref) =>
+      expect(pi, setMutationFor(none, oref.some, CatalogInput.some), CatalogResult)
+
+  test("can specify observation by both id and reference"):
+    observationByReference.flatMap: (oid, oref) =>
+      expect(pi, setMutationFor(oid.some, oref.some, CatalogInput.some), CatalogResult)
+
+  test("observation id and reference must correspond"):
+    for
+      (oid1, oref) <- observationByReference
+      pid          <- createProgramAs(pi)
+      oid2         <- createObservationAs(pi, pid)
+      _            <- expect(
+                        pi,
+                        setMutationFor(oid2.some, oref.some, CatalogInput.some),
+                        List(s"Observation '${oref.label}' (id $oid1) does not correspond to observation id $oid2.").asLeft
+                      )
+    yield ()
+
+  test("must specify either observation id or reference"):
+    expect(
+      pi,
+      setMutationFor(none, none, none),
+      List("One of observationId or observationReference must be provided.").asLeft
+    )
+
+  test("omission unsets"):
+    gmosObservation.flatMap: (_, oid) =>
+      for
+        _ <- expect(staff, setMutationFor(oid.some, none, CatalogInput.some), CatalogResult)
+        _ <- expect(pi, setMutationFor(oid.some, none, none), setResult(none, Json.Null))
+      yield ()
+
+  test("changing observation time keeps the selection"):
+    gmosObservation.flatMap: (_, oid) =>
+      for
+        _ <- expect(staff, setMutationFor(oid.some, none, CatalogInput.some), CatalogResult)
+        _ <- setObservationTimeAndDuration(pi, oid, Later.some, none)
+        _ <- expectSelection(oid, GaiaName.some, CatalogSelection)
+      yield ()
+
+  test("can always unset"):
+    gmosObservation.flatMap: (tid, oid) =>
+      for
+        _ <- expect(staff, setMutationFor(oid.some, none, CatalogInput.some), CatalogResult)
+        _ <- updateAsterisms(pi, List(oid), List.empty, List(tid), List(oid -> List.empty))
+        _ <- expect(staff, setMutationFor(oid.some, none, none), setResult(none, Json.Null))
+      yield ()

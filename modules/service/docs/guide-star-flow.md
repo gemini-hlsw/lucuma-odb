@@ -15,7 +15,7 @@ Everything lives in `GuideService`. The automatic guide star search (AGS) itself
 | `targetEnvironment.guideTargetName` | (column `c_guide_target_name`) | The override, if any. |
 | `targetEnvironment.guideProbe`, `defaultGuideProbe`, `explicitGuideProbe` | `getGuideProbes` | Which probe the search uses (see `docs/adr/0019-explicit-guide-probe.md`). |
 | `altair.fieldLens`, `altair.defaultFieldLens` | `resolveGuideStar` | NGS derives the field lens from the resolved star's separation. |
-| `setGuideTargetName` mutation | `setGuideTargetName` | Stores or clears the override. |
+| `setGuideTarget` mutation | `setGuideTarget` | Stores or clears the override. |
 
 The sequence generator is the other caller: behind Altair it resolves the star itself, because the sequence depends on it (see below).
 
@@ -58,11 +58,11 @@ Details worth knowing:
 
 ## Guide Star Override
 
-The user names a Gaia star with `setGuideTargetName`. It is stored in `t_observation.c_guide_target_name` and holds until the user clears it (`targetName: null`) or names another star. No edit to the observation, and no deploy, discards it.
+The user picks a Gaia star by its catalog name, or one of the observation's science targets, with `setGuideTarget`. A catalog name is stored in `t_observation.c_guide_target_name` and the selection holds until the user clears it (`guideTarget: null`) or picks another star. No edit to the observation, and no deploy, discards it.
 
 ```mermaid
 flowchart TD
-    A[setGuideTargetName name] --> B{name given?}
+    A[setGuideTarget catalogName] --> B{name given?}
     B -- null --> C[clear name]
     B -- yes --> D[parse as Gaia source id]
     D --> E[getParams: generator parameters]
@@ -123,7 +123,7 @@ flowchart TD
     H -- unusable or Gaia failure --> K[keep the sequence, record altairProblem]
 ```
 
-`altairProblem` is not a failure of generation: the guide star calculations need a sequence to check the star against, so `digestWithParams` (what the guide star search calls) hands back the context as is, while `digest` and the other generator entry points, `setGuideTargetName` among them, report the problem. An NGS observation's default field lens follows the resolved star's separation, which is why `altair.fieldLens` resolves a star too.
+`altairProblem` is not a failure of generation: the guide star calculations need a sequence to check the star against, so `digestWithParams` (what the guide star search calls) hands back the context as is, while `digest` and the other generator entry points, `setGuideTarget` among them, report the problem. An NGS observation's default field lens follows the resolved star's separation, which is why `altair.fieldLens` resolves a star too.
 
 ## Storage
 

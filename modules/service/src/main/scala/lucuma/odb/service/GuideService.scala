@@ -76,7 +76,6 @@ import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.graphql.input.SetGuideTargetInput
-import lucuma.odb.graphql.input.SetGuideTargetNameInput
 import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.json.all.query.given
 import lucuma.odb.json.target
@@ -128,10 +127,6 @@ trait GuideService[F[_]] {
   def getGuideAvailability(pid: Program.Id, oid: Observation.Id, period: TimestampInterval)(using
     NoTransaction[F], SuperUserAccess
   ): F[Result[List[AvailabilityPeriod]]]
-
-  def setGuideTargetName(
-    checked: AccessControl.CheckedWithId[SetGuideTargetNameInput, Observation.Id]
-  )(using NoTransaction[F]): F[Result[Observation.Id]]
 
   def setGuideTarget(
     checked: AccessControl.CheckedWithId[SetGuideTargetInput, Observation.Id]
@@ -325,14 +320,15 @@ object GuideService {
 
   /**
    * The observation target candidates an observation target selection picks. An id-less selection
-   * is ambiguous with more than one candidate.
+   * is ambiguous with more than one science target, whether or not each has a position.
    */
   private def selectObservationTargetCandidates(
-    oid:        Observation.Id,
-    selection:  GuideStarId,
-    candidates: List[(Target, GuideStarCandidate)]
+    oid:            Observation.Id,
+    selection:      GuideStarId,
+    scienceTargets: Int,
+    candidates:     List[(Target, GuideStarCandidate)]
   ): Result[List[(Target, GuideStarCandidate)]] =
-    if selection.observationTargetId.isEmpty && candidates.sizeIs > 1 then
+    if selection.observationTargetId.isEmpty && candidates.nonEmpty && scienceTargets > 1 then
       generalError(ambiguousObservationTargetMessage(oid)).asFailure
     else candidates.filter((_, candidate) => selection.selects(candidate.id)).success
 
@@ -977,11 +973,10 @@ object GuideService {
       ): F[Result[List[(Target, GuideStarCandidate)]]] =
         (for {
           gaia <- ResultT(getAllCandidates(oid, start, end, explicitBase, tracking, wavelength, probe, constraints, altair))
-          all: List[(Target, GuideStarCandidate)] =
-                  gaia ++ (if probe.guidesOnAxis then science else Nil)
+          all: List[(Target, GuideStarCandidate)] = gaia ++ science
           _    <- ResultT.fromResult(
                     if all.nonEmpty then Result.unit
-                    else generalError("No potential guidestars found on Gaia.").asFailure
+                    else generalError("No potential guidestars found.").asFailure
                   )
         } yield all).value
 
@@ -1057,7 +1052,7 @@ object GuideService {
       extension (usable: AgsAnalysis.Usable)
         def toGuideEnvironment(originals: List[(Target, GuideStarCandidate)]): Option[GuideEnvironment] =
           originals.collectFirst:
-            case (target, candidate) if candidate === usable.target =>
+            case (target, candidate) if candidate.id === usable.target.id =>
               GuideEnvironment(usable.posAngle, List(GuideTarget(usable.guideProbe, target)))
 
       def getGeneratorInfo(
@@ -1367,7 +1362,7 @@ object GuideService {
                              selection match
                                case None                                                                 => getAllCandidatesNonEmpty(oid, obsTime, visitEnd, obsInfo.explicitBase, baseTracking, genInfo.agsWavelength, agsParams.probe, obsInfo.constraints, obsInfo.altair, science)
                                case Some(GuideStarId.GaiaDr3(sourceId = sourceId))                       => getGuideStarFromGaia(sourceId).map(_.map(List(_)))
-                               case Some(observationSelection @ GuideStarId.ObservationTarget(targetId = _)) => selectObservationTargetCandidates(oid, observationSelection, science).pure[F]
+                               case Some(observationSelection @ GuideStarId.ObservationTarget(targetId = _)) => selectObservationTargetCandidates(oid, observationSelection, targets.asterism.size, science).pure[F]
                            )
           corrected: List[(Target, GuideStarCandidate)] =
                            original.map((target, candidate) => (target, candidate.at(obsTime.toInstant))) // PM corrected
@@ -1524,7 +1519,7 @@ object GuideService {
                 .onError(_ => restore)
                 .flatMap(r => if r.hasValue then r.pure[F] else restore.as(r))
 
-          // A target that is not a science target is never a candidate, and selecting a blind
+          // A target that is not a present science target is never a candidate, and selecting a blind
           // offset target would block its cleanup through the foreign key.
           val checkObservationTarget: F[Result[Unit]] =
             guideStarId.observationTargetId.fold(Result.unit.pure[F]): targetId =>
@@ -1545,29 +1540,16 @@ object GuideService {
           } yield result).value
         }
 
-      // The path both mutations share.
-      private def setGuideStarSelection[A](
-        spanName:  String,
-        checked:   AccessControl.CheckedWithId[A, Observation.Id],
-        selection: A => Result[Option[GuideStarId]]
-      )(using NoTransaction[F]): F[Result[Observation.Id]] =
-        T.span(spanName).surround:
+      override def setGuideTarget(checked: AccessControl.CheckedWithId[SetGuideTargetInput, Observation.Id])(
+        using NoTransaction[F]): F[Result[Observation.Id]] =
+        T.span("setGuideTarget").surround:
           checked.foldWithId(
             OdbError.InvalidArgument().asFailureF
           ): (input, obsId) =>
             (for {
-              guideStarId <- ResultT.fromResult(selection(input))
-              obsInfo     <- ResultT(getObservationInfo(obsId))
-              result      <- ResultT(setGuideStarSelectionImpl(obsInfo, guideStarId))
+              obsInfo <- ResultT(getObservationInfo(obsId))
+              result  <- ResultT(setGuideStarSelectionImpl(obsInfo, input.guideTarget))
             } yield result).value
-
-      override def setGuideTargetName(checked: AccessControl.CheckedWithId[SetGuideTargetNameInput, Observation.Id])(
-        using NoTransaction[F]): F[Result[Observation.Id]] =
-          setGuideStarSelection("setGuideTargetName", checked, _.targetName.traverse(catalogGuideStarId))
-
-      override def setGuideTarget(checked: AccessControl.CheckedWithId[SetGuideTargetInput, Observation.Id])(
-        using NoTransaction[F]): F[Result[Observation.Id]] =
-          setGuideStarSelection("setGuideTarget", checked, _.guideTarget.success)
 
     }
 
@@ -1636,7 +1618,7 @@ object GuideService {
 
     def isScienceTarget(tid: Target.Id): AppliedFragment =
       sql"""
-        SELECT c_target_disposition = 'science'
+        SELECT c_target_disposition = 'science' AND c_existence = 'present'
         FROM t_target
         WHERE c_target_id = $target_id
       """.apply(tid)

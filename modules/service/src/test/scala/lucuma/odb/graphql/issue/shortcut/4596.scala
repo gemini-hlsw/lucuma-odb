@@ -517,10 +517,10 @@ class ShortCut_4596 extends OdbSuite
           user = pi,
           query = s"""
             mutation {
-              setGuideTargetName(
+              setGuideTarget(
                 input: {
                   observationId: ${oid.asJson}
-                  targetName: ${guideTargetName.asJson}
+                  guideTarget: { catalogName: ${guideTargetName.asJson} }
                 }
               ) {
                 observation {
@@ -542,10 +542,10 @@ class ShortCut_4596 extends OdbSuite
           user = staff,
           query = s"""
             mutation {
-              setGuideTargetName(
+              setGuideTarget(
                 input: {
                   observationId: ${oid.asJson}
-                  targetName: ${guideTargetName.asJson}
+                  guideTarget: { catalogName: ${guideTargetName.asJson} }
                 }
               ) {
                 observation {
@@ -556,7 +556,7 @@ class ShortCut_4596 extends OdbSuite
           """,
           expected = Ior.Right(json"""
             {
-              "setGuideTargetName": {
+              "setGuideTarget": {
                 "observation": {
                   "id": $oid
                 }

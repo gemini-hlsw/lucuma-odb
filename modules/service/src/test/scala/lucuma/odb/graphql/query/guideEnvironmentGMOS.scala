@@ -226,7 +226,7 @@ class guideEnvironmentGMOS extends ExecutionTestSupportForGmos with GuideEnviron
       expect(
         pi,
         guideEnvironmentQuery(oid),
-        expected = List("No potential guidestars found on Gaia.").asLeft)
+        expected = List("No potential guidestars found.").asLeft)
     }
   }
 
@@ -253,7 +253,7 @@ class guideEnvironmentGMOS extends ExecutionTestSupportForGmos with GuideEnviron
         t <- createTargetWithProfileAs(pi, p)
         o <- createObservationAs(pi, p, List(t))
         _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
-        _ <- setGuideTargetName(pi, o, invalidTargetName.some)
+        _ <- setCatalogGuideTarget(pi, o, invalidTargetName.some)
       } yield o
     setup.flatMap { oid =>
       expect(
@@ -296,7 +296,7 @@ class guideEnvironmentGMOS extends ExecutionTestSupportForGmos with GuideEnviron
         t <- createTargetWithProfileAs(pi, p)
         o <- createObservationAs(pi, p, List(t))
         _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
-        _ <- setGuideTargetName(pi, o, defaultTargetName.some)
+        _ <- setCatalogGuideTarget(pi, o, defaultTargetName.some)
       } yield o
     setup.flatMap { oid =>
       expect(pi, guideEnvironmentQuery(oid), expected = successfulGuideEnvironmentResult)
@@ -310,7 +310,7 @@ class guideEnvironmentGMOS extends ExecutionTestSupportForGmos with GuideEnviron
         t <- createTargetWithProfileAs(pi, p)
         o <- createObservationAs(pi, p, List(t))
         _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
-        _ <- setGuideTargetName(pi, o, otherTargetName.some)
+        _ <- setCatalogGuideTarget(pi, o, otherTargetName.some)
       } yield o
     setup.flatMap { oid =>
       expect(pi, guideEnvironmentQuery(oid), expected = otherGuideEnvironmentResults)
@@ -521,7 +521,7 @@ class guideEnvironmentGMOS extends ExecutionTestSupportForGmos with GuideEnviron
         t <- createTargetWithProfileAs(pi, p)
         o <- createObservationAs(pi, p, List(t))
         _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
-        _ <- setGuideTargetName(pi, o, defaultTargetName.some)
+        _ <- setCatalogGuideTarget(pi, o, defaultTargetName.some)
         _ <- updateObservation(pi, o, "targetEnvironment: { explicitGuideProbe: PWFS2 }", "observations { id }", json"""{ "updateObservations": { "observations": [ { "id": $o } ] } }""".asRight)
       } yield o
     setup.flatMap: oid =>
@@ -572,9 +572,9 @@ class guideEnvironmentGMOS extends ExecutionTestSupportForGmos with GuideEnviron
         t <- createTargetWithProfileAs(pi, p)
         o <- createObservationAs(pi, p, List(t))
         _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
-        _ <- setGuideTargetName(pi, o, defaultTargetName.some)
+        _ <- setCatalogGuideTarget(pi, o, defaultTargetName.some)
         _ <- updateObservation(pi, o, "targetEnvironment: { explicitGuideProbe: PWFS2 }", "observations { id }", json"""{ "updateObservations": { "observations": [ { "id": $o } ] } }""".asRight)
-        _ <- setGuideTargetName(pi, o, none)
+        _ <- setCatalogGuideTarget(pi, o, none)
       } yield o
     setup.flatMap: oid =>
       query(

@@ -114,7 +114,7 @@ trait AltairItcRecording extends ExecutionTestSupportForGnirs with GuideEnvironm
       // Setting the guide star generates the sequence, and that generation is what the tests of a
       // stored star look at, so the recording starts before it.
       _ <- clearItcCalls
-      _ <- guideStar.traverse_(n => setGuideTargetName(pi, o, n.some))
+      _ <- guideStar.traverse_(n => setCatalogGuideTarget(pi, o, n.some))
     yield (p, o)
 
   /** Generates the sequence, which is where the Altair guide star loop lives. */
@@ -325,7 +325,7 @@ class executionGnirsAltair extends AltairItcRecording:
       (pid, oid) <- observationWithAltair("{ mode: NGS }", aowfsStarName.some)
       _          <- runObscalcUpdate(pid, oid)
       before     <- itcResultHashes(oid)
-      _          <- setGuideTargetName(pi, oid, none)
+      _          <- setCatalogGuideTarget(pi, oid, none)
       after      <- itcResultHashes(oid)
     yield
       assert(before.isDefined, "the ITC result should be cached before the guide star is cleared")
@@ -370,7 +370,7 @@ class executionGnirsAltairNearStar extends AltairItcRecording:
       (pid, oid) <- observationWithAltair("{ mode: NGS }", none)
       _          <- runObscalcUpdate(pid, oid)
       _          <- clearItcCalls
-      _          <- setGuideTargetName(pi, oid, aowfsStarName.some)
+      _          <- setCatalogGuideTarget(pi, oid, aowfsStarName.some)
       (acq, sci) <- itcAltairCalls
     yield
       assert(acq.nonEmpty && sci.nonEmpty, "setting the guide star should call the ITC again")
@@ -459,7 +459,7 @@ class executionGnirsAltairFailedSet extends AltairItcRecording:
       (_, oid) <- observationWithAltair("{ mode: NGS }", aowfsStarName.some)
       before   <- storedGuideStar(oid)
       _        <- IO(gaiaDown.set(true))
-      failed   <- setGuideTargetName(pi, oid, otherTargetName.some).attempt
+      failed   <- setCatalogGuideTarget(pi, oid, otherTargetName.some).attempt
       after    <- storedGuideStar(oid)
     yield
       assertEquals(before, aowfsStarName.some, "expected a stored selection")
@@ -473,7 +473,7 @@ class executionGnirsAltairFailedSet extends AltairItcRecording:
     for
       _        <- IO(gaiaDown.set(false))
       (_, oid) <- observationWithAltair("{ mode: LGS_P1 }", none)
-      failed   <- setGuideTargetName(pi, oid, aowfsStarName.some).attempt
+      failed   <- setCatalogGuideTarget(pi, oid, aowfsStarName.some).attempt
       after    <- storedGuideStar(oid)
     yield
       assert(

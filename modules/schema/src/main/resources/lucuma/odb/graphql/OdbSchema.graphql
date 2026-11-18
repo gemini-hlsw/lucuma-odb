@@ -4247,13 +4247,6 @@ type Mutation {
   deleteTacFeedback(input: DeleteTacFeedbackInput!): DeleteTacFeedbackResult!
 
   """
-  Set the name of the guide target for an observation. Deprecated: names
-  catalog stars only; use `setGuideTarget`, which can also select an observation
-  target.
-  """
-  setGuideTargetName(input: SetGuideTargetNameInput!): SetGuideTargetNameResult! @deprecated(reason: "Use `setGuideTarget` instead.")
-
-  """
   Select by hand the guide target of an observation, a catalog star or one of
   its own targets, or return it to automatic selection.
   """
@@ -6680,34 +6673,6 @@ type SetupTime {
   A reduced setup time contemplating reacquiring a previously acquired target
   """
   reacquisition: TimeSpan!
-}
-
-"""
-Input parameters for setting the guide star name for an observation.
-Identify the observation to clone by specifying either its id or reference.  If
-both are specified, they must refer to the same observation.  If neither is
-specified, an error will be returned. Deprecated in favour of
-`SetGuideTargetInput`.
-"""
-input SetGuideTargetNameInput {
-  observationId: ObservationId @deprecated(reason: "Use `SetGuideTargetInput.observationId` instead.")
-  observationReference: ObservationReferenceLabel @deprecated(reason: "Use `SetGuideTargetInput.observationReference` instead.")
-
-  """
-  The name of the guide star. This must satisfy the regular expression "^Gaia DR3 (-?\d+)$" where the
-  numeric part is the Gaia source_id. Setting a name replaces an observation
-  target selection. Omit or set to null to delete the selection and return to
-  automatic guide star selection.
-  """
-  targetName: NonEmptyString @deprecated(reason: "Use `SetGuideTargetInput.guideTarget` instead.")
-}
-
-"""
-The result of setting the guide target name for an observation. Deprecated in
-favour of `SetGuideTargetResult`.
-"""
-type SetGuideTargetNameResult {
-  observation: Observation @deprecated(reason: "Use `SetGuideTargetResult.observation` instead.")
 }
 
 """
@@ -23187,16 +23152,16 @@ type TargetEnvironment {
 
   """
   The guide target(s) and related information.
-  If a guide target has been selected via `setGuideTarget` (or
-  `setGuideTargetName`), that target will be returned. If it is not found or not
-  usable, an error naming it will be returned; select another guide target or
-  clear the selection to return to automatic selection. A selection is never
-  discarded by observation or target changes. An observation target selected
-  without a target id is an error if the observation has more than one science
-  target. If no guide target has been selected, Gaia will be searched for the
-  best guide target available and, behind Altair, the science targets are also
-  considered. An observation target, sidereal or non-sidereal, is returned as
-  the target it is, so the telescope follows it.
+  If a guide target has been selected via `setGuideTarget`, that target will be
+  returned. If it is not found or not usable, an error naming it will be
+  returned; select another guide target or clear the selection to return to
+  automatic selection. A selection is never discarded by observation or target
+  changes. An observation target selected without a target id is an error if the
+  observation has more than one science target. If no guide target has been
+  selected, Gaia will be searched for the best guide target available and,
+  behind Altair, the science targets are also considered. An observation target,
+  sidereal or non-sidereal, is returned as the target it is, so the telescope
+  follows it.
   """
   guideEnvironment: GuideEnvironment!
 
@@ -23219,19 +23184,18 @@ type TargetEnvironment {
   explicitBase: Coordinates
 
   """
-  The name of the catalog guide star, if any, selected by `setGuideTargetName`
-  or `setGuideTarget`; null when the selection is automatic or an observation
-  target.
+  The name of the catalog guide star, if any, selected by `setGuideTarget`; null
+  when the selection is automatic or an observation target.
   The selection is returned until it is cleared or replaced, whether or not the
   star is usable with the current observation settings.
   """
   guideTargetName: NonEmptyString @deprecated(reason: "Use `guideTargetSelection` instead.")
 
   """
-  The guide target, if any, selected by hand with `setGuideTarget` (or
-  `setGuideTargetName`); null when the selection is automatic. The selection is
-  returned until it is cleared or replaced, whether or not the star is usable
-  with the current observation settings.
+  The guide target, if any, selected by hand with `setGuideTarget`; null when
+  the selection is automatic. The selection is returned until it is cleared or
+  replaced, whether or not the star is usable with the current observation
+  settings.
   """
   guideTargetSelection: GuideTargetSelection
 

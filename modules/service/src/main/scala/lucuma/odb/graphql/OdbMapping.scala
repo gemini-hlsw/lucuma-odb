@@ -311,7 +311,6 @@ object OdbMapping {
           with SchedulingConstraintsMapping[F]
           with ScienceRequirementsMapping[F]
           with SetAllocationsResultMapping[F]
-          with SetGuideTargetNameResultMapping[F]
           with SetGuideTargetResultMapping[F]
           with SetProgramReferenceResultMapping[F]
           with SetProgramResourceLimitResultMapping[F]
@@ -601,7 +600,6 @@ object OdbMapping {
                 SpectroscopyConfigOptionScorpioMapping,
                 SpectroscopyScienceRequirementsMapping,
                 SetAllocationsResultMapping,
-                SetGuideTargetNameResultMapping,
                 SetGuideTargetResultMapping,
                 SetProgramReferenceResultMapping,
                 SetProgramResourceLimitResultMapping,

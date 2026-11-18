@@ -3712,28 +3712,6 @@ trait DatabaseOperations { this: OdbSuite =>
     expect(user = user, query = q, expected = expected)
   }
 
-  def setGuideTargetName(
-    user: User,
-    oid: Observation.Id,
-    guideTargetName: Option[String]
-  ): IO[Unit] = {
-    val q = s"""
-      mutation {
-        setGuideTargetName(
-          input: {
-            observationId: ${oid.asJson}
-            targetName: ${guideTargetName.asJson}
-          }
-        ) {
-          observation {
-            id
-          }
-        }
-      }
-    """
-    query(user = user, query = q).void
-  }
-
   /** Sets the guide target selection; `guideTarget` is a GraphQL `GuideTargetSelectionInput` literal. */
   def setGuideTarget(
     user:        User,
@@ -3755,6 +3733,14 @@ trait DatabaseOperations { this: OdbSuite =>
       }
     """
     query(user = user, query = q).void
+
+  /** Selects a catalog star by its name, or returns to automatic selection. */
+  def setCatalogGuideTarget(
+    user:        User,
+    oid:         Observation.Id,
+    catalogName: Option[String]
+  ): IO[Unit] =
+    setGuideTarget(user, oid, catalogName.map(name => s"{ catalogName: ${name.asJson} }"))
 
   def createConfigurationRequestAs(user: User, oid: Observation.Id, justification: Option[NonEmptyString] = None): IO[ConfigurationRequest.Id] =
     query(

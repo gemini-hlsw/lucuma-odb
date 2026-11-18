@@ -339,7 +339,7 @@ class guideEnvironmentGnirsAltair extends ExecutionTestSupportForGnirs
   test("the stored guide star resolves to its separation and R magnitude"):
     for
       oid        <- observationWithAltair("{ mode: NGS }")
-      _          <- setGuideTargetName(pi, oid, aowfsStarName.some)
+      _          <- setCatalogGuideTarget(pi, oid, aowfsStarName.some)
       resolution <- resolveGuideStar(oid)
     yield assertResolvedStar(resolution, aowfsStarName, aowfsStarSeparation, aowfsStarRBrightness)
 
@@ -364,7 +364,7 @@ class guideEnvironmentGnirsAltair extends ExecutionTestSupportForGnirs
   test("a stored star the current parameters rule out resolves as unusable"):
     for
       oid        <- observationWithAltair("{ mode: LGS_P1 }")
-      _          <- setGuideTargetName(pi, oid, pwfs1StarName.some)
+      _          <- setCatalogGuideTarget(pi, oid, pwfs1StarName.some)
       _          <- storeGuideStarName(oid, aowfsStarName)
       resolution <- resolveGuideStar(oid)
     yield assertEquals(
