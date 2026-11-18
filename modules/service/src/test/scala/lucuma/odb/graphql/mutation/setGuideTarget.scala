@@ -12,6 +12,8 @@ import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.ags.GuideStarName
+import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.TargetDisposition
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationReference
 import lucuma.core.model.Target
@@ -226,6 +228,14 @@ class setGuideTarget extends query.ExecutionTestSupportForGmos:
       spareTid  <- createTargetWithProfileAs(pi, pid)
       oid       <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
       _         <- setAndCheck(oid, s"""{ observationTarget: { targetId: "$spareTid" } }""", none, observationTargetSelection(spareTid.some))
+    yield ()
+
+  test("a calibration target is accepted, as automatic selection considers it"):
+    for
+      pid <- createProgramAs(pi)
+      tid <- createTargetViaServiceAs(pi, pid, TargetDisposition.Calibration, CalibrationRole.Telluric.some)
+      oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      _   <- setAndCheck(oid, s"""{ observationTarget: { targetId: "$tid" } }""", none, observationTargetSelection(tid.some))
     yield ()
 
   test("a deleted science target is rejected"):

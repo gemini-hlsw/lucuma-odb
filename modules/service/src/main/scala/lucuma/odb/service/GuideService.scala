@@ -1519,17 +1519,17 @@ object GuideService {
                 .onError(_ => restore)
                 .flatMap(r => if r.hasValue then r.pure[F] else restore.as(r))
 
-          // A target that is not a present science target is never a candidate, and selecting a blind
+          // Only a present science or calibration target is ever a candidate, and selecting a blind
           // offset target would block its cleanup through the foreign key.
           val checkObservationTarget: F[Result[Unit]] =
             guideStarId.observationTargetId.fold(Result.unit.pure[F]): targetId =>
-              val af: AppliedFragment = Statements.isScienceTarget(targetId)
+              val af: AppliedFragment = Statements.isAsterismTarget(targetId)
               session
                 .prepareR(af.fragment.query(bool))
                 .use(_.option(af.argument))
-                .map: isScience =>
+                .map: isAsterismTarget =>
                   // A missing target is left to the foreign key.
-                  if isScience.contains(false) then OdbError.InvalidTarget(targetId).asFailure
+                  if isAsterismTarget.contains(false) then OdbError.InvalidTarget(targetId).asFailure
                   else Result.unit
 
           (for {
@@ -1616,9 +1616,10 @@ object GuideService {
           AND t.c_target_disposition = 'blind_offset'
       """.apply(oid)
 
-    def isScienceTarget(tid: Target.Id): AppliedFragment =
+    // Whether a target is of a kind an asterism holds, the targets automatic selection considers.
+    def isAsterismTarget(tid: Target.Id): AppliedFragment =
       sql"""
-        SELECT c_target_disposition = 'science' AND c_existence = 'present'
+        SELECT c_target_disposition IN ('science', 'calibration') AND c_existence = 'present'
         FROM t_target
         WHERE c_target_id = $target_id
       """.apply(tid)
