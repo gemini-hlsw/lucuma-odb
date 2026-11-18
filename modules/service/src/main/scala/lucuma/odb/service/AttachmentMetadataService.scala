@@ -121,7 +121,7 @@ object AttachmentMetadataService {
         else NonEmptyList.fromList(ids).fold(Result.unit.pure[F]): nel =>
           session.execute(Statements.selectMasks(nel))(nel.toList).map: rows =>
             val found = rows.map((aid, name, inst) => aid -> (name, inst)).toMap
-            nel.traverse_ : aid =>
+            nel.parTraverse_ : aid =>
               found.get(aid) match
                 case Some((maskName, maskInstrument)) if maskInstrument =!= instrument =>
                   invalid(maskInstrumentMismatchMessage(maskName, maskInstrument, instrument))

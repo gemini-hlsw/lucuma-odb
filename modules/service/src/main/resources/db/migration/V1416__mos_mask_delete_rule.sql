@@ -1,6 +1,7 @@
 -- A daytime calibration set may point at a mask in another program.  It must
 -- not block that mask's owner from deleting it: the set loses its mask instead.
--- Stored steps keep blocking the delete, as before.
+-- Stored steps keep blocking the delete, as before.  The index keeps an
+-- attachment delete from scanning the setup tables.
 DO $$
 DECLARE
   t text;
@@ -28,5 +29,9 @@ BEGIN
         REFERENCES t_attachment(c_attachment_id)
         ON DELETE SET NULL
     $f$, t, substring(t from 3) || '_mask_fkey');
+    EXECUTE format(
+      'CREATE INDEX %I ON %I (c_fpu_custom_mask_attachment_id)',
+      'i_' || substring(t from 3) || '_mask', t
+    );
   END LOOP;
 END $$;

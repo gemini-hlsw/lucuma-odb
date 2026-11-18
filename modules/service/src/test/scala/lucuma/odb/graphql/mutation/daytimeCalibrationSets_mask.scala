@@ -19,6 +19,7 @@ import lucuma.odb.data.OdbError
 import lucuma.odb.service.AttachmentMetadataService
 import lucuma.odb.service.workflow.validator.DaytimeCalibrationValidator
 import lucuma.odb.util.Codecs.*
+import skunk.codec.text.text
 import skunk.syntax.all.*
 
 class daytimeCalibrationSets_mask extends OdbSuite
@@ -292,3 +293,26 @@ class daytimeCalibrationSets_mask extends OdbSuite
       assertEquals(w1, ("UNDEFINED", List(DaytimeCalibrationValidator.maskMissing)))
       assertEquals(w2, ("DEFINED", Nil))
 
+  private def recutMask(aid: Attachment.Id, instrument: Instrument): IO[Unit] =
+    withSession(_.execute(sql"""
+      UPDATE t_attachment
+         SET c_mask_definition = jsonb_set(c_mask_definition, '{instrument}', to_jsonb($text::text))
+       WHERE c_attachment_id = $attachment_id
+    """.command)(instrument.tag.toScreamingSnakeCase, aid)).void
+
+  test("a set whose mask was cut again for another instrument is reported"):
+    for
+      sci <- createProgramAs(pi)
+      cal <- createProgramAs(staff)
+      aid <- insertMosMaskAttachment(sci, "recut_ODF.fits", Instrument.GmosNorth)
+      oid <- createDaytimeCalibrationAs(staff, cal)
+      _   <- query(staff, updateQuery(oid, dark(setupFor(Instrument.GmosNorth, Some(aid)))))
+      w0  <- workflow(cal, oid)
+      _   <- recutMask(aid, Instrument.GmosSouth)
+      w1  <- workflow(cal, oid)
+      _   <- recutMask(aid, Instrument.GmosNorth)
+      w2  <- workflow(cal, oid)
+    yield
+      assertEquals(w0, ("DEFINED", Nil))
+      assertEquals(w1, ("UNDEFINED", List(DaytimeCalibrationValidator.maskMismatch)))
+      assertEquals(w2, ("DEFINED", Nil))
