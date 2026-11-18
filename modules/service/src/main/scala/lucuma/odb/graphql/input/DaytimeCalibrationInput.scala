@@ -10,18 +10,19 @@ import lucuma.core.enums.Instrument
 import lucuma.odb.graphql.binding.InstrumentBinding
 import lucuma.odb.graphql.binding.Matcher
 import lucuma.odb.graphql.binding.ObjectFieldsBinding
-import lucuma.odb.sequence.daytimecal.CalibrationSet
-import lucuma.odb.sequence.daytimecal.Config
-import lucuma.odb.sequence.daytimecal.InstrumentSetup
 
 object DaytimeCalibrationInput:
 
-  type Create = Config
-  val  Create = Config
+  case class Create(
+    instrument: Instrument,
+    sets:       List[CalibrationSetInput]
+  ):
+    def mode: DaytimeCalibrationObservingModeType =
+      DaytimeCalibrationObservingModeType.DaytimeCalibration
 
   case class Edit(
     instrument: Option[Instrument],
-    sets:       Option[List[CalibrationSet[InstrumentSetup]]]
+    sets:       Option[List[CalibrationSetInput]]
   ):
     def toCreate: Result[Create] =
       Result.fromOption(
@@ -42,7 +43,7 @@ object DaytimeCalibrationInput:
       ) =>
         (rInstrument, rSets).parFlatMapN: (i, sets) =>
           val ss = sets.getOrElse(Nil)
-          CalibrationSetInput.validateInstrument(i, ss).as(Create(i, ss))
+          CalibrationSetInput.validateInstrument(i, ss.map(_.set)).as(Create(i, ss))
 
   val EditBinding: Matcher[Edit] =
     ObjectFieldsBinding.rmap:
@@ -51,4 +52,4 @@ object DaytimeCalibrationInput:
         CalibrationSetInput.Binding.List.Option("calibrationSets", rSets)
       ) =>
         (rInstrument, rSets).parFlatMapN: (i, sets) =>
-          (i, sets).tupled.fold(Result.unit)(CalibrationSetInput.validateInstrument).as(Edit(i, sets))
+          (i, sets).tupled.fold(Result.unit)((inst, ss) => CalibrationSetInput.validateInstrument(inst, ss.map(_.set))).as(Edit(i, sets))

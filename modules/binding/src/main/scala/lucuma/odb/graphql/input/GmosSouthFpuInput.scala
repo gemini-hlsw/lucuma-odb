@@ -4,16 +4,23 @@
 package lucuma.odb.graphql
 package input
 
+import grackle.Result
 import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.odb.graphql.binding.*
 
 object GmosSouthFpuInput {
 
-  val Binding: Matcher[GmosFpuMask[GmosSouthFpu]] =
+  /** @see [[GmosCustomMaskInput.OptionalWidthBinding]] */
+  val OptionalWidthBinding: Matcher[(GmosFpuMask[GmosSouthFpu], Boolean)] =
     OneOfBinding(
-      "customMask" -> GmosCustomMaskInput.Binding,
-      "builtin"    -> GmosSouthFpuBinding.map(GmosFpuMask.Builtin(_))
+      "customMask" -> GmosCustomMaskInput.OptionalWidthBinding.map((c, widthless) => (c: GmosFpuMask[GmosSouthFpu], widthless)),
+      "builtin"    -> GmosSouthFpuBinding.map(f => (GmosFpuMask.Builtin(f): GmosFpuMask[GmosSouthFpu], false))
     )
 
+  val Binding: Matcher[GmosFpuMask[GmosSouthFpu]] =
+    OptionalWidthBinding.rmap {
+      case (fpu, false) => Result(fpu)
+      case (_, true)    => Result.failure(GmosCustomMaskInput.SlitWidthRequiredMessage)
+    }
 }

@@ -11,11 +11,13 @@ import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.SequenceType
+import lucuma.core.math.Angle
 import lucuma.core.model.Attachment
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.syntax.string.*
 import lucuma.odb.data.OdbError
+import lucuma.odb.graphql.input.GmosCustomMaskInput
 import lucuma.odb.service.AttachmentMetadataService
 import lucuma.odb.service.workflow.validator.DaytimeCalibrationValidator
 import lucuma.odb.util.Codecs.*
@@ -35,6 +37,9 @@ class daytimeCalibrationSets_mask extends OdbSuite
 
   private def maskFpu(aid: Option[Attachment.Id], slitWidth: String): String =
     s"fpu: { customMask: { slitWidth: $slitWidth${aid.fold("")(a => s", attachmentId: ${a.asJson}")} } }"
+
+  private def widthlessMaskFpu(aid: Attachment.Id): String =
+    s"fpu: { customMask: { attachmentId: ${aid.asJson} } }"
 
   private def gmosSetup(site: String, fpu: String): String =
     s"""
@@ -208,6 +213,78 @@ class daytimeCalibrationSets_mask extends OdbSuite
       "PINHOLE".asJson
     )
 
+  private def storedWidth(instrument: Instrument, json: Json): Json =
+    val field = instrument match
+      case Instrument.GmosNorth => "gmosNorth"
+      case Instrument.GmosSouth => "gmosSouth"
+      case _                    => "flamingos2"
+    json.hcursor
+      .downFields("createObservation", "observation", "observingMode", "daytimeCalibration", "calibrationSets")
+      .downArray
+      .downFields(field, "fpu", "customMask", "slitWidth")
+      .require[Json]
+
+  private def arcsec(d: Double): Angle =
+    Angle.fromDoubleArcseconds(d)
+
+  test("a GMOS set without a slit width takes the nearest width to the mask's"):
+    for
+      sci <- createProgramAs(pi)
+      cal <- createProgramAs(staff)
+      aid <- insertMosMaskAttachment(sci, "width_n_ODF.fits", Instrument.GmosNorth, averageSlitWidth = Some(arcsec(0.8)))
+      res <- query(staff, createQuery(cal, Instrument.GmosNorth, dark(gmosSetup("gmosNorth", widthlessMaskFpu(aid)))))
+    yield assertEquals(storedWidth(Instrument.GmosNorth, res), "CUSTOM_WIDTH_0_75".asJson)
+
+  test("a Flamingos 2 set without a slit width takes the mask's width in pixels"):
+    for
+      sci <- createProgramAs(pi)
+      cal <- createProgramAs(staff)
+      aid <- insertMosMaskAttachment(sci, "width_f_ODF.fits", Instrument.Flamingos2, averageSlitWidth = Some(arcsec(0.72)))
+      res <- query(staff, createQuery(cal, Instrument.Flamingos2, dark(flamingos2Setup(widthlessMaskFpu(aid)))))
+    yield assertEquals(storedWidth(Instrument.Flamingos2, res), "CUSTOM_WIDTH_4_PIX".asJson)
+
+  test("a slit width that is given wins over the mask's"):
+    for
+      sci <- createProgramAs(pi)
+      cal <- createProgramAs(staff)
+      aid <- insertMosMaskAttachment(sci, "width_s_ODF.fits", Instrument.GmosSouth, averageSlitWidth = Some(arcsec(0.8)))
+      res <- query(staff, createQuery(cal, Instrument.GmosSouth, dark(gmosSetup("gmosSouth", maskFpu(Some(aid), "CUSTOM_WIDTH_2_00")))))
+    yield assertEquals(storedWidth(Instrument.GmosSouth, res), "CUSTOM_WIDTH_2_00".asJson)
+
+  test("a mask that gives no slit width needs one in the set"):
+    for
+      sci <- createProgramAs(pi)
+      cal <- createProgramAs(staff)
+      aid <- insertMosMaskAttachment(sci, "nowidth_ODF.fits", Instrument.GmosNorth)
+      _   <- expectRejected(
+               createQuery(cal, Instrument.GmosNorth, dark(gmosSetup("gmosNorth", widthlessMaskFpu(aid)))),
+               AttachmentMetadataService.daytimeMaskSlitWidthMessage(aid)
+             )
+    yield ()
+
+  test("replacing the sets takes the mask's slit width too"):
+    for
+      sci <- createProgramAs(pi)
+      cal <- createProgramAs(staff)
+      oid <- createDaytimeCalibrationAs(staff, cal)
+      aid <- insertMosMaskAttachment(sci, "width_u_ODF.fits", Instrument.GmosNorth, averageSlitWidth = Some(arcsec(1.4)))
+      _   <- query(staff, updateQuery(oid, dark(gmosSetup("gmosNorth", widthlessMaskFpu(aid)))))
+      res <- query(staff, s"""
+               query {
+                 observation(observationId: ${oid.asJson}) {
+                   observingMode { daytimeCalibration { calibrationSets { gmosNorth { fpu { customMask { slitWidth } } } } } }
+                 }
+               }
+             """)
+    yield assertEquals(
+      res.hcursor
+        .downFields("observation", "observingMode", "daytimeCalibration", "calibrationSets")
+        .downArray
+        .downFields("gmosNorth", "fpu", "customMask", "slitWidth")
+        .require[Json],
+      "CUSTOM_WIDTH_1_50".asJson
+    )
+
   private def maskStep(aid: Option[Attachment.Id]): String =
     s"""
       {
@@ -222,6 +299,9 @@ class daytimeCalibrationSets_mask extends OdbSuite
         observeClass: DAY_CAL
       }
     """
+
+  private def widthlessMaskStep(aid: Attachment.Id): String =
+    maskStep(Some(aid)).replace("slitWidth: CUSTOM_WIDTH_0_50, ", "")
 
   private def replaceQuery(oid: Observation.Id, step: String): String =
     s"""
@@ -261,6 +341,15 @@ class daytimeCalibrationSets_mask extends OdbSuite
       bad <- insertMosMaskAttachment(sci, "wrong_ODF.fits", Instrument.GmosSouth)
       _   <- expectRejected(replaceQuery(oid, maskStep(None)), AttachmentMetadataService.DaytimeMaskRequiredMessage)
       _   <- expectRejected(replaceQuery(oid, maskStep(Some(bad))), "is designed for GMOS South")
+    yield ()
+
+  test("a hand-entered step still needs a slit width"):
+    for
+      sci <- createProgramAs(pi)
+      cal <- createProgramAs(staff)
+      oid <- createDaytimeCalibrationAs(staff, cal)
+      aid <- insertMosMaskAttachment(sci, "stepwidth_ODF.fits", Instrument.GmosNorth, averageSlitWidth = Some(arcsec(0.8)))
+      _   <- expectRejected(replaceQuery(oid, widthlessMaskStep(aid)), GmosCustomMaskInput.SlitWidthRequiredMessage)
     yield ()
 
   private def deleteMask(aid: Attachment.Id): IO[Unit] =

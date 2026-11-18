@@ -5,12 +5,14 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.parallel.*
+import grackle.Result
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
 import lucuma.odb.graphql.binding.*
 
 object GmosSouthDynamicInput {
 
-  val Binding: Matcher[GmosSouth] =
+  /** @see [[GmosCustomMaskInput.OptionalWidthBinding]] */
+  val OptionalWidthBinding: Matcher[(GmosSouth, Boolean)] =
     ObjectFieldsBinding.rmap {
       case List(
         TimeSpanInput.Binding("exposure", rExposure),
@@ -19,18 +21,24 @@ object GmosSouthDynamicInput {
         GmosRoiBinding("roi", rRoi),
         GmosSouthGratingConfigInput.Binding.Option("gratingConfig", rGrating),
         GmosSouthFilterBinding.Option("filter", rFilter),
-        GmosSouthFpuInput.Binding.Option("fpu", rFpu)
+        GmosSouthFpuInput.OptionalWidthBinding.Option("fpu", rFpu)
       ) => (rExposure, rReadout, rDtax, rRoi, rGrating, rFilter, rFpu).parMapN { (exposure, readout, dtax, roi, grating, filter, fpu) =>
-        GmosSouth(
+        (GmosSouth(
           exposure,
           readout,
           dtax,
           roi,
           grating,
           filter,
-          fpu
-        )
+          fpu.map(_._1)
+        ), fpu.exists(_._2))
       }
+    }
+
+  val Binding: Matcher[GmosSouth] =
+    OptionalWidthBinding.rmap {
+      case (config, false) => Result(config)
+      case (_, true)       => Result.failure(GmosCustomMaskInput.SlitWidthRequiredMessage)
     }
 
 }
