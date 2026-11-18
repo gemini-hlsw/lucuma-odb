@@ -63,7 +63,7 @@ _Avoid_: outdated, dirty, invalid (the snapshot remains valid evidence of what w
 Whatever sits at the instrument's focal plane and defines the aperture light passes through. Unqualified, the term is ambiguous — always say Builtin FPU or Custom Mask, because an observing mode carries exactly one of the two and they are different kinds of thing.
 
 **Builtin FPU**:
-A fixed aperture permanently available in the instrument, named by an enumerated value (`GmosNorthFpu.LongSlit_1_00`). Long slit and IFU modes carry one. A MOS mode never does.
+A fixed aperture permanently available in the instrument, named by an enumerated value (`GmosNorthFpu.LongSlit_1_00`). Long slit and IFU modes carry one. A MOS mode never does. The GMOS `Pinhole` is one too, although it is a plate: the facility mask the instrument calls `focus_array_new`, staff-only.
 _Avoid_: FPU (ambiguous), slit, aperture.
 
 **Custom Mask**:
@@ -74,7 +74,7 @@ _Avoid_: MDF (that names the file, not the FPU), mask FPU, custom FPU.
 The representative width of the slitlets cut into a Custom Mask, from `GmosCustomSlitWidth`. Always known — it is how the mode is chosen at Phase 0 — and so is required even when the mask itself has not been made. In 1:1 correspondence with the builtin long slit FPU widths, which is what lets a MOS observation be estimated as a long slit and take its spectrophotometric standard through the equivalent long slit.
 
 **Mask Attachment**:
-The uploaded file describing a Custom Mask's actual slitlet layout, an attachment of type `mos_mask`. Optional and absent by default: the mask is usually only designed during Phase 2, from pre-imaging. Its absence is the normal early state of a valid MOS observation, not an error. Carries a Mask Name and a Mask Instrument, and may only be assigned to a MOS observation whose instrument matches it.
+The uploaded file describing a Custom Mask's actual slitlet layout, an attachment of type `mos_mask`. Optional and absent by default: the mask is usually only designed during Phase 2, from pre-imaging. Its absence is the normal early state of a valid MOS observation, not an error. Carries a Mask Name and a Mask Instrument, and may only be used where the instrument matches it. A MOS observation takes one from its own program; a Daytime Calibration Set may take one from any program. It cannot be deleted while any stored step points at it, which in practice means once an observation using it has started executing or had its sequence entered by hand. A MOS observation's mode or a Daytime Calibration Set pointing at it never blocks the owner: they simply lose the mask.
 _Avoid_: mask file, MDF, mask id.
 
 **Mask Name**:
@@ -319,7 +319,7 @@ A Smart GCAL table row whose `Calibration Observe` is zero, by which an instrume
 _Avoid_: empty row, disabled row, zero row.
 
 **Instrument Setup**:
-The single instrument state a Daytime Calibration Set is taken in: exactly what one step's dynamic configuration holds for that instrument, exposure time included. A bias ignores the exposure time and takes zero, and a Smart row stores zero since the Smart GCAL Lookup supplies it. A Flamingos-2 window cover may be left unset for any kind; the set never defaults it, unlike a hand-entered dark step. Once Iterators exist, a field an Iterator covers is still present here but ignored.
+The single instrument state a Daytime Calibration Set is taken in: exactly what one step's dynamic configuration holds for that instrument, exposure time included. A bias ignores the exposure time and takes zero, and a Smart row stores zero since the Smart GCAL Lookup supplies it. A Flamingos-2 window cover may be left unset for any kind; the set never defaults it, unlike a hand-entered dark step. Once Iterators exist, a field an Iterator covers is still present here but ignored. Its FPU may be a Custom Mask, which here, unlike in a MOS observation, must name its Mask Attachment and may take it from any program; the Custom Slit Width is entered, never derived. If that attachment is later deleted the Daytime Calibration cannot be made Ready until another is chosen.
 _Avoid_: configuration, dynamic config (the storage shape, not the concept), base config.
 
 **Iterator**:

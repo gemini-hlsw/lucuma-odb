@@ -26,6 +26,7 @@ import lucuma.odb.graphql.input.DaytimeCalibrationInput
 import lucuma.odb.sequence.daytimecal.CalibrationSet
 import lucuma.odb.sequence.daytimecal.Config
 import lucuma.odb.sequence.daytimecal.InstrumentSetup
+import lucuma.odb.service.Services.Syntax.attachmentMetadataService
 import lucuma.odb.service.Services.Syntax.session
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Flamingos2Codecs.*
@@ -101,6 +102,19 @@ object DaytimeCalibrationService:
         input: DaytimeCalibrationInput.Create,
         which: List[Observation.Id]
       )(using Transaction[F]): F[Result[Unit]] =
+        validateMasks(input.instrument, input.sets).flatMap(_.traverse(_ => insertUnchecked(input, which)).map(_.flatten))
+
+      private def validateMasks(
+        instrument: Instrument,
+        sets:       List[CalibrationSet[InstrumentSetup]]
+      )(using Transaction[F]): F[Result[Unit]] =
+        attachmentMetadataService.validateDaytimeMasks(instrument, sets.flatMap(_.setup.customMask))
+
+      // A clone keeps a set whose mask has since been deleted, so it skips the mask check.
+      private def insertUnchecked(
+        input: DaytimeCalibrationInput.Create,
+        which: List[Observation.Id]
+      ): F[Result[Unit]] =
         val doInsert: F[Result[Unit]] =
           session.prepareR(Statements.Insert).use: ps =>
             which
@@ -150,6 +164,12 @@ object DaytimeCalibrationService:
             val materialized: F[Result[Unit]] =
               if SET.sets.isDefined then checkNotMaterialized(oids) else Result.unit.pure
 
+            val masks: F[Result[Unit]] =
+              SET.sets.fold(Result.unit.pure[F]): sets =>
+                existing.values.map(c => SET.instrument.getOrElse(c.instrument)).toList.distinct
+                  .traverse(validateMasks(_, sets))
+                  .map(_.sequenceVoid)
+
             val updateInstrument: F[Unit] =
               SET.instrument.traverse_ : inst =>
                 val af = Statements.updateInstrument(inst, oids)
@@ -163,6 +183,7 @@ object DaytimeCalibrationService:
             (for
               _ <- ResultT(checks.pure)
               _ <- ResultT(materialized)
+              _ <- ResultT(masks)
               _ <- ResultT.liftF(updateInstrument *> replaceSets)
             yield ()).value
 
@@ -174,7 +195,7 @@ object DaytimeCalibrationService:
           case None         =>
             Concurrent[F].raiseError(new RuntimeException(s"Clone: original observation $originalId has no daytime calibration config."))
           case Some(config) =>
-            insert(config, List(newId)).flatMap: res =>
+            insertUnchecked(config, List(newId)).flatMap: res =>
               res.toEither match
                 case Left(Left(t))   => Concurrent[F].raiseError(t)
                 case Left(Right(ps)) => Concurrent[F].raiseError(new RuntimeException(s"Clone: insert failed: ${ps.toList.mkString(", ")}"))

@@ -68,6 +68,7 @@ import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.StreamingExecutionConfig
 import lucuma.odb.sequence.data.UnsplittableAtom
+import lucuma.odb.sequence.daytimecal.InstrumentSetup
 import lucuma.odb.sequence.daytimecal.StaticConfigs as DaytimeStatics
 import lucuma.odb.sequence.gcalClass
 import lucuma.odb.sequence.util.AtomBuilder
@@ -776,7 +777,8 @@ object SequenceService:
         abandonOngoingStep: Boolean,
         customized:         Boolean,
         insertInstConfig:   (rows: List[(Step.Id, D)]) => Command[rows.type],
-        atomBuilder:        AtomBuilder[D]
+        atomBuilder:        AtomBuilder[D],
+        setup:              D => InstrumentSetup
       )(using Transaction[F]): ResultT[F, Stream[Pure, Atom[D]]] =
 
         val checkAtomLength: ResultT[F, Unit] =
@@ -806,14 +808,15 @@ object SequenceService:
         val checkDaytime: ResultT[F, List[ProtoAtom[ProtoStep[D]]]] =
           ResultT.liftF(selectDaytimeCalibration(observationId)).flatMap:
             case None    => ResultT.pure(sequence)
-            case Some(_) =>
+            case Some(i) =>
+              val masks    = sequence.flatMap(_.steps.toList).flatMap(s => setup(s.value).customMask).distinct
               val badClass = sequence.flatMap(_.steps.toList).exists(_.observeClass =!= ObserveClass.DayCal)
               if sequenceType =!= SequenceType.Science then
                 ResultT(OdbError.InvalidArgument("Daytime calibrations have no acquisition sequence.".some).asFailureF)
               else if badClass then
                 ResultT(OdbError.InvalidArgument("Every step of a daytime calibration must have observe class DAY_CAL.".some).asFailureF)
               else
-                ResultT.pure:
+                ResultT(attachmentMetadataService.validateDaytimeMasks(i, masks)).as:
                   sequence.map: atom =>
                     atom.copy(steps = atom.steps.map(step => step.copy(telescopeConfig = step.telescopeConfig.copy(guiding = StepGuideState.Disabled))))
 
@@ -906,7 +909,8 @@ object SequenceService:
                  abandonOngoingStep,
                  customized,
                  Flamingos2SequenceService.Statements.insertDynamics,
-                 b
+                 b,
+                 InstrumentSetup.Flamingos2(_)
                )
         yield r).value
 
@@ -953,7 +957,8 @@ object SequenceService:
                  abandonOngoingStep,
                  customized,
                  GhostSequenceService.Statements.insertDynamics,
-                 b
+                 b,
+                 InstrumentSetup.Ghost(_)
                )
         yield r).value
 
@@ -992,7 +997,8 @@ object SequenceService:
                  abandonOngoingStep,
                  customized,
                  GmosSequenceService.Statements.insertNorthDynamics,
-                 b
+                 b,
+                 InstrumentSetup.GmosNorth(_)
                )
         yield r).value
 
@@ -1031,7 +1037,8 @@ object SequenceService:
                  abandonOngoingStep,
                  customized,
                  GmosSequenceService.Statements.insertSouthDynamics,
-                 b
+                 b,
+                 InstrumentSetup.GmosSouth(_)
                )
         yield r).value
 
@@ -1071,7 +1078,8 @@ object SequenceService:
                  abandonOngoingStep,
                  customized,
                  Igrins2SequenceService.Statements.insertDynamics,
-                 b
+                 b,
+                 InstrumentSetup.Igrins2(_)
                )
         yield r).value
 
@@ -1110,7 +1118,8 @@ object SequenceService:
                  abandonOngoingStep,
                  customized,
                  GnirsSequenceService.Statements.insertDynamics,
-                 b
+                 b,
+                 InstrumentSetup.Gnirs(_)
                )
         yield r).value
 

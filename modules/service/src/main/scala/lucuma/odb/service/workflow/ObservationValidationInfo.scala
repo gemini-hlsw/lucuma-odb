@@ -63,7 +63,13 @@ import java.time.Instant
 
 import Services.Syntax.*
 
-/* Validation Info Record */
+/**
+ * Validation Info Record
+ *
+ * `daytimeMaskMissing` tells that a calibration set's custom mask names no
+ * attachment, `daytimeMaskMismatch` that it names one which is no longer a
+ * MOS mask for the set's instrument.
+ */
 case class ObservationValidationInfo(
   pid:                    Program.Id,
   tpe:                    ProgramType,
@@ -97,6 +103,8 @@ case class ObservationValidationInfo(
   altair:                 Option[AltairConfiguration],
   executionDigest:        Option[ExecutionDigest] = None,
   hasSequenceSource:      Boolean = false, // set for daytime calibrations
+  daytimeMaskMissing:     Boolean = false,
+  daytimeMaskMismatch:    Boolean = false,
   instrument:             Option[Instrument] = None,
   posAngleConstraint:     PosAngleConstraint = PosAngleConstraint.Unbounded,
   maskPositionAngle:      Option[Angle] = None,
@@ -292,13 +300,14 @@ object ObservationValidationInfo {
         case Some(nel) =>
           val enc = observation_id.nel(nel)
           session
-            .stream(Statements.WithSequenceSource(enc))(nel, 1024)
+            .stream(Statements.DaytimeCalibrationSource(enc))(nel, 1024)
             .compile
             .toList
-            .map(_.toSet)
-            .map: withSteps =>
+            .map(_.map((oid, source, missing, mismatch) => oid -> (source, missing, mismatch)).toMap)
+            .map: found =>
               input.map: (oid, info) =>
-                oid -> (if info.isDaytimeCalibration then info.copy(hasSequenceSource = withSteps.contains(oid)) else info)
+                oid -> found.get(oid).fold(info): (source, missing, mismatch) =>
+                  info.copy(hasSequenceSource = source, daytimeMaskMissing = missing, daytimeMaskMismatch = mismatch)
 
     def addProgramAllocations(input: Map[Observation.Id, ObservationValidationInfo]): F[Map[Observation.Id, ObservationValidationInfo]] =
       NonEmptyList.fromList(input.values.map(_.pid).toList.distinct) match
@@ -450,32 +459,63 @@ object ObservationValidationInfo {
         ) mk ON TRUE
       """
 
-    def WithSequenceSource[A <: NonEmptyList[Observation.Id]](enc: skunk.Encoder[A]): Query[A, Observation.Id] =
+    // Per observation: whether it has a sequence source, whether a set still
+    // driving the sequence has a custom mask without an attachment, and
+    // whether one has an attachment that is not a mask for its instrument.
+    def DaytimeCalibrationSource[A <: NonEmptyList[Observation.Id]](enc: skunk.Encoder[A]): Query[A, (Observation.Id, Boolean, Boolean, Boolean)] =
       sql"""
-        SELECT o.c_observation_id
+        SELECT
+          o.c_observation_id,
+          EXISTS (
+            SELECT 1
+              FROM t_atom a
+              JOIN t_step s ON s.c_atom_id = a.c_atom_id
+             WHERE a.c_observation_id = o.c_observation_id
+               AND a.c_sequence_type = 'science'
+          ) OR (
+            NOT m.c_materialized AND EXISTS (
+              SELECT 1
+                FROM t_daytime_calibration_set c
+               WHERE c.c_observation_id = o.c_observation_id
+            )
+          ),
+          NOT m.c_materialized AND EXISTS (
+            SELECT 1
+              FROM (
+                SELECT c_observation_id, c_fpu_custom_mask_slit_width, c_fpu_custom_mask_attachment_id FROM t_gmos_north_daytime_calibration_setup
+                UNION ALL
+                SELECT c_observation_id, c_fpu_custom_mask_slit_width, c_fpu_custom_mask_attachment_id FROM t_gmos_south_daytime_calibration_setup
+                UNION ALL
+                SELECT c_observation_id, c_fpu_custom_mask_slit_width, c_fpu_custom_mask_attachment_id FROM t_flamingos_2_daytime_calibration_setup
+              ) u
+             WHERE u.c_observation_id = o.c_observation_id
+               AND u.c_fpu_custom_mask_slit_width    IS NOT NULL
+               AND u.c_fpu_custom_mask_attachment_id IS NULL
+          ),
+          NOT m.c_materialized AND EXISTS (
+            SELECT 1
+              FROM (
+                SELECT c_observation_id, c_instrument, c_fpu_custom_mask_attachment_id FROM t_gmos_north_daytime_calibration_setup
+                UNION ALL
+                SELECT c_observation_id, c_instrument, c_fpu_custom_mask_attachment_id FROM t_gmos_south_daytime_calibration_setup
+                UNION ALL
+                SELECT c_observation_id, c_instrument, c_fpu_custom_mask_attachment_id FROM t_flamingos_2_daytime_calibration_setup
+              ) u
+              JOIN t_attachment a ON a.c_attachment_id = u.c_fpu_custom_mask_attachment_id
+             WHERE u.c_observation_id = o.c_observation_id
+               AND a.c_mask_instrument IS DISTINCT FROM u.c_instrument
+          )
           FROM t_observation o
+          CROSS JOIN LATERAL (
+            SELECT EXISTS (
+              SELECT 1
+                FROM t_sequence_materialization sm
+               WHERE sm.c_observation_id = o.c_observation_id
+                 AND sm.c_sequence_type = 'science'
+            ) AS c_materialized
+          ) m
          WHERE o.c_observation_id IN ($enc)
-           AND (
-             EXISTS (
-               SELECT 1
-                 FROM t_atom a
-                 JOIN t_step s ON s.c_atom_id = a.c_atom_id
-                WHERE a.c_observation_id = o.c_observation_id
-                  AND a.c_sequence_type = 'science'
-             ) OR (
-               NOT EXISTS (
-                 SELECT 1
-                   FROM t_sequence_materialization m
-                  WHERE m.c_observation_id = o.c_observation_id
-                    AND m.c_sequence_type = 'science'
-               ) AND EXISTS (
-                 SELECT 1
-                   FROM t_daytime_calibration_set c
-                  WHERE c.c_observation_id = o.c_observation_id
-               )
-             )
-           )
-      """.query(observation_id)
+      """.query(observation_id *: bool *: bool *: bool)
 
     def ObservationValidationInfosWithoutAsterisms[A <: NonEmptyList[Observation.Id]](enc: Encoder[A]): Query[A, ObservationValidationInfo] =
       sql"""
