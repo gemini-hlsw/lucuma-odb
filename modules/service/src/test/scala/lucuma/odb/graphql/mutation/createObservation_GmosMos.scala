@@ -488,6 +488,36 @@ class createObservation_GmosMos extends OdbSuite with MosMaskSupport:
              )
     yield ()
 
+  test("customMask needs a slit width"):
+    for
+      pid <- createProgramAs(pi)
+      tid <- createTargetAs(pi, pid)
+      _   <- expect(
+               user = pi,
+               query = s"""
+                 mutation {
+                   createObservation(input: {
+                     programId: ${pid.asJson}
+                     SET: {
+                       targetEnvironment: { asterism: ${List(tid).asJson} }
+                       scienceRequirements: { $scienceRequirements }
+                       observingMode: {
+                         gmosNorthMos: {
+                           grating: R831_G5302
+                           centralWavelength: { nanometers: 500 }
+                           customMask: { }
+                         }
+                       }
+                     }
+                   }) {
+                     observation { id }
+                   }
+                 }
+               """,
+               expected = List("Argument 'input.SET.observingMode.gmosNorthMos.customMask' is invalid: A custom mask needs a `slitWidth`.").asLeft
+             )
+    yield ()
+
   // A MOS and a long slit observation with the same grating must not share a request.
   test("a MOS request is distinct from a long slit request with the same grating"):
     for

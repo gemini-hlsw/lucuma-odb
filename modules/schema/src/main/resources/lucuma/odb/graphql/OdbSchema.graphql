@@ -2048,9 +2048,11 @@ input GmosCustomMaskInput {
   attachmentId: AttachmentId
 
   """
-  Custom mask slit width
+  Custom mask slit width.  A daytime calibration set may leave it out: it is
+  then the allowed width nearest the mean width of the mask's science slits.
+  Required everywhere else.
   """
-  slitWidth: GmosCustomSlitWidth!
+  slitWidth: GmosCustomSlitWidth
 }
 
 """
@@ -11094,9 +11096,11 @@ input Flamingos2CustomMaskInput {
   attachmentId: AttachmentId
 
   """
-  Custom mask slit width
+  Custom mask slit width.  A daytime calibration set may leave it out: it is
+  then the allowed width nearest the mean width of the mask's science slits.
+  Required everywhere else.
   """
-  slitWidth: Flamingos2CustomSlitWidth!
+  slitWidth: Flamingos2CustomSlitWidth
 }
 
 """
