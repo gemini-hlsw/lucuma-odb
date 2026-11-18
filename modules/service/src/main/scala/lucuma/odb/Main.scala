@@ -317,17 +317,47 @@ object FMain extends MainParams {
       HealthCheck.info("itc", HealthCheck.reachable(httpClient, healthOf(itcRoot, "health")))
     )
 
+  private def flyway(config: Config.Database): Flyway =
+    Flyway
+      .configure()
+      .loggers("slf4j")
+      .dataSource(config.jdbcUrl, config.user, config.password)
+      .baselineOnMigrate(true)
+      .load()
+
   /** A startup action that runs database migrations using Flyway. */
   def migrateDatabase[F[_]: Sync](config: Config.Database): F[MigrateResult] =
-    Sync[F].delay {
-      Flyway
-        .configure()
-        .loggers("slf4j")
-        .dataSource(config.jdbcUrl, config.user, config.password)
-        .baselineOnMigrate(true)
-        .load()
-        .migrate()
-    }
+    Sync[F].delay(flyway(config).migrate())
+
+  /**
+   * The migrations on the classpath that haven't been applied to the database
+   * yet, in order, labelled like `V1416: visit time accounting version`.
+   * Repeatable migrations, which have no version, are labelled `R: ...`.
+   * Migrations applied to the database that aren't on the classpath (e.g.,
+   * after a rollback) are not pending.
+   */
+  def pendingMigrations[F[_]: Sync](config: Config.Database): F[List[String]] =
+    Sync[F].blocking:
+      flyway(config).info().pending().toList.map: m =>
+        Option(m.getVersion).fold(s"R: ${m.getDescription}")(v => s"V$v: ${m.getDescription}")
+
+  /**
+   * Waits until `pending` finds no pending migrations, checking every
+   * `pollPeriod`.  A process that doesn't migrate the database itself (e.g.,
+   * obscalc) can start before the ODB service has finished migrating it, and
+   * it must not run its startup diagnostics against the old schema.
+   */
+  def awaitMigrations[F[_]: Temporal: Logger](
+    pending:    F[List[String]],
+    pollPeriod: FiniteDuration
+  ): F[Unit] =
+    pending.flatMap:
+      case Nil  =>
+        Logger[F].info("The database has no pending migrations.")
+      case next :: rest =>
+        Logger[F].info(s"Waiting for ${rest.size + 1} pending migration(s), starting with $next.") >>
+          Temporal[F].sleep(pollPeriod) >>
+          awaitMigrations(pending, pollPeriod)
 
   private def dbSessionBuilder[F[_]: Temporal: Console: Network: TracerProvider: MeterProvider](
     config:          Config.Database,
@@ -373,8 +403,12 @@ object FMain extends MainParams {
     }
   }
 
-  def runStartupDiagnostics[F[_]: Async : Console : Network: Logger](config: Config.Database, fatal: Boolean): F[Unit] =
-    singleSession(config).map(StartupDiagnostics.apply(_)).use: sd =>
+  def runStartupDiagnostics[F[_]: Async : Console : Network: Logger](
+    config:          Config.Database,
+    fatal:           Boolean,
+    applicationName: String = "odb-web"
+  ): F[Unit] =
+    singleSession(config, applicationName = applicationName).map(StartupDiagnostics.apply(_)).use: sd =>
       sd.runAllDiagnostics(fatal)
 
   implicit def kleisliLogger[F[_]: Logger, A]: Logger[Kleisli[F, A, *]] =

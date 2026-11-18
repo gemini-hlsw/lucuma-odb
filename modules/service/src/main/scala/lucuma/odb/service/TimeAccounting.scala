@@ -36,18 +36,18 @@ object TimeAccounting {
     val Qa: String            = "Time spent observing atoms with one or more datasets that don't pass QA."
   }
 
-  /**
-   * Versions of the time accounting rules.  Each visit records the version in
-   * effect when it was created (`t_visit.c_ta_version`), so that a change to the
-   * rules does not reprice visits that were already charged.
-   */
   object version {
 
-    /** Only the atoms with datasets that don't pass QA are discounted. */
-    val Initial: Short = 1
-
-    /** In addition, a visit in which no dataset passes QA is not charged. */
-    val NoPassingData: Short = 2
+    /**
+     * The version of the time accounting rules implemented here.  Each visit
+     * records the version that produced its stored charge
+     * (`t_visit.c_ta_version`), and visits on any other version are not
+     * recomputed.  When the rules change, increment it and add a migration
+     * that calls `add_time_accounting_version` with the new version and a
+     * description of the change.  A startup check requires it to match the
+     * latest version in `t_time_accounting_version`.
+     */
+    val Current: Short = 2
 
   }
 

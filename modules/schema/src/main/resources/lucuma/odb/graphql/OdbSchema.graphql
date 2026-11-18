@@ -4185,6 +4185,17 @@ type Mutation {
   ): ReplaceGhostSequenceResult!
 
   """
+  Recomputes the time accounting of a visit, or of every visit of an
+  observation, under the current rules, including visits whose time accounting
+  was frozen when the rules changed.  Existing time charge corrections are
+  applied to the recomputed charge, so a correction that compensated for the
+  old rules may need to be revisited.  Requires staff (or better) access.
+  """
+  recalculateTimeAccounting(
+    input: RecalculateTimeAccountingInput!
+  ): RecalculateTimeAccountingResult!
+
+  """
   Re-runs the Archive Duplication Search for an observation, replacing its
   stored result with what the Gemini Observatory Archive holds now.
 
@@ -6011,6 +6022,25 @@ input RadialVelocityInput @oneOf {
   centimetersPerSecond: Long
   metersPerSecond: BigDecimal
   kilometersPerSecond: BigDecimal
+}
+
+"""
+Input parameters for recalculating time accounting.  Select one of
+`observationId` or `observationReference` to recalculate every visit of an
+observation, or `visitId` to recalculate just that visit.
+"""
+input RecalculateTimeAccountingInput {
+  observationId: ObservationId
+  observationReference: ObservationReferenceLabel
+  visitId: VisitId
+}
+
+"""
+The result of recalculating time accounting.
+"""
+type RecalculateTimeAccountingResult {
+  "The observation whose time accounting was recalculated, or the visit's observation."
+  observation: Observation!
 }
 
 "Dataset creation parameters."

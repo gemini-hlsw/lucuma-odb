@@ -9,6 +9,8 @@ import cats.data.StateT
 import cats.effect.Concurrent
 import cats.syntax.all.*
 import fs2.Stream
+import grackle.Result
+import grackle.syntax.*
 import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.Site
@@ -26,6 +28,8 @@ import lucuma.core.model.sequence.TimeChargeCorrection
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
+import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.TimeCharge
 import lucuma.odb.graphql.input.TimeChargeCorrectionInput
 import lucuma.odb.service.Services.SuperUserAccess
@@ -78,6 +82,27 @@ trait TimeAccountingService[F[_]] {
   def invalidateStaleVisitorVisits(
     limit: Int
   )(using NoTransaction[F], Services.ServiceAccess): F[Int]
+
+  /**
+   * Moves every visit of the observation to the current version of the time
+   * accounting rules and recomputes it, whether or not its time accounting was
+   * frozen.  Time charge corrections are applied to the recomputed charge as
+   * they were to the original.
+   */
+  def recalculateObservation(
+    observationId: Observation.Id
+  )(using Transaction[F], Services.StaffAccess): F[Unit]
+
+  /**
+   * Moves a single visit to the current version of the time accounting rules
+   * and recomputes it, as `recalculateObservation` does for every visit of an
+   * observation.
+   *
+   * @return the visit's observation
+   */
+  def recalculateVisit(
+    visitId: Visit.Id
+  )(using Transaction[F], Services.StaffAccess): F[Result[Observation.Id]]
 
   /**
    * Adds a manual time charge correction.
@@ -168,8 +193,8 @@ object TimeAccountingService {
    * @param lastEvent time of the visit's last execution event, if any
    * @param nextVisitStart start of the next chargeable visit at the same site,
    *                       if any (only looked up for visitor visits)
-   * @param version version of the time accounting rules that apply to the
-   *                visit (see `TimeAccounting.version`)
+   * @param version version of the time accounting rules that produced the
+   *                visit's stored charge (see `TimeAccounting.version`)
    */
   case class VisitInfo(
     isVisitor:      Boolean,
@@ -231,7 +256,7 @@ object TimeAccountingService {
         // them.  We record the invalidation timestamp we observed (not `now()`)
         // so that an invalidation arriving during the recompute leaves the visit
         // dirty for the next pass.
-        session.execute(SelectDirtyVisits)(observationId).flatMap:
+        session.execute(SelectDirtyVisits)(observationId, TimeAccounting.version.Current).flatMap:
           _.traverse_ { (visitId, invalidation) =>
             update(visitId) *>
             session.execute(MarkVisitTimeAccountingUpdated)(invalidation, visitId).void
@@ -244,7 +269,7 @@ object TimeAccountingService {
           .transactionally:
             for
               now <- timeService.transactionTime
-              cs  <- session.execute(SelectRecentVisitorVisits)(VisitorSweepWindow)
+              cs  <- session.execute(SelectRecentVisitorVisits)(VisitorSweepWindow, TimeAccounting.version.Current)
             yield cs.collect { case (vid, oid, info, recorded) if info.visitorEnd(now) =!= recorded => (vid, oid) }
           .flatMap: stale =>
             stale
@@ -255,16 +280,17 @@ object TimeAccountingService {
                 results.collectFirst { case Left(t) => t }.fold(results.size.pure[F])(_.raiseError[F, Int])
 
       case class Update(visitId: Visit.Id)(using Transaction[F]) {
-        // The end of a visitor visit's charge is recorded so that the obscalc
-        // worker can tell when it would change.
+        // A visit on another version of the rules is frozen: its stored charge
+        // is left as it is.  The end of a visitor visit's charge is recorded so
+        // that the obscalc worker can tell when it would change.
         lazy val run: F[Unit] =
-          for
-            v   <- session.unique(SelectVisitInfo)(visitId)
-            now <- timeService.transactionTime
-            end  = v.visitorEnd(now)
-            i   <- computeInvoice(v, end)
-            _   <- updateInvoice(i, end)
-          yield ()
+          session.unique(SelectVisitInfo)(visitId).flatMap: v =>
+            (for
+              now <- timeService.transactionTime
+              end  = v.visitorEnd(now)
+              i   <- computeInvoice(v, end)
+              _   <- updateInvoice(i, end)
+            yield ()).whenA(v.version === TimeAccounting.version.Current)
 
         private def initialState(end: Option[Timestamp]): F[TimeAccountingState] =
           for {
@@ -312,21 +338,19 @@ object TimeAccountingService {
                 case None                     =>
                   (tas, Nil)
 
-        // Each atom with a dataset that doesn't pass QA is discounted.  From
-        // version `NoPassingData` on, when no science dataset in the visit
-        // passes QA whatever remains (e.g., time between atoms while the
-        // sequence was paused) is discounted too.  The remainder is discounted
-        // one run of adjacent intervals at a time so that no discount spans
-        // time already discounted otherwise.
-        private def qaDiscounts(visit: VisitInfo): StateT[F, TimeAccountingState, List[TimeCharge.DiscountEntry]] =
+        // Each atom with a dataset that doesn't pass QA is discounted.  When no
+        // science dataset in the visit passes QA, whatever remains (e.g., time
+        // between atoms while the sequence was paused) is discounted too.  The
+        // remainder is discounted one run of adjacent intervals at a time so
+        // that no discount spans time already discounted otherwise.
+        private val qaDiscounts: StateT[F, TimeAccountingState, List[TimeCharge.DiscountEntry]] =
           StateT { tas =>
             for
               failures <- datasetService.selectDatasetsWithQaFailures(visitId)
               // Without a failing dataset (as is always the case for visitor
               // visits, which have no datasets) every science dataset passes
               // or is unassessed, so there's no need to ask.
-              allFail  <- if visit.version >= TimeAccounting.version.NoPassingData && failures.nonEmpty
-                          then datasetService.allScienceDatasetsFail(visitId)
+              allFail  <- if failures.nonEmpty then datasetService.allScienceDatasetsFail(visitId)
                           else false.pure[F]
             yield
               val (rest, perAtom) =
@@ -357,7 +381,7 @@ object TimeAccountingService {
               nod <- noDataDiscount(visit.isVisitor)
               day <- daylightDiscounts(visit.night)
               ovr <- overlapDiscounts
-              qa  <- qaDiscounts(visit)
+              qa  <- qaDiscounts
               // ... other discounts here ...
               fin <- StateT.get[F, TimeAccountingState]
             } yield TimeCharge.Invoice(ini.charge, nod ++ day ++ ovr ++ qa, fin.charge.corrected(corrections))
@@ -399,6 +423,44 @@ object TimeAccountingService {
             Applicative[F].unit
         }
       }
+
+      // Takes the observation's execution lock and invalidates obscalc before
+      // any visit row is touched, in the order invalidate_visit_time_accounting
+      // uses.  Then moves the visits to the current version and recomputes
+      // them right away, rather than leaving them dirty for updateAll, and
+      // records them as updated so that the obscalc worker doesn't redo them.
+      private def recalculate(
+        observationId: Observation.Id,
+        upgrade:       F[List[Visit.Id]]
+      )(using Transaction[F]): F[Unit] =
+        for
+          _    <- session.unique(SequenceService.Statements.LockObservationExecution)(observationId)
+          _    <- session.execute(InvalidateObscalc)(observationId)
+          vids <- upgrade
+          _    <- vids.traverse_ { vid =>
+                    Update(vid).run *> session.execute(MarkVisitRecomputed)(vid)
+                  }
+        yield ()
+
+      override def recalculateObservation(
+        observationId: Observation.Id
+      )(using Transaction[F], Services.StaffAccess): F[Unit] =
+        recalculate(
+          observationId,
+          session.execute(UpgradeObservationVisits)(TimeAccounting.version.Current, observationId)
+        )
+
+      override def recalculateVisit(
+        visitId: Visit.Id
+      )(using Transaction[F], Services.StaffAccess): F[Result[Observation.Id]] =
+        session.option(SelectObservationId)(visitId).flatMap:
+          case None      =>
+            OdbError.InvalidVisit(visitId, Some(s"Visit '$visitId' not found")).asFailureF
+          case Some(oid) =>
+            recalculate(
+              oid,
+              session.execute(UpgradeVisit)(TimeAccounting.version.Current, visitId)
+            ).as(oid.success)
 
       def addCorrection(
         visitId: Visit.Id,
@@ -505,7 +567,11 @@ object TimeAccountingService {
 
     // The observation's visits that are "dirty" (invalidated since their last
     // update), each with the invalidation timestamp to record once recomputed.
-    val SelectDirtyVisits: Query[Observation.Id, (Visit.Id, Timestamp)] =
+    // Visits on a newer version of the rules than the given one (the version
+    // this code implements) are left dirty for code that implements it, e.g.
+    // after a rollback.  Visits on an older version are selected and marked
+    // updated, though their frozen charge is left as it is.
+    val SelectDirtyVisits: Query[(Observation.Id, Short), (Visit.Id, Timestamp)] =
       sql"""
         SELECT
           c_visit_id,
@@ -514,6 +580,7 @@ object TimeAccountingService {
           t_visit
         WHERE
           c_observation_id  = $observation_id AND
+          c_ta_version     <= $int2           AND
           c_ta_invalidation > c_ta_update
       """.query(visit_id *: core_timestamp)
 
@@ -603,8 +670,9 @@ object TimeAccountingService {
     // was recorded for their charge.  Visits already awaiting a time
     // accounting update are skipped so that they are not invalidated again on
     // every sweep until the worker gets to them, as are visits with a
-    // correction.
-    val SelectRecentVisitorVisits: Query[Duration, (Visit.Id, Observation.Id, VisitInfo, Option[Timestamp])] =
+    // correction and frozen visits on another version of the rules, which
+    // the update would leave unchanged.
+    val SelectRecentVisitorVisits: Query[(Duration, Short), (Visit.Id, Observation.Id, VisitInfo, Option[Timestamp])] =
       sql"""
         SELECT
           v.c_visit_id,
@@ -622,6 +690,7 @@ object TimeAccountingService {
         WHERE
           i.c_is_visitor                         AND
           v.c_start > now() - $interval          AND
+          v.c_ta_version = $int2                 AND
           v.c_ta_invalidation <= v.c_ta_update   AND
           NOT EXISTS (
             SELECT 1
@@ -629,6 +698,47 @@ object TimeAccountingService {
             WHERE c.c_visit_id = v.c_visit_id
           )
       """.query(visit_id *: observation_id *: visit_info *: core_timestamp.opt)
+
+    val InvalidateObscalc: Command[Observation.Id] =
+      sql"""
+        CALL invalidate_obscalc($observation_id)
+      """.command
+
+    // Moves every visit of an observation to the given version (the one this
+    // code implements), returning the visits.  Their invalidation is bumped so
+    // that a time accounting update already under way elsewhere counts as out
+    // of date.  Visits on a newer version (e.g., after a rollback) are left
+    // alone rather than downgraded, as SelectDirtyVisits leaves them dirty.
+    val UpgradeObservationVisits: Query[(Short, Observation.Id), Visit.Id] =
+      sql"""
+        UPDATE t_visit
+           SET c_ta_version      = $int2,
+               c_ta_invalidation = now()
+         WHERE c_observation_id = $observation_id
+           AND c_ta_version    <= $int2
+     RETURNING c_visit_id
+      """.query(visit_id)
+         .contramap { case (v, o) => (v, o, v) }
+
+    // Moves one visit to the given version, as UpgradeObservationVisits does.
+    val UpgradeVisit: Query[(Short, Visit.Id), Visit.Id] =
+      sql"""
+        UPDATE t_visit
+           SET c_ta_version      = $int2,
+               c_ta_invalidation = now()
+         WHERE c_visit_id    = $visit_id
+           AND c_ta_version <= $int2
+     RETURNING c_visit_id
+      """.query(visit_id)
+         .contramap { case (v, vid) => (v, vid, v) }
+
+    // Records that a visit's time accounting reflects its latest invalidation.
+    val MarkVisitRecomputed: Command[Visit.Id] =
+      sql"""
+        UPDATE t_visit
+           SET c_ta_update = c_ta_invalidation
+         WHERE c_visit_id = $visit_id
+      """.command
 
     val InvalidateVisit: Command[(Visit.Id, Observation.Id)] =
       sql"""

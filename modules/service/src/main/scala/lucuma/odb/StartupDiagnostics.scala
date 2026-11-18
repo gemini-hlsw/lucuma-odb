@@ -6,10 +6,12 @@ package lucuma.odb
 import cats.data.NonEmptyList
 import cats.data.StateT
 import cats.effect.Concurrent
+import cats.syntax.all.*
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.util.Enumerated
 import lucuma.odb.StartupChecks.*
 import lucuma.odb.service.ObservationWorkflowService
+import lucuma.odb.service.TimeAccounting
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Flamingos2Codecs.flamingos_2_acquisition_type
 import lucuma.odb.util.GhostCodecs.ghost_ifu_mapping_type
@@ -17,7 +19,9 @@ import lucuma.odb.util.GmosCodecs.*
 import lucuma.odb.util.GnirsCodecs.*
 import org.typelevel.log4cats.Logger
 import skunk.Session
+import skunk.codec.numeric.int2
 import skunk.data.Type
+import skunk.syntax.all.*
 
 trait StartupDiagnostics[F[_]]:
 
@@ -199,10 +203,30 @@ object StartupDiagnostics:
           assertUnusedPostgresEnum(Type("e_source_profile_type")),
           assertUnusedPostgresEnum(Type("e_summary_job_state")),
 
+          // The time accounting rules
+          checkTimeAccountingVersion,
+
           // This should come last
           checkEnumCoverage,
 
         )
+
+      // The rules that the service implements must be the latest ones that the
+      // database knows about, or else visits would be computed under one
+      // version of the rules and recorded as another.
+      def checkTimeAccountingVersion: Check[F] =
+        StateT.modifyF: ds =>
+          db.unique(sql"SELECT current_time_accounting_version()".query(int2.opt)).map:
+            case Some(v) if v === TimeAccounting.version.Current =>
+              ds
+            case Some(v) =>
+              ds.updated(List(
+                s"Time accounting: the service implements rules version ${TimeAccounting.version.Current} but the latest version in t_time_accounting_version is $v."
+              ))
+            case None    =>
+              ds.updated(List(
+                s"Time accounting: t_time_accounting_version is empty, but the service implements rules version ${TimeAccounting.version.Current}."
+              ))
 
       def runAllDiagnostics(fatal: Boolean): F[Unit] =
         runChecks(allDiagnostics, fatal)

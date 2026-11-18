@@ -102,6 +102,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] with UserEnv {
       DeleteSequence,
       InsertSmartGcal,
       LinkUser,
+      RecalculateTimeAccounting,
       RecordDataset,
       RecordFlamingos2Visit,
       RecordGmosNorthVisit,
@@ -395,6 +396,21 @@ trait MutationMapping[F[_]] extends AccessControl[F] with UserEnv {
                   Predicates.cloneObservationResult.newObservation.id.eql(ids.cloneId),
                   child
                 )
+
+  private lazy val RecalculateTimeAccounting: MutationField =
+    MutationField("recalculateTimeAccounting", RecalculateTimeAccountingInput.Binding): (input, child) =>
+      services.useTransactionally:
+        requireStaffAccess:
+          val recalculated: F[Result[Observation.Id]] =
+            input match
+              case RecalculateTimeAccountingInput.ForVisit(vid)            =>
+                timeAccountingService.recalculateVisit(vid)
+              case RecalculateTimeAccountingInput.ForObservation(oid, ref) =>
+                Services.asSuperUser(observationService.resolveOid(oid, ref)).flatMap: r =>
+                  r.flatTraverse: oid =>
+                    timeAccountingService.recalculateObservation(oid).as(oid.success)
+          recalculated.nestMap: oid =>
+            Filter(Predicates.recalculateTimeAccountingResult.observation.id.eql(oid), child)
 
   private lazy val RefreshArchiveDuplication: MutationField =
     MutationField("refreshArchiveDuplication", RefreshArchiveDuplicationInput.Binding): (input, child) =>
