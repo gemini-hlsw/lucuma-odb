@@ -55,9 +55,6 @@ object Science:
   val ScienceCycleTitle: NonEmptyString =
     NonEmptyString.unsafeFrom("Science Cycle")
 
-  val DaytimePinholeTitle: NonEmptyString =
-    NonEmptyString.unsafeFrom("Daytime Pinhole")
-
   /**
    * The pinhole FPU used for a daytime pinhole flat, chosen by pixel scale:
    * the small pinhole for the long (0.05"/pix) cameras and the large pinhole
@@ -314,12 +311,7 @@ object Science:
     val distinctWavelengths: NonEmptyList[CentralWavelengthConfig] =
       NonEmptyList.fromListUnsafe(config.wavelengths.toList.distinctBy(_.centralWavelength))
 
-    val atoms: NonEmptyList[(NonEmptyString, ProtoStep[GnirsDynamicConfig])] =
-      distinctWavelengths
-        .zip(titleSuffixes(distinctWavelengths, config.wavelengths.length > 1))
-        .map((sw, suffix) => (AtomTitle(DaytimePinholeTitle, suffix), flat(sw)))
-
-    DaytimeSmartGcal.sequence(observationId, estimator, static, namespace, expander, Calibration.SpectroscopicFlat, atoms)
+    DaytimeSmartGcal.sequence(observationId, estimator, static, namespace, expander, Calibration.SpectroscopicFlat, distinctWavelengths.map(flat))
 
   def instantiate[F[_]: Monad](
     observationId: Observation.Id,

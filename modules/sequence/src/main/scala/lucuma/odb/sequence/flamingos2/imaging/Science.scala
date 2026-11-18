@@ -15,7 +15,6 @@ import cats.effect.Sync
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.PosInt
-import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Chunk
 import fs2.Pure
 import fs2.Stream
@@ -45,13 +44,10 @@ import lucuma.odb.sequence.imaging.ImagingSequence
 import lucuma.odb.sequence.imaging.Variant
 import lucuma.odb.sequence.util.DaytimeSmartGcal
 import lucuma.odb.sequence.util.definitionError
-import lucuma.refined.*
 
 import java.util.UUID
 
 object Science:
-
-  val DaytimeFlatTitle: NonEmptyString = "Daytime Flat".refined
 
   object ProtoSequences extends SequenceState[F2] with Flamingos2InitialDynamicConfig:
 
@@ -261,11 +257,7 @@ object Science:
     val filters: NonEmptyList[Flamingos2Filter] =
       config.filters.map(_.filter).distinct.sorted
 
-    def title(filter: Flamingos2Filter): NonEmptyString =
-      if filters.length > 1 then NonEmptyString.unsafeFrom(s"${DaytimeFlatTitle.value} ${filter.shortName}")
-      else DaytimeFlatTitle
-
-    DaytimeSmartGcal.sequence(observationId, estimator, static, namespace, expander, Calibration.ImagingFlat, filters.map(f => (title(f), flat(f))))
+    DaytimeSmartGcal.sequence(observationId, estimator, static, namespace, expander, Calibration.ImagingFlat, filters.map(flat))
 
   def flamingos2[F[_]: Sync](
     observationId: Observation.Id,

@@ -67,8 +67,6 @@ object Science:
    */
   val AbbaCycleTitle: NonEmptyString = "ABBA Cycle".refined
 
-  val MosMaskFlatTitle: NonEmptyString = "MOS Mask Flat".refined
-
   case class StepDefinition(
     a0:   ProtoStep[F2],
     b0:   ProtoStep[F2],
@@ -208,7 +206,7 @@ object Science:
         _ <- F2.reads       := Flamingos2ReadMode.Bright.readCount
         f <- StepDefinition.flatStep(TelescopeConfig(Offset.Zero, Disabled), ObserveClass.DayCal)
       yield f
-    DaytimeSmartGcal.sequence(observationId, estimator, static, namespace, expander, Calibration.ImagingFlat, NonEmptyList.one((MosMaskFlatTitle, flat)))
+    DaytimeSmartGcal.sequence(observationId, estimator, static, namespace, expander, Calibration.ImagingFlat, NonEmptyList.one(flat))
 
   /**
    * @param modeName observing mode name, for error messages
