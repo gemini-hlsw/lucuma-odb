@@ -69,9 +69,9 @@ sealed trait DatasetService[F[_]] {
   /**
    * Whether the visit has written science datasets and none of them passes
    * QA.  As in `v_observation_qa`, acquisition datasets and datasets that were
-   * never written (no end time) are ignored because nobody assesses them.  A
-   * dataset whose QA state hasn't been set counts as passing, but any state
-   * other than 'pass' does not.
+   * never written (no end time) are ignored because nobody assesses them.
+   * Whether a dataset passes is decided by the `dataset_qa_passes` SQL
+   * function.
    */
   def allScienceDatasetsFail(
     visitId: Visit.Id
@@ -247,7 +247,7 @@ object DatasetService {
     val AllScienceDatasetsFail: Query[Visit.Id, Boolean] =
       sql"""
         SELECT COALESCE(
-                 bool_and(d.c_qa_state IS NOT NULL AND d.c_qa_state <> 'pass'),
+                 bool_and(NOT dataset_qa_passes(d.c_qa_state)),
                  false
                )
           FROM t_dataset d
@@ -265,7 +265,7 @@ object DatasetService {
           FROM t_dataset d
     INNER JOIN t_step s
             ON s.c_step_id = d.c_step_id
-         WHERE (d.c_qa_state = 'fail' OR d.c_qa_state = 'usable')
+         WHERE NOT dataset_qa_passes(d.c_qa_state)
            AND d.c_visit_id = $visit_id
       """.query(atom_id *: dataset_id)
   }

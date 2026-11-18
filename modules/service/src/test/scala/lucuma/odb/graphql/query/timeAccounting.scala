@@ -43,6 +43,7 @@ import lucuma.core.model.sequence.TimeChargeCorrection
 import lucuma.core.syntax.string.*
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.CalculationState
+import lucuma.core.util.Enumerated
 import lucuma.core.util.Gid
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
@@ -50,8 +51,10 @@ import lucuma.core.util.TimestampInterval
 import lucuma.odb.data.TimeCharge
 import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.graphql.input.TimeChargeCorrectionInput
+import lucuma.odb.sequence.syntax.qastate.*
 import lucuma.odb.service.TimeAccounting
 import lucuma.odb.util.Codecs.*
+import skunk.codec.boolean.bool
 import skunk.codec.numeric.int2
 import skunk.codec.text.text
 import skunk.syntax.all.*
@@ -993,6 +996,40 @@ class timeAccounting extends OdbSuite with DatabaseOperations with ExecutionTest
 
   test("timeChargeInvoice (no passing data, initial version charges the pause)") {
     pausedAllFailedTest(TimeAccounting.version.Initial, 320)
+  }
+
+  test("dataset_qa_passes agrees with isPassing") {
+    def sqlPasses(qa: Option[DatasetQaState]): IO[Boolean] =
+      withSession(_.unique(sql"SELECT dataset_qa_passes(${dataset_qa_state.opt})".query(bool))(qa))
+
+    (none[DatasetQaState] :: Enumerated[DatasetQaState].all.map(_.some)).traverse_ { qa =>
+      assertIO(sqlPasses(qa), DatasetQaState.orPassing(qa).isPassing)
+    }
+  }
+
+  test("a dataset QA change invalidates time accounting only when passing changes") {
+    def isDirty(vid: Visit.Id): IO[Boolean] =
+      withSession(_.unique(sql"SELECT c_ta_invalidation > c_ta_update FROM t_visit WHERE c_visit_id = $visit_id".query(bool))(vid))
+
+    for {
+      v   <- recordVisit(pi, serviceUser, mode, visitTime, 1, 1, 1, 360)
+      dids = v.atoms.flatMap(_.steps.flatMap(_.dids))
+      _   <- runTimeAccounting(v.oid)
+      _   <- assertIO(isDirty(v.vid), false)
+
+      // Unassessed -> fail stops passing.
+      _   <- updateDatasets(staff, DatasetQaState.Fail, dids)
+      _   <- assertIO(isDirty(v.vid), true)
+      _   <- runTimeAccounting(v.oid)
+
+      // Fail -> usable fails either way.
+      _   <- updateDatasets(staff, DatasetQaState.Usable, dids)
+      _   <- assertIO(isDirty(v.vid), false)
+
+      // Usable -> pass starts passing.
+      _   <- updateDatasets(staff, DatasetQaState.Pass, dids)
+      _   <- assertIO(isDirty(v.vid), true)
+    } yield ()
   }
 
   test("new visits use the current time accounting version") {
