@@ -26,6 +26,7 @@ import lucuma.odb.data.MaskDefinition
 import lucuma.odb.json.maskDefinition.given
 import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.util.Codecs.*
+import org.http4s.MediaType
 import org.typelevel.otel4s.trace.Tracer
 import skunk.*
 import skunk.circe.codec.all.*
@@ -38,12 +39,13 @@ import Services.Syntax.*
 
 trait AttachmentFileService[F[_]] {
   import AttachmentFileService.AttachmentException
+  import AttachmentFileService.AttachmentFile
 
-  /** Retrieves the given file from S3 as a stream. */
+  /** Retrieves the given file from S3 as a stream, with its file name. */
   def getAttachment(
     user:         User,
     attachmentId: Attachment.Id
-  )(using NoTransaction[F]): F[Either[AttachmentException, Stream[F, Byte]]]
+  )(using NoTransaction[F]): F[Either[AttachmentException, AttachmentFile[F]]]
 
   /** Uploads the file to S3 and addes it to the database */
   def insertAttachment(
@@ -101,6 +103,36 @@ object AttachmentFileService {
   }
 
   import AttachmentException.*
+
+  /** The contents of an attachment, and the name of the file they came from. */
+  case class AttachmentFile[F[_]](fileName: NonEmptyString, data: Stream[F, Byte])
+
+  /**
+   * What the database knows about where an attachment is.  The remote path is
+   * the internal S3 key; the file name is the one the user gave.  They are
+   * named fields so that one cannot be used in place of the other.
+   */
+  case class AttachmentInfo(
+    programId:      Program.Id,
+    attachmentType: AttachmentType,
+    remotePath:     NonEmptyString,
+    fileName:       NonEmptyString
+  )
+
+  /**
+   * The media type a download of the named file claims, from its extension.
+   * Only the extensions that some attachment type accepts are recognized.
+   * Every other file is an opaque `application/octet-stream`, so that a
+   * download never claims to be HTML, SVG or another type a browser can run.
+   */
+  def downloadMediaType(fileName: NonEmptyString): MediaType =
+    FileName(fileName).extName.map(_.value) match
+      case Some("pdf")                 => MediaType.application.pdf
+      case Some("jpg" | "jpeg")        => MediaType.image.jpeg
+      case Some("png")                 => MediaType.image.png
+      case Some("fits")                => MediaType.application.fits
+      case Some("sed" | "txt" | "dat") => MediaType.text.plain
+      case _                           => MediaType.application.`octet-stream`
 
   /**
    * Attachments the ODB generates for itself rather than accepting from a user.
@@ -328,7 +360,7 @@ object AttachmentFileService {
 
     def getAttachmentInfoFromDB(
       attachmentId: Attachment.Id
-    ): F[Either[AttachmentException, (Program.Id, NonEmptyString)]] =
+    ): F[Either[AttachmentException, AttachmentInfo]] =
         session
           .option(Statements.GetAttachmentInfo)(attachmentId)
           .map(_.toRight(FileNotFound))
@@ -337,11 +369,11 @@ object AttachmentFileService {
       user:         User,
       attachmentId: Attachment.Id,
       required: AccessRequired
-    )(using Services[F], Transaction[F]): EitherT[F, AttachmentException, (Program.Id, NonEmptyString)] =
+    )(using Services[F], Transaction[F]): EitherT[F, AttachmentException, AttachmentInfo] =
       for {
-        (pid, path) <- getAttachmentInfoFromDB(attachmentId).asEitherT
-        _           <- checkAccess(user, pid, required, FileNotFound)
-      } yield (pid, path)
+        info <- getAttachmentInfoFromDB(attachmentId).asEitherT
+        _    <- checkAccess(user, info.programId, required, FileNotFound)
+      } yield info
 
     def deleteAttachmentFromDB(
       attachmentId: Attachment.Id
@@ -387,13 +419,6 @@ object AttachmentFileService {
               .map(_.fold(().asRight)(_ => InvalidRequest(duplicateMaskNameMsg(mn)).asLeft))
           )
       }
-
-    def getAttachmentTypeById(
-      attachmentId: Attachment.Id
-    ): F[Either[AttachmentException, AttachmentType]] =
-      session
-        .option(Statements.GetAttachmentTypeById)(attachmentId)
-        .map(_.toRight(FileNotFound))
 
     def validateFileExtensionByType(
       attachmentType: AttachmentType,
@@ -453,13 +478,13 @@ object AttachmentFileService {
       def getAttachment(
         user:         User,
         attachmentId: Attachment.Id
-      )(using NoTransaction[F]): F[Either[AttachmentException, Stream[F, Byte]]] =
+      )(using NoTransaction[F]): F[Either[AttachmentException, AttachmentFile[F]]] =
         (for {
-          path <- services.transactionallyEitherT {
-                      getAttachmentInfoAndCheckAccess(user, attachmentId, AccessRequired.Read).map(_._2)
+          info <- services.transactionallyEitherT {
+                    getAttachmentInfoAndCheckAccess(user, attachmentId, AccessRequired.Read)
                   }
-          res  <- Services.asSuperUser(s3FileSvc.verifyAndGet(path)).right
-        } yield res).value
+          res  <- Services.asSuperUser(s3FileSvc.verifyAndGet(info.remotePath)).right
+        } yield AttachmentFile(info.fileName, res)).value
           .recoverWith { case e: AttachmentException =>
             e.asLeft.pure
           }
@@ -530,14 +555,13 @@ object AttachmentFileService {
             fn                 <- FileName.fromString(fileName).liftF
             (pid, at, mn, oldPath) <- services.transactionallyEitherT {
                 for {
-                  (pid, oldPath) <- getAttachmentInfoAndCheckAccess(user, attachmentId, AccessRequired.Write)
-                  at             <- getAttachmentTypeById(attachmentId).asEitherT
-                  _              <- checkNotOdbGenerated(at).liftF
-                  _              <- checkExtension(fn, at.fileExtensions).liftF
-                  mn             <- deriveMaskName(at, fn).liftF
-                  _              <- checkForDuplicateName(pid, fn, attachmentId.some).asEitherT
-                  _              <- checkForDuplicateMaskName(pid, mn, attachmentId.some).asEitherT
-                } yield (pid, at, mn, oldPath)
+                  info <- getAttachmentInfoAndCheckAccess(user, attachmentId, AccessRequired.Write)
+                  _    <- checkNotOdbGenerated(info.attachmentType).liftF
+                  _    <- checkExtension(fn, info.attachmentType.fileExtensions).liftF
+                  mn   <- deriveMaskName(info.attachmentType, fn).liftF
+                  _    <- checkForDuplicateName(info.programId, fn, attachmentId.some).asEitherT
+                  _    <- checkForDuplicateMaskName(info.programId, mn, attachmentId.some).asEitherT
+                } yield (info.programId, info.attachmentType, mn, info.remotePath)
               }
             uuid               <- UUIDGen[F].randomUUID.right
             newPath            = Services.asSuperUser(filePath(pid, uuid, fn.value))
@@ -575,11 +599,10 @@ object AttachmentFileService {
         (for {
           path <- services.transactionallyEitherT {
               for {
-                (_, path) <- getAttachmentInfoAndCheckAccess(user, attachmentId, AccessRequired.Write)
-                at        <- getAttachmentTypeById(attachmentId).asEitherT
-                _         <- checkNotOdbGenerated(at).liftF
-                _         <- deleteAttachmentFromDB(attachmentId).asEitherT
-              } yield path
+                info <- getAttachmentInfoAndCheckAccess(user, attachmentId, AccessRequired.Write)
+                _    <- checkNotOdbGenerated(info.attachmentType).liftF
+                _    <- deleteAttachmentFromDB(attachmentId).asEitherT
+              } yield info.remotePath
             }
           res  <-
             // We'll trap errors from the remote delete because, although not ideal, we don't
@@ -591,13 +614,12 @@ object AttachmentFileService {
         NoTransaction[F]
       ): F[Either[AttachmentException, String]] =
         (for {
-          (path, at) <- services.transactionallyEitherT {
-                          for {
-                            (_, path) <- getAttachmentInfoAndCheckAccess(user, attachmentId, AccessRequired.Read)
-                            at        <- getAttachmentTypeById(attachmentId).asEitherT
-                          } yield (path, at)
-                        }
-          res        <- Services.asSuperUser(s3FileSvc.presignedUrl(path, at.presignHeaders)).right
+          info <- services.transactionallyEitherT {
+                    getAttachmentInfoAndCheckAccess(user, attachmentId, AccessRequired.Read)
+                  }
+          res  <- Services.asSuperUser(
+                    s3FileSvc.presignedUrl(info.remotePath, info.attachmentType.presignHeaders)
+                  ).right
         } yield res).value
 
     }
@@ -649,12 +671,12 @@ object AttachmentFileService {
         RETURNING true
       """.query(bool)
 
-    val GetAttachmentInfo: Query[Attachment.Id, (Program.Id, NonEmptyString)] =
+    val GetAttachmentInfo: Query[Attachment.Id, AttachmentInfo] =
       sql"""
-        SELECT c_program_id, c_remote_path
+        SELECT c_program_id, c_attachment_type, c_remote_path, c_file_name
         FROM t_attachment
         WHERE c_attachment_id = $attachment_id
-      """.query(program_id *: text_nonempty)
+      """.query(program_id *: attachment_type *: text_nonempty *: text_nonempty).to[AttachmentInfo]
 
     def checkForDuplicateName(
       programId:    Program.Id,
@@ -700,12 +722,5 @@ object AttachmentFileService {
         WHERE c_attachment_id = $attachment_id
         RETURNING c_remote_path
       """.query(text_nonempty)
-
-    val GetAttachmentTypeById: Query[Attachment.Id, AttachmentType] =
-      sql"""
-        SELECT c_attachment_type
-        FROM t_attachment
-        WHERE c_attachment_id = $attachment_id
-      """.query(attachment_type)
   }
 }

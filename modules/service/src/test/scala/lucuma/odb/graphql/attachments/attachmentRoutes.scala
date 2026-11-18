@@ -12,25 +12,29 @@ import lucuma.core.enums.AttachmentType
 import lucuma.core.model.Attachment
 import lucuma.core.model.Program
 import lucuma.core.model.User
+import lucuma.core.util.Enumerated
 import lucuma.odb.service.AttachmentFileService
 import lucuma.odb.service.AttachmentFileService.AttachmentException
+import lucuma.odb.service.AttachmentFileService.AttachmentFile
 import lucuma.odb.service.NoTransaction
 import lucuma.refined.*
 import lucuma.sso.client.SsoClient
 import org.http4s.*
 import org.http4s.headers.Authorization
 import org.http4s.implicits.*
+import org.typelevel.ci.*
 
 class attachmentRoutes extends AttachmentRoutesSuite {
 
   private val attachmentId    = Attachment.Id(5.refined)
+  private val fileName        = NonEmptyString.unsafeFrom("finder.png")
 
   private val service: AttachmentFileService[IO] = new AttachmentFileService[IO] {
     def getAttachment(
       user:         User,
       attachmentId: Attachment.Id
-    )(using NoTransaction[IO]): IO[Either[AttachmentException, Stream[IO, Byte]]] = {
-      val either = getError(user).fold(responseStream(fileContents).asRight)(_.asLeft)
+    )(using NoTransaction[IO]): IO[Either[AttachmentException, AttachmentFile[IO]]] = {
+      val either = getError(user).fold(AttachmentFile(fileName, responseStream(fileContents)).asRight)(_.asLeft)
       IO(either)
     }
 
@@ -147,6 +151,52 @@ class attachmentRoutes extends AttachmentRoutesSuite {
       val request =
         Request[IO](method = Method.GET, uri = uri"attachment/a-1", headers = hs)
       routes.run(request).assertResponse(Status.Ok, fileContents.some)
+  }
+
+  test("valid GET sends a type, forbids sniffing and asks for a download") {
+    headers(pi).flatMap: hs =>
+      val request =
+        Request[IO](method = Method.GET, uri = uri"attachment/a-1", headers = hs)
+      routes.run(request).map: resp =>
+        assertEquals(resp.headers.headerValue(ci"Content-Type"), "image/png".some)
+        assertEquals(resp.headers.headerValue(ci"X-Content-Type-Options"), "nosniff".some)
+        assertEquals(resp.headers.headerValue(ci"Content-Disposition"), "attachment; filename=\"finder.png\"".some)
+  }
+
+  test("download headers cannot be broken out of by the file name") {
+    val hostile = NonEmptyString.unsafeFrom("a\"b\r\nSet-Cookie: x=1;\u00e9.png")
+    val value   = AttachmentRoutes.downloadHeaders(hostile).headerValue(ci"Content-Disposition")
+    assertEquals(
+      value,
+      "attachment; filename=\"a?b??Set-Cookie: x=1;?.png\"; filename*=UTF-8''a%22b%0D%0ASet-Cookie%3A%20x%3D1%3B%C3%A9.png".some
+    )
+  }
+
+  private def downloadContentType(fileName: String): Option[String] =
+    AttachmentRoutes.downloadHeaders(NonEmptyString.unsafeFrom(fileName)).headerValue(ci"Content-Type")
+
+  test("download content type for each accepted extension") {
+    List(
+      "f.jpg"  -> "image/jpeg",
+      "f.jpeg" -> "image/jpeg",
+      "f.png"  -> "image/png",
+      "f.fits" -> "application/fits",
+      "f.pdf"  -> "application/pdf",
+      "f.sed"  -> "text/plain; charset=UTF-8",
+      "f.txt"  -> "text/plain; charset=UTF-8",
+      "f.dat"  -> "text/plain; charset=UTF-8"
+    ).foreach: (n, mediaType) =>
+      assertEquals(downloadContentType(n), mediaType.some, n)
+  }
+
+  test("every extension an attachment type accepts has a download content type") {
+    Enumerated[AttachmentType].all.flatMap(_.fileExtensions).foreach: ext =>
+      assertNotEquals(downloadContentType(s"f.${ext.value}"), "application/octet-stream".some, ext.value)
+  }
+
+  test("download of an unrecognized extension is an opaque octet stream") {
+    List("page.html", "image.svg", "noextension", "script.js").foreach: n =>
+      assertEquals(downloadContentType(n), "application/octet-stream".some, n)
   }
 
   test("valid GETurl returns url") {

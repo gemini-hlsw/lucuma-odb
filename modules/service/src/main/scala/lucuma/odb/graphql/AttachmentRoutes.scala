@@ -24,13 +24,18 @@ import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.AttachmentFileService
 import lucuma.odb.service.AttachmentFileService.AttachmentException
+import lucuma.odb.service.AttachmentFileService.downloadMediaType
 import lucuma.odb.service.S3FileService
 import lucuma.odb.service.Services
 import lucuma.sso.client.SsoClient
 import org.http4s.*
 import org.http4s.client.Client
 import org.http4s.dsl.Http4sDsl
+import org.http4s.headers.`Content-Disposition`
+import org.http4s.headers.`Content-Type`
+import org.http4s.headers.`X-Content-Type-Options`
 import org.http4s.server.middleware.EntityLimiter
+import org.typelevel.ci.*
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.LoggerFactory
 import org.typelevel.otel4s.trace.Tracer
@@ -40,6 +45,21 @@ object AttachmentRoutes {
   object AttachmentId {
     def unapply(str: String): Option[Attachment.Id] = Attachment.Id.parse(str)
   }
+
+  /**
+   * Headers for a download of a user-uploaded file.  The files are served from
+   * the API origin, so a browser must neither guess their type nor show them
+   * inline: an HTML page uploaded under an image name would otherwise run as a
+   * page of this origin.  A text type names UTF-8, so that a browser does not
+   * guess the charset either.
+   */
+  def downloadHeaders(fileName: NonEmptyString): Headers =
+    val mediaType = downloadMediaType(fileName)
+    Headers(
+      `Content-Type`(mediaType, Option.when(mediaType.isText)(Charset.`UTF-8`)),
+      `X-Content-Type-Options`.nosniff: `X-Content-Type-Options`,
+      `Content-Disposition`("attachment", Map(ci"filename" -> fileName.value))
+    )
 
   // the normal constructor
   def apply[F[_]: Async: Parallel: Logger: LoggerFactory: Tracer: SecureRandom](
@@ -133,7 +153,7 @@ object AttachmentRoutes {
         ssoClient.require(req) { user =>
           service(user) { s =>
             s.getAttachment(user, attachmentId)
-              .toResponse(s => Response(Status.Ok, body = s).pure)
+              .toResponse(f => Response[F](Status.Ok, headers = downloadHeaders(f.fileName), body = f.data).pure)
           }
         }
 
