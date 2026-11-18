@@ -1346,6 +1346,7 @@ lazy val resourceService = project
       "org.scalameta" %% "munit"                                 % munitVersion                 % Test,
       "org.typelevel" %% "munit-cats-effect"                     % munitCatsEffectVersion       % Test,
       "org.typelevel" %% "scalacheck-effect-munit"               % scalacheckEffectMunitVersion % Test,
+      "org.typelevel" %% "log4cats-testing"                      % log4catsVersion              % Test,
       "org.http4s"    %% "http4s-jdk-http-client"                % http4sJdkHttpClientVersion   % Test,
       "edu.gemini"    %% "clue-http4s"                           % clueVersion                  % Test
     ),

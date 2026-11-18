@@ -35,9 +35,9 @@ To run the server locally, export the variables in `resource/.env` first, for ex
 
 **Editing the GraphQL schema needs a clean build.** `GraphQlRoutes.loadSchema` calls `SchemaStitcher.load`, which is an inline macro. The macro bakes the stitched schema text into the class at compile time. The incremental compiler does not track the `.graphql` file. After you edit `resource.graphql`, run `sbt resourceService/clean` before you compile or test. Without the clean, the server runs the old schema and reports errors such as "Unknown field(s)".
 
-**Never copy ODB or SSO code into `resource/`.** If a helper exists in `modules/service`, `modules/sso-service`, or `modules/binding`, move it to `modules/schema` (cross JVM and JS, no grackle) or `modules/common-middleware` (JVM, grackle-core). Keep the original package name when you move it. `resourceService` must never depend on the ODB `service` project.
+**Never copy ODB or SSO code into `resource/`.** If a helper exists in `modules/service`, `modules/sso-service`, move it to `modules/schema` (cross JVM and JS, no grackle), `modules/binding` or `modules/common-middleware` (JVM, grackle-core). Keep the original package name when you move it. `resourceService` must never depend on the ODB `service` project.
 
-**Each enum has three spellings.** The Scala case (`TooSupport.Standard`), the Scala tag and Postgres enum label (`'Standard'`), and the GraphQL value (`STANDARD`). The migration comment says: enum members spell the Scala `Enumerated` tags. `Codecs.enumerated(Type("e_..."))` maps by tag. Test seeds insert the tag, and test queries use the GraphQL value.
+**Each enum has three spellings.** The Scala case (`TooSupport.Standard`), the Scala tag and Postgres enum label (`'Standard'`), and the GraphQL value (`STANDARD`). The migration comment says: enum members spell the Scala `Enumerated` tags. `Codecs.enumerated(Type("e_..."))` maps by tag. A new Postgres enum needs a codec in `Codecs` and a `checkPostgresEnum` line in `StartupDiagnostics`, or the server refuses to start. Test seeds insert the tag, and test queries use the GraphQL value.
 
 **Blocks have no id.** Every query can clip a block to the requested window, so no id stays stable. The mapping keeps `_id`, `_start`, and `_end` as hidden fields for ordering and clipping only.
 
@@ -45,9 +45,9 @@ To run the server locally, export the variables in `resource/.env` first, for ex
 
 Three layers, all in `resource/service/src/main/scala/resource/server/`:
 
-- `http4s/`: `ResourceMain` loads config with ciris, runs Flyway, opens a skunk pool, and mounts routes. `/` serves static files and `/resource` serves GraphQL over HTTP and WebSocket. `ServerMiddleware` adds CORS, GZip, and OpenTelemetry. Authentication comes from `lucuma.common.middleware.UserContext` and the SSO client.
+- `http4s/`: `ResourceMain` loads config with ciris, runs Flyway, runs the startup diagnostics, opens a skunk pool, and mounts routes. The diagnostics (`StartupDiagnostics`) check every Postgres enum against its codec in `Codecs`, then fail for any Postgres enum that no check covers. Any failure is logged and stops the server. `/` serves static files and `/resource` serves GraphQL over HTTP and WebSocket. `ServerMiddleware` adds CORS, GZip, and OpenTelemetry. Authentication comes from `lucuma.common.middleware.UserContext` and the SSO client.
 - `graphql/`: `ResourceMapping` is a grackle `SkunkMapping`. It mixes in one trait per concern and combines them in `typeMappings` and `selectElaborator`. `BaseMapping` holds every `schema.ref(...)`, the `MaxWindow` limit of 400 days, and `validateWindow`. `graphql/table/` holds the `TableDef` objects. `BlockTable` is the shared column set of every block table.
-- Root package: `Codecs` (skunk codecs, extends the shared `CoreCodecs`), `NightProjection`, and `ComponentCatalog`.
+- Root package: `Codecs` (skunk codecs, extends the shared `CoreCodecs`), `StartupDiagnostics`, `NightProjection`, and `ComponentCatalog`.
 
 `resource/model/` holds the `Enumerated` enums and the ciris config case classes. It depends on `modules/schema`, `modules/otel`, and the SSO client. Keep it free of grackle and skunk.
 

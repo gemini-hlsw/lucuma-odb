@@ -58,9 +58,10 @@ object ResourceTestDb:
           .withDockerfile(dockerPath)
           .withBuildArgs(dbImageEnv.asJava)
 
-trait ServerFixtures extends munit.CatsEffectSuite with ResourceBaseSuite with TestContainerForAll:
-
-  override def munitFixtures = super.munitFixtures ++ List(serverFixture)
+trait DatabaseFixtures
+    extends munit.CatsEffectSuite
+    with ResourceBaseSuite
+    with TestContainerForAll:
 
   /**
    * A PostgreSQL container from an image with all migrations already applied at image-build time
@@ -82,8 +83,6 @@ trait ServerFixtures extends munit.CatsEffectSuite with ResourceBaseSuite with T
 
   override def afterContainersStart(c: Containers): Unit =
     container = c.asInstanceOf[GenericContainer]
-
-  lazy val serverFixture: IOFixture[Server] = ResourceSuiteLocalFixture("server", server)
 
   def session: Resource[IO, Session[IO]] =
     given TracerProvider[IO] = TracerProvider.noop
@@ -109,6 +108,12 @@ trait ServerFixtures extends munit.CatsEffectSuite with ResourceBaseSuite with T
       resetDatabase = false,
       skipMigration = true // migrations are baked into the container image
     )
+
+trait ServerFixtures extends DatabaseFixtures:
+
+  override def munitFixtures = super.munitFixtures ++ List(serverFixture)
+
+  lazy val serverFixture: IOFixture[Server] = ResourceSuiteLocalFixture("server", server)
 
   private def server: Resource[IO, Server] =
     for
