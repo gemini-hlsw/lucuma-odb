@@ -28,11 +28,27 @@ object TimeAccounting {
     )
 
   object comment {
-    val NoData: String   = "Time spent during a visit in which no dataset sets were collected."
-    val Overlap: String  = "Time spent observing after an overlapping chargeable observation started."
-    val PreDusk: String  = "Time spent observing pre-dusk (nautical twilight)."
-    val PostDawn: String = "Time spent observing post-dawn (nautical twilight)."
-    val Qa: String       = "Time spent observing atoms with one or more datasets that don't pass QA."
+    val NoData: String        = "Time spent during a visit in which no dataset sets were collected."
+    val NoPassingData: String = "Time spent during a visit in which no datasets pass QA."
+    val Overlap: String       = "Time spent observing after an overlapping chargeable observation started."
+    val PreDusk: String       = "Time spent observing pre-dusk (nautical twilight)."
+    val PostDawn: String      = "Time spent observing post-dawn (nautical twilight)."
+    val Qa: String            = "Time spent observing atoms with one or more datasets that don't pass QA."
+  }
+
+  /**
+   * Versions of the time accounting rules.  Each visit records the version in
+   * effect when it was created (`t_visit.c_ta_version`), so that a change to the
+   * rules does not reprice visits that were already charged.
+   */
+  object version {
+
+    /** Only the atoms with datasets that don't pass QA are discounted. */
+    val Initial: Short = 1
+
+    /** In addition, a visit in which no dataset passes QA is not charged. */
+    val NoPassingData: Short = 2
+
   }
 
   /**

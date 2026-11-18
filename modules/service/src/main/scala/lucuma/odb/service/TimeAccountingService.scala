@@ -32,6 +32,7 @@ import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.codec.boolean.bool
+import skunk.codec.numeric.int2
 import skunk.codec.numeric.int8
 import skunk.codec.temporal.interval
 import skunk.codec.text.text
@@ -167,12 +168,15 @@ object TimeAccountingService {
    * @param lastEvent time of the visit's last execution event, if any
    * @param nextVisitStart start of the next chargeable visit at the same site,
    *                       if any (only looked up for visitor visits)
+   * @param version version of the time accounting rules that apply to the
+   *                visit (see `TimeAccounting.version`)
    */
   case class VisitInfo(
     isVisitor:      Boolean,
     night:          ObservingNight,
     lastEvent:      Option[Timestamp],
-    nextVisitStart: Option[Timestamp]
+    nextVisitStart: Option[Timestamp],
+    version:        Short
   ) {
 
     /**
@@ -308,17 +312,39 @@ object TimeAccountingService {
                 case None                     =>
                   (tas, Nil)
 
-        private val qaDiscounts: StateT[F, TimeAccountingState, List[TimeCharge.DiscountEntry]] =
+        // Each atom with a dataset that doesn't pass QA is discounted.  From
+        // version `NoPassingData` on, when no science dataset in the visit
+        // passes QA whatever remains (e.g., time between atoms while the
+        // sequence was paused) is discounted too.  The remainder is discounted
+        // one run of adjacent intervals at a time so that no discount spans
+        // time already discounted otherwise.
+        private def qaDiscounts(visit: VisitInfo): StateT[F, TimeAccountingState, List[TimeCharge.DiscountEntry]] =
           StateT { tas =>
-            datasetService.selectDatasetsWithQaFailures(visitId).map { failures =>
-              failures.toList.foldLeft((tas, List.empty[TimeCharge.DiscountEntry])) { case ((state, discounts), (atomId, datasets)) =>
-                val (in, out) = state.partitionOnAtom(atomId)
-                val discount  = toDiscount(in, TimeAccounting.comment.Qa).map { d =>
-                  TimeCharge.DiscountEntry.Qa(d, datasets.toSet)
+            for
+              failures <- datasetService.selectDatasetsWithQaFailures(visitId)
+              // Without a failing dataset (as is always the case for visitor
+              // visits, which have no datasets) every science dataset passes
+              // or is unassessed, so there's no need to ask.
+              allFail  <- if visit.version >= TimeAccounting.version.NoPassingData && failures.nonEmpty
+                          then datasetService.allScienceDatasetsFail(visitId)
+                          else false.pure[F]
+            yield
+              val (rest, perAtom) =
+                failures.foldLeft((tas, List.empty[TimeCharge.DiscountEntry])) { case ((state, discounts), (atomId, datasets)) =>
+                  val (in, out) = state.partitionOnAtom(atomId)
+                  val discount  = toDiscount(in, TimeAccounting.comment.Qa).map { d =>
+                    TimeCharge.DiscountEntry.Qa(d, datasets.toSet)
+                  }
+                  (out, discount.fold(discounts)(_ :: discounts))
                 }
-                (out, discount.fold(discounts)(_ :: discounts))
-              }
-            }
+
+              if allFail then
+                val datasets  = failures.flatMap(_._2).toSet
+                val remainder = rest.contiguous.flatMap { run =>
+                  toDiscount(run, TimeAccounting.comment.NoPassingData).map(TimeCharge.DiscountEntry.Qa(_, datasets))
+                }
+                (TimeAccountingState.Empty, remainder ++ perAtom)
+              else (rest, perAtom)
           }
 
         private def computeInvoice(
@@ -331,7 +357,7 @@ object TimeAccountingService {
               nod <- noDataDiscount(visit.isVisitor)
               day <- daylightDiscounts(visit.night)
               ovr <- overlapDiscounts
-              qa  <- qaDiscounts
+              qa  <- qaDiscounts(visit)
               // ... other discounts here ...
               fin <- StateT.get[F, TimeAccountingState]
             } yield TimeCharge.Invoice(ini.charge, nod ++ day ++ ovr ++ qa, fin.charge.corrected(corrections))
@@ -551,9 +577,9 @@ object TimeAccountingService {
       """
 
     private val visit_info: Decoder[VisitInfo] =
-      (bool *: site *: core_timestamp *: core_timestamp.opt *: core_timestamp.opt).map:
-        case (isVisitor, site, time, last, next) =>
-          VisitInfo(isVisitor, ObservingNight.fromSiteAndInstant(site, time.toInstant), last, next)
+      (bool *: site *: core_timestamp *: core_timestamp.opt *: core_timestamp.opt *: int2).map:
+        case (isVisitor, site, time, last, next, version) =>
+          VisitInfo(isVisitor, ObservingNight.fromSiteAndInstant(site, time.toInstant), last, next, version)
 
     // The next visit only matters for visitor visits, so it isn't looked up
     // for the others.
@@ -564,7 +590,8 @@ object TimeAccountingService {
           v.c_site,
           v.c_effective_time,
           v.c_end,
-          CASE WHEN i.c_is_visitor THEN $NextVisitStart END
+          CASE WHEN i.c_is_visitor THEN $NextVisitStart END,
+          v.c_ta_version
         FROM
           t_visit v
         INNER JOIN t_instrument i ON i.c_tag = v.c_instrument
@@ -587,6 +614,7 @@ object TimeAccountingService {
           v.c_effective_time,
           v.c_end,
           $NextVisitStart,
+          v.c_ta_version,
           v.c_ta_visitor_end
         FROM
           t_instrument i

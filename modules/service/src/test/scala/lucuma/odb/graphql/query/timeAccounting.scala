@@ -43,6 +43,7 @@ import lucuma.core.model.sequence.TimeChargeCorrection
 import lucuma.core.syntax.string.*
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.CalculationState
+import lucuma.core.util.Gid
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
@@ -51,6 +52,8 @@ import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.graphql.input.TimeChargeCorrectionInput
 import lucuma.odb.service.TimeAccounting
 import lucuma.odb.util.Codecs.*
+import skunk.codec.numeric.int2
+import skunk.codec.text.text
 import skunk.syntax.all.*
 
 import java.time.Duration
@@ -786,6 +789,217 @@ class timeAccounting extends OdbSuite with DatabaseOperations with ExecutionTest
       _ <- expect(pi, invoiceQuery(v.oid), invoiceExected(invoice(v), Nil))
     } yield ()
 
+  }
+
+  // Marks the datasets written, as recording an EndWrite dataset event through
+  // the API would.  Only written datasets are considered by the no passing data
+  // rule.
+  def markWritten(dids: List[Dataset.Id], when: Timestamp): IO[Unit] =
+    withSession: s =>
+      s.transaction.use: _ =>
+        // The dataset update audit trigger records the user.
+        s.unique(sql"select set_config('lucuma.user', $text, true)".query(text))(Gid[User.Id].show(serviceUser.id)) >>
+        dids.traverse_ : did =>
+          s.execute(sql"""
+            UPDATE t_dataset
+               SET c_start_time = $core_timestamp,
+                   c_end_time   = $core_timestamp
+             WHERE c_dataset_id = $dataset_id
+          """.command)((when, when, did)).void
+
+  // Two atoms, each with one failing dataset, and the sequence paused between
+  // them.  The paused time [ts(5), ts(26)) belongs to neither atom.
+  private def pausedAllFailedTest(version: Short, index: Int): IO[Unit] = {
+
+    val ts = (0 until 32).map(_.fromNightStart)
+
+    def events(v: VisitNode): List[ExecutionEvent] = {
+
+      val aid0 = v.atoms.head.aid
+      val sid0 = v.atoms.head.steps.head.sid
+      val did0 = v.atoms.head.steps.head.dids.head
+
+      val aid1 = v.atoms.last.aid
+      val sid1 = v.atoms.last.steps.head.sid
+      val did1 = v.atoms.last.steps.head.dids.head
+
+      List(
+        AtomEvent(    EventId, ts( 0), v.oid, v.vid, none, aid0,             AtomStage.StartAtom),
+        StepEvent(    EventId, ts( 1), v.oid, v.vid, none, aid0, sid0,       StepStage.StartStep),
+        DatasetEvent( EventId, ts( 2), v.oid, v.vid, none, aid0, sid0, did0, DatasetStage.StartExpose),
+        DatasetEvent( EventId, ts( 3), v.oid, v.vid, none, aid0, sid0, did0, DatasetStage.EndWrite),
+        StepEvent(    EventId, ts( 4), v.oid, v.vid, none, aid0, sid0,       StepStage.EndStep),
+        AtomEvent(    EventId, ts( 5), v.oid, v.vid, none, aid0,             AtomStage.EndAtom),
+
+        SequenceEvent(EventId, ts( 6), v.oid, v.vid, none, SequenceCommand.Pause),
+        SequenceEvent(EventId, ts(25), v.oid, v.vid, none, SequenceCommand.Continue),
+
+        AtomEvent(    EventId, ts(26), v.oid, v.vid, none, aid1,             AtomStage.StartAtom),
+        StepEvent(    EventId, ts(27), v.oid, v.vid, none, aid1, sid1,       StepStage.StartStep),
+        DatasetEvent( EventId, ts(28), v.oid, v.vid, none, aid1, sid1, did1, DatasetStage.StartExpose),
+        DatasetEvent( EventId, ts(29), v.oid, v.vid, none, aid1, sid1, did1, DatasetStage.EndWrite),
+        StepEvent(    EventId, ts(30), v.oid, v.vid, none, aid1, sid1,       StepStage.EndStep),
+        AtomEvent(    EventId, ts(31), v.oid, v.vid, none, aid1,             AtomStage.EndAtom)
+      )
+    }
+
+    def invoice(v: VisitNode): TimeCharge.Invoice = {
+      def qa(start: Int, end: Int, comment: String, dids: List[Dataset.Id]): TimeCharge.DiscountEntry =
+        TimeCharge.DiscountEntry.Qa(
+          TimeCharge.Discount(TimestampInterval.between(ts(start), ts(end)), (end - start).sec, comment),
+          dids.toSet
+        )
+
+      val did0 = v.atoms.head.steps.head.dids
+      val did1 = v.atoms.last.steps.head.dids
+
+      val perAtom = List(
+        qa( 0,  5, TimeAccounting.comment.Qa, did0),
+        qa(26, 31, TimeAccounting.comment.Qa, did1)
+      )
+
+      if version >= TimeAccounting.version.NoPassingData then
+        TimeCharge.Invoice(
+          CategorizedTime(ChargeClass.Program -> 31.sec),
+          List(perAtom.head, qa(5, 26, TimeAccounting.comment.NoPassingData, did0 ++ did1), perAtom.last),
+          CategorizedTime.Zero
+        )
+      else
+        TimeCharge.Invoice(
+          CategorizedTime(ChargeClass.Program -> 31.sec),
+          perAtom,
+          CategorizedTime(ChargeClass.Program -> 21.sec)
+        )
+    }
+
+    for {
+      _ <- cleanup
+      v <- recordVisit(pi, serviceUser, mode, visitTime, 2, 1, 1, index)
+      _ <- withSession(_.execute(sql"UPDATE t_visit SET c_ta_version = $int2 WHERE c_visit_id = $visit_id".command)((version, v.vid)).void)
+      _ <- insertEvents(v.pid, events(v))
+      _ <- updateDatasets(staff, DatasetQaState.Fail, v.atoms.flatMap(_.steps.flatMap(_.dids)))
+      _ <- markWritten(v.atoms.flatMap(_.steps.flatMap(_.dids)), ts(3))
+      _ <- withServices(serviceUser) { s => s.session.transaction use { xa => s.timeAccountingService.update(v.vid)(using xa) } }
+      _ <- expect(pi, invoiceQuery(v.oid), invoiceExected(invoice(v), Nil))
+    } yield ()
+  }
+
+  // The sequence starts before the first atom and stops after the last one.
+  // An acquisition atom, whose written dataset nobody assesses, precedes two
+  // science atoms with the sequence paused between them.  The first science
+  // dataset fails QA and the second is given `atom1Qa`.
+  private def mixedVisitTest(atom1Qa: Option[DatasetQaState], index: Int): IO[Unit] = {
+
+    val ts = (0 until 28).map(_.fromNightStart)
+
+    def events(v: VisitNode): List[ExecutionEvent] = {
+      def atomEvents(a: AtomNode, t: Int): List[ExecutionEvent] = {
+        val sid = a.steps.head.sid
+        val did = a.steps.head.dids.head
+        List(
+          AtomEvent(   EventId, ts(t    ), v.oid, v.vid, none, a.aid,           AtomStage.StartAtom),
+          StepEvent(   EventId, ts(t + 1), v.oid, v.vid, none, a.aid, sid,      StepStage.StartStep),
+          DatasetEvent(EventId, ts(t + 2), v.oid, v.vid, none, a.aid, sid, did, DatasetStage.StartExpose),
+          DatasetEvent(EventId, ts(t + 3), v.oid, v.vid, none, a.aid, sid, did, DatasetStage.EndWrite),
+          StepEvent(   EventId, ts(t + 4), v.oid, v.vid, none, a.aid, sid,      StepStage.EndStep),
+          AtomEvent(   EventId, ts(t + 5), v.oid, v.vid, none, a.aid,           AtomStage.EndAtom)
+        )
+      }
+
+      val List(acq, sci0, sci1) = v.atoms: @unchecked
+
+      List(SequenceEvent(EventId, ts(0), v.oid, v.vid, none, SequenceCommand.Start)) ++
+      atomEvents(acq,  1)                                                            ++  // [ 1,  6)
+      atomEvents(sci0, 7)                                                            ++  // [ 7, 12)
+      List(
+        SequenceEvent(EventId, ts(13), v.oid, v.vid, none, SequenceCommand.Pause),
+        SequenceEvent(EventId, ts(19), v.oid, v.vid, none, SequenceCommand.Continue)
+      )                                                                              ++
+      atomEvents(sci1, 20)                                                           ++  // [20, 25)
+      List(SequenceEvent(EventId, ts(27), v.oid, v.vid, none, SequenceCommand.Stop))
+    }
+
+    def invoice(v: VisitNode): TimeCharge.Invoice = {
+      def qa(start: Int, end: Int, comment: String, dids: List[Dataset.Id]): TimeCharge.DiscountEntry =
+        TimeCharge.DiscountEntry.Qa(
+          TimeCharge.Discount(TimestampInterval.between(ts(start), ts(end)), (end - start).sec, comment),
+          dids.toSet
+        )
+
+      val did0 = v.atoms(1).steps.head.dids
+      val did1 = v.atoms(2).steps.head.dids
+
+      atom1Qa match {
+        case Some(DatasetQaState.Usable | DatasetQaState.Fail) =>
+          // Nothing passes: the per-atom discounts plus one discount for each
+          // run of remaining time.
+          val dids = did0 ++ did1
+          TimeCharge.Invoice(
+            CategorizedTime(ChargeClass.Program -> 27.sec),
+            List(
+              qa( 0,  7, TimeAccounting.comment.NoPassingData, dids),
+              qa( 7, 12, TimeAccounting.comment.Qa,            did0),
+              qa(12, 20, TimeAccounting.comment.NoPassingData, dids),
+              qa(20, 25, TimeAccounting.comment.Qa,            did1),
+              qa(25, 27, TimeAccounting.comment.NoPassingData, dids)
+            ),
+            CategorizedTime.Zero
+          )
+
+        case _ =>
+          // The second science dataset passes or is unassessed, so only the
+          // failing atom is discounted.
+          TimeCharge.Invoice(
+            CategorizedTime(ChargeClass.Program -> 27.sec),
+            List(qa(7, 12, TimeAccounting.comment.Qa, did0)),
+            CategorizedTime(ChargeClass.Program -> 22.sec)
+          )
+      }
+    }
+
+    for {
+      _    <- cleanup
+      pid  <- createProgramAs(pi)
+      tid  <- createTargetWithProfileAs(pi, pid)
+      oid  <- createObservationAs(pi, pid, mode.some, tid)
+      acq  <- acquisitionSequenceIds(pi, oid)
+      sci  <- scienceSequenceIds(pi, oid)
+      vid  <- recordVisitAs(serviceUser, oid)
+      _    <- setVisitTime(vid, visitTime)
+      a0   <- recordAtom(serviceUser, vid, acq.head._1, acq.head._2, 1, 1, index)
+      a1   <- recordAtom(serviceUser, vid, sci.head._1, sci.head._2, 1, 1, index + 1)
+      a2   <- recordAtom(serviceUser, vid, sci.toList(1)._1, sci.toList(1)._2, 1, 1, index + 2)
+      v     = VisitNode(pid, oid, vid, List(a0, a1, a2))
+      _    <- insertEvents(pid, events(v))
+      _    <- markWritten(List(a0, a1, a2).flatMap(_.steps.flatMap(_.dids)), ts(3))
+      _    <- updateDatasets(staff, DatasetQaState.Fail, a1.steps.flatMap(_.dids))
+      _    <- atom1Qa.traverse_(q => updateDatasets(staff, q, a2.steps.flatMap(_.dids)))
+      _    <- withServices(serviceUser) { s => s.session.transaction use { xa => s.timeAccountingService.update(vid)(using xa) } }
+      _    <- expect(pi, invoiceQuery(oid), invoiceExected(invoice(v), Nil))
+    } yield ()
+  }
+
+  test("timeChargeInvoice (no passing data, unassessed acquisition and time outside atoms)") {
+    mixedVisitTest(DatasetQaState.Usable.some, 340)
+  }
+
+  test("timeChargeInvoice (an unassessed science dataset counts as passing)") {
+    mixedVisitTest(none, 350)
+  }
+
+  test("timeChargeInvoice (no passing data, sequence paused between atoms)") {
+    pausedAllFailedTest(TimeAccounting.version.NoPassingData, 310)
+  }
+
+  test("timeChargeInvoice (no passing data, initial version charges the pause)") {
+    pausedAllFailedTest(TimeAccounting.version.Initial, 320)
+  }
+
+  test("new visits use the current time accounting version") {
+    for {
+      v <- recordVisit(pi, serviceUser, mode, visitTime, 1, 0, 0, 330)
+      r <- withSession(_.unique(sql"SELECT c_ta_version FROM t_visit WHERE c_visit_id = $visit_id".query(int2))(v.vid))
+    } yield assertEquals(r, TimeAccounting.version.NoPassingData)
   }
 
   private def correctionTest(

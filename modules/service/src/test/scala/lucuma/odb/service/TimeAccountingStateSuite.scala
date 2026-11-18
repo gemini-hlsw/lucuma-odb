@@ -250,6 +250,27 @@ final class TimeAccountingStateSuite extends ScalaCheckSuite {
     }
   }
 
+  test("contiguous runs reassemble the state, split only at gaps") {
+    forAll { (d: TestData) =>
+      // Excluding an interval may leave a gap to split on.
+      val state = d.state.excluding(d.interval)
+      val runs  = state.contiguous
+
+      assertEquals(runs.flatMap(_.toList), state.toList)
+      assert(runs.forall(_.nonEmpty))
+
+      runs.foreach { run =>
+        run.toList.zip(run.toList.drop(1)).foreach { case ((a, _), (b, _)) =>
+          assertEquals(a.end, b.start)
+        }
+      }
+
+      runs.zip(runs.drop(1)).foreach { (a, b) =>
+        assert(a.end.exists(e => b.start.exists(e < _)))
+      }
+    }
+  }
+
   test("partitionAtoms is complete") {
     forAll { (d: TestData) =>
       val a = d.atoms.headOption
