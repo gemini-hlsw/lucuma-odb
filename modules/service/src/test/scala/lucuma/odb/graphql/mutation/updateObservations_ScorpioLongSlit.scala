@@ -162,6 +162,58 @@ class updateObservations_ScorpioLongSlit extends query.ExecutionTestSupportForGm
         "The SCORPIO i and z channels share a detector controller and must have the same exposure time and count.".asLeft
       )
 
+  test("cannot update to both arms"):
+    createScorpio.flatMap: o =>
+      updateObservation(
+        pi, o,
+        edit("channelSelection: VIS_IR"),
+        ModeQuery,
+        "Argument 'input.SET.observingMode.scorpioLongSlit' is invalid: SCORPIO Long Slit only supports the VIS_ONLY channel selection, not VIS_IR".asLeft
+      )
+
+  private val RepeatsQuery: String =
+    "observations { observingMode { scorpioLongSlit { repeats } } }"
+
+  private def expectedRepeats(repeats: Int): Either[String, Json] =
+    json"""
+      {
+        "updateObservations": {
+          "observations": [
+            { "observingMode": { "scorpioLongSlit": { "repeats": $repeats } } }
+          ]
+        }
+      }
+    """.asRight
+
+  test("update repeats"):
+    createScorpio.flatMap: o =>
+      updateObservation(pi, o, edit("repeats: 4"), RepeatsQuery, expectedRepeats(4))
+
+  test("other edits leave repeats unchanged"):
+    for
+      o <- createScorpio
+      _ <- updateObservation(pi, o, edit("repeats: 4"), RepeatsQuery, expectedRepeats(4))
+      _ <- updateObservation(pi, o, edit("fpu: LONG_SLIT_1_08"), RepeatsQuery, expectedRepeats(4))
+    yield ()
+
+  test("cannot update repeats to zero"):
+    createScorpio.flatMap: o =>
+      updateObservation(
+        pi, o,
+        edit("repeats: 0"),
+        RepeatsQuery,
+        "Argument 'input.SET.observingMode.scorpioLongSlit.repeats' is invalid: Invalid PosInt: 0: Predicate failed: (0 > 0).".asLeft
+      )
+
+  test("cannot unset repeats"):
+    createScorpio.flatMap: o =>
+      updateObservation(
+        pi, o,
+        edit("repeats: null"),
+        RepeatsQuery,
+        "Argument 'input.SET.observingMode.scorpioLongSlit.repeats' is invalid: cannot be null".asLeft
+      )
+
   test("set and clear explicit telescope configs"):
     val g = channelJson(10, 2, 469)
     val r = channelJson(10, 2, 622)

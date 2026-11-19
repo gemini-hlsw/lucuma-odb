@@ -6,6 +6,7 @@ package lucuma.odb.service
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.all.*
+import eu.timepit.refined.types.numeric.PosInt
 import grackle.Result
 import grackle.ResultT
 import lucuma.core.enums.ScorpioFilter
@@ -179,12 +180,13 @@ object ScorpioLongSlitService:
         exposure_time_mode *:
         exposure_time_mode *:
         slit_offset_mode   *:
-        text
-      ).emap: (fpu, g, r, i, z, offsetMode, configsText) =>
+        text               *:
+        int4_pos
+      ).emap: (fpu, g, r, i, z, offsetMode, configsText, repeats) =>
         SlitTelescopeConfigsFormat
           .getOption((offsetMode, configsText))
           .toRight(s"Could not parse '$configsText' as telescope configs (mode ${offsetMode.tag}).")
-          .map(Config(fpu, g, r, i, z, _))
+          .map(Config(fpu, g, r, i, z, _, repeats))
 
     private def etmIdColumn(channel: ScorpioFilter): String =
       s"c_${channel.tag.toLowerCase}_exposure_time_mode_id"
@@ -212,7 +214,8 @@ object ScorpioLongSlitService:
           ls.c_fpu,
           #${ScorpioFilter.visible.toList.map(etmColumns).mkString(",\n")},
           ls.c_slit_offset_mode_effective,
-          ls.c_telescope_configs_effective
+          ls.c_telescope_configs_effective,
+          ls.c_repeats
         FROM
           v_scorpio_long_slit ls
         #${ScorpioFilter.visible.toList.map(etmJoin).mkString("\n")}
@@ -229,7 +232,8 @@ object ScorpioLongSlitService:
       ExposureTimeModeId,
       ExposureTimeModeId,
       Option[SlitOffsetMode],
-      Option[String]
+      Option[String],
+      PosInt
     )] =
       sql"""
         INSERT INTO t_scorpio_long_slit (
@@ -241,7 +245,8 @@ object ScorpioLongSlitService:
           c_i_exposure_time_mode_id,
           c_z_exposure_time_mode_id,
           c_slit_offset_mode,
-          c_telescope_configs
+          c_telescope_configs,
+          c_repeats
         )
         SELECT
           $observation_id,
@@ -252,10 +257,11 @@ object ScorpioLongSlitService:
           $exposure_time_mode_id,
           $exposure_time_mode_id,
           ${slit_offset_mode.opt},
-          ${text.opt}
+          ${text.opt},
+          $int4_pos
         FROM t_observation
         WHERE c_observation_id = $observation_id
-      """.contramap { (o, f, g, r, i, z, m, tc) => (o, f, g, r, i, z, m, tc, o) }
+      """.contramap { (o, f, g, r, i, z, m, tc, n) => (o, f, g, r, i, z, m, tc, n, o) }
 
     def insert(
       observationId: Observation.Id,
@@ -270,7 +276,8 @@ object ScorpioLongSlitService:
         etms(ScorpioFilter.I),
         etms(ScorpioFilter.Z),
         input.explicitSlitOffsetMode,
-        input.formattedTelescopeConfigs
+        input.formattedTelescopeConfigs,
+        input.repeats.getOrElse(Config.DefaultRepeats)
       )
 
     def update(
@@ -280,13 +287,15 @@ object ScorpioLongSlitService:
       val upFpu              = sql"c_fpu               = $scorpio_fpu"
       val upSlitOffsetMode   = sql"c_slit_offset_mode  = ${slit_offset_mode.opt}"
       val upTelescopeConfigs = sql"c_telescope_configs = ${text.opt}"
+      val upRepeats          = sql"c_repeats           = $int4_pos"
 
       NonEmptyList
         .fromList:
           List(
             SET.fpu.map(upFpu),
             SET.explicitSlitOffsetMode.toOptionOption.map(upSlitOffsetMode),
-            SET.formattedTelescopeConfigs.toOptionOption.map(upTelescopeConfigs)
+            SET.formattedTelescopeConfigs.toOptionOption.map(upTelescopeConfigs),
+            SET.repeats.map(upRepeats)
           ).flatten
         .map: us =>
           void"UPDATE t_scorpio_long_slit " |+|
@@ -362,7 +371,8 @@ object ScorpioLongSlitService:
           c_fpu,
           #${channels.map(etmIdColumn).mkString(",\n")},
           c_slit_offset_mode,
-          c_telescope_configs
+          c_telescope_configs,
+          c_repeats
         )
         SELECT
           $observation_id,
@@ -370,7 +380,8 @@ object ScorpioLongSlitService:
           src.c_fpu,
           #${channels.map(c => s"${alias(c)}.new_id").mkString(",\n")},
           src.c_slit_offset_mode,
-          src.c_telescope_configs
+          src.c_telescope_configs,
+          src.c_repeats
         FROM t_scorpio_long_slit src"""(newId) |+|
         joins |+|
         sql" WHERE src.c_observation_id = $observation_id"(originalId)

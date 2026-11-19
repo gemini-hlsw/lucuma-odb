@@ -6,6 +6,8 @@ package lucuma.odb.sequence.scorpio.longslit
 import cats.Eq
 import cats.data.NonEmptyList
 import cats.derived.*
+import eu.timepit.refined.cats.*
+import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.ScorpioFilter
 import lucuma.core.enums.ScorpioFpu
 import lucuma.core.enums.ScorpioSlitOffsetPreset
@@ -14,6 +16,7 @@ import lucuma.core.model.SlitTelescopeConfigs
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.scorpio.defaultSlitTelescopeConfigs
 import lucuma.odb.sequence.syntax.all.*
+import lucuma.refined.*
 
 import java.io.ByteArrayOutputStream
 import java.io.DataOutputStream
@@ -25,7 +28,8 @@ case class Config(
   r:                ExposureTimeMode,
   i:                ExposureTimeMode,
   z:                ExposureTimeMode,
-  telescopeConfigs: SlitTelescopeConfigs
+  telescopeConfigs: SlitTelescopeConfigs,
+  repeats:          PosInt
 ) derives Eq:
 
   def exposureTimeModes: NonEmptyList[(ScorpioFilter, ExposureTimeMode)] =
@@ -49,6 +53,7 @@ case class Config(
     out.writeChars(telescopeConfigs.offsetsType.tag)
     steps.toList.foreach: tc =>
       out.write(tc.hashBytes)
+    out.writeInt(repeats.value)
 
     out.close()
     bao.toByteArray
@@ -57,3 +62,6 @@ object Config:
 
   val DefaultTelescopeConfigs: SlitTelescopeConfigs =
     defaultSlitTelescopeConfigs(ScorpioSlitOffsetPreset.NodAlongSlit)
+
+  val DefaultRepeats: PosInt =
+    1.refined

@@ -34,6 +34,7 @@ class cloneObservation_ScorpioLongSlit extends OdbSuite with UpdateObservationsO
             { q: { arcseconds:  5 }, guiding: ENABLED }
           ]
         }
+        repeats: 3
       }
     """
 
@@ -62,6 +63,7 @@ class cloneObservation_ScorpioLongSlit extends OdbSuite with UpdateObservationsO
           i $ChannelQuery
           z $ChannelQuery
           explicitTelescopeConfigs { alongSlit { q { arcseconds } } }
+          repeats
         }
       }
     """
@@ -82,7 +84,8 @@ class cloneObservation_ScorpioLongSlit extends OdbSuite with UpdateObservationsO
                 { "q": { "arcseconds": -5.000000 } },
                 { "q": { "arcseconds": 5.000000 } }
               ]
-            }
+            },
+            "repeats": 3
           }
         }
       }
@@ -106,7 +109,7 @@ class cloneObservation_ScorpioLongSlit extends OdbSuite with UpdateObservationsO
       o1 <- cloneObservationAs(pi, o0)
     yield (o0, o1)
 
-  test("a clone has the same slit, channels and explicit telescope configs"):
+  test("a clone has the same slit, channels, explicit telescope configs and repeats"):
     createAndClone.flatMap: (_, clone) =>
       expectMode(clone, OriginalMode)
 
