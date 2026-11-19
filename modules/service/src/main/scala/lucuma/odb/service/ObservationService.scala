@@ -107,6 +107,14 @@ sealed trait ObservationService[F[_]] {
     oid: Observation.Id
   )(using Transaction[F]): F[Result[Program.Id]]
 
+  /**
+   * Succeeds if the observation exists, whether or not it has been deleted,
+   * and fails with `InvalidObservation` otherwise.
+   */
+  def verifyExists(
+    oid: Observation.Id
+  )(using Transaction[F]): F[Result[Unit]]
+
   /** Selects the ids of observations whose stored J2000 base position lies
    *  within `cone` (exact great-circle match on angular distance).
    */
@@ -254,6 +262,13 @@ object ObservationService {
       )(using Transaction[F]): F[Result[Program.Id]] =
         session.option(Statements.selectPid)(oid).map: p =>
           p.fold(OdbError.InvalidObservation(oid, s"Program for observation $oid not found.".some).asFailure)(_.success)
+
+      override def verifyExists(
+        oid: Observation.Id
+      )(using Transaction[F]): F[Result[Unit]] =
+        session.unique(Statements.ObservationExists)(oid).map: exists =>
+          if exists then Result.unit
+          else OdbError.InvalidObservation(oid, s"Observation '$oid' not found.".some).asFailure
 
       override def coneCandidates(cone: Cone, max: Int): F[Result[List[Observation.Id]]] =
         val af = Statements.coneCandidates(user, cone, max)
@@ -969,6 +984,13 @@ object ObservationService {
 
 
   private object Statements {
+
+    val ObservationExists: Query[Observation.Id, Boolean] =
+      sql"""
+        SELECT EXISTS (
+          SELECT 1 FROM t_observation WHERE c_observation_id = $observation_id
+        )
+      """.query(bool)
 
     extension (m: ExposureTimeMode)
       def tpe: ExposureTimeModeType =

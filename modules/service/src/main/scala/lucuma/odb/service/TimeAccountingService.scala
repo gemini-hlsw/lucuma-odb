@@ -87,11 +87,13 @@ trait TimeAccountingService[F[_]] {
    * Moves every visit of the observation to the current version of the time
    * accounting rules and recomputes it, whether or not its time accounting was
    * frozen.  Time charge corrections are applied to the recomputed charge as
-   * they were to the original.
+   * they were to the original.  Fails if there is no such observation.
+   *
+   * @return the observation
    */
   def unfreezeObservation(
     observationId: Observation.Id
-  )(using Transaction[F], Services.StaffAccess): F[Unit]
+  )(using Transaction[F], Services.StaffAccess): F[Result[Observation.Id]]
 
   /**
    * Moves a single visit to the current version of the time accounting rules
@@ -444,11 +446,14 @@ object TimeAccountingService {
 
       override def unfreezeObservation(
         observationId: Observation.Id
-      )(using Transaction[F], Services.StaffAccess): F[Unit] =
-        unfreeze(
-          observationId,
-          session.execute(UpgradeObservationVisits)(TimeAccounting.version.Current, observationId)
-        )
+      )(using Transaction[F], Services.StaffAccess): F[Result[Observation.Id]] =
+        observationService.verifyExists(observationId).flatMap:
+          _.traverse: _ =>
+            unfreeze(
+              observationId,
+              session.execute(UpgradeObservationVisits)(TimeAccounting.version.Current, observationId)
+            )
+          .map(_.as(observationId))
 
       override def unfreezeVisit(
         visitId: Visit.Id

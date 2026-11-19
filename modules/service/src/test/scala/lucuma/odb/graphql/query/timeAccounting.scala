@@ -1170,6 +1170,15 @@ class timeAccounting extends OdbSuite with DatabaseOperations with ExecutionTest
     )
   }
 
+  test("unfreezeTimeAccounting with an unknown observation") {
+    val oid = Observation.Id.fromLong(Long.MaxValue).get
+    expectOdbError(
+      staff,
+      unfreezeTimeAccountingQuery(oid),
+      { case OdbError.InvalidObservation(`oid`, _) => () }
+    )
+  }
+
   test("the latest time accounting version is the one implemented") {
     assertIO(
       withSession(_.unique(sql"SELECT current_time_accounting_version()".query(int2))),

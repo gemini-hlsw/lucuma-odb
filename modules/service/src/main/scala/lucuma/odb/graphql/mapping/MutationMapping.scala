@@ -407,8 +407,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] with UserEnv {
                 timeAccountingService.unfreezeVisit(vid)
               case UnfreezeTimeAccountingInput.ForObservation(oid, ref) =>
                 Services.asSuperUser(observationService.resolveOid(oid, ref)).flatMap: r =>
-                  r.flatTraverse: oid =>
-                    timeAccountingService.unfreezeObservation(oid).as(oid.success)
+                  r.flatTraverse(timeAccountingService.unfreezeObservation)
           unfrozen.nestMap: oid =>
             Filter(Predicates.unfreezeTimeAccountingResult.observation.id.eql(oid), child)
 
