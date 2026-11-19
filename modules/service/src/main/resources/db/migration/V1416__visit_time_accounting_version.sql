@@ -67,6 +67,13 @@ AS $$
     ) z
 $$;
 
+-- Time accounting looks up a visit's datasets on every recompute (whether it
+-- has any, which fail QA, and whether any science dataset passes), as does
+-- visit_time_accounting_locked.  Without an index on the visit each of those
+-- scans the whole table.  It is created here, before the upgrade below runs
+-- visit_time_accounting_locked over every visit, so that the upgrade uses it.
+CREATE INDEX i_dataset_visit ON t_dataset (c_visit_id);
+
 -- Whether a visit's time accounting is locked as of `as_of`, so that a change
 -- to the rules leaves its stored charge alone.  As in `v_observation_qa`,
 -- acquisition datasets and datasets that were never written are not expected
