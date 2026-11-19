@@ -4,11 +4,15 @@
 package lucuma.odb.graphql.mapping
 
 import lucuma.odb.graphql.table.ObservationView
+import lucuma.odb.graphql.table.VisitTable
 
-trait UnfreezeTimeAccountingResultMapping[F[_]] extends ObservationView[F]:
+trait UnfreezeTimeAccountingResultMapping[F[_]] extends ObservationView[F] with VisitTable[F]:
 
   lazy val UnfreezeTimeAccountingResultMapping: ObjectMapping =
     ObjectMapping(UnfreezeTimeAccountingResultType)(
       SqlField("id", ObservationView.Id, key = true, hidden = true),
-      SqlObject("observation")
+      SqlObject("observation"),
+
+      // Filtered down to the unfrozen visits by the mutation.
+      SqlObject("visits", Join(ObservationView.Id, VisitTable.ObservationId))
     )

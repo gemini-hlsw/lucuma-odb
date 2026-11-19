@@ -4190,6 +4190,8 @@ type Mutation {
   time accounting was frozen when the rules changed (see
   `TimeChargeInvoice.frozen`).  A visit that isn't frozen is simply
   recomputed, which is harmless since its charge already follows its changes.
+  A visit on a newer version of the rules than this service implements (as
+  after a rollback) is left alone and is missing from the result's `visits`.
   Existing time charge corrections are applied to the recomputed charge, so a
   correction that compensated for the old rules may need to be revisited.
   Requires staff (or better) access.
@@ -4949,6 +4951,14 @@ The result of unfreezing time accounting.
 type UnfreezeTimeAccountingResult {
   "The observation whose time accounting was unfrozen, or the visit's observation."
   observation: Observation!
+
+  """
+  The visits that were moved to the current time accounting rules and
+  recomputed, in visit id order.  A visit on a newer version of the rules than
+  this service implements (as after a rollback) is left alone and doesn't
+  appear, so this may be empty.
+  """
+  visits: [Visit!]!
 }
 
 """

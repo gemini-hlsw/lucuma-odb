@@ -1123,13 +1123,37 @@ class timeAccounting extends OdbSuite with DatabaseOperations with ExecutionTest
       _  <- runTimeAccounting(v1.oid)
       _  <- List(v1.vid, v2).traverse_ { vid => setVersion(vid, old) *> setFinalProgramTime(vid, frozen) }
 
+      // The result's visits are just the unfrozen one, while the observation's
+      // own visits, selected alongside, are all of them.
       _  <- query(staff, s"""
               mutation {
                 unfreezeTimeAccounting(input: { visitId: "${v1.vid}" }) {
-                  observation { id }
+                  observation {
+                    id
+                    execution { visits { matches { id } } }
+                  }
+                  visits {
+                    id
+                    timeChargeInvoice { frozen }
+                  }
                 }
               }
-            """).map(json => assertEquals(json.hcursor.downFields("unfreezeTimeAccounting", "observation", "id").as[Observation.Id], Right(v1.oid)))
+            """).map { json =>
+              val result = json.hcursor.downField("unfreezeTimeAccounting")
+              assertEquals(result.downFields("observation", "id").as[Observation.Id], Right(v1.oid))
+              assertEquals(
+                result.downFields("observation", "execution", "visits", "matches").as[List[Json]].map(_.flatMap(_.hcursor.downField("id").as[Visit.Id].toOption).toSet),
+                Right(Set(v1.vid, v2))
+              )
+              assertEquals(
+                result.downField("visits").as[List[Json]].map(_.map(_.hcursor.downField("id").as[Visit.Id])),
+                Right(List(Right(v1.vid)))
+              )
+              assertEquals(
+                result.downField("visits").downArray.downFields("timeChargeInvoice", "frozen").as[Boolean],
+                Right(false)
+              )
+            }
 
       _  <- assertIO(visitVersion(v1.vid), TimeAccounting.version.Current)
       _  <- assertIO(visitFinalProgramTime(v1.vid), 10.sec)
@@ -1168,6 +1192,33 @@ class timeAccounting extends OdbSuite with DatabaseOperations with ExecutionTest
       """,
       { case OdbError.InvalidVisit(`vid`, _) => () }
     )
+  }
+
+  test("unfreezeTimeAccounting with nothing to unfreeze returns no visits") {
+    for {
+      pid <- createProgramAs(pi)
+      tid <- createTargetWithProfileAs(pi, pid)
+      oid <- createObservationAs(pi, pid, mode.some, tid)
+      _   <- expect(
+               staff,
+               s"""
+                 mutation {
+                   unfreezeTimeAccounting(input: { observationId: "$oid" }) {
+                     observation { id }
+                     visits { id }
+                   }
+                 }
+               """,
+               json"""
+                 {
+                   "unfreezeTimeAccounting": {
+                     "observation": { "id": $oid },
+                     "visits": []
+                   }
+                 }
+               """.asRight
+             )
+    } yield ()
   }
 
   test("unfreezeTimeAccounting with an unknown observation") {
@@ -1288,11 +1339,14 @@ class timeAccounting extends OdbSuite with DatabaseOperations with ExecutionTest
                          WHERE c_visit_id = $visit_id
                       """.command)((newer, frozen, v.vid))
 
-                 _ <- Services.asSuperUser(s.timeAccountingService.unfreezeObservation(v.oid)(using xa, summon))
+                 // Both succeed, but report that nothing was unfrozen.
+                 o <- Services.asSuperUser(s.timeAccountingService.unfreezeObservation(v.oid)(using xa, summon))
+                 _  = assertEquals(o.toOption, Some(Nil))
                  _ <- assertIO(version, newer)
                  _ <- assertIO(charge, frozen)
 
-                 _ <- Services.asSuperUser(s.timeAccountingService.unfreezeVisit(v.vid)(using xa, summon))
+                 r <- Services.asSuperUser(s.timeAccountingService.unfreezeVisit(v.vid)(using xa, summon))
+                 _  = assertEquals(r.toOption, Some((v.oid, Nil)))
                  _ <- assertIO(version, newer)
                  _ <- assertIO(charge, frozen)
 

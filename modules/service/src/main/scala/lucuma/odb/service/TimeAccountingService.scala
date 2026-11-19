@@ -87,24 +87,28 @@ trait TimeAccountingService[F[_]] {
    * Moves every visit of the observation to the current version of the time
    * accounting rules and recomputes it, whether or not its time accounting was
    * frozen.  Time charge corrections are applied to the recomputed charge as
-   * they were to the original.  Fails if there is no such observation.
+   * they were to the original.  Visits on a newer version than the current
+   * one (as after a rollback) are left alone.  Fails if there is no such
+   * observation.
    *
-   * @return the observation
+   * @return the visits that were moved and recomputed
    */
   def unfreezeObservation(
     observationId: Observation.Id
-  )(using Transaction[F], Services.StaffAccess): F[Result[Observation.Id]]
+  )(using Transaction[F], Services.StaffAccess): F[Result[List[Visit.Id]]]
 
   /**
    * Moves a single visit to the current version of the time accounting rules
    * and recomputes it, as `unfreezeObservation` does for every visit of an
-   * observation.
+   * observation, leaving it alone if it is on a newer version.  Fails if there
+   * is no such visit.
    *
-   * @return the visit's observation
+   * @return the visit's observation, and the visit if it was moved and
+   *         recomputed
    */
   def unfreezeVisit(
     visitId: Visit.Id
-  )(using Transaction[F], Services.StaffAccess): F[Result[Observation.Id]]
+  )(using Transaction[F], Services.StaffAccess): F[Result[(Observation.Id, List[Visit.Id])]]
 
   /**
    * Adds a manual time charge correction.
@@ -436,7 +440,7 @@ object TimeAccountingService {
       private def unfreeze(
         observationId: Observation.Id,
         upgrade:       F[List[(Visit.Id, Timestamp)]]
-      )(using Transaction[F]): F[Unit] =
+      )(using Transaction[F]): F[List[Visit.Id]] =
         for
           _  <- session.unique(SequenceService.Statements.LockObservationExecution)(observationId)
           _  <- session.execute(InvalidateObscalc)(observationId)
@@ -444,22 +448,21 @@ object TimeAccountingService {
           _  <- vs.traverse_ { (vid, invalidation) =>
                   Update(vid).run *> session.execute(MarkVisitTimeAccountingUpdated)(invalidation, vid)
                 }
-        yield ()
+        yield vs.map(_._1)
 
       override def unfreezeObservation(
         observationId: Observation.Id
-      )(using Transaction[F], Services.StaffAccess): F[Result[Observation.Id]] =
+      )(using Transaction[F], Services.StaffAccess): F[Result[List[Visit.Id]]] =
         observationService.verifyExists(observationId).flatMap:
           _.traverse: _ =>
             unfreeze(
               observationId,
               session.execute(UpgradeObservationVisits)(TimeAccounting.version.Current, observationId)
             )
-          .map(_.as(observationId))
 
       override def unfreezeVisit(
         visitId: Visit.Id
-      )(using Transaction[F], Services.StaffAccess): F[Result[Observation.Id]] =
+      )(using Transaction[F], Services.StaffAccess): F[Result[(Observation.Id, List[Visit.Id])]] =
         session.option(SelectObservationId)(visitId).flatMap:
           case None      =>
             OdbError.InvalidVisit(visitId, Some(s"Visit '$visitId' not found")).asFailureF
@@ -467,7 +470,7 @@ object TimeAccountingService {
             unfreeze(
               oid,
               session.execute(UpgradeVisit)(TimeAccounting.version.Current, visitId)
-            ).as(oid.success)
+            ).map(vids => (oid, vids).success)
 
       def addCorrection(
         visitId: Visit.Id,
