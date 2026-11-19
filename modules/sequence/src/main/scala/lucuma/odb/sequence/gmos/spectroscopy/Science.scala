@@ -473,7 +473,7 @@ object Science:
       // A daytime arc has no ITC: its exposures come from SmartGcal.
       if calRole.contains(CalibrationRole.DaytimeArc) then
         DaytimeSmartGcal.sequence(oid, estimator, static, namespace, expander, Calibration.Arc, stepDef.daytimeArcs(calibrationObservationConfig(config)))
-      else if calRole.contains(CalibrationRole.MosMaskFlat) then
+      else if calRole.contains(CalibrationRole.DaytimeMaskImage) then
         DaytimeSmartGcal.sequence(oid, estimator, static, namespace, expander, Calibration.ImagingFlat, stepDef.mosMaskFlat(config))
       else
         def sequenceUnavailable(m: String): OdbError =
