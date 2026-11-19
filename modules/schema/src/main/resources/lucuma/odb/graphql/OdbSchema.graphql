@@ -22994,9 +22994,9 @@ enum CalibrationRole {
   DAYTIME_CALIBRATION
 
   """
-  CalibrationRole MosMaskFlat
+  CalibrationRole DaytimeMaskImage
   """
-  MOS_MASK_FLAT
+  DAYTIME_MASK_IMAGE
 }
 
 """
