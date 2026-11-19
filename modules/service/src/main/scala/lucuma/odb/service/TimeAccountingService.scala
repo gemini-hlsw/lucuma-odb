@@ -285,6 +285,30 @@ object TimeAccountingService {
               .flatMap: results =>
                 results.collectFirst { case Left(t) => t }.fold(results.size.pure[F])(_.raiseError[F, Int])
 
+      // Lock order.  The obscalc worker's updateAll recomputes an
+      // observation's dirty visits without the observation's execution lock
+      // (taking it would hold up execution events while time accounting runs),
+      // and unfreeze does so with it, so the two can run at once on the same
+      // visits.  To keep them from deadlocking:
+      //
+      //   * A recompute (Update.run) computes the charge without taking any
+      //     locks, then writes the visit row before it deletes and rewrites the
+      //     visit's discount rows (updateInvoice).  The other way round, the
+      //     worker could hold the discount rows while waiting for the visit row
+      //     that unfreeze's upgrade holds, while unfreeze waited for those
+      //     discount rows.  Locking the visit row only when it is written, not
+      //     before computing, keeps execution events for the visit (which
+      //     update its row) from waiting out the whole recompute.
+      //   * Both lock an observation's visit rows in visit id order: updateAll
+      //     takes its dirty visits in that order (SelectDirtyVisits), and
+      //     unfreeze's upgrade locks them all, in that order, before updating
+      //     them.
+      //
+      // The upgrade locks FOR NO KEY UPDATE, the mode the UPDATE of t_visit
+      // takes anyway, so that inserts of rows referencing a visit (which take
+      // FOR KEY SHARE) aren't blocked (see V1227).  Execution events and QA
+      // changes take the execution lock and then a visit row, never discount
+      // rows, so they can't join a cycle with these.
       case class Update(visitId: Visit.Id)(using Transaction[F]) {
         // A visit on another version of the rules is frozen: its stored charge
         // is left as it is.  The end of a visitor visit's charge is recorded so
@@ -399,10 +423,11 @@ object TimeAccountingService {
           } yield i
         }
 
+        // Updates the visit row before its discount rows (see "Lock order").
         private def updateInvoice(inv: TimeCharge.Invoice, visitorEnd: Option[Timestamp]): F[Unit] =
           for {
-            _ <- updateDiscounts(inv.discounts)
             _ <- session.execute(UpdateTimeAccounting)((visitId, inv.executionTime, inv.finalCharge, visitorEnd))
+            _ <- updateDiscounts(inv.discounts)
           } yield ()
 
         // Delete existing discounts (if any) and write the new ones.
@@ -592,6 +617,8 @@ object TimeAccountingService {
           c_observation_id  = $observation_id AND
           c_ta_version     <= $int2           AND
           c_ta_invalidation > c_ta_update
+        ORDER BY
+          c_visit_id
       """.query(visit_id *: core_timestamp)
 
     val MarkVisitTimeAccountingUpdated: Command[(Timestamp, Visit.Id)] =
@@ -720,16 +747,28 @@ object TimeAccountingService {
     // already under way elsewhere counts as out of date.  Visits on a newer
     // version (e.g., after a rollback) are left alone rather than downgraded,
     // as SelectDirtyVisits leaves them dirty.
+    //
+    // The rows are locked in visit id order before they are updated, since an
+    // UPDATE locks them in whatever order it scans them (see "Lock order"
+    // above Update).
     private def upgradeVisits[A](key: Fragment[A]): Query[(Short, A), (Visit.Id, Timestamp)] =
       sql"""
-        UPDATE t_visit
+        WITH locked AS (
+          SELECT c_visit_id
+            FROM t_visit
+           WHERE $key
+             AND c_ta_version <= $int2
+           ORDER BY c_visit_id
+             FOR NO KEY UPDATE
+        )
+        UPDATE t_visit v
            SET c_ta_version      = $int2,
                c_ta_invalidation = now()
-         WHERE $key
-           AND c_ta_version     <= $int2
-     RETURNING c_visit_id, c_ta_invalidation
+          FROM locked l
+         WHERE v.c_visit_id = l.c_visit_id
+     RETURNING v.c_visit_id, v.c_ta_invalidation
       """.query(visit_id *: core_timestamp)
-         .contramap { case (v, a) => (v, a, v) }
+         .contramap { case (v, a) => (a, v, v) }
 
     val UpgradeObservationVisits: Query[(Short, Observation.Id), (Visit.Id, Timestamp)] =
       upgradeVisits(sql"c_observation_id = $observation_id")
