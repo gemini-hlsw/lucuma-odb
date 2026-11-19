@@ -429,19 +429,21 @@ object TimeAccountingService {
       // Takes the observation's execution lock and invalidates obscalc before
       // any visit row is touched, in the order invalidate_visit_time_accounting
       // uses.  Then moves the visits to the current version and recomputes
-      // them right away, rather than leaving them dirty for updateAll, and
-      // records them as updated so that the obscalc worker doesn't redo them.
+      // them right away, rather than leaving them dirty for updateAll.  Like
+      // updateAll, it records the invalidation it observed (here the one the
+      // upgrade set) so that the obscalc worker doesn't redo them, but an
+      // invalidation arriving during the recompute leaves them dirty.
       private def unfreeze(
         observationId: Observation.Id,
-        upgrade:       F[List[Visit.Id]]
+        upgrade:       F[List[(Visit.Id, Timestamp)]]
       )(using Transaction[F]): F[Unit] =
         for
-          _    <- session.unique(SequenceService.Statements.LockObservationExecution)(observationId)
-          _    <- session.execute(InvalidateObscalc)(observationId)
-          vids <- upgrade
-          _    <- vids.traverse_ { vid =>
-                    Update(vid).run *> session.execute(MarkVisitRecomputed)(vid)
-                  }
+          _  <- session.unique(SequenceService.Statements.LockObservationExecution)(observationId)
+          _  <- session.execute(InvalidateObscalc)(observationId)
+          vs <- upgrade
+          _  <- vs.traverse_ { (vid, invalidation) =>
+                  Update(vid).run *> session.execute(MarkVisitTimeAccountingUpdated)(invalidation, vid)
+                }
         yield ()
 
       override def unfreezeObservation(
@@ -709,41 +711,28 @@ object TimeAccountingService {
         CALL invalidate_obscalc($observation_id)
       """.command
 
-    // Moves every visit of an observation to the given version (the one this
-    // code implements), returning the visits.  Their invalidation is bumped so
-    // that a time accounting update already under way elsewhere counts as out
-    // of date.  Visits on a newer version (e.g., after a rollback) are left
-    // alone rather than downgraded, as SelectDirtyVisits leaves them dirty.
-    val UpgradeObservationVisits: Query[(Short, Observation.Id), Visit.Id] =
+    // Moves the visits selected by `key` to the given version (the one this
+    // code implements), returning each with the invalidation timestamp it now
+    // has.  Their invalidation is bumped so that a time accounting update
+    // already under way elsewhere counts as out of date.  Visits on a newer
+    // version (e.g., after a rollback) are left alone rather than downgraded,
+    // as SelectDirtyVisits leaves them dirty.
+    private def upgradeVisits[A](key: Fragment[A]): Query[(Short, A), (Visit.Id, Timestamp)] =
       sql"""
         UPDATE t_visit
            SET c_ta_version      = $int2,
                c_ta_invalidation = now()
-         WHERE c_observation_id = $observation_id
-           AND c_ta_version    <= $int2
-     RETURNING c_visit_id
-      """.query(visit_id)
-         .contramap { case (v, o) => (v, o, v) }
+         WHERE $key
+           AND c_ta_version     <= $int2
+     RETURNING c_visit_id, c_ta_invalidation
+      """.query(visit_id *: core_timestamp)
+         .contramap { case (v, a) => (v, a, v) }
 
-    // Moves one visit to the given version, as UpgradeObservationVisits does.
-    val UpgradeVisit: Query[(Short, Visit.Id), Visit.Id] =
-      sql"""
-        UPDATE t_visit
-           SET c_ta_version      = $int2,
-               c_ta_invalidation = now()
-         WHERE c_visit_id    = $visit_id
-           AND c_ta_version <= $int2
-     RETURNING c_visit_id
-      """.query(visit_id)
-         .contramap { case (v, vid) => (v, vid, v) }
+    val UpgradeObservationVisits: Query[(Short, Observation.Id), (Visit.Id, Timestamp)] =
+      upgradeVisits(sql"c_observation_id = $observation_id")
 
-    // Records that a visit's time accounting reflects its latest invalidation.
-    val MarkVisitRecomputed: Command[Visit.Id] =
-      sql"""
-        UPDATE t_visit
-           SET c_ta_update = c_ta_invalidation
-         WHERE c_visit_id = $visit_id
-      """.command
+    val UpgradeVisit: Query[(Short, Visit.Id), (Visit.Id, Timestamp)] =
+      upgradeVisits(sql"c_visit_id = $visit_id")
 
     val InvalidateVisit: Command[(Visit.Id, Observation.Id)] =
       sql"""
