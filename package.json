@@ -18,7 +18,7 @@
     "@graphql-tools/import": "^7.1.14",
     "@graphql-tools/load": "^8.1.10",
     "@whatwg-node/fetch": "^0.10.13",
-    "glob": "^13.0.6",
+    "glob": "^14.0.6",
     "graphql": "^16.11.0"
   },
   "repository": {
