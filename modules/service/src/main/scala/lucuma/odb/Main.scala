@@ -347,9 +347,12 @@ object FMain extends MainParams {
    * obscalc) can start before the ODB service has finished migrating it, and
    * it must not run its startup diagnostics against the old schema.
    *
-   * Fails if migrations are still pending after `deadline`, as when the ODB
-   * service's migration failed or was skipped, so that a process that will
-   * never start fails visibly instead of waiting forever.
+   * A check that fails (e.g., the database briefly refuses connections during
+   * a deploy) is logged and retried on the next poll rather than failing the
+   * wait.  Fails if migrations are still pending, or the check is still
+   * failing, after `deadline`, as when the ODB service's migration failed or
+   * was skipped, so that a process that will never start fails visibly
+   * instead of waiting forever.
    */
   def awaitMigrations[F[_]: Temporal: Logger](
     pending:    F[List[String]],
@@ -357,11 +360,15 @@ object FMain extends MainParams {
     deadline:   FiniteDuration
   ): F[Unit] =
     def loop: F[Unit] =
-      pending.flatMap:
-        case Nil  =>
+      pending.attempt.flatMap:
+        case Right(Nil)          =>
           Logger[F].info("The database has no pending migrations.")
-        case next :: rest =>
+        case Right(next :: rest) =>
           Logger[F].info(s"Waiting for ${rest.size + 1} pending migration(s), starting with $next.") >>
+            Temporal[F].sleep(pollPeriod) >>
+            loop
+        case Left(e)             =>
+          Logger[F].warn(e)("Couldn't check for pending migrations; trying again.") >>
             Temporal[F].sleep(pollPeriod) >>
             loop
 

@@ -48,6 +48,17 @@ class StartupDiagnosticsSuite extends OdbSuite:
       _      <- assertIO(calls.get, 3)
     yield ()
 
+  test("awaitMigrations retries a check that fails"):
+    for
+      // The first two checks fail, the third finds nothing pending.
+      calls  <- Ref.of[IO, Int](0)
+      pending = calls.getAndUpdate(_ + 1).flatMap: n =>
+                  if n < 2 then IO.raiseError(new RuntimeException("connection refused"))
+                  else IO.pure(Nil)
+      _      <- FMain.awaitMigrations(pending, 10.millis, 1.minute)
+      _      <- assertIO(calls.get, 3)
+    yield ()
+
   test("awaitMigrations fails once its deadline passes"):
     FMain
       .awaitMigrations(IO.pure(List("V9999: never")), 10.millis, 100.millis)
