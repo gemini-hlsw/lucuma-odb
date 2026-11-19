@@ -120,7 +120,7 @@ object GraphQLRoutes {
         L.debug(s"${describe(ctx)}: $message")
 
       val service: GraphQLService[F] =
-        new GraphQLService[F](odbMapping) {
+        new GraphQLService[F](odbMapping, OdbMapping.slowQueryThreshold.some) {
 
           override def query(
             ctx:           RequestContext,
