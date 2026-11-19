@@ -5,8 +5,8 @@ package lucuma.odb.service
 
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
-import eu.timepit.refined.types.numeric.PosInt
 import cats.syntax.all.*
+import eu.timepit.refined.types.numeric.PosInt
 import grackle.Result
 import grackle.ResultT
 import lucuma.core.enums.ScorpioFilter
