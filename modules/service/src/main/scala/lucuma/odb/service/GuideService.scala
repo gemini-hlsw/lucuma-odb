@@ -933,9 +933,9 @@ object GuideService {
           given ADQLInterpreter = ADQLInterpreter.nTarget(MaxTargets)
 
           gaiaClient
-            .query(query)
+            .queryGuideStarResults(query)
             .map:
-              _.collect { case Right(s) => (s.target, GuideStarCandidate.fromCatalog(s.target))}
+              _.collect { case Right(r) => (r.target, GuideStarCandidate.fromCatalogResult(r)) }
                 .success
               // Should we have access to a logger in Services so we can log this instead of passing details on to the user?
             .handleError(e => gaiaError(e.getMessage()).asFailure)
