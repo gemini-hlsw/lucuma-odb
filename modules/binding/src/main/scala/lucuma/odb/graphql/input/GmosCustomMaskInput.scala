@@ -18,6 +18,12 @@ object GmosCustomMaskInput {
   val SlitWidthRequiredMessage: String =
     "A custom mask needs a `slitWidth`."
 
+  /** Refuses a value whose custom mask slit width was left out. */
+  def requireSlitWidth[A](m: Matcher[(A, Boolean)]): Matcher[A] =
+    m.rmap:
+      case (a, false) => Result(a)
+      case (_, true)  => Result.failure(SlitWidthRequiredMessage)
+
   /**
    * The mask, and whether its slit width was left out.  The width of a mask
    * given without one is a stand-in, to be replaced before it is used.
@@ -34,9 +40,6 @@ object GmosCustomMaskInput {
     }
 
   val Binding: Matcher[Custom] =
-    OptionalWidthBinding.rmap {
-      case (custom, false) => Result(custom)
-      case (_, true)       => Result.failure(SlitWidthRequiredMessage)
-    }
+    requireSlitWidth(OptionalWidthBinding)
 
 }

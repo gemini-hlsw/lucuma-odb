@@ -5,7 +5,6 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.parallel.*
-import grackle.Result
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.odb.graphql.binding.*
 
@@ -36,9 +35,6 @@ object GmosNorthDynamicInput {
     }
 
   val Binding: Matcher[GmosNorth] =
-    OptionalWidthBinding.rmap {
-      case (config, false) => Result(config)
-      case (_, true)       => Result.failure(GmosCustomMaskInput.SlitWidthRequiredMessage)
-    }
+    GmosCustomMaskInput.requireSlitWidth(OptionalWidthBinding)
 
 }

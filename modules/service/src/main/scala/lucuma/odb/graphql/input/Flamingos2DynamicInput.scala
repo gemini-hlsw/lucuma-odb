@@ -5,7 +5,6 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.parallel.*
-import grackle.Result
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
 import lucuma.odb.graphql.binding.*
@@ -41,6 +40,4 @@ object Flamingos2DynamicInput:
         ), fpu.exists(_._2))
 
   val Binding: Matcher[Flamingos2DynamicConfig] =
-    OptionalWidthBinding.rmap:
-      case (config, false) => Result(config)
-      case (_, true)       => Result.failure(GmosCustomMaskInput.SlitWidthRequiredMessage)
+    GmosCustomMaskInput.requireSlitWidth(OptionalWidthBinding)

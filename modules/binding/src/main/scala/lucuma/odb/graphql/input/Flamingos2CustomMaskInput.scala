@@ -4,7 +4,6 @@
 package lucuma.odb.graphql.input
 
 import cats.syntax.parallel.*
-import grackle.Result
 import lucuma.core.enums.Flamingos2CustomSlitWidth
 import lucuma.core.model.Defined
 import lucuma.core.model.MaskDefinition
@@ -25,6 +24,4 @@ object Flamingos2CustomMaskInput:
         (Custom(mask, slitWidth.getOrElse(Flamingos2CustomSlitWidth.CustomWidth_2_pix)), slitWidth.isEmpty)
 
   val Binding: Matcher[Custom] =
-    OptionalWidthBinding.rmap:
-      case (custom, false) => Result(custom)
-      case (_, true)       => Result.failure(GmosCustomMaskInput.SlitWidthRequiredMessage)
+    GmosCustomMaskInput.requireSlitWidth(OptionalWidthBinding)
