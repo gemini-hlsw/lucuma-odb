@@ -9,7 +9,7 @@
 -- isn't yet locked (see `visit_time_accounting_locked`) to the new version and
 -- invalidates it so that it is recomputed under the new rules.  Locked visits
 -- keep the charge they have.  Staff can move an observation or a single visit
--- to the current version with the `recalculateTimeAccounting` mutation.
+-- to the current version with the `unfreezeTimeAccounting` mutation.
 
 CREATE TABLE t_time_accounting_version (
   c_version     smallint PRIMARY KEY CHECK (c_version >= 1),

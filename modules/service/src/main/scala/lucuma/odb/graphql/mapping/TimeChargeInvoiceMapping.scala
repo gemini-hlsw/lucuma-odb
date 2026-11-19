@@ -5,6 +5,7 @@ package lucuma.odb.graphql
 package mapping
 
 import cats.syntax.apply.*
+import cats.syntax.eq.*
 import cats.syntax.order.*
 import grackle.Query.Binding
 import grackle.Query.OrderBy
@@ -20,6 +21,7 @@ import lucuma.odb.graphql.table.TimeChargeCorrectionTable
 import lucuma.odb.graphql.table.TimeChargeDiscountTable
 import lucuma.odb.graphql.table.VisitTable
 import lucuma.odb.json.time.query.given
+import lucuma.odb.service.TimeAccounting
 
 trait TimeChargeInvoiceMapping[F[_]] extends VisitTable[F]
                                         with TimeChargeCorrectionTable[F]
@@ -31,6 +33,18 @@ trait TimeChargeInvoiceMapping[F[_]] extends VisitTable[F]
       SqlField("_start",      VisitTable.Start,      hidden = true),
       SqlField("_end",        VisitTable.End,        hidden = true),
       SqlField("_visitorEnd", VisitTable.VisitorEnd, hidden = true),
+      SqlField("_taVersion",  VisitTable.TaVersion,  hidden = true),
+
+      CursorField("rulesVersion", _.fieldAs[Short]("_taVersion").map(_.toInt), List("_taVersion")),
+
+      // A visit on any version other than the one implemented here isn't
+      // recomputed (see TimeAccountingService), whether it is older or, after
+      // a rollback, newer.
+      CursorField(
+        "frozen",
+        _.fieldAs[Short]("_taVersion").map(_ =!= TimeAccounting.version.Current),
+        List("_taVersion")
+      ),
 
       // The execution time is measured from the first event to the last or,
       // for a visitor instrument visit, to where its charge ends (see

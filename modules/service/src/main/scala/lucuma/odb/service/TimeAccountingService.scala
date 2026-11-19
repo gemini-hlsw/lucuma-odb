@@ -89,18 +89,18 @@ trait TimeAccountingService[F[_]] {
    * frozen.  Time charge corrections are applied to the recomputed charge as
    * they were to the original.
    */
-  def recalculateObservation(
+  def unfreezeObservation(
     observationId: Observation.Id
   )(using Transaction[F], Services.StaffAccess): F[Unit]
 
   /**
    * Moves a single visit to the current version of the time accounting rules
-   * and recomputes it, as `recalculateObservation` does for every visit of an
+   * and recomputes it, as `unfreezeObservation` does for every visit of an
    * observation.
    *
    * @return the visit's observation
    */
-  def recalculateVisit(
+  def unfreezeVisit(
     visitId: Visit.Id
   )(using Transaction[F], Services.StaffAccess): F[Result[Observation.Id]]
 
@@ -429,7 +429,7 @@ object TimeAccountingService {
       // uses.  Then moves the visits to the current version and recomputes
       // them right away, rather than leaving them dirty for updateAll, and
       // records them as updated so that the obscalc worker doesn't redo them.
-      private def recalculate(
+      private def unfreeze(
         observationId: Observation.Id,
         upgrade:       F[List[Visit.Id]]
       )(using Transaction[F]): F[Unit] =
@@ -442,22 +442,22 @@ object TimeAccountingService {
                   }
         yield ()
 
-      override def recalculateObservation(
+      override def unfreezeObservation(
         observationId: Observation.Id
       )(using Transaction[F], Services.StaffAccess): F[Unit] =
-        recalculate(
+        unfreeze(
           observationId,
           session.execute(UpgradeObservationVisits)(TimeAccounting.version.Current, observationId)
         )
 
-      override def recalculateVisit(
+      override def unfreezeVisit(
         visitId: Visit.Id
       )(using Transaction[F], Services.StaffAccess): F[Result[Observation.Id]] =
         session.option(SelectObservationId)(visitId).flatMap:
           case None      =>
             OdbError.InvalidVisit(visitId, Some(s"Visit '$visitId' not found")).asFailureF
           case Some(oid) =>
-            recalculate(
+            unfreeze(
               oid,
               session.execute(UpgradeVisit)(TimeAccounting.version.Current, visitId)
             ).as(oid.success)

@@ -5,10 +5,10 @@ package lucuma.odb.graphql.mapping
 
 import lucuma.odb.graphql.table.ObservationView
 
-trait RecalculateTimeAccountingResultMapping[F[_]] extends ObservationView[F]:
+trait UnfreezeTimeAccountingResultMapping[F[_]] extends ObservationView[F]:
 
-  lazy val RecalculateTimeAccountingResultMapping: ObjectMapping =
-    ObjectMapping(RecalculateTimeAccountingResultType)(
+  lazy val UnfreezeTimeAccountingResultMapping: ObjectMapping =
+    ObjectMapping(UnfreezeTimeAccountingResultType)(
       SqlField("id", ObservationView.Id, key = true, hidden = true),
       SqlObject("observation")
     )

@@ -15,30 +15,30 @@ import lucuma.odb.graphql.binding.ObservationReferenceBinding
 import lucuma.odb.graphql.binding.VisitIdBinding
 
 /**
- * Selects what to recalculate: a single visit, or every visit of an
+ * Selects what to unfreeze: a single visit, or every visit of an
  * observation.
  */
-sealed trait RecalculateTimeAccountingInput
+sealed trait UnfreezeTimeAccountingInput
 
-object RecalculateTimeAccountingInput:
+object UnfreezeTimeAccountingInput:
 
   final case class ForVisit(
     visitId: Visit.Id
-  ) extends RecalculateTimeAccountingInput
+  ) extends UnfreezeTimeAccountingInput
 
   final case class ForObservation(
     observationId:  Option[Observation.Id],
     observationRef: Option[ObservationReference]
-  ) extends RecalculateTimeAccountingInput
+  ) extends UnfreezeTimeAccountingInput
 
-  val Binding: Matcher[RecalculateTimeAccountingInput] =
+  val Binding: Matcher[UnfreezeTimeAccountingInput] =
     ObjectFieldsBinding.rmap:
       case List(
         ObservationIdBinding.Option("observationId", rObservationId),
         ObservationReferenceBinding.Option("observationReference", rObservationRef),
         VisitIdBinding.Option("visitId", rVisitId)
       ) =>
-        (rObservationId, rObservationRef, rVisitId).parFlatMapN[RecalculateTimeAccountingInput]:
+        (rObservationId, rObservationRef, rVisitId).parFlatMapN[UnfreezeTimeAccountingInput]:
           case (None, None, Some(vid)) => Result(ForVisit(vid))
           case (oid,  ref,  None)      => Result(ForObservation(oid, ref))
           case _                       => Result.failure("Select either a visit or an observation, not both.")

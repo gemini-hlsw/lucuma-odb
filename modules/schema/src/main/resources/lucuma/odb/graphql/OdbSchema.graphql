@@ -4185,15 +4185,18 @@ type Mutation {
   ): ReplaceGhostSequenceResult!
 
   """
-  Recomputes the time accounting of a visit, or of every visit of an
-  observation, under the current rules, including visits whose time accounting
-  was frozen when the rules changed.  Existing time charge corrections are
-  applied to the recomputed charge, so a correction that compensated for the
-  old rules may need to be revisited.  Requires staff (or better) access.
+  Moves a visit, or every visit of an observation, to the current time
+  accounting rules and recomputes its charge right away, unfreezing any whose
+  time accounting was frozen when the rules changed (see
+  `TimeChargeInvoice.frozen`).  A visit that isn't frozen is simply
+  recomputed, which is harmless since its charge already follows its changes.
+  Existing time charge corrections are applied to the recomputed charge, so a
+  correction that compensated for the old rules may need to be revisited.
+  Requires staff (or better) access.
   """
-  recalculateTimeAccounting(
-    input: RecalculateTimeAccountingInput!
-  ): RecalculateTimeAccountingResult!
+  unfreezeTimeAccounting(
+    input: UnfreezeTimeAccountingInput!
+  ): UnfreezeTimeAccountingResult!
 
   """
   Re-runs the Archive Duplication Search for an observation, replacing its
@@ -4927,6 +4930,25 @@ input SpiralTelescopeConfigGeneratorInput {
 
   "Random generator seed, which will default to a random value if not specified."
   seed: Long
+}
+
+"""
+Input parameters for unfreezing time accounting.  Select one of
+`observationId` or `observationReference` to unfreeze every visit of an
+observation, or `visitId` to unfreeze just that visit.
+"""
+input UnfreezeTimeAccountingInput {
+  observationId: ObservationId
+  observationReference: ObservationReferenceLabel
+  visitId: VisitId
+}
+
+"""
+The result of unfreezing time accounting.
+"""
+type UnfreezeTimeAccountingResult {
+  "The observation whose time accounting was unfrozen, or the visit's observation."
+  observation: Observation!
 }
 
 """
@@ -6022,25 +6044,6 @@ input RadialVelocityInput @oneOf {
   centimetersPerSecond: Long
   metersPerSecond: BigDecimal
   kilometersPerSecond: BigDecimal
-}
-
-"""
-Input parameters for recalculating time accounting.  Select one of
-`observationId` or `observationReference` to recalculate every visit of an
-observation, or `visitId` to recalculate just that visit.
-"""
-input RecalculateTimeAccountingInput {
-  observationId: ObservationId
-  observationReference: ObservationReferenceLabel
-  visitId: VisitId
-}
-
-"""
-The result of recalculating time accounting.
-"""
-type RecalculateTimeAccountingResult {
-  "The observation whose time accounting was recalculated, or the visit's observation."
-  observation: Observation!
 }
 
 "Dataset creation parameters."
@@ -23546,6 +23549,23 @@ type TimeChargeInvoice {
   initial 'executionTime'.
   """
   finalCharge: CategorizedTime!
+
+  """
+  The version of the time accounting rules that produced this charge.  Each
+  change to the rules gets a new version.
+  """
+  rulesVersion: Int!
+
+  """
+  Whether the charge is frozen because it was produced by a version of the time
+  accounting rules other than the current one.  When the rules change, a visit
+  whose time accounting was settled keeps the charge it had.  A frozen charge
+  is not recomputed, so later changes to the visit, such as dataset QA
+  updates, don't affect it.  Staff can still add corrections, which apply
+  right away, or recompute it under the current rules with
+  `unfreezeTimeAccounting`.
+  """
+  frozen: Boolean!
 }
 
 """

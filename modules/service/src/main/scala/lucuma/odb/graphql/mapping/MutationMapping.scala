@@ -102,7 +102,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] with UserEnv {
       DeleteSequence,
       InsertSmartGcal,
       LinkUser,
-      RecalculateTimeAccounting,
+      UnfreezeTimeAccounting,
       RecordDataset,
       RecordFlamingos2Visit,
       RecordGmosNorthVisit,
@@ -397,20 +397,20 @@ trait MutationMapping[F[_]] extends AccessControl[F] with UserEnv {
                   child
                 )
 
-  private lazy val RecalculateTimeAccounting: MutationField =
-    MutationField("recalculateTimeAccounting", RecalculateTimeAccountingInput.Binding): (input, child) =>
+  private lazy val UnfreezeTimeAccounting: MutationField =
+    MutationField("unfreezeTimeAccounting", UnfreezeTimeAccountingInput.Binding): (input, child) =>
       services.useTransactionally:
         requireStaffAccess:
-          val recalculated: F[Result[Observation.Id]] =
+          val unfrozen: F[Result[Observation.Id]] =
             input match
-              case RecalculateTimeAccountingInput.ForVisit(vid)            =>
-                timeAccountingService.recalculateVisit(vid)
-              case RecalculateTimeAccountingInput.ForObservation(oid, ref) =>
+              case UnfreezeTimeAccountingInput.ForVisit(vid)            =>
+                timeAccountingService.unfreezeVisit(vid)
+              case UnfreezeTimeAccountingInput.ForObservation(oid, ref) =>
                 Services.asSuperUser(observationService.resolveOid(oid, ref)).flatMap: r =>
                   r.flatTraverse: oid =>
-                    timeAccountingService.recalculateObservation(oid).as(oid.success)
-          recalculated.nestMap: oid =>
-            Filter(Predicates.recalculateTimeAccountingResult.observation.id.eql(oid), child)
+                    timeAccountingService.unfreezeObservation(oid).as(oid.success)
+          unfrozen.nestMap: oid =>
+            Filter(Predicates.unfreezeTimeAccountingResult.observation.id.eql(oid), child)
 
   private lazy val RefreshArchiveDuplication: MutationField =
     MutationField("refreshArchiveDuplication", RefreshArchiveDuplicationInput.Binding): (input, child) =>

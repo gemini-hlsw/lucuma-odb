@@ -995,10 +995,10 @@ class timeAccounting extends OdbSuite with DatabaseOperations with ExecutionTest
   def visitVersion(vid: Visit.Id): IO[Short] =
     withSession(_.unique(sql"SELECT c_ta_version FROM t_visit WHERE c_visit_id = $visit_id".query(int2))(vid))
 
-  def recalculateTimeAccountingQuery(oid: Observation.Id): String =
+  def unfreezeTimeAccountingQuery(oid: Observation.Id): String =
     s"""
       mutation {
-        recalculateTimeAccounting(input: { observationId: "$oid" }) {
+        unfreezeTimeAccounting(input: { observationId: "$oid" }) {
           observation { id }
         }
       }
@@ -1027,9 +1027,9 @@ class timeAccounting extends OdbSuite with DatabaseOperations with ExecutionTest
       _ <- runTimeAccounting(v.oid)
       _ <- assertIO(visitFinalProgramTime(v.vid), frozen)
 
-      // ... but recalculating it moves it to the current rules, right away
+      // ... but unfreezing it moves it to the current rules, right away
       // rather than leaving it for the obscalc worker.
-      _ <- query(staff, recalculateTimeAccountingQuery(v.oid))
+      _ <- query(staff, unfreezeTimeAccountingQuery(v.oid))
       _ <- assertIO(visitVersion(v.vid), TimeAccounting.version.Current)
       _ <- assertIO(visitFinalProgramTime(v.vid), 10.sec)
       _ <- assertIO(
@@ -1039,7 +1039,56 @@ class timeAccounting extends OdbSuite with DatabaseOperations with ExecutionTest
     } yield ()
   }
 
-  test("recalculateTimeAccounting keeps corrections") {
+  test("the invoice reports the rules version and whether the charge is frozen") {
+    val events = List(
+      (SequenceCommand.Start, t00),
+      (SequenceCommand.Stop,  t10)
+    )
+
+    val old    = (TimeAccounting.version.Current - 1).toShort
+    val frozen = 999.sec
+
+    def rulesAndFrozen(oid: Observation.Id): IO[(Int, Boolean)] =
+      query(pi, s"""
+        query {
+          observation(observationId: "$oid") {
+            execution {
+              visits {
+                matches {
+                  timeChargeInvoice {
+                    rulesVersion
+                    frozen
+                  }
+                }
+              }
+            }
+          }
+        }
+      """).map { json =>
+        val invoice = json.hcursor.downFields("observation", "execution", "visits", "matches").downArray.downField("timeChargeInvoice")
+        (invoice.downField("rulesVersion").require[Int], invoice.downField("frozen").require[Boolean])
+      }
+
+    for {
+      v <- recordVisit(pi, serviceUser, mode, visitTime, 1, 1, 1, 9940)
+      _ <- insertEvents(v.pid, events.map { (c, t) => SequenceEvent(EventId, t, v.oid, v.vid, none, c) })
+      _ <- runTimeAccounting(v.oid)
+      _ <- assertIO(rulesAndFrozen(v.oid), (TimeAccounting.version.Current.toInt, false))
+
+      // Stand in a charge computed by older rules.
+      _ <- setVersion(v.vid, old)
+      _ <- setFinalProgramTime(v.vid, frozen)
+      _ <- assertIO(rulesAndFrozen(v.oid), (old.toInt, true))
+
+      // A correction still applies to a frozen charge, right away, and leaves
+      // it frozen.
+      _ <- addTimeChargeCorrection(staff, v.vid, TimeChargeCorrectionInput(ChargeClass.Program, TimeChargeCorrection.Op.Add, 5.sec, none))
+      _ <- assertIO(visitFinalProgramTime(v.vid), 1004.sec)
+      _ <- assertIO(rulesAndFrozen(v.oid), (old.toInt, true))
+    } yield ()
+  }
+
+  test("unfreezeTimeAccounting keeps corrections") {
     val events = List(
       (SequenceCommand.Start, t00),
       (SequenceCommand.Stop,  t10)
@@ -1051,12 +1100,12 @@ class timeAccounting extends OdbSuite with DatabaseOperations with ExecutionTest
       _ <- runTimeAccounting(v.oid)
       _ <- addTimeChargeCorrection(staff, v.vid, TimeChargeCorrectionInput(ChargeClass.Program, TimeChargeCorrection.Op.Add, 5.sec, none))
       _ <- setVersion(v.vid, (TimeAccounting.version.Current - 1).toShort)
-      _ <- query(staff, recalculateTimeAccountingQuery(v.oid))
+      _ <- query(staff, unfreezeTimeAccountingQuery(v.oid))
       _ <- assertIO(visitFinalProgramTime(v.vid), 15.sec)
     } yield ()
   }
 
-  test("recalculateTimeAccounting with a visit id recalculates just that visit") {
+  test("unfreezeTimeAccounting with a visit id unfreezes just that visit") {
     val events = List(
       (SequenceCommand.Start, t00),
       (SequenceCommand.Stop,  t10)
@@ -1076,11 +1125,11 @@ class timeAccounting extends OdbSuite with DatabaseOperations with ExecutionTest
 
       _  <- query(staff, s"""
               mutation {
-                recalculateTimeAccounting(input: { visitId: "${v1.vid}" }) {
+                unfreezeTimeAccounting(input: { visitId: "${v1.vid}" }) {
                   observation { id }
                 }
               }
-            """).map(json => assertEquals(json.hcursor.downFields("recalculateTimeAccounting", "observation", "id").as[Observation.Id], Right(v1.oid)))
+            """).map(json => assertEquals(json.hcursor.downFields("unfreezeTimeAccounting", "observation", "id").as[Observation.Id], Right(v1.oid)))
 
       _  <- assertIO(visitVersion(v1.vid), TimeAccounting.version.Current)
       _  <- assertIO(visitFinalProgramTime(v1.vid), 10.sec)
@@ -1089,14 +1138,14 @@ class timeAccounting extends OdbSuite with DatabaseOperations with ExecutionTest
     } yield ()
   }
 
-  test("recalculateTimeAccounting rejects a visit and an observation together") {
+  test("unfreezeTimeAccounting rejects a visit and an observation together") {
     for {
       v <- recordVisit(pi, serviceUser, mode, visitTime, 1, 1, 1, 9800)
       _ <- expectOdbError(
              staff,
              s"""
                mutation {
-                 recalculateTimeAccounting(input: { observationId: "${v.oid}", visitId: "${v.vid}" }) {
+                 unfreezeTimeAccounting(input: { observationId: "${v.oid}", visitId: "${v.vid}" }) {
                    observation { id }
                  }
                }
@@ -1106,13 +1155,13 @@ class timeAccounting extends OdbSuite with DatabaseOperations with ExecutionTest
     } yield ()
   }
 
-  test("recalculateTimeAccounting with an unknown visit") {
+  test("unfreezeTimeAccounting with an unknown visit") {
     val vid = Visit.Id.fromLong(Long.MaxValue).get
     expectOdbError(
       staff,
       s"""
         mutation {
-          recalculateTimeAccounting(input: { visitId: "$vid" }) {
+          unfreezeTimeAccounting(input: { visitId: "$vid" }) {
             observation { id }
           }
         }
@@ -1189,7 +1238,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations with ExecutionTest
     } yield ()
   }
 
-  test("recalculation leaves a visit on a newer version of the rules alone") {
+  test("unfreezing leaves a visit on a newer version of the rules alone") {
     // As after a rollback.  The newer version only exists inside the
     // transaction, which is rolled back.
     val newer  = (TimeAccounting.version.Current + 1).toShort
@@ -1214,11 +1263,11 @@ class timeAccounting extends OdbSuite with DatabaseOperations with ExecutionTest
                          WHERE c_visit_id = $visit_id
                       """.command)((newer, frozen, v.vid))
 
-                 _ <- Services.asSuperUser(s.timeAccountingService.recalculateObservation(v.oid)(using xa, summon))
+                 _ <- Services.asSuperUser(s.timeAccountingService.unfreezeObservation(v.oid)(using xa, summon))
                  _ <- assertIO(version, newer)
                  _ <- assertIO(charge, frozen)
 
-                 _ <- Services.asSuperUser(s.timeAccountingService.recalculateVisit(v.vid)(using xa, summon))
+                 _ <- Services.asSuperUser(s.timeAccountingService.unfreezeVisit(v.vid)(using xa, summon))
                  _ <- assertIO(version, newer)
                  _ <- assertIO(charge, frozen)
 
@@ -1238,11 +1287,11 @@ class timeAccounting extends OdbSuite with DatabaseOperations with ExecutionTest
     }
   }
 
-  test("recalculateTimeAccounting requires staff access") {
+  test("unfreezeTimeAccounting requires staff access") {
     for {
       v <- recordVisit(pi, serviceUser, mode, visitTime, 1, 1, 1, 9500)
       _ <- setVersion(v.vid, (TimeAccounting.version.Current - 1).toShort)
-      _ <- expectOdbError(pi, recalculateTimeAccountingQuery(v.oid), { case OdbError.NotAuthorized(_, _) => () })
+      _ <- expectOdbError(pi, unfreezeTimeAccountingQuery(v.oid), { case OdbError.NotAuthorized(_, _) => () })
       _ <- assertIO(visitVersion(v.vid), (TimeAccounting.version.Current - 1).toShort)
     } yield ()
   }

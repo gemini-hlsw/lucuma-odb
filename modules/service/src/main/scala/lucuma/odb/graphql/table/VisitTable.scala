@@ -12,6 +12,7 @@ import lucuma.odb.util.Codecs.site
 import lucuma.odb.util.Codecs.time_span
 import lucuma.odb.util.Codecs.visit_id
 import skunk.codec.boolean.bool
+import skunk.codec.numeric.int2
 
 trait VisitTable[F[_]] extends BaseMapping[F]:
 
@@ -28,6 +29,7 @@ trait VisitTable[F[_]] extends BaseMapping[F]:
     val Start: ColumnRef          = col("c_start",           core_timestamp.opt)
     val End: ColumnRef            = col("c_end",             core_timestamp.opt)
     val VisitorEnd: ColumnRef     = col("c_ta_visitor_end",  core_timestamp.opt)
+    val TaVersion: ColumnRef      = col("c_ta_version",      int2)
 
     object Raw:
       val NonChargedTime = col("c_raw_non_charged_time", time_span)
