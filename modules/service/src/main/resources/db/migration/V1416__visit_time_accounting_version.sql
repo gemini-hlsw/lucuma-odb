@@ -111,11 +111,27 @@ AS $$
 $$;
 
 -- Adds a new version of the time accounting rules, which must follow the
--- current one.  Every visit whose time accounting isn't locked moves to the
--- new version and is invalidated so that the obscalc worker recomputes it
--- under the new rules.  New visits get the new version through the column
--- default.  Call it from the migration that accompanies the rule change, with
--- the same version as `TimeAccounting.version.Current`.
+-- current one.  Moves every visit that wasn't frozen when the upgrade started
+-- (it is on the version being replaced) and is either awaiting a recompute or
+-- not locked, then invalidates it so that the obscalc worker recomputes it
+-- under the new rules.
+--
+--   * Visits that were already frozen stay frozen: a change to the rules
+--     shouldn't unfreeze them (unfreezeTimeAccounting does that explicitly).
+--   * A visit awaiting a recompute (invalidated after its last time accounting
+--     update) moves even if it is locked: the code for the old rules is gone,
+--     so leaving it behind would silently drop the change that invalidated it.
+--
+-- New visits get the new version through the column default.  Call it from
+-- the migration that accompanies the rule change, with the same version as
+-- `TimeAccounting.version.Current`.
+--
+-- It updates t_visit before invalidating obscalc and takes no observation
+-- execution locks, the reverse of invalidate_visit_time_accounting's order.
+-- That is safe because migrations run as the ODB service starts, before it
+-- accepts requests, and obscalc waits for them to finish, so nothing else is
+-- writing.  Run against a live database, it could deadlock with execution
+-- events; Postgres then aborts one side, and rerunning is the remedy.
 CREATE PROCEDURE add_time_accounting_version(
   version     smallint,
   description text
@@ -135,7 +151,15 @@ BEGIN
     UPDATE t_visit
        SET c_ta_version      = version,
            c_ta_invalidation = now()
-     WHERE NOT visit_time_accounting_locked(c_visit_id, (now() AT TIME ZONE 'UTC'))
+     -- Not frozen when the upgrade started: on the version being replaced,
+     -- which the check above guarantees is `version - 1`.
+     -- (current_time_accounting_version() already returns the new one, since
+     -- its row was inserted above.)
+     WHERE c_ta_version = version - 1
+       AND (
+         c_ta_invalidation > c_ta_update
+         OR NOT visit_time_accounting_locked(c_visit_id, (now() AT TIME ZONE 'UTC'))
+       )
     RETURNING c_observation_id
   )
   SELECT array_agg(DISTINCT c_observation_id) INTO obs_ids

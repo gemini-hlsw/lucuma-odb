@@ -1177,7 +1177,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations with ExecutionTest
     )
   }
 
-  test("add_time_accounting_version moves only unlocked visits") {
+  test("add_time_accounting_version moves unlocked visits and visits awaiting a recompute, on the replaced version only") {
     val next = (TimeAccounting.version.Current + 1).toShort
 
     def versionIn(s: skunk.Session[IO], vid: Visit.Id): IO[Short] =
@@ -1189,8 +1189,22 @@ class timeAccounting extends OdbSuite with DatabaseOperations with ExecutionTest
       now    <- IO.realTimeInstant.map(Timestamp.unsafeFromInstantTruncated)
       _      <- setVisitTime(open.vid, now)
 
-      // Executed long ago, with no dataset awaiting QA.
+      // Executed long ago, with no dataset awaiting QA, and up to date.
       locked <- recordVisit(pi, serviceUser, mode, visitTime, 1, 1, 1, 9910)
+      _      <- runTimeAccounting(locked.oid)
+
+      // Locked too, but invalidated (say by a QA change) since its last
+      // update, so its recompute is still pending.
+      dirty  <- recordVisit(pi, serviceUser, mode, visitTime, 1, 1, 1, 9960)
+      _      <- runTimeAccounting(dirty.oid)
+      _      <- invalidateTimeAccounting(dirty.vid, dirty.oid)
+
+      // Already frozen on an older version: executed just now and awaiting a
+      // recompute, so it would be moved if it were on the replaced version.
+      older  <- recordVisit(pi, serviceUser, mode, visitTime, 1, 1, 1, 9970)
+      _      <- setVisitTime(older.vid, now)
+      _      <- setVersion(older.vid, (TimeAccounting.version.Current - 1).toShort)
+      _      <- invalidateTimeAccounting(older.vid, older.oid)
 
       // The procedure changes global state, so roll it back.
       _      <- withSession { s =>
@@ -1199,6 +1213,8 @@ class timeAccounting extends OdbSuite with DatabaseOperations with ExecutionTest
                       _ <- s.execute(sql"CALL add_time_accounting_version($int2, 'test')".command)(next)
                       _ <- assertIO(versionIn(s, open.vid), next)
                       _ <- assertIO(versionIn(s, locked.vid), TimeAccounting.version.Current)
+                      _ <- assertIO(versionIn(s, dirty.vid), next)
+                      _ <- assertIO(versionIn(s, older.vid), (TimeAccounting.version.Current - 1).toShort)
                       _ <- xa.rollback
                     } yield ()
                   }
