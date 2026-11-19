@@ -5,7 +5,6 @@ package lucuma.odb.graphql
 package mapping
 
 import cats.syntax.apply.*
-import cats.syntax.eq.*
 import cats.syntax.order.*
 import grackle.Query.Binding
 import grackle.Query.OrderBy
