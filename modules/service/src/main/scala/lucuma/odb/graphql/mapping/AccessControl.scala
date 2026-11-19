@@ -59,7 +59,7 @@ import lucuma.odb.graphql.input.RefreshArchiveDuplicationInput
 import lucuma.odb.graphql.input.ReplaceSequenceInput
 import lucuma.odb.graphql.input.ResetAcquisitionInput
 import lucuma.odb.graphql.input.SetAllocationsInput
-import lucuma.odb.graphql.input.SetGuideTargetNameInput
+import lucuma.odb.graphql.input.SetGuideTargetInput
 import lucuma.odb.graphql.input.SetObservationWorkflowStateInput
 import lucuma.odb.graphql.input.SetProgramReferenceInput
 import lucuma.odb.graphql.input.SetTacFeedbackInput
@@ -536,11 +536,11 @@ trait AccessControl[F[_]] extends Predicates[F] {
    * set based on access control policies and return a checked edit that is valid for execution.
    */
   def selectForUpdate(
-    input: SetGuideTargetNameInput,
+    input: SetGuideTargetInput,
     includeCalibrations: Boolean
   )(using Services[F],
           NoTransaction[F]
-  ): F[Result[AccessControl.CheckedWithId[SetGuideTargetNameInput, Observation.Id]]] =
+  ): F[Result[AccessControl.CheckedWithId[SetGuideTargetInput, Observation.Id]]] =
     Services.asSuperUser:
       observationService.resolveOid(input.observationId, input.observationRef).flatMap: r =>
         r.flatTraverse: oid =>

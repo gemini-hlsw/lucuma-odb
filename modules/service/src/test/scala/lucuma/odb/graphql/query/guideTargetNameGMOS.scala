@@ -37,7 +37,7 @@ class guideTargetNameGMOS extends ExecutionTestSupportForGmos with GuideTargetNa
       t <- createTargetWithProfileAs(pi, p)
       o <- createObservationAs(pi, p, List(t))
       _ <- setObservationTimeAndDuration(pi, o, ObsTime.some, none)
-      _ <- setGuideTargetName(pi, o, targetName1.some)
+      _ <- setCatalogGuideTarget(pi, o, targetName1.some)
       _ <- edit(o)
     yield o
 
@@ -59,7 +59,7 @@ class guideTargetNameGMOS extends ExecutionTestSupportForGmos with GuideTargetNa
         t <- createTargetWithProfileAs(pi, p)
         o <- createGmosNorthImagingObservationAs(pi, p, t)
         _ <- setObservationTimeAndDuration(pi, o, ObsTime.some, none)
-        _ <- setGuideTargetName(pi, o, targetName1.some)
+        _ <- setCatalogGuideTarget(pi, o, targetName1.some)
         _ <- query(
                pi,
                s"""

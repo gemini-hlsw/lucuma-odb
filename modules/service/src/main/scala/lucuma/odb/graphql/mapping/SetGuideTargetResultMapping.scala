@@ -7,10 +7,10 @@ package mapping
 
 import lucuma.odb.graphql.table.ObservationView
 
-trait SetGuideTargetNameResultMapping[F[_]] extends ObservationView[F] {
+trait SetGuideTargetResultMapping[F[_]] extends ObservationView[F] {
 
-  lazy val SetGuideTargetNameResultMapping =
-    ObjectMapping(SetGuideTargetNameResultType)(
+  lazy val SetGuideTargetResultMapping =
+    ObjectMapping(SetGuideTargetResultType)(
       SqlField("observationId", ObservationView.Id, key = true, hidden = true),
       SqlObject("observation")
     )

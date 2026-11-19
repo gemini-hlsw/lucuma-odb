@@ -126,7 +126,7 @@ trait GuideTargetNameSuite extends ExecutionTestSupport {
         t <- createTargetWithProfileAs(pi, p)
         o <- createObservationAs(pi, p, List(t))
         _ <- setObservationTimeAndDuration(pi, o, ObsTime.some, none)
-        _ <- setGuideTargetName(pi, o, targetName1.some)
+        _ <- setCatalogGuideTarget(pi, o, targetName1.some)
       } yield o
     setup.flatMap { oid =>
       expect(
@@ -143,7 +143,7 @@ trait GuideTargetNameSuite extends ExecutionTestSupport {
         t <- createTargetWithProfileAs(pi, p)
         o <- createObservationAs(pi, p, List(t))
         _ <- setObservationTimeAndDuration(pi, o, ObsTime.some, none)
-        _ <- setGuideTargetName(pi, o, targetName1.some)
+        _ <- setCatalogGuideTarget(pi, o, targetName1.some)
         _ <- updateAsterisms(pi, List(o), add = List.empty, del = List(t), exp = List((o -> List.empty)))
       } yield o
     setup.flatMap { oid =>
@@ -161,8 +161,8 @@ trait GuideTargetNameSuite extends ExecutionTestSupport {
         t <- createTargetWithProfileAs(pi, p)
         o <- createObservationAs(pi, p, List(t))
         _ <- setObservationTimeAndDuration(pi, o, ObsTime.some, none)
-        _ <- setGuideTargetName(pi, o, targetName1.some)
-        _ <- setGuideTargetName(pi, o, none)
+        _ <- setCatalogGuideTarget(pi, o, targetName1.some)
+        _ <- setCatalogGuideTarget(pi, o, none)
       } yield o
     setup.flatMap { oid =>
       expect(
@@ -179,7 +179,7 @@ trait GuideTargetNameSuite extends ExecutionTestSupport {
         t <- createTargetWithProfileAs(pi, p)
         o <- createObservationAs(pi, p, List(t))
         _ <- setObservationTimeAndDuration(pi, o, ObsTime.some, none)
-        _ <- setGuideTargetName(pi, o, targetName1.some)
+        _ <- setCatalogGuideTarget(pi, o, targetName1.some)
         _ <- setObservationTimeAndDuration(pi, o, none, none)
       } yield o
     setup.flatMap { oid =>
@@ -197,7 +197,7 @@ trait GuideTargetNameSuite extends ExecutionTestSupport {
         t <- createTargetWithProfileAs(pi, p)
         o <- createObservationAs(pi, p, List(t))
         _ <- setObservationTimeAndDuration(pi, o, ObsTime.some, none)
-        _ <- setGuideTargetName(pi, o, targetName1.some)
+        _ <- setCatalogGuideTarget(pi, o, targetName1.some)
         _ <- setObservationTimeAndDuration(pi, o, Later.some, none)
       } yield o
     setup.flatMap { oid =>
@@ -215,7 +215,7 @@ trait GuideTargetNameSuite extends ExecutionTestSupport {
         t <- createTargetWithProfileAs(pi, p)
         o <- createObservationAs(pi, p, List(t))
         _ <- setObservationTimeAndDuration(pi, o, ObsTime.some, none)
-        _ <- setGuideTargetName(pi, o, targetName1.some)
+        _ <- setCatalogGuideTarget(pi, o, targetName1.some)
         _ <- setObservationTimeAndDuration(pi, o, ObsTime.some, ObsDuration.some)
       } yield o
     setup.flatMap { oid =>
@@ -233,7 +233,7 @@ trait GuideTargetNameSuite extends ExecutionTestSupport {
         t <- createTargetWithProfileAs(pi, p)
         o <- createObservationAs(pi, p, List(t))
         _ <- setObservationTimeAndDuration(pi, o, ObsTime.some, none)
-        _ <- setGuideTargetName(pi, o, targetName1.some)
+        _ <- setCatalogGuideTarget(pi, o, targetName1.some)
         _ <- query(
                pi,
                s"""
@@ -260,7 +260,7 @@ trait GuideTargetNameSuite extends ExecutionTestSupport {
       t <- createTargetWithProfileAs(pi, p)
       o <- createObservationAs(pi, p, List(t))
       _ <- setObservationTimeAndDuration(pi, o, ObsTime.some, none)
-      _ <- setGuideTargetName(pi, o, targetName1.some)
+      _ <- setCatalogGuideTarget(pi, o, targetName1.some)
       _ <- query(
              pi,
              s"""
@@ -293,7 +293,7 @@ trait GuideTargetNameSuite extends ExecutionTestSupport {
         t <- createTargetWithProfileAs(pi, p)
         o <- createObservationAs(pi, p, List(t))
         _ <- setObservationTimeAndDuration(pi, o, ObsTime.some, none)
-        _ <- setGuideTargetName(pi, o, targetName1.some)
+        _ <- setCatalogGuideTarget(pi, o, targetName1.some)
         _ <- query(
                pi,
                s"""
@@ -321,7 +321,7 @@ trait GuideTargetNameSuite extends ExecutionTestSupport {
         t <- createTargetWithProfileAs(pi, p)
         o <- createObservationAs(pi, p, List(t))
         _ <- setObservationTimeAndDuration(pi, o, ObsTime.some, none)
-        _ <- setGuideTargetName(pi, o, targetName1.some)
+        _ <- setCatalogGuideTarget(pi, o, targetName1.some)
         _ <- recordVisitAs(serviceUser, o)
       } yield o
     setup.flatMap: oid =>
@@ -337,7 +337,7 @@ trait GuideTargetNameSuite extends ExecutionTestSupport {
         t   <- createTargetWithProfileAs(pi, p)
         o   <- createObservationAs(pi, p, List(t))
         _   <- setObservationTimeAndDuration(pi, o, ObsTime.some, none)
-        _   <- setGuideTargetName(pi, o, targetName1.some)
+        _   <- setCatalogGuideTarget(pi, o, targetName1.some)
         v   <- recordVisitAs(serviceUser, o)
         sid <- firstScienceAtomStepIds(serviceUser, o).map(_.head)
         _   <- addEndStepEvent(sid, v)
@@ -355,11 +355,11 @@ trait GuideTargetNameSuite extends ExecutionTestSupport {
         t    <- createTargetWithProfileAs(pi, p)
         o    <- createObservationAs(pi, p, List(t))
         _    <- setObservationTimeAndDuration(pi, o, ObsTime.some, none)
-        _    <- setGuideTargetName(pi, o, targetName1.some)
+        _    <- setCatalogGuideTarget(pi, o, targetName1.some)
         v    <- recordVisitAs(serviceUser, o)
         sids <- scienceStepIds(serviceUser, o)
         _    <- addEndStepEvent(sids(0), v)
-        _    <- setGuideTargetName(staff, o, targetName1.some)
+        _    <- setCatalogGuideTarget(staff, o, targetName1.some)
         _    <- addEndStepEvent(sids(1), v)
       } yield o
     setup.flatMap: oid =>

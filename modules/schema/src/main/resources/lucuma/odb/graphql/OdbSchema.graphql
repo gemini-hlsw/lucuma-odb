@@ -4247,9 +4247,10 @@ type Mutation {
   deleteTacFeedback(input: DeleteTacFeedbackInput!): DeleteTacFeedbackResult!
 
   """
-  Set the name of the guide target for an observation.
+  Select by hand the guide target of an observation, a catalog star or one of
+  its own targets, or return it to automatic selection.
   """
-  setGuideTargetName(input: SetGuideTargetNameInput!): SetGuideTargetNameResult!
+  setGuideTarget(input: SetGuideTargetInput!): SetGuideTargetResult!
 
   "Set the program reference."
   setProgramReference(
@@ -6675,27 +6676,90 @@ type SetupTime {
 }
 
 """
-Input parameters for setting the guide star name for an observation.
-Identify the observation to clone by specifying either its id or reference.  If
-both are specified, they must refer to the same observation.  If neither is
-specified, an error will be returned.
+The guide target selected by hand for an observation. Exactly one field is set.
 """
-input SetGuideTargetNameInput {
+type GuideTargetSelection {
+  """
+  The catalog name of the selected star, for example "Gaia DR3 123". The name
+  carries the catalog and its release.
+  """
+  catalogName: NonEmptyString
+
+  """
+  Set when the observation guides on one of its own targets. Today these are its
+  science targets, sidereal or non-sidereal, usable behind Altair, where the
+  AOWFS guides on axis.
+  """
+  observationTarget: ObservationGuideTargetSelection
+}
+
+"""
+The observation target an observation guides on.
+"""
+type ObservationGuideTargetSelection {
+  """
+  The id of the target, or null for the observation's only science target.
+  Without an id the selection is an error when the guide star is resolved if the
+  observation has more than one science target. An id that is not one of the
+  observation's science targets makes the selection unusable.
+  """
+  targetId: TargetId
+}
+
+"""
+The guide target to select for an observation. Exactly one of the fields must
+be set.
+"""
+input GuideTargetSelectionInput @oneOf {
+  """
+  The catalog name of the guide star, for example "Gaia DR3 123". The name
+  carries the catalog and its release. Gaia DR3 is the only catalog accepted for
+  now: the name must satisfy the regular expression "^Gaia DR3 (-?\d+)$".
+  """
+  catalogName: NonEmptyString
+
+  """
+  Guide on one of the observation's own targets. Today these are its science
+  targets, sidereal or non-sidereal, usable behind Altair, where the AOWFS
+  guides on axis.
+  """
+  observationTarget: ObservationGuideTargetSelectionInput
+}
+
+"""
+The observation target an observation should guide on.
+"""
+input ObservationGuideTargetSelectionInput {
+  """
+  The id of the target. Omit it when the observation has a single science
+  target: without an id the selection is an error when the guide star is
+  resolved if the observation has more than one science target. An id that is
+  not one of the observation's science targets makes the selection unusable.
+  """
+  targetId: TargetId
+}
+
+"""
+Input parameters for selecting the guide target of an observation.
+Identify the observation by specifying either its id or reference.  If both are
+specified, they must refer to the same observation.  If neither is specified,
+an error will be returned.
+"""
+input SetGuideTargetInput {
   observationId: ObservationId
   observationReference: ObservationReferenceLabel
 
   """
-  The name of the guide star. This must satisfy the regular expression "^Gaia DR3 (-?\d+)$" where the
-  numeric part is the Gaia source_id. Omit or set to null to delete the
-  selection and return to automatic guide star selection.
+  The guide target to select. Omit or set to null to delete the selection and
+  return to automatic guide target selection.
   """
-  targetName: NonEmptyString
+  guideTarget: GuideTargetSelectionInput
 }
 
 """
-The result of setting the guide target name for an observation.
+The result of selecting the guide target of an observation.
 """
-type SetGuideTargetNameResult {
+type SetGuideTargetResult {
   observation: Observation
 }
 
@@ -23088,12 +23152,16 @@ type TargetEnvironment {
 
   """
   The guide target(s) and related information.
-  If a guide target has been selected via `setGuideTargetName`, that target will
-  be returned. If it is not found or not usable, an error naming it will be
+  If a guide target has been selected via `setGuideTarget`, that target will be
+  returned. If it is not found or not usable, an error naming it will be
   returned; select another guide target or clear the selection to return to
   automatic selection. A selection is never discarded by observation or target
-  changes. If no guide target has been selected, Gaia will be searched for the
-  best guide target available.
+  changes. An observation target selected without a target id is an error if the
+  observation has more than one science target. If no guide target has been
+  selected, Gaia will be searched for the best guide target available and,
+  behind Altair, the science targets are also considered. An observation target,
+  sidereal or non-sidereal, is returned as the target it is, so the telescope
+  follows it.
   """
   guideEnvironment: GuideEnvironment!
 
@@ -23116,11 +23184,20 @@ type TargetEnvironment {
   explicitBase: Coordinates
 
   """
-  The name of the guide target, if any, selected by `setGuideTargetName`. The
-  selection is returned until it is cleared or replaced, whether or not the
+  The name of the catalog guide star, if any, selected by `setGuideTarget`; null
+  when the selection is automatic or an observation target.
+  The selection is returned until it is cleared or replaced, whether or not the
   star is usable with the current observation settings.
   """
-  guideTargetName: NonEmptyString
+  guideTargetName: NonEmptyString @deprecated(reason: "Use `guideTargetSelection` instead.")
+
+  """
+  The guide target, if any, selected by hand with `setGuideTarget`; null when
+  the selection is automatic. The selection is returned until it is cleared or
+  replaced, whether or not the star is usable with the current observation
+  settings.
+  """
+  guideTargetSelection: GuideTargetSelection
 
   """
   Whether blind offset is enabled for this observation

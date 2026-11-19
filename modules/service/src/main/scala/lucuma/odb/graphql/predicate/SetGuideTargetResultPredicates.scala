@@ -6,6 +6,6 @@ package lucuma.odb.graphql.predicate
 import grackle.Path
 import lucuma.core.model.Observation
 
-class SetGuideTargetNameResultPredicates(path: Path) {
+class SetGuideTargetResultPredicates(path: Path) {
   val observationId = LeafPredicates[Observation.Id](path / "observationId")
 }

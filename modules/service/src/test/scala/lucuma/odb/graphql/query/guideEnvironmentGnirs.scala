@@ -8,6 +8,7 @@ import cats.effect.IO
 import cats.syntax.all.*
 import io.circe.Json
 import io.circe.literal.*
+import lucuma.ags.GuideStarId
 import lucuma.ags.GuideStarName
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.math.Angle
@@ -302,7 +303,7 @@ class guideEnvironmentGnirsAltair extends ExecutionTestSupportForGnirs
     rBrightness: BigDecimal
   ): Unit =
     val resolved: Option[GuideService.ResolvedGuideStar] = resolution.star
-    assertEquals(resolved.map(_.name.value.value), name.some)
+    assertEquals(resolved.flatMap(_.guideStarId.catalogName).map(_.value.value), name.some)
     val actualSeparation: Angle = resolved.map(_.separation).get
     assert(
       (Angle.signedDecimalArcseconds.get(actualSeparation) - Angle.signedDecimalArcseconds.get(separation)).abs < BigDecimal("0.1"),
@@ -338,7 +339,7 @@ class guideEnvironmentGnirsAltair extends ExecutionTestSupportForGnirs
   test("the stored guide star resolves to its separation and R magnitude"):
     for
       oid        <- observationWithAltair("{ mode: NGS }")
-      _          <- setGuideTargetName(pi, oid, aowfsStarName.some)
+      _          <- setCatalogGuideTarget(pi, oid, aowfsStarName.some)
       resolution <- resolveGuideStar(oid)
     yield assertResolvedStar(resolution, aowfsStarName, aowfsStarSeparation, aowfsStarRBrightness)
 
@@ -363,12 +364,14 @@ class guideEnvironmentGnirsAltair extends ExecutionTestSupportForGnirs
   test("a stored star the current parameters rule out resolves as unusable"):
     for
       oid        <- observationWithAltair("{ mode: LGS_P1 }")
-      _          <- setGuideTargetName(pi, oid, pwfs1StarName.some)
+      _          <- setCatalogGuideTarget(pi, oid, pwfs1StarName.some)
       _          <- storeGuideStarName(oid, aowfsStarName)
       resolution <- resolveGuideStar(oid)
     yield assertEquals(
       resolution,
-      GuideService.GuideStarResolution.SelectedStarUnusable(GuideStarName.unsafeFrom(aowfsStarName))
+      GuideService.GuideStarResolution.SelectedStarUnusable(
+        GuideStarId.GaiaDr3(GuideStarName.gaiaSourceId.getOption(GuideStarName.unsafeFrom(aowfsStarName)).get)
+      )
     )
 
   test("a calibration that does not guide resolves to NotGuided"):
@@ -380,3 +383,342 @@ class guideEnvironmentGnirsAltair extends ExecutionTestSupportForGnirs
       _          <- setObservationCalibrationRole(List(o), CalibrationRole.DaytimePinhole)
       resolution <- resolveGuideStar(o)
     yield assertEquals(resolution, GuideService.GuideStarResolution.NotGuided)
+
+
+// Behind Altair the AOWFS guides on axis, so the science target is a guide star candidate even
+// where Gaia has no star at all.
+class guideEnvironmentGnirsAltairObservationTarget extends ExecutionTestSupportForGnirs
+                                                       with GuideEnvironmentSuite:
+
+  override val gaiaResponseString: String = GaiaVoTables.noCandidates
+
+  override def createObservationAs(user: User, pid: Program.Id, tids: List[Target.Id]): IO[Observation.Id] =
+    createGnirsLongSlitObservationAs(user, pid, tids*)
+
+  // Bright enough in R for the Altair NGS limits.
+  private val RBrightProfile: String =
+    """
+      sourceProfile: {
+        point: {
+          bandNormalized: {
+            sed: { stellarLibrary: O5_V },
+            brightnesses: [ { band: R, value: 11, units: VEGA_MAGNITUDE } ]
+          }
+        }
+      }
+    """
+
+  // Too faint in R for the Altair NGS limits.
+  private val RFaintProfile: String =
+    """
+      sourceProfile: {
+        point: {
+          bandNormalized: {
+            sed: { stellarLibrary: O5_V },
+            brightnesses: [ { band: R, value: 20, units: VEGA_MAGNITUDE } ]
+          }
+        }
+      }
+    """
+
+  private def availabilityQuery(oid: Observation.Id): String =
+    s"""
+      query {
+        observation(observationId: "$oid") {
+          targetEnvironment {
+            guideAvailability(start: "2023-08-30T00:00:00Z", end: "2023-09-06T00:00:00Z") {
+              posAngles { degrees }
+            }
+          }
+        }
+      }
+    """
+
+  // The position angles of each availability period.
+  private def availablePosAngles(oid: Observation.Id): IO[List[List[Json]]] =
+    query(user = pi, query = availabilityQuery(oid)).map:
+      _.hcursor
+        .downField("observation")
+        .downField("targetEnvironment")
+        .downField("guideAvailability")
+        .as[List[Json]]
+        .toOption
+        .get
+        .map(_.hcursor.downField("posAngles").as[List[Json]].toOption.get)
+
+  private def assertAvailability(oid: Observation.Id): IO[Unit] =
+    availablePosAngles(oid).map: angles =>
+      assert(angles.nonEmpty)
+      assert(angles.forall(_.nonEmpty), s"periods without position angles: $angles")
+
+  private def setAltairNgs(oid: Observation.Id): IO[Unit] =
+    query(
+      user  = pi,
+      query = s"""
+        mutation {
+          updateObservations(input: {
+            WHERE: { id: { EQ: "$oid" } }
+            SET: { targetEnvironment: { altair: { mode: NGS } } }
+          }) {
+            observations { id }
+          }
+        }
+      """
+    ).void
+
+  private def altairNgsObservation(tids: List[Target.Id], pid: Program.Id): IO[Observation.Id] =
+    for
+      o <- createObservationAs(pi, pid, tids)
+      _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
+      _ <- setAltairNgs(o)
+    yield o
+
+  // The science target and the observation that guides on it.
+  private def altairNgsObservation(sourceProfile: String): IO[(Target.Id, Observation.Id)] =
+    for
+      p <- createProgramAs(pi)
+      t <- createTargetWithProfileAs(pi, p, sourceProfile)
+      o <- altairNgsObservation(List(t), p)
+    yield (t, o)
+
+  private def observationWithAltairNgs: IO[Observation.Id] =
+    altairNgsObservation(RBrightProfile).map(_._2)
+
+  // A bright sidereal target near V1647 Orionis.
+  private def createBrightTargetAs(pid: Program.Id, name: String, ra: String): IO[Target.Id] =
+    query(
+      user  = pi,
+      query = s"""
+        mutation {
+          createTarget(input: {
+            programId: "$pid"
+            SET: {
+              name: "$name"
+              sidereal: {
+                ra: { hms: "$ra" }
+                dec: { dms: "-00:06:04.89" }
+                epoch: "J2000.0"
+              }
+              $RBrightProfile
+            }
+          }) {
+            target { id }
+          }
+        }
+      """
+    ).map(_.hcursor.downFields("createTarget", "target", "id").require[Target.Id])
+
+  private def observationTargetQuery(oid: Observation.Id): String =
+    s"""
+      query {
+        observation(observationId: "$oid") {
+          targetEnvironment {
+            guideEnvironment {
+              guideTargets {
+                name
+                probe
+                sidereal {
+                  ra { hms }
+                  dec { dms }
+                }
+              }
+            }
+          }
+        }
+      }
+    """
+
+  private val observationTargetResult: Either[List[String], Json] =
+    json"""
+    {
+      "observation": {
+        "targetEnvironment": {
+          "guideEnvironment": {
+            "guideTargets": [
+              {
+                "name": "V1647 Orionis",
+                "probe": "ALTAIR_AOWFS",
+                "sidereal": {
+                  "ra": { "hms": "05:46:13.137000" },
+                  "dec": { "dms": "-00:06:04.890000" }
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+    """.asRight
+
+  private def guideTargetNamesQuery(oid: Observation.Id): String =
+    s"""
+      query {
+        observation(observationId: "$oid") {
+          targetEnvironment {
+            guideEnvironment {
+              guideTargets {
+                name
+                probe
+              }
+            }
+          }
+        }
+      }
+    """
+
+  private def guideTargetNamesResult(name: String): Either[List[String], Json] =
+    json"""
+    {
+      "observation": {
+        "targetEnvironment": {
+          "guideEnvironment": {
+            "guideTargets": [
+              {
+                "name": $name,
+                "probe": "ALTAIR_AOWFS"
+              }
+            ]
+          }
+        }
+      }
+    }
+    """.asRight
+
+  private def setGuideTargetMutation(oid: Observation.Id, guideTarget: String): String =
+    s"""
+      mutation {
+        setGuideTarget(input: { observationId: "$oid", guideTarget: $guideTarget }) {
+          observation { id }
+        }
+      }
+    """
+
+  private def resolveGuideStar(oid: Observation.Id): IO[GuideService.GuideStarResolution] =
+    withServices(pi): services =>
+      Services.asSuperUser(services.guideService.resolveGuideStar(oid)).flatMap(_.get)
+
+  test("Altair NGS guides on the science target when Gaia has no star"):
+    observationWithAltairNgs.flatMap: oid =>
+      expect(pi, observationTargetQuery(oid), expected = observationTargetResult)
+
+  test("the science target gives guide availability when Gaia has no star"):
+    observationWithAltairNgs.flatMap(assertAvailability)
+
+  // Behind Altair the sequence is sized from the star, so without one there is no availability.
+  test("a science target too faint to guide on gives no guide availability"):
+    altairNgsObservation(RFaintProfile).flatMap: (_, oid) =>
+      expect(
+        pi,
+        availabilityQuery(oid),
+        expected = List(
+          s"Could not generate a sequence for $oid: Altair needs a guide star but none is usable."
+        ).asLeft
+      )
+
+  test("the selected observation target resolves to the science target"):
+    for
+      (tid, oid) <- altairNgsObservation(RBrightProfile)
+      _          <- setGuideTarget(pi, oid, "{ observationTarget: {} }".some)
+      _          <- expect(pi, observationTargetQuery(oid), expected = observationTargetResult)
+      resolution <- resolveGuideStar(oid)
+    yield
+      val resolved: Option[GuideService.ResolvedGuideStar] = resolution.star
+      assertEquals(resolved.map(_.guideStarId), GuideStarId.ObservationTarget(tid.some).some)
+      val separation: Angle = resolved.map(_.separation).get
+      assert(Angle.signedMicroarcseconds.get(separation).abs < 1000L, s"unexpected separation $separation")
+
+  test("with two science targets an id-less observation target selection is ambiguous, an id'd one is followed"):
+    for
+      p      <- createProgramAs(pi)
+      first  <- createBrightTargetAs(p, "First", "05:46:13.137")
+      second <- createBrightTargetAs(p, "Second", "05:46:13.470")
+      oid    <- altairNgsObservation(List(first, second), p)
+      // Automatic selection picks one of them.
+      _      <- query(pi, guideTargetNamesQuery(oid)).map: json =>
+                  val probes: Option[List[String]] =
+                    json.hcursor
+                      .downFields("observation", "targetEnvironment", "guideEnvironment", "guideTargets")
+                      .as[List[Json]]
+                      .toOption
+                      .map(_.flatMap(_.hcursor.downField("probe").as[String].toOption))
+                  assertEquals(probes, List("ALTAIR_AOWFS").some)
+      _      <- expect(
+                  pi,
+                  setGuideTargetMutation(oid, "{ observationTarget: {} }"),
+                  expected = List(
+                    s"Could not generate a sequence for $oid: ${GuideService.ambiguousObservationTargetMessage(oid)}"
+                  ).asLeft
+                )
+      _      <- setGuideTarget(pi, oid, s"""{ observationTarget: { targetId: "$second" } }""".some)
+      _      <- expect(pi, guideTargetNamesQuery(oid), expected = guideTargetNamesResult("Second"))
+    yield ()
+
+  test("an observation target selection naming a target not in the observation is unusable"):
+    for
+      (tid, oid) <- altairNgsObservation(RBrightProfile)
+      p          <- query(pi, s"""query { observation(observationId: "$oid") { program { id } } }""")
+                      .map(_.hcursor.downFields("observation", "program", "id").require[Program.Id])
+      other      <- createTargetWithProfileAs(pi, p, RBrightProfile)
+      _          <- expect(
+                      pi,
+                      setGuideTargetMutation(oid, s"""{ observationTarget: { targetId: "$other" } }"""),
+                      expected = List(
+                        s"Could not generate a sequence for $oid: ${GuideService.selectedStarUnusableMessage(GuideStarId.ObservationTarget(other.some))}"
+                      ).asLeft
+                    )
+      resolution <- resolveGuideStar(oid)
+    yield assertEquals(resolution.star.map(_.guideStarId), GuideStarId.ObservationTarget(tid.some).some)
+
+  test("Altair NGS guides on a non-sidereal science target, which it follows"):
+    val setup: IO[Observation.Id] =
+      for
+        p   <- createProgramAs(pi)
+        eph  = createNonsiderealEphemeris
+        t   <- createNonsiderealTargetWithUserSuppliedEphemerisAs(pi, p, eph, name = "Nonsidereal Target", sourceProfile = RBrightProfile)
+        o   <- altairNgsObservation(List(t), p)
+      yield o
+
+    val nonsiderealQuery: Observation.Id => String =
+      oid => s"""
+        query {
+          observation(observationId: "$oid") {
+            targetEnvironment {
+              guideEnvironment {
+                guideTargets {
+                  name
+                  probe
+                  sidereal { epoch }
+                  nonsidereal { keyType }
+                }
+              }
+            }
+          }
+        }
+      """
+
+    for
+      oid <- setup
+      _   <- expect(
+               pi,
+               nonsiderealQuery(oid),
+               expected = json"""
+                 {
+                   "observation": {
+                     "targetEnvironment": {
+                       "guideEnvironment": {
+                         "guideTargets": [
+                           {
+                             "name": "Nonsidereal Target",
+                             "probe": "ALTAIR_AOWFS",
+                             "sidereal": null,
+                             "nonsidereal": { "keyType": "USER_SUPPLIED" }
+                           }
+                         ]
+                       }
+                     }
+                   }
+                 }
+               """.asRight
+             )
+      _   <- assertAvailability(oid)
+    yield ()

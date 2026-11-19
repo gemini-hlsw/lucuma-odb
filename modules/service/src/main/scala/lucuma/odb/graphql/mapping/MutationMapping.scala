@@ -122,7 +122,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] with UserEnv {
       RevokeGroupConstraintWaiver,
       RevokeUserInvitation,
       SetAllocations,
-      SetGuideTargetName,
+      SetGuideTarget,
       SetObservationWorkflowState,
       SetProgramReference,
       SetProgramResourceLimit,
@@ -865,19 +865,19 @@ trait MutationMapping[F[_]] extends AccessControl[F] with UserEnv {
             tacFeedbackService.deleteTacFeedback(checked).nestMap: b =>
               Json.obj("result" -> b.asJson)
 
-  private lazy val SetGuideTargetName =
-    MutationField("setGuideTargetName", SetGuideTargetNameInput.Binding): (input, child) =>
+  private lazy val SetGuideTarget =
+    MutationField("setGuideTarget", SetGuideTargetInput.Binding): (input, child) =>
       services.useNonTransactionally:
         selectForUpdate(input, false /* ignore cals */).flatMap: r =>
           r match
-            // This shortcuts setGuideTargetName if we know it has to fail
-            case r @ Warning(problems, AccessControl.Checked.Empty) => Failure(problems).pure[F]
-            case other =>
+            // This shortcuts setGuideTarget if we know it has to fail
+            case Warning(problems, AccessControl.Checked.Empty) => Failure(problems).pure[F]
+            case other                                          =>
               other.flatTraverse: checked =>
                 guideService
-                  .setGuideTargetName(checked)
+                  .setGuideTarget(checked)
                   .nestMap: oid =>
-                    Unique(Filter(Predicates.setGuideTargetNameResult.observationId.eql(oid), child))
+                    Unique(Filter(Predicates.setGuideTargetResult.observationId.eql(oid), child))
 
   private lazy val SetObservationWorkflowState =
     MutationField.json("setObservationWorkflowState", SetObservationWorkflowStateInput.Binding): input =>

@@ -13,7 +13,7 @@ import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
 import grackle.Result
-import lucuma.ags.GuideStarName
+import lucuma.ags.GuideStarId
 import lucuma.core.data.Zipper
 import lucuma.core.enums.AltairMode
 import lucuma.core.model.ConstraintSet
@@ -124,8 +124,8 @@ object GeneratorContext:
   private def noUsableStar(oid: Observation.Id): OdbError =
     GeneratorError.sequenceUnavailable(oid, "Altair needs a guide star but none is usable.")
 
-  private def selectedStarUnusable(oid: Observation.Id, name: GuideStarName): OdbError =
-    GeneratorError.sequenceUnavailable(oid, GuideService.selectedStarUnusableMessage(name))
+  private def selectedStarUnusable(oid: Observation.Id, selection: GuideStarId): OdbError =
+    GeneratorError.sequenceUnavailable(oid, GuideService.selectedStarUnusableMessage(selection))
 
   private def unsettled(oid: Observation.Id): String =
     s"$oid: The Altair guide star selection did not settle after $MaxAltairGuideStarPasses passes; using the last selection."
@@ -267,18 +267,18 @@ object GeneratorContext:
         digest   <- digestOf(ctx)
         verified <- EitherT.liftF(verify(ctx, digest))
         settled  <- verified match
-                      case Right(GuideService.GuideStarResolution.Resolved(guideStar = resolved)) =>
+                      case Right(GuideService.GuideStarResolution.Resolved(guideStar = resolved))      =>
                         val next: GeneratorParams = withAltairGuideStar(params, resolved.some)
                         if next === ctx.params then EitherT.pure(ctx)
                         else if number >= MaxAltairGuideStarPasses then EitherT.liftF(Logger[F].warn(unsettled(oid))).as(ctx)
                         else generate(resolved.some).flatMap(go(number + 1, _))
-                      case Right(GuideService.GuideStarResolution.NotGuided)                      =>
+                      case Right(GuideService.GuideStarResolution.NotGuided)                           =>
                         EitherT.pure(ctx)
-                      case Right(GuideService.GuideStarResolution.NoUsableStar)                   =>
+                      case Right(GuideService.GuideStarResolution.NoUsableStar)                        =>
                         EitherT.pure(ctx.copy(altairProblem = noUsableStar(oid).some))
-                      case Right(GuideService.GuideStarResolution.SelectedStarUnusable(name = n)) =>
-                        EitherT.pure(ctx.copy(altairProblem = selectedStarUnusable(oid, n).some))
-                      case Left(problem)                                                          =>
+                      case Right(GuideService.GuideStarResolution.SelectedStarUnusable(selection = s)) =>
+                        EitherT.pure(ctx.copy(altairProblem = selectedStarUnusable(oid, s).some))
+                      case Left(problem)                                                               =>
                         EitherT.pure(ctx.copy(altairProblem = problem.some))
       yield settled
 
@@ -286,15 +286,15 @@ object GeneratorContext:
       if params.altair.exists(_.mode === AltairMode.LgsP1) then generate(none).flatMap(go(1, _))
       else
         EitherT(pick).flatMap:
-          case GuideService.GuideStarResolution.Resolved(guideStar = star)     =>
+          case GuideService.GuideStarResolution.Resolved(guideStar = star)          =>
             generate(star.some).flatMap(go(1, _))
           // A calibration that does not guide is generated without Altair parameters.
-          case GuideService.GuideStarResolution.NotGuided                      =>
+          case GuideService.GuideStarResolution.NotGuided                           =>
             generate(none)
-          case GuideService.GuideStarResolution.NoUsableStar                   =>
+          case GuideService.GuideStarResolution.NoUsableStar                        =>
             EitherT.leftT(noUsableStar(oid))
-          case GuideService.GuideStarResolution.SelectedStarUnusable(name = n) =>
-            EitherT.leftT(selectedStarUnusable(oid, n))
+          case GuideService.GuideStarResolution.SelectedStarUnusable(selection = s) =>
+            EitherT.leftT(selectedStarUnusable(oid, s))
 
     settled.value
 

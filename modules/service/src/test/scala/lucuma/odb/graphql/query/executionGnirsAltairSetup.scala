@@ -55,7 +55,7 @@ class executionGnirsAltairSetup extends ExecutionTestSupportForGnirs
       o <- createObservationAs(pi, p, List(t))
       _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
       _ <- setAltair(o, altair)
-      _ <- IO.whenA(guideStar)(setGuideTargetName(pi, o, aowfsStarName.some))
+      _ <- IO.whenA(guideStar)(setCatalogGuideTarget(pi, o, aowfsStarName.some))
     yield (p, o)
 
   private def setupTime(pid: Program.Id, oid: Observation.Id): IO[TimeSpan] =
