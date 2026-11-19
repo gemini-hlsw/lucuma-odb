@@ -23567,18 +23567,13 @@ type TimeChargeInvoice {
   rulesVersion: Int!
 
   """
-  Whether the charge is frozen: produced by a version of the time accounting
-  rules other than the one this service implements.  A frozen charge isn't
-  recomputed, so later changes to the visit, such as dataset QA updates, don't
-  affect it.  Staff can still add corrections, which apply right away, or
-  recompute it under the current rules with `unfreezeTimeAccounting`.
-
-  A visit becomes frozen when the rules change while its time accounting is
-  locked, unless it is awaiting a recompute at the time.  It is locked once
-  staff have corrected its charge, once its observing night is over and none
-  of its written science datasets is awaiting QA, or once a week has passed
-  since its night ended.  Other visits move to the new rules and are
-  recomputed.  Being locked changes nothing until the rules change.
+  Whether the charge is frozen: worked out under earlier time accounting rules
+  than the ones in effect now.  A visit's charge follows the rules in effect
+  while it was observed and reviewed, and a later change to the rules leaves it
+  as it was.  A frozen charge isn't recomputed, so later changes to the visit,
+  such as dataset QA updates, don't affect it.  Staff can still add
+  corrections, which apply right away, or recompute it under the current rules
+  with `unfreezeTimeAccounting`.
   """
   frozen: Boolean!
 }
