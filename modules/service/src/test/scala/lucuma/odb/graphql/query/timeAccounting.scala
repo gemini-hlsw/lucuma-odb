@@ -1105,6 +1105,29 @@ class timeAccounting extends OdbSuite with DatabaseOperations with ExecutionTest
     } yield ()
   }
 
+  test("a correction added while frozen survives unfreezing") {
+    val events = List(
+      (SequenceCommand.Start, t00),
+      (SequenceCommand.Stop,  t10)
+    )
+
+    for {
+      v <- recordVisit(pi, serviceUser, mode, visitTime, 1, 1, 1, 9980)
+      _ <- insertEvents(v.pid, events.map { (c, t) => SequenceEvent(EventId, t, v.oid, v.vid, none, c) })
+      _ <- runTimeAccounting(v.oid)
+
+      // Frozen on an older version, then corrected.
+      _ <- setVersion(v.vid, (TimeAccounting.version.Current - 1).toShort)
+      _ <- setFinalProgramTime(v.vid, 999.sec)
+      _ <- addTimeChargeCorrection(staff, v.vid, TimeChargeCorrectionInput(ChargeClass.Program, TimeChargeCorrection.Op.Add, 5.sec, none))
+      _ <- assertIO(visitFinalProgramTime(v.vid), 1004.sec)
+
+      // Unfreezing recomputes the charge and applies the correction to it.
+      _ <- query(staff, unfreezeTimeAccountingQuery(v.oid))
+      _ <- assertIO(visitFinalProgramTime(v.vid), 15.sec)
+    } yield ()
+  }
+
   test("unfreezeTimeAccounting with a visit id unfreezes just that visit") {
     val events = List(
       (SequenceCommand.Start, t00),
@@ -2268,6 +2291,30 @@ class timeAccounting extends OdbSuite with DatabaseOperations with ExecutionTest
       // A next visit would otherwise end its charge differently.
       next        <- recordVisit(pi, serviceUser, mode, futureTime, 1, 1, 1, 3750)
       _           <- insertSequence(next, future(30), future(40))
+      _           <- assertIO(runVisitorSweep, 0)
+    yield ()
+
+  test("visitor: unfreezing recomputes the charge and records where it ends"):
+    for
+      _           <- cleanup
+      (p, o, v)   <- recordVisitorVisit(futureTime)
+      _           <- insertSlew(p, o, v, future(0), future(10))
+      _           <- runTimeAccounting(o)
+      _           <- assertIO(visitFinalProgramTime(v), 10.sec)
+
+      // Frozen, so a next visit at the site doesn't extend its charge: the
+      // sweep leaves it alone.
+      _           <- setVersion(v, (TimeAccounting.version.Current - 1).toShort)
+      next        <- recordVisit(pi, serviceUser, mode, futureTime, 1, 1, 1, 3780)
+      _           <- insertSequence(next, future(30), future(40))
+      _           <- assertIO(runVisitorSweep, 0)
+      _           <- assertIO(visitFinalProgramTime(v), 10.sec)
+
+      // Unfreezing charges it until the next visit started and records that
+      // end, so the sweep still has nothing to do.
+      _           <- query(staff, unfreezeTimeAccountingQuery(o))
+      _           <- assertIO(visitVersion(v), TimeAccounting.version.Current)
+      _           <- assertIO(visitFinalProgramTime(v), 30.sec)
       _           <- assertIO(runVisitorSweep, 0)
     yield ()
 
