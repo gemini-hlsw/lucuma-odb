@@ -129,7 +129,9 @@ object CalcMain extends MainParams:
    * obscalc down for a while, since Heroku waits a long time before retrying a
    * dyno that crashed twice.  Each check for pending migrations also beats the
    * worker heartbeat, so that obscalc doesn't look dead to monitoring while a
-   * long migration runs.
+   * long migration runs.  If migrations are still pending after
+   * `MigrationDeadline`, it fails, so that a wait that will never end shows as
+   * a crashed dyno rather than a healthy heartbeat.
    */
   def startupDiagnostics[F[_]: Async: Console: Network: Logger](
     config:            Config.Database,
@@ -140,13 +142,18 @@ object CalcMain extends MainParams:
       if skipMigrationWait then
         Logger[F].info("Not waiting for pending migrations.  Ensure that your database is up-to-date.")
       else
-        FMain.awaitMigrations(heartbeat >> FMain.pendingMigrations[F](config), MigrationPollPeriod)
+        FMain.awaitMigrations(heartbeat >> FMain.pendingMigrations[F](config), MigrationPollPeriod, MigrationDeadline)
 
     awaitMigrations >>
       FMain.runStartupDiagnostics[F](config, fatal = true, applicationName = "odb-obscalc")
 
   val MigrationPollPeriod: FiniteDuration =
     5.seconds
+
+  // Long enough for any migration we expect.  After it, obscalc exits so that
+  // a crashed dyno reveals that it can't start.
+  val MigrationDeadline: FiniteDuration =
+    15.minutes
 
   /** A resource that yields a Skunk session pool. */
   def databasePoolResource[F[_]: Temporal: TracerProvider: MeterProvider: Network: Console](

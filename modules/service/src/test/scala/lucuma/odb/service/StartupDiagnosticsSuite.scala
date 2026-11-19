@@ -44,6 +44,12 @@ class StartupDiagnosticsSuite extends OdbSuite:
       // Two polls find a pending migration, the third finds none.
       calls  <- Ref.of[IO, Int](0)
       pending = calls.getAndUpdate(_ + 1).map(n => if n < 2 then List("V9999: next") else Nil)
-      _      <- FMain.awaitMigrations(pending, 10.millis)
+      _      <- FMain.awaitMigrations(pending, 10.millis, 1.minute)
       _      <- assertIO(calls.get, 3)
     yield ()
+
+  test("awaitMigrations fails once its deadline passes"):
+    FMain
+      .awaitMigrations(IO.pure(List("V9999: never")), 10.millis, 100.millis)
+      .attempt
+      .map(r => assert(r.isLeft, "awaitMigrations returned"))

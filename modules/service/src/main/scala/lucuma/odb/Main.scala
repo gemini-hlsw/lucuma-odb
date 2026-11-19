@@ -346,18 +346,30 @@ object FMain extends MainParams {
    * `pollPeriod`.  A process that doesn't migrate the database itself (e.g.,
    * obscalc) can start before the ODB service has finished migrating it, and
    * it must not run its startup diagnostics against the old schema.
+   *
+   * Fails if migrations are still pending after `deadline`, as when the ODB
+   * service's migration failed or was skipped, so that a process that will
+   * never start fails visibly instead of waiting forever.
    */
   def awaitMigrations[F[_]: Temporal: Logger](
     pending:    F[List[String]],
-    pollPeriod: FiniteDuration
+    pollPeriod: FiniteDuration,
+    deadline:   FiniteDuration
   ): F[Unit] =
-    pending.flatMap:
-      case Nil  =>
-        Logger[F].info("The database has no pending migrations.")
-      case next :: rest =>
-        Logger[F].info(s"Waiting for ${rest.size + 1} pending migration(s), starting with $next.") >>
-          Temporal[F].sleep(pollPeriod) >>
-          awaitMigrations(pending, pollPeriod)
+    def loop: F[Unit] =
+      pending.flatMap:
+        case Nil  =>
+          Logger[F].info("The database has no pending migrations.")
+        case next :: rest =>
+          Logger[F].info(s"Waiting for ${rest.size + 1} pending migration(s), starting with $next.") >>
+            Temporal[F].sleep(pollPeriod) >>
+            loop
+
+    val timedOut: F[Unit] =
+      val msg = s"Migrations are still pending after $deadline.  Has the ODB service failed to migrate the database?"
+      Logger[F].error(msg) >> Temporal[F].raiseError(new RuntimeException(msg))
+
+    Temporal[F].timeoutTo(loop, deadline, timedOut)
 
   private def dbSessionBuilder[F[_]: Temporal: Console: Network: TracerProvider: MeterProvider](
     config:          Config.Database,
