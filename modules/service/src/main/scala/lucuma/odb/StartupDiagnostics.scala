@@ -216,17 +216,31 @@ object StartupDiagnostics:
       // version of the rules and recorded as another.
       def checkTimeAccountingVersion: Check[F] =
         StateT.modifyF: ds =>
-          db.unique(sql"SELECT current_time_accounting_version()".query(int2.opt)).map:
-            case Some(v) if v === TimeAccounting.version.Current =>
-              ds
+          val current = TimeAccounting.version.Current
+          db.unique(sql"SELECT current_time_accounting_version()".query(int2.opt)).flatMap:
+            case Some(v) if v === current =>
+              ds.pure[F]
+
+            // The database is ahead of the code, as after a rollback.  This
+            // code leaves visits on the newer version alone (they stay dirty
+            // and aren't unfrozen), so it is safe to run, just not complete:
+            // those visits aren't recomputed until code for their version
+            // runs again.
+            case Some(v) if v > current =>
+              Logger[F].warn(
+                s"Time accounting: the latest rules version in t_time_accounting_version is $v, newer than version $current, which this service implements (e.g., after a rollback).  Visits on version $v won't be recomputed until a service that implements it runs."
+              ).as(ds)
+
+            // The database is behind the code: a migration is missing.
             case Some(v) =>
               ds.updated(List(
-                s"Time accounting: the service implements rules version ${TimeAccounting.version.Current} but the latest version in t_time_accounting_version is $v."
-              ))
+                s"Time accounting: the service implements rules version $current but the latest version in t_time_accounting_version is $v.  The migration that adds version $current is missing."
+              )).pure[F]
+
             case None    =>
               ds.updated(List(
-                s"Time accounting: t_time_accounting_version is empty, but the service implements rules version ${TimeAccounting.version.Current}."
-              ))
+                s"Time accounting: t_time_accounting_version is empty, but the service implements rules version $current."
+              )).pure[F]
 
       def runAllDiagnostics(fatal: Boolean): F[Unit] =
         runChecks(allDiagnostics, fatal)
