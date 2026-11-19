@@ -133,7 +133,7 @@ object PerProgramPerConfigCalibrationsService:
                           program_id
                         ),
                     system = true,
-                    calibrationRoles = List(CalibrationRole.Twilight, CalibrationRole.SpectroPhotometric, CalibrationRole.MosMaskFlat)
+                    calibrationRoles = List(CalibrationRole.Twilight, CalibrationRole.SpectroPhotometric, CalibrationRole.DaytimeMaskImage)
                   ).map(_.toOption)
               }
             case _ => none.pure[F]
@@ -382,7 +382,7 @@ object PerProgramPerConfigCalibrationsService:
                   (recordMaskFile(f.oid, source.remotePath) *> refresh(f.oid)).as(none)
                 case None    =>
                   for
-                    oid <- insertDaytimeCalibration(pid, cg, CalibrationRole.MosMaskFlat)
+                    oid <- insertDaytimeCalibration(pid, cg, CalibrationRole.DaytimeMaskImage)
                     _   <- replaceObservingMode(source.oid, source.modeType.some, oid, none)
                     _   <- recordMaskFile(oid, source.remotePath)
                     _   <- setBand(oid, band)
@@ -673,7 +673,7 @@ object PerProgramPerConfigCalibrationsService:
         ) m ON m.c_observation_id = o.c_observation_id
         LEFT JOIN t_mos_mask_flat f ON f.c_observation_id = o.c_observation_id
         WHERE o.c_program_id       = $program_id
-          AND o.c_calibration_role = 'mos_mask_flat'
+          AND o.c_calibration_role = 'daytime_mask_image'
           AND o.c_existence        = 'present'
         ORDER BY o.c_observation_id
       """.query(observation_id *: attachment_id.opt *: text.opt)

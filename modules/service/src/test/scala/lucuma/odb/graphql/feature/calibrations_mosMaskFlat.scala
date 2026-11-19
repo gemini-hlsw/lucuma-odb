@@ -111,7 +111,7 @@ class calibrations_mosMaskFlat
     ).flatMap(_.hcursor.downFields("observation", "observingMode", "gmosNorthMos", "customMask", "slitWidth").as[String].liftTo[IO])
 
   private def flatsOf(pid: Program.Id): IO[List[Observation.Id]] =
-    queryCalibrationsWithRole(pid, CalibrationRole.MosMaskFlat)
+    queryCalibrationsWithRole(pid, CalibrationRole.DaytimeMaskImage)
 
   private def maskOfFlat(oid: Observation.Id, mode: String): IO[Option[Attachment.Id]] =
     query(
