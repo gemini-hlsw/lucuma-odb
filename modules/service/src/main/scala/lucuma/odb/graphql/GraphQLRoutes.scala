@@ -50,6 +50,7 @@ import skunk.Session
 import skunk.SqlState
 import skunk.exception.TooManyParametersException
 
+import java.lang.management.ManagementFactory
 import java.nio.file.Files
 import java.nio.file.Path as NIOPath
 import scala.concurrent.duration.*
@@ -119,7 +120,7 @@ object GraphQLRoutes {
         L.debug(s"${describe(ctx)}: $message")
 
       val service: GraphQLService[F] =
-        new GraphQLService[F](odbMapping) {
+        new GraphQLService[F](odbMapping, OdbMapping.slowQueryThreshold.some) {
 
           override def query(
             ctx:           RequestContext,
@@ -150,6 +151,9 @@ object GraphQLRoutes {
               .withSpanKind(SpanKind.Server)
               .build
               .use: span =>
+                // Tells a cold start apart from a slow query.
+                F.delay(ManagementFactory.getRuntimeMXBean.getUptime / 1000L)
+                  .flatMap(s => span.addAttribute(Attribute("process.uptime_s", s))) *>
                 F.timed(
                   resolveAndRun
                     .handleError(Result.InternalError.apply)
