@@ -35,15 +35,18 @@ import lucuma.core.enums.GnirsGrating
 import lucuma.core.enums.GnirsPixelScale
 import lucuma.core.enums.GnirsPrism
 import lucuma.core.enums.GnirsWellDepth
+import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.StepStage
 import lucuma.core.math.BoundedInterval
 import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
+import lucuma.core.model.ServiceUser
 import lucuma.core.model.User
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.StepConfig.Gcal
 import lucuma.core.model.sequence.gnirs.GnirsFpu
+import lucuma.core.util.CalculationState
 import lucuma.core.util.IdempotencyKey
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.OdbError
@@ -59,7 +62,7 @@ import skunk.Session
 
 class recordVisit extends OdbSuite with query.GenerationTestSupport with ExecutionState:
 
-  val service: User = TestUsers.service(nextId)
+  val service: ServiceUser = TestUsers.service(nextId)
 
   override lazy val validUsers: List[User] = List(service)
 
@@ -530,6 +533,147 @@ class recordVisit extends OdbSuite with query.GenerationTestSupport with Executi
         e1  <- stepExecutionState(service, oid)
       yield (e0 === List(StepExecutionState.Abandoned, StepExecutionState.Ongoing)) &&
             e1.forall(_ === StepExecutionState.Abandoned)
+
+  // The number of steps of every type in the observation's remaining science
+  // sequence, according to its stored execution digest.
+  def remainingSteps(oid: Observation.Id): IO[Int] =
+    query(
+      user  = service,
+      query = s"""
+        query {
+          observation(observationId: "$oid") {
+            execution {
+              digest {
+                value {
+                  science {
+                    steps {
+                      bias { count }
+                      dark { count }
+                      arc { count }
+                      flat { count }
+                      science { count }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      """
+    ).flatMap: js =>
+      val steps = js.hcursor.downFields("observation", "execution", "digest", "value", "science", "steps")
+      List("bias", "dark", "arc", "flat", "science")
+        .traverse(k => steps.downFields(k, "count").as[Int])
+        .map(_.sum)
+        .leftMap(f => new RuntimeException(f.message))
+        .liftTo[IO]
+
+  test("recordVisit - abandoning another observation's step invalidates its obscalc"):
+    for
+      pid <- createProgramAs(service)
+      tid <- createTargetWithProfileAs(service, pid)
+      oid <- createObservationAs(service, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
+      o2  <- createObservationAs(service, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
+      ss  <- firstScienceAtomStepIds(service, oid)
+      v0  <- recordVisitAs(service, oid)
+      _   <- addStepEventAs(service, ss(0), v0, StepStage.StartStep)
+      _   <- runObscalcUpdateAs(service, pid, oid)
+      r0  <- remainingSteps(oid)        // includes the ongoing step
+      _   <- recordVisitAs(service, o2)
+      c0  <- obscalcRow(oid).map(_._1)  // marked, not yet invalidated
+      _   <- invalidateMarkedAs(service)
+      c1  <- obscalcRow(oid).map(_._1)
+      n   <- invalidateMarkedAs(service) // the mark is gone
+      _   <- runObscalcUpdateAs(service, pid, oid)
+      r1  <- remainingSteps(oid)
+    yield
+      assertEquals(c0, CalculationState.Ready)
+      assertEquals(c1, CalculationState.Pending)
+      assertEquals(n, 0)
+      assertEquals(r1, r0 - 1)
+
+  // The stored workflow state of the observation.
+  def workflowState(oid: Observation.Id): IO[ObservationWorkflowState] =
+    query(
+      user  = service,
+      query = s"""
+        query {
+          observation(observationId: "$oid") {
+            workflow { value { state } }
+          }
+        }
+      """
+    ).flatMap: js =>
+      js.hcursor
+        .downFields("observation", "workflow", "value", "state")
+        .as[ObservationWorkflowState]
+        .leftMap(f => new RuntimeException(f.message))
+        .liftTo[IO]
+
+  test("recordVisit - abandoning another observation's last step completes its workflow"):
+    for
+      pid <- createProgramAs(service)
+      tid <- createTargetWithProfileAs(service, pid)
+      oid <- createObservationAs(service, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
+      o2  <- createObservationAs(service, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
+      ss  <- scienceSequenceIds(service, oid).map(_.values.toList.flatten)
+      _   <- runObscalcUpdateAs(service, pid, oid)
+      n   <- remainingSteps(oid)
+      _    = assertEquals(ss.length, n, "expected the whole science sequence")
+      v0  <- recordVisitAs(service, oid)
+      _   <- ss.init.traverse_ : sid =>
+               addStepEventAs(service, sid, v0, StepStage.StartStep) *>
+               addStepEventAs(service, sid, v0, StepStage.EndStep)
+      _   <- addStepEventAs(service, ss.last, v0, StepStage.StartStep)
+      _   <- runObscalcUpdateAs(service, pid, oid)
+      w0  <- workflowState(oid)
+      _   <- recordVisitAs(service, o2)
+      w1  <- workflowState(oid)  // marked, not yet recalculated
+      _   <- invalidateMarkedAs(service)
+      c   <- obscalcRow(oid).map(_._1)  // so the daemon recalculates it
+      _   <- runObscalcUpdateAs(service, pid, oid)
+      w2  <- workflowState(oid)
+      r2  <- remainingSteps(oid)
+    yield
+      assertEquals(w0, ObservationWorkflowState.Ongoing)
+      assertEquals(w1, ObservationWorkflowState.Ongoing)
+      assertEquals(c, CalculationState.Pending)
+      assertEquals(w2, ObservationWorkflowState.Completed)
+      assertEquals(r2, 0)
+
+  test("recordVisit - a calculation in flight when a visit abandons its step is redone"):
+    for
+      pid <- createProgramAs(service)
+      tid <- createTargetWithProfileAs(service, pid)
+      oid <- createObservationAs(service, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
+      o2  <- createObservationAs(service, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
+      ss  <- firstScienceAtomStepIds(service, oid)
+      v0  <- recordVisitAs(service, oid)
+      _   <- addStepEventAs(service, ss(0), v0, StepStage.StartStep)
+      pc  <- claimObscalcAs(service, oid)
+      _   <- recordVisitAs(service, o2)
+      _   <- invalidateMarkedAs(service)
+      c0  <- obscalcRow(oid).map(_._1)
+      c1  <- finishObscalcAs(service, pc)
+    yield
+      assertEquals(c0, CalculationState.Calculating) // invalidation leaves it calculating
+      assertEquals(c1, CalculationState.Pending.some) // but the result is stored as pending
+
+  test("recordVisit - a visit that abandons nothing leaves other observations' obscalc alone"):
+    for
+      pid <- createProgramAs(service)
+      tid <- createTargetWithProfileAs(service, pid)
+      oid <- createObservationAs(service, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
+      o2  <- createObservationAs(service, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
+      ss  <- firstScienceAtomStepIds(service, oid)
+      v0  <- recordVisitAs(service, oid)
+      _   <- addStepEventAs(service, ss(0), v0, StepStage.StartStep)
+      _   <- addStepEventAs(service, ss(0), v0, StepStage.EndStep)
+      _   <- runObscalcUpdateAs(service, pid, oid)
+      _   <- recordVisitAs(service, o2)
+      _   <- invalidateMarkedAs(service)
+      c   <- obscalcRow(oid).map(_._1)
+    yield assertEquals(c, CalculationState.Ready)
 
   test("recordVisit - a visit on another instrument does not abandon steps"):
     assertIOBoolean:
