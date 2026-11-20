@@ -4661,7 +4661,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
                     ]
                   },
                   "svc": {
-                    "exposure": { "microseconds": 3080000 }
+                    "exposure": { "microseconds": 1630000 }
                   }
                 }
               }
@@ -4759,7 +4759,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
                     ]
                   },
                   "svc": {
-                    "exposure": { "microseconds": 3080000 }
+                    "exposure": { "microseconds": 1630000 }
                   }
                 }
               }
@@ -4814,8 +4814,8 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
       Right(json"""{ "updateObservations": { "observations": [{ "observingMode": { "igrins2LongSlit": { "svc": null } } }] } }""")
     multiUpdateTest(pi,
       List(
-        // off by default; turn ON with defaults (exposure 3.08s)
-        ("observingMode: { igrins2LongSlit: { svc: {} } }", query, svcOn(3080000L)),
+        // off by default; turn ON with defaults (exposure 1.63s)
+        ("observingMode: { igrins2LongSlit: { svc: {} } }", query, svcOn(1630000L)),
         // turn OFF
         ("observingMode: { igrins2LongSlit: { svc: null } }", query, svcOff),
         // turn ON with an explicit exposure (10s)
@@ -4837,9 +4837,9 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
         // turn ON with an explicit exposure (10s)
         ("observingMode: { igrins2LongSlit: { svc: { explicitExposure: { seconds: 10.0 } } } }", query,
           expected(10000000L, json"""{ "microseconds": 10000000 }""")),
-        // clear just the exposure: SVC stays on, effective exposure reverts to the 3.08s default
+        // clear just the exposure: SVC stays on, effective exposure reverts to the 1.63s default
         ("observingMode: { igrins2LongSlit: { svc: { explicitExposure: null } } }", query,
-          expected(3080000L, Json.Null))
+          expected(1630000L, Json.Null))
       ),
       Some(ObservingModeType.Igrins2LongSlit)
     )
