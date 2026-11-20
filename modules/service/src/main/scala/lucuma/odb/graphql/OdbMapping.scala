@@ -141,6 +141,7 @@ object OdbMapping {
           with AsterismGroupSelectResultMapping[F]
           with AtomRecordMapping[F]
           with AtomRecordSelectResultMapping[F]
+          with CalculatedExecutedStepsMapping[F]
           with CalculatedObservationWorkflowMapping[F]
           with GroupStandingMapping[F]
           with GroupConstraintWaiverMapping[F]
@@ -663,6 +664,7 @@ object OdbMapping {
                 AngleMappings,
                 ArcMappings,
                 AtomRecordSelectResultMappings,
+                CalculatedExecutedStepsMappings,
                 CalculatedObservationWorkflowMappings,
                 GroupStandingMappings,
                 GroupConstraintWaiverMappings,

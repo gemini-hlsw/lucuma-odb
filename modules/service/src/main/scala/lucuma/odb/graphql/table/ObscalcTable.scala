@@ -19,6 +19,10 @@ trait ObscalcTable[F[_]] extends BaseMapping[F]:
     val FailureCount: ColumnRef        = col("c_failure_count",        int4_nonneg)
     val OdbError: ColumnRef            = col("c_odb_error",            jsonb.opt)
 
+    object ExecutedSteps:
+      val Successful: ColumnRef        = col("c_sci_executed_successful_count",   int4_nonneg)
+      val Unsuccessful: ColumnRef      = col("c_sci_executed_unsuccessful_count", int4_nonneg)
+
     object Workflow:
       val State: ColumnRef             = col("c_workflow_state",       observation_workflow_state)
       val Transitions: ColumnRef       = col("c_workflow_transitions", _observation_workflow_state)
