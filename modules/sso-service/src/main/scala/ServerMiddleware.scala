@@ -5,12 +5,12 @@ package lucuma.sso.service
 
 import cats.*
 import cats.effect.*
+import lucuma.common.config.Environment
+import lucuma.common.config.Environment.*
 import lucuma.common.middleware.CorsMiddleware
 import lucuma.common.middleware.LoggingMiddleware
 import lucuma.otel.HttpInstrumentation
 import lucuma.sso.service.config.Config
-import lucuma.sso.service.config.Environment
-import lucuma.sso.service.config.Environment.*
 import org.http4s.HttpApp
 import org.http4s.HttpRoutes
 import org.http4s.server.middleware.ErrorAction
@@ -34,8 +34,8 @@ object ServerMiddleware:
   ): Middleware[F] =
     LoggingMiddleware.logging[F](revealSensitiveHeaders =
       env match
-        case Local                         => true
-        case Review | Staging | Production => false
+        case Local                              => true
+        case Development | Staging | Production => false
     )
 
   /** A middleware that reports errors during requets processing. */

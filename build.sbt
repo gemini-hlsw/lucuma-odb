@@ -636,7 +636,7 @@ lazy val ssoService = project
       "com.dimafeng"        %% "testcontainers-scala-postgresql" % testcontainersScalaVersion % Test,
 
     ),
-    reStart / envVars += "PORT" -> "8082",
+    reStart / envVars ++= Map("PORT" -> "8082", "LUCUMA_SSO_ENVIRONMENT" -> "local"),
     reStartArgs       += "serve",
     description                     := "Lucuma SSO Service",
     // Name of the launch script
@@ -927,6 +927,7 @@ lazy val common = project
     libraryDependencies ++= Seq(
       "edu.gemini"    %% "lucuma-core"                           % lucumaCoreVersion,
       "edu.gemini"    %% "lucuma-graphql-routes"                 % lucumaGraphQLRoutesVersion,
+      "is.cir"        %% "ciris"                                 % cirisVersion,
       "org.http4s"    %% "http4s-client"                         % http4sVersion,
       "org.http4s"    %% "http4s-core"                           % http4sVersion,
       "org.http4s"    %% "http4s-server"                         % http4sVersion,
@@ -935,7 +936,8 @@ lazy val common = project
       "org.typelevel" %% "cats-effect"                           % catsEffectVersion,
       "org.typelevel" %% "log4cats-core"                         % log4catsVersion,
       "org.typelevel" %% "otel4s-core"                           % otel4sVersion,
-      "org.scalameta" %% "munit"                                 % munitVersion % Test
+      "org.scalameta" %% "munit"                                 % munitVersion % Test,
+      "org.typelevel" %% "munit-cats-effect"                     % munitCatsEffectVersion % Test
     )
   )
 
@@ -1182,7 +1184,7 @@ lazy val service = project
       "org.typelevel"                    %% "munit-cats-effect"                          % munitCatsEffectVersion       % Test,
       "org.typelevel"                    %% "log4cats-testing"                           % log4catsVersion              % Test,
     ),
-    reStart / envVars += "PORT" -> "8082",
+    reStart / envVars ++= Map("PORT" -> "8082", "ODB_ENVIRONMENT" -> "local"),
     reStartArgs += "serve",
     reStart / javaOptions += s"-D$RealStackTracesProp",
     description                     := "Lucuma ODB Service",
@@ -1201,7 +1203,7 @@ lazy val obscalc = project
   .settings(
     name                        := "obscalc-service",
     projectDependencyArtifacts  := (Compile / dependencyClasspathAsJars).value,
-    reStart / envVars += "PORT" -> "8082",
+    reStart / envVars ++= Map("PORT" -> "8082", "ODB_ENVIRONMENT" -> "local"),
     description                     := "Lucuma ODB ObsCalc Service",
     realStackTraces,
     // Add command line parameters
@@ -1218,7 +1220,7 @@ lazy val calibrations = project
   .settings(
     name                        := "calibrations-service",
     projectDependencyArtifacts  := (Compile / dependencyClasspathAsJars).value,
-    reStart / envVars += "PORT" -> "8082",
+    reStart / envVars ++= Map("PORT" -> "8082", "ODB_ENVIRONMENT" -> "local"),
     description                     := "Lucuma ODB Calibrations Service",
     realStackTraces,
     // Add command line parameters
@@ -1240,7 +1242,7 @@ lazy val pdfSummary = project
     projectDependencyArtifacts  := (Compile / dependencyClasspathAsJars).value,
     description                     := "Lucuma ODB Proposal Summary PDF Service",
     // Config requires PORT even though this dyno serves nothing; Heroku always sets it.
-    reStart / envVars += "PORT" -> "8083",
+    reStart / envVars ++= Map("PORT" -> "8083", "ODB_ENVIRONMENT" -> "local"),
     // The Python renderer shares the dyno's memory with the JVM; leave it room.
     lucumaDockerHeapSubtract := 400,
     realStackTraces,
@@ -1309,7 +1311,7 @@ lazy val resourceModel =
   project
     .in(file("resource/model"))
     .enablePlugins(NoPublishPlugin)
-    .dependsOn(schema.jvm, otel, ssoBackendClient)
+    .dependsOn(schema.jvm, otel, ssoBackendClient, common)
     .settings(resourceCommonSettings)
     .settings(
       name := "lucuma-resource-model",
@@ -1362,7 +1364,7 @@ lazy val resourceService = project
       "org.http4s"    %% "http4s-jdk-http-client"                % http4sJdkHttpClientVersion   % Test,
       "edu.gemini"    %% "clue-http4s"                           % clueVersion                  % Test
     ),
-    reStart / envVars += "PORT" -> "8484",
+    reStart / envVars ++= Map("PORT" -> "8484", "RESOURCE_ENVIRONMENT" -> "local"),
     executableScriptName        := "resource-service",
     dockerExposedPorts ++= Seq(8484),
     // Load resources during compile so they are available for GraphQL schema macros

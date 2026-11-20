@@ -54,13 +54,13 @@ class CorsSuite extends SsoSuite {
   //   }
 
   noHeaderTest("foo.bar")
-  // noHeaderTest(Environment.Review)
+  // noHeaderTest(Environment.Development)
   // noHeaderTest(Environment.Staging)
   // noHeaderTest(Environment.Production)
 
   // failing … why?
   // headerTestForArbitraryDomain(Environment.Local)
-  // headerTestForArbitraryDomain(Environment.Review)
+  // headerTestForArbitraryDomain(Environment.Development)
   // headerTestForArbitraryDomain(Environment.Staging)
 
   test("CORS headers must not be added if origin is mismatched.") {

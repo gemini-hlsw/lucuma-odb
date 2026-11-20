@@ -12,13 +12,13 @@ import com.dimafeng.testcontainers.GenericContainer
 import com.dimafeng.testcontainers.PostgreSQLContainer
 import com.dimafeng.testcontainers.munit.TestContainerForAll
 import fs2.io.net.Network
+import lucuma.common.config.Environment
 import lucuma.core.model.GuestUser
 import lucuma.core.model.ServiceUser
 import lucuma.core.model.StandardUser
 import lucuma.sso.client.SsoJwtReader
 import lucuma.sso.service.config.Config
 import lucuma.sso.service.config.DatabaseConfig
-import lucuma.sso.service.config.Environment
 import lucuma.sso.service.config.OrcidConfig
 import lucuma.sso.service.database.Database
 import lucuma.sso.service.graphql.GraphQLRoutes
