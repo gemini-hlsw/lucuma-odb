@@ -5,6 +5,7 @@ package lucuma.odb.service
 
 import cats.effect.IO
 import cats.syntax.eq.*
+import cats.syntax.foldable.*
 import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import lucuma.core.enums.ChargeClass
@@ -40,6 +41,7 @@ import lucuma.odb.util.Codecs.observation_id
 import lucuma.odb.util.Codecs.program_id
 import lucuma.odb.util.Codecs.visit_id
 import skunk.*
+import skunk.codec.numeric.int8
 import skunk.implicits.*
 
 import scala.collection.immutable.SortedSet
@@ -386,3 +388,62 @@ class ObscalcServiceSuite extends ObscalcServiceSuiteSupport:
     yield (r0(o), r1(o))
 
     assertIO(states, (CalculationState.Ready, CalculationState.Pending))
+
+  test("invalidateMarked requeues an observation that fails and goes on with the rest"):
+    def mark(o: Observation.Id): IO[Unit] =
+      withSession: session =>
+        session.execute(sql"""
+          INSERT INTO t_obscalc_mark (c_observation_id) VALUES ($observation_id)
+        """.command)(o).void
+
+    // The latest mark id of each marked observation.
+    val markIds: IO[Map[Observation.Id, Long]] =
+      withSession: session =>
+        session.execute(sql"""
+          SELECT c_observation_id, MAX(c_mark_id) FROM t_obscalc_mark GROUP BY c_observation_id
+        """.query(observation_id *: int8)).map(_.toMap)
+
+    val clearMarks: IO[Unit] =
+      withSession(_.execute(sql"DELETE FROM t_obscalc_mark".command).void)
+
+    // Makes invalidating `o` fail for the duration of `fa`.
+    def failingInvalidationOf[A](o: Observation.Id)(fa: IO[A]): IO[A] =
+      val create = List(
+        """
+          CREATE FUNCTION test_fail_obscalc_update() RETURNS TRIGGER
+            LANGUAGE plpgsql AS 'BEGIN RAISE EXCEPTION ''invalidation failure for testing''; END;'
+        """,
+        s"""
+          CREATE TRIGGER test_fail_obscalc_update_trigger
+            BEFORE UPDATE ON t_obscalc FOR EACH ROW
+            WHEN (NEW.c_observation_id = '$o')
+            EXECUTE FUNCTION test_fail_obscalc_update()
+        """
+      )
+      val drop = List(
+        "DROP TRIGGER test_fail_obscalc_update_trigger ON t_obscalc",
+        "DROP FUNCTION test_fail_obscalc_update()"
+      )
+      def run(ddl: List[String]): IO[Unit] =
+        withSession(session => ddl.traverse_(d => session.execute(sql"#$d".command)))
+      run(create) *> fa.guarantee(run(drop))
+
+    val invalidateMarked: IO[Int] =
+      withObscalcService(_.invalidateMarked(64))
+
+    for
+      p  <- createProgram
+      o0 <- createGmosNorthLongSlitObservationAs(pi, p, Nil)
+      o1 <- createGmosNorthLongSlitObservationAs(pi, p, Nil)
+      _  <- clearMarks *> mark(o0) *> mark(o1)
+      m0 <- markIds
+      n0 <- failingInvalidationOf(o0)(invalidateMarked)
+      m1 <- markIds
+      n1 <- invalidateMarked
+      m2 <- markIds
+    yield
+      assertEquals(n0, 1)                    // o1 was invalidated despite o0 failing first
+      assertEquals(m1.keySet, Set(o0))       // o0 keeps its mark
+      assert(m1(o0) > m0(o1), "o0's mark should be requeued behind o1's")
+      assertEquals(n1, 1)                    // o0 succeeds once it no longer fails
+      assertEquals(m2, Map.empty)
