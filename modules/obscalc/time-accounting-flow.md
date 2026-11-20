@@ -36,7 +36,7 @@ machinery this rides on.
 | Re-mark visitor-instrument visits whose charge end moved | `TimeAccountingService.invalidateStaleVisitorVisits`, obscalc `visitorTimeAccountingStream` |
 | Retry decision when a recompute fails | `ObscalcService.storeResult` |
 | Current rules version | `TimeAccounting.version.Current` (Scala) |
-| Triggers, markers, procedures | migrations `V1210__async_time_accounting.sql`; `V1419__visit_time_accounting_version.sql` (versions, lock rule, upgrade procedure); `V1420__dataset_qa_passes.sql` (what counts as passing QA) |
+| Triggers, markers, procedures | migrations `V1210__async_time_accounting.sql`; `V1420__visit_time_accounting_version.sql` (versions, lock rule, upgrade procedure); `V1421__dataset_qa_passes.sql` (what counts as passing QA) |
 | Startup check that code and database agree on the version | `StartupDiagnostics.checkTimeAccountingVersion` (ODB service and obscalc) |
 
 ## What causes time accounting to update

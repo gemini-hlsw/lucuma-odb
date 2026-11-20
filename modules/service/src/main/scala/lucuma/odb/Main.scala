@@ -331,7 +331,7 @@ object FMain extends MainParams {
 
   /**
    * The migrations on the classpath that haven't been applied to the database
-   * yet, in order, labelled like `V1419: visit time accounting version`.
+   * yet, in order, labelled like `V1420: visit time accounting version`.
    * Repeatable migrations, which have no version, are labelled `R: ...`.
    * Migrations applied to the database that aren't on the classpath (e.g.,
    * after a rollback) are not pending.
