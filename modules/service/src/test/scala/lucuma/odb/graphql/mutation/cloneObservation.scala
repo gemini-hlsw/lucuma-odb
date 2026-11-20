@@ -2724,7 +2724,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations with M
                       "observingMode": {
                         "igrins2LongSlit": {
                           "svc": {
-                            "exposure": { "microseconds": 3080000 }
+                            "exposure": { "microseconds": 1630000 }
                           }
                         }
                       }
@@ -2733,7 +2733,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations with M
                       "observingMode": {
                         "igrins2LongSlit": {
                           "svc": {
-                            "exposure": { "microseconds": 3080000 }
+                            "exposure": { "microseconds": 1630000 }
                           }
                         }
                       }

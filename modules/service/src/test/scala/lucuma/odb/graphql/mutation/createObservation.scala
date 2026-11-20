@@ -2927,7 +2927,7 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat with que
       }
     """
 
-  test("[igrins2] SVC enabled with defaults: exposure 3.08s and telescope dither [(0,0),(5,0)] guided"):
+  test("[igrins2] SVC enabled with defaults: exposure 1.63s and telescope dither [(0,0),(5,0)] guided"):
     createProgramAs(pi).flatMap: pid =>
       query(pi, createObsWithIgrins2SvcQuery(pid, "svc: {}")).flatMap: js =>
         val svc = js.hcursor.downPath(
@@ -2940,8 +2940,8 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat with que
            svc.downIO[Json]("telescopeConfigs"),
            svc.downIO[Json]("defaultTelescopeConfigs")
           ).tupled,
-          (3080000L,
-           3080000L,
+          (1630000L,
+           1630000L,
            Some(Json.Null),
            igrins2SvcDefaultTelescopeConfigs,
            igrins2SvcDefaultTelescopeConfigs
@@ -2976,7 +2976,7 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat with que
            svc.downIO[Json]("defaultTelescopeConfigs")
           ).tupled,
           (10000000L,
-           3080000L,
+           1630000L,
            10000000L,
            explicitTcs,
            explicitTcs,

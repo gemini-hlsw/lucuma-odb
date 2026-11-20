@@ -12612,7 +12612,7 @@ type Igrins2SvcConfig {
   exposure: TimeSpan!
 
   """
-  Default SVC exposure time (3.08 s).
+  Default SVC exposure time (1.63 s).
   """
   defaultExposure: TimeSpan!
 
