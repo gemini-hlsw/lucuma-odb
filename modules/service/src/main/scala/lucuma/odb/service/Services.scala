@@ -32,6 +32,7 @@ import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
+import lucuma.odb.graphql.OdbMapping
 import lucuma.odb.logic.Generator
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.logic.TimeEstimateService
@@ -356,7 +357,7 @@ object Services:
       private val graphQlService: Result[GraphQLService[F]] =
         mapping0 match
           case None => Result.internalError("No GraphQL Mapping available for this Services instance.")
-          case Some(f) => Result(GraphQLService.unvalidated(f(session)))
+          case Some(f) => Result(GraphQLService.unvalidated(f(session), OdbMapping.slowQueryThreshold.some))
 
       // The query runs on behalf of an already-known user, so the context carries that user under
       // the same env key the mappings read.
@@ -366,7 +367,7 @@ object Services:
       def runGraphQLQueryImpl(query: String, op: Option[String], vars: Option[JsonObject]): ResultT[F, Json] =
         for
           svc    <- ResultT(graphQlService.pure[F])
-          parsed <- ResultT(svc.parse(graphQlContext, query, op, vars).pure[F])
+          parsed <- ResultT(svc.parse(graphQlContext, query, op, vars))
           json   <- ResultT(svc.query(graphQlContext, parsed, query, op))
         yield json
 

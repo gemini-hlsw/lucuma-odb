@@ -13,6 +13,11 @@ import lucuma.core.model.User
 import lucuma.odb.service.AttachmentFileService.AttachmentException
 import munit.CatsEffectSuite
 import org.http4s.*
+import org.typelevel.ci.CIString
+
+/** The value of the first header with the given name, for both attachment suites. */
+extension (hs: Headers)
+  def headerValue(name: CIString): Option[String] = hs.get(name).map(_.head.value)
 
 abstract class AttachmentRoutesSuite extends CatsEffectSuite with TestSsoClient {
   val pi               = TestUsers.Standard.pi(1, 30)

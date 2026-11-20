@@ -222,7 +222,7 @@ object Science:
     time:          Either[OdbError, IntegrationTime],
     calRole:       Option[CalibrationRole]
   ): F[Either[OdbError, SequenceGenerator[F2]]] =
-    if calRole.contains(CalibrationRole.MosMaskFlat) then
+    if calRole.contains(CalibrationRole.DaytimeMaskImage) then
       mosMaskFlat(observationId, estimator, static, namespace, expander, config)
     else
       scienceGenerator(observationId, estimator, static, namespace, expander, modeName, config, time, calRole)
