@@ -7,11 +7,12 @@ import cats.effect.*
 import cats.syntax.all.*
 import ciris.*
 import com.comcast.ip4s.Port
+import lucuma.common.config.Environment
+import lucuma.common.config.Environment.Local
 import lucuma.otel.OtelConfig
 import lucuma.sso.client.SsoJwtReader
 import lucuma.sso.client.util.JwtDecoder
 import lucuma.sso.service.SsoJwtWriter
-import lucuma.sso.service.config.Environment.Local
 import lucuma.sso.service.util.JwtEncoder
 import org.http4s.Uri
 import org.http4s.Uri.Authority
@@ -102,12 +103,10 @@ object Config {
   }
 
   private def otelConfig(env: Environment): ConfigValue[Effect, Option[OtelConfig]] =
-    OtelConfig.fromEnv("LUCUMA_SSO_OTEL", ConfigValue.default(env.toString.toLowerCase))
+    OtelConfig.fromEnv("LUCUMA_SSO_OTEL", ConfigValue.default(env.name))
 
   def config: ConfigValue[Effect, Config] =
-    envOrProp("LUCUMA_SSO_ENVIRONMENT")
-      .as[Environment]
-      .default(Local)
+    Environment.fromCiris("LUCUMA_SSO_ENVIRONMENT")
       .flatMap {
 
         case Local =>

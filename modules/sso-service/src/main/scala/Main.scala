@@ -14,6 +14,7 @@ import com.comcast.ip4s.Port
 import com.monovore.decline.*
 import com.monovore.decline.effect.CommandIOApp
 import fs2.io.net.Network
+import lucuma.common.config.Environment
 import lucuma.common.middleware.LoggingMiddleware
 import lucuma.core.model.StandardRole
 import lucuma.core.util.Gid

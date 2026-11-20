@@ -9,11 +9,12 @@ import cats.syntax.all.*
 import ciris.*
 import ciris.http4s.*
 import com.comcast.ip4s.*
+import lucuma.common.config.Environment
 import lucuma.otel.OtelConfig
 
 final case class ResourceConfiguration(
   database:      DatabaseConfiguration,
-  environment:   ExecutionEnvironment,
+  environment:   Environment,
   port:          Port,
   corsOverHttps: Boolean,     // Whether to require CORS over HTTPS
   domain:        Seq[String], // Domains, for CORS headers
@@ -33,12 +34,7 @@ object ResourceConfiguration:
     SsoConfiguration.fromCiris
   ).parMapN(ResourceConfiguration.apply)
 
-  private lazy val environment =
-    val ee = envOrProp("RESOURCE_ENVIRONMENT").as[ExecutionEnvironment]
-    inHeroku.ifM(
-      ee,
-      ee.default(ExecutionEnvironment.Local)
-    )
+  private lazy val environment = Environment.fromCiris("RESOURCE_ENVIRONMENT")
 
   private lazy val port = envOrProp("PORT").as[Port].default(port"8484")
 
@@ -51,12 +47,12 @@ object ResourceConfiguration:
     // In Heroku, otel configuration is required
     inHeroku.ifM(
       (otelEndpoint, otelKey, environment).parMapN((endpoint, key, env) =>
-        OtelConfig(endpoint, key, env.stringValue).some
+        OtelConfig(endpoint, key, env.name).some
       ),
       (otelEndpoint.option, otelKey.option, environment).parMapN:
         // Otherwise otel is optional
         case (Some(endpoint), Some(key), env) if endpoint.trim.nonEmpty && key.trim.nonEmpty =>
-          OtelConfig(endpoint, key, env.stringValue).some
+          OtelConfig(endpoint, key, env.name).some
         case _                                                                               =>
           None
     )

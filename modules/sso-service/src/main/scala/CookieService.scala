@@ -101,7 +101,7 @@ object CookieWriter {
           content  = "",
           sameSite = Some(SameSite.Strict),
           secure   = secure,
-          httpOnly = secure,
+          httpOnly = true,
           path     = Some("/"),
         )
 

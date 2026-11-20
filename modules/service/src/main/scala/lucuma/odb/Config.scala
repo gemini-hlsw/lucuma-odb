@@ -20,6 +20,7 @@ import lucuma.catalog.clients.SimbadClient
 import lucuma.catalog.goa.GoaClient
 import lucuma.catalog.simbad.SEDDataLoader
 import lucuma.catalog.telluric.TelluricTargetsClient
+import lucuma.common.config.Environment
 import lucuma.core.data.EmailAddress
 import lucuma.core.enums.ExchangePartner
 import lucuma.core.enums.GeminiCallForProposalsType
@@ -57,6 +58,7 @@ import java.util.UUID
 import scala.concurrent.duration.*
 
 case class Config(
+  environment:   Environment,
   port:          Port,                          // Our port, nothing fancy.
   itc:           Config.Itc,                    // ITC config
   sso:           Config.Sso,                    // SSO config
@@ -481,16 +483,21 @@ object Config:
     value.fold(ConfigValue.failed(ConfigError("Missing value"))): v =>
       ConfigValue.loaded(ConfigKey(key), v)
 
-  private val otelConfig: ConfigValue[Effect, Option[OtelConfig]] =
-    OtelConfig.fromEnv("ODB_OTEL", envOrProp("ODB_ENVIRONMENT").default("local"))
+  private def otelConfig(environment: Environment): ConfigValue[Effect, Option[OtelConfig]] =
+    OtelConfig.fromEnv("ODB_OTEL", ConfigValue.default(environment.name))
 
-  lazy val fromCiris: ConfigValue[Effect, Config] = (
+  lazy val fromCiris: ConfigValue[Effect, Config] =
+    Environment.fromCiris("ODB_ENVIRONMENT").flatMap: environment =>
+      fromCiris(environment)
+
+  private def fromCiris(environment: Environment): ConfigValue[Effect, Config] = (
+    ConfigValue.default(environment),
     envOrProp("PORT").as[Int].as[Port], // passed by Heroku
     Itc.fromCiris,
     Sso.fromCiris,
     Telluric.fromCiris,
     envOrProp("ODB_SERVICE_JWT"),
-    otelConfig,
+    otelConfig(environment),
     Database.fromCiris,
     Aws.fromCiris,
     Email.fromCiris,

@@ -14,7 +14,7 @@ SSO requires the following configuration in staging/production.
 | `LUCUMA_ORCID_CLIENT_ID` | ORCID Client Id |
 | `LUCUMA_ORCID_CLIENT_SECRET` | ORCID secret |
 | `LUCUMA_SSO_COOKIE_DOMAIN` | Domain for refresh token cookie (`gemini.edu`) |
-| `LUCUMA_SSO_ENVIRONMENT` | Constant value `staging` (will go away) |
+| `LUCUMA_SSO_ENVIRONMENT` | Required. One of `dev` (or `development`), `staging`, `production`, or `local` for development only. |
 | `LUCUMA_SSO_HOSTNAME` | External hostname for this service. |
 
 ##### OpenTelemetry (OTLP)
@@ -188,8 +188,8 @@ Docker-compose also starts up a local nginx server that serves an example client
 
 ### Using reStart
 
-Alternatively, you can run the app from within SBT with `service/reStart`
-(stopping with `service/reStop`).  By default, this command will fail after
+Alternatively, you can run the app from within SBT with `ssoService/reStart`
+(stopping with `ssoService/reStop`). `reStart` sets `LUCUMA_SSO_ENVIRONMENT=local` for you.  By default, this command will fail after
 running `docker-compose` `down` and then `up` as described above.  You can
 supply optional arguments to simplify development though:
 
@@ -202,7 +202,7 @@ flyway already skips migrations that have previously run.
 
 ### Working on the Schema
 
-The app runs the migrations in `/modules/service/src/main/resources/db/migration` on startup.
+The app runs the migrations in `/modules/sso-service/src/main/resources/db/migration` on startup.
 
 ### Connecting to the Database
 
@@ -220,7 +220,7 @@ You can connect to youe dev database with locally-installed tools like `pgAdmin`
 
 If you try to run `Main` you will find that it barfs because it needs some ORCID configuration. To set this up, sign into [ORCID](http://orcid.org) as yourself, go to **Developer Tools** under the name menu and create an API key with redirect URL `http://localhost:8080/auth/v1/stage2`. This will allow you to test ORCID authentication locally.
 
-You will need to provide `LUCUMA_ORCID_CLIENT_ID` and `LUCUMA_ORCID_CLIENT_SECRET` either as environment variables or system properties when you run `Main`. To do this in VS-Code you can hit F5 and then set up a run configuration as follows after which hitting F5 again should run SSO locally. Output will be in the Debug Console window.
+You will need to provide `LUCUMA_ORCID_CLIENT_ID` and `LUCUMA_ORCID_CLIENT_SECRET`, and also `LUCUMA_SSO_ENVIRONMENT=local`, either as environment variables or system properties when you run `Main`. `sbt ssoService/reStart` sets `LUCUMA_SSO_ENVIRONMENT=local` for you. To do this in VS-Code you can hit F5 and then set up a run configuration as follows after which hitting F5 again should run SSO locally. Output will be in the Debug Console window.
 
 ```json
 {
@@ -232,8 +232,9 @@ You will need to provide `LUCUMA_ORCID_CLIENT_ID` and `LUCUMA_ORCID_CLIENT_SECRE
       "name"       : "Lucuma SSO",
       "mainClass"  : "lucuma.sso.service.Main",
       "args"       : [],
-      "buildTarget": "service",
+      "buildTarget": "ssoService",
       "jvmOptions" : [
+        "-DLUCUMA_SSO_ENVIRONMENT=local",
         "-DLUCUMA_ORCID_CLIENT_ID=<client-id>",
         "-DLUCUMA_ORCID_CLIENT_SECRET=<client-secret>",
       ],
