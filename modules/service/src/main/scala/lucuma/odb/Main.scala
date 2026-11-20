@@ -182,15 +182,25 @@ object FMain extends MainParams {
             |""".stripMargin
     banner.linesIterator.toList.traverse_(Logger[F].info(_))
 
+  /** Spans the wait for a pooled session. It adds no span outside a trace, so daemons stay quiet. */
+  private def tracedAllocation[F[_]: MonadCancelThrow, A](
+    tracer: Tracer[F],
+    rsrc:   Resource[F, A]
+  ): Resource[F, A] =
+    Resource.applyFull: poll =>
+      tracer.currentSpanContext.flatMap:
+        case Some(_) => tracer.span("pool.allocate").surround(poll(rsrc.allocatedCase))
+        case None    => poll(rsrc.allocatedCase)
+
   /** A resource that yields a Skunk session pool. */
   def databasePoolResource[F[_]: Temporal: TracerProvider: MeterProvider: Network: Console: Logger](
     config: Config.Database
   ): Resource[F, Resource[F, Session[F]]] =
-    Resource.eval(AtomicCell[F].of(config.maxConnections)).flatMap: cell =>
+    Resource.eval((AtomicCell[F].of(config.maxConnections), TracerProvider[F].get(ServiceName)).tupled).flatMap: (cell, tracer) =>
       dbSessionBuilder(config)
         .pooled(config.maxConnections)
       .map: rsrc =>
-        rsrc
+        tracedAllocation(tracer, rsrc)
           .preAllocate(cell.updateAndGet(_ - 1).flatMap(n => Logger[F].debug(s"acquiring session (should be $n remaining)")))
           .onFinalize(cell.updateAndGet(_ + 1).flatMap(n => Logger[F].debug(s"released session (should be $n remaining)")))
 
