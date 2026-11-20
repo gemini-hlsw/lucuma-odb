@@ -15,6 +15,7 @@ import lucuma.sso.client.util.JwtDecoder
 import org.http4s.*
 import org.http4s.headers.Authorization
 import org.typelevel.ci.CIString
+import org.typelevel.log4cats.Logger
 import pdi.jwt.Jwt
 import pdi.jwt.JwtAlgorithm
 import pdi.jwt.JwtClaim
@@ -35,7 +36,7 @@ trait TestSsoClient:
   val invalidAuthHeader =
     Authorization(Credentials.Token(AuthScheme.Bearer, "***"))
 
-  def ssoClient: SsoClient[IO, User] =
+  def ssoClient(using Logger[IO]): SsoClient[IO, User] =
     new SsoClient.AbstractSsoClient[IO, User]:
       def get(authorization: Authorization): IO[Either[String, User]] =
         authorization match

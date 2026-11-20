@@ -163,7 +163,8 @@ object SsoClient {
           .map(_.asRight[String])
           .recoverWith {
             case UnexpectedStatus(Status.Forbidden, _, _) =>
-              Logger[F].warn(s"SSO refused to exchange API key ${apiKey.id}").as(InvalidApiKey.asLeft[UserInfo])
+              // DEBUG: a caller can call `get` more than once per request. `require` logs the refusal.
+              Logger[F].debug(s"SSO refused to exchange API key ${apiKey.id}").as(InvalidApiKey.asLeft[UserInfo])
             // Any other status is a server error. Remove the request URI, which contains the key.
             case UnexpectedStatus(status, method, uri) =>
               UnexpectedStatus(status, method, uri.removeQueryParam("key")).raiseError[F, Either[String, UserInfo]]
@@ -179,7 +180,8 @@ object SsoClient {
         } yield UserInfo(user, claim, authorization(bearerAuthorization))
       } .attempt.flatMap(_.leftTraverse { ex =>
         // Log neither the token nor the exception: the message of some exceptions contains the token.
-        Logger[F].warn(s"JWT validation failed: ${safeMessage(ex)}").as(denialMessage(ex))
+        // DEBUG: a caller can call `get` more than once per request. `require` logs the refusal.
+        Logger[F].debug(s"JWT validation failed: ${safeMessage(ex)}").as(denialMessage(ex))
       })
 
       def getUserInfo(bearerAuthorization: String): F[Either[String, UserInfo]] =
@@ -197,7 +199,10 @@ object SsoClient {
 
     }
 
-  abstract class AbstractSsoClient[F[_]: Monad, A] extends SsoClient[F, A] { outer =>
+  /** The most characters of the operation and of the reason that go to the log. */
+  val MaxLogLength: Int = 256
+
+  abstract class AbstractSsoClient[F[_]: Monad: Logger, A] extends SsoClient[F, A] { outer =>
 
     object FDsl extends Http4sDsl[F]
     import FDsl._
@@ -207,7 +212,19 @@ object SsoClient {
       req.headers.get[Authorization].fold(AccessDenied.asLeft[A].pure[F])(get)
 
     final def require(req: Request[F])(f: A => F[Response[F]]): F[Response[F]] =
-      EitherT(find(req)).foldF(Forbidden(_), f)
+      EitherT(find(req)).foldF(reason => authenticationDenied(req, reason) >> Forbidden(reason), f)
+
+    private def authenticationDenied(req: Request[F], reason: String): F[Unit] = {
+      val credentials =
+        req.headers.get[Authorization] match {
+          case Some(a) => s"scheme ${a.credentials.authScheme}".some
+          case None    => Option.when(req.headers.get(Header[Authorization].name).isDefined)("malformed credentials")
+        }
+      val operation = s"${req.method} ${req.uri.path}"
+      credentials.traverse_ { c =>
+        Logger[F].warn(s"Authentication denied ($c), operation ${operation.take(MaxLogLength)}: ${reason.take(MaxLogLength)}")
+      }
+    }
 
     private def transform[B](f: Either[String, A] => Either[String, B]): SsoClient[F, B] =
       new AbstractSsoClient[F, B] {
