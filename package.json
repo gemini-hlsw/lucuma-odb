@@ -12,7 +12,7 @@
   "devDependencies": {
     "@actions/core": "^3.0.1",
     "@actions/github": "^9.1.1",
-    "@graphql-inspector/action": "^5.0.20",
+    "@graphql-inspector/action": "^6.2.8",
     "@graphql-inspector/git-loader": "^5.0.1",
     "@graphql-tools/graphql-file-loader": "^8.1.14",
     "@graphql-tools/import": "^7.1.14",
