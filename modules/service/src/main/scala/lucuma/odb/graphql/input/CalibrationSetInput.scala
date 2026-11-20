@@ -24,6 +24,16 @@ import lucuma.odb.graphql.binding.*
 import lucuma.odb.sequence.daytimecal.CalibrationSet
 import lucuma.odb.sequence.daytimecal.InstrumentSetup
 
+/**
+ * A calibration set as entered.  `needsSlitWidth` marks a custom mask given
+ * without a slit width: the width in `set` is then a stand-in, to be replaced
+ * with the mask's own before the set is stored.
+ */
+case class CalibrationSetInput(
+  set:            CalibrationSet[InstrumentSetup],
+  needsSlitWidth: Boolean
+)
+
 object CalibrationSetInput:
 
   private case class GcalFields(
@@ -112,32 +122,33 @@ object CalibrationSetInput:
       if n.value <= MaxCount then n.success
       else Result.failure(s"A calibration set may have at most $MaxCount exposures.")
 
-  val Binding: Matcher[CalibrationSet[InstrumentSetup]] =
+  val Binding: Matcher[CalibrationSetInput] =
     ObjectFieldsBinding.rmap:
       case List(
         CalibrationSetTypeBinding("kind", rKind),
         CountBinding.Option("explicitCount", rCount),
         GcalBinding.Option("gcal", rGcal),
-        GmosNorthDynamicInput.Binding.Option("gmosNorth", rNorth),
-        GmosSouthDynamicInput.Binding.Option("gmosSouth", rSouth),
-        Flamingos2DynamicInput.Binding.Option("flamingos2", rFlamingos2),
+        GmosNorthDynamicInput.OptionalWidthBinding.Option("gmosNorth", rNorth),
+        GmosSouthDynamicInput.OptionalWidthBinding.Option("gmosSouth", rSouth),
+        Flamingos2DynamicInput.OptionalWidthBinding.Option("flamingos2", rFlamingos2),
         Igrins2DynamicInput.Binding.Option("igrins2", rIgrins2),
         GnirsDynamicInput.Binding.Option("gnirs", rGnirs),
         GhostDynamicInput.Binding.Option("ghost", rGhost)
       ) =>
-        val rSetup: Result[InstrumentSetup] =
+        val rSetup: Result[(InstrumentSetup, Boolean)] =
           (rNorth, rSouth, rFlamingos2, rIgrins2, rGnirs, rGhost).parFlatMapN:
-            case (Some(n), None, None, None, None, None) => InstrumentSetup.GmosNorth(n).success
-            case (None, Some(s), None, None, None, None) => InstrumentSetup.GmosSouth(s).success
-            case (None, None, Some(f), None, None, None) => InstrumentSetup.Flamingos2(f).success
-            case (None, None, None, Some(i), None, None) => InstrumentSetup.Igrins2(i).success
-            case (None, None, None, None, Some(g), None) => InstrumentSetup.Gnirs(g).success
-            case (None, None, None, None, None, Some(h)) => InstrumentSetup.Ghost(h).success
-            case _                                       => Result.failure("Exactly one instrument setup (`gmosNorth`, `gmosSouth`, `flamingos2`, `igrins2`, `gnirs` or `ghost`) must be given.")
+            case (Some((n, w)), None, None, None, None, None) => (InstrumentSetup.GmosNorth(n), w).success
+            case (None, Some((s, w)), None, None, None, None) => (InstrumentSetup.GmosSouth(s), w).success
+            case (None, None, Some((f, w)), None, None, None) => (InstrumentSetup.Flamingos2(f), w).success
+            case (None, None, None, Some(i), None, None)      => (InstrumentSetup.Igrins2(i), false).success
+            case (None, None, None, None, Some(g), None)      => (InstrumentSetup.Gnirs(g), false).success
+            case (None, None, None, None, None, Some(h))      => (InstrumentSetup.Ghost(h), false).success
+            case _                                            => Result.failure("Exactly one instrument setup (`gmosNorth`, `gmosSouth`, `flamingos2`, `igrins2`, `gnirs` or `ghost`) must be given.")
 
-        (rKind, rCount, rGcal, rSetup).parFlatMapN: (kind, count, gcal, setup) =>
-          (checkKind(kind, setup), explicitCountFor(kind, count), gcalFor(kind, gcal, setup.instrument)).parMapN: (_, n, g) =>
-            CalibrationSet(kind, n, g, zeroExposure(kind, setup))
+        (rKind, rCount, rGcal, rSetup).parFlatMapN:
+          case (kind, count, gcal, (setup, needsSlitWidth)) =>
+            (checkKind(kind, setup), explicitCountFor(kind, count), gcalFor(kind, gcal, setup.instrument)).parMapN: (_, n, g) =>
+              CalibrationSetInput(CalibrationSet(kind, n, g, zeroExposure(kind, setup)), needsSlitWidth)
 
   /** The complaint, if any, about a set whose setup is not for the mode's instrument. */
   def instrumentMismatch(instrument: Instrument, sets: List[CalibrationSet[InstrumentSetup]]): Option[String] =

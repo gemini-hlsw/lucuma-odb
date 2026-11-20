@@ -5,6 +5,7 @@ package lucuma.odb.graphql
 
 import cats.effect.IO
 import cats.syntax.eq.*
+import cats.syntax.functor.*
 import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.enums.Instrument
@@ -34,8 +35,9 @@ trait MosMaskSupport:
   protected def insertMosMaskAttachment(
     pid:            Program.Id,
     fileName:       String,
-    maskInstrument: Instrument,
-    positionAngle:  Option[Angle] = None
+    maskInstrument:   Instrument,
+    positionAngle:    Option[Angle] = None,
+    averageSlitWidth: Option[Angle] = None
   ): IO[Attachment.Id] =
     val q: Query[(Program.Id, String, String, Json), Attachment.Id] =
       sql"""
@@ -51,7 +53,7 @@ trait MosMaskSupport:
         VALUES ($program_id, 'mos_mask', $text, 42, 'unused', $text, $jsonb)
         RETURNING c_attachment_id
       """.query(attachment_id)
-    withSession(_.unique(q)(pid, fileName, maskName(fileName), stubDefinition(maskInstrument, positionAngle)))
+    withSession(_.unique(q)(pid, fileName, maskName(fileName), stubDefinition(maskInstrument, positionAngle, averageSlitWidth)))
 
   /** A non-mask observation attachment, which carries no instrument. */
   protected def insertObsAttachment(
@@ -110,8 +112,20 @@ trait MosMaskSupport:
   private def maskName(fileName: String): String =
     fileName.stripSuffix("_ODF.fits").toUpperCase
 
-  private def stubDefinition(instrument: Instrument, positionAngle: Option[Angle]): Json =
+  private def stubDefinition(
+    instrument:       Instrument,
+    positionAngle:    Option[Angle],
+    averageSlitWidth: Option[Angle]
+  ): Json =
+    def angle(a: Angle): Json =
+      Json.obj("microarcseconds" -> a.toMicroarcseconds.asJson)
+
+    val pixelScale: BigDecimal =
+      if instrument === Instrument.Flamingos2 then BigDecimal("0.18") else BigDecimal("0.0807")
+
     Json.obj(
-      "instrument"    -> instrument.asJson,
-      "positionAngle" -> positionAngle.map(a => Json.obj("microarcseconds" -> a.toMicroarcseconds.asJson)).asJson
+      "instrument"       -> instrument.asJson,
+      "positionAngle"    -> positionAngle.map(angle).asJson,
+      "averageSlitWidth" -> averageSlitWidth.map(angle).asJson,
+      "pixelScale"       -> averageSlitWidth.as(pixelScale).asJson
     ).dropNullValues

@@ -8,8 +8,10 @@ import cats.effect.Concurrent
 import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
+import grackle.syntax.*
 import lucuma.core.enums.AttachmentType
 import lucuma.core.enums.Instrument
+import lucuma.core.math.Angle
 import lucuma.core.model.Attachment
 import lucuma.core.model.Defined
 import lucuma.core.model.MaskDefinition
@@ -50,18 +52,22 @@ trait AttachmentMetadataService [F[_]] {
   /**
    * Checks the custom masks of a daytime calibration's sets or steps: each
    * must name a MOS mask attachment cut for the instrument.  The mask may
-   * belong to any program.
+   * belong to any program.  Gives the mean science slit width and the pixel
+   * scale, in arcseconds per pixel, of each mask whose design records both.
    */
   def validateDaytimeMasks(
     instrument: Instrument,
     masks:      List[MaskDefinition]
-  )(using Transaction[F]): F[Result[Unit]]
+  )(using Transaction[F]): F[Result[Map[Attachment.Id, (Angle, BigDecimal)]]]
 }
 
 object AttachmentMetadataService {
 
   val DaytimeMaskRequiredMessage: String =
     "A daytime calibration through a custom mask must name its MOS mask attachment."
+
+  def daytimeMaskSlitWidthMessage(attachmentId: Attachment.Id): String =
+    s"The design of mask attachment $attachmentId gives no slit width, give a `slitWidth`."
 
   def daytimeMaskNotFoundMessage(attachmentId: Attachment.Id): String =
     s"Attachment $attachmentId does not exist or is not of type 'mos_mask'."
@@ -111,24 +117,26 @@ object AttachmentMetadataService {
       override def validateDaytimeMasks(
         instrument: Instrument,
         masks:      List[MaskDefinition]
-      )(using Transaction[F]): F[Result[Unit]] =
-        def invalid(msg: String): Result[Unit] =
+      )(using Transaction[F]): F[Result[Map[Attachment.Id, (Angle, BigDecimal)]]] =
+        def invalid[A](msg: String): Result[A] =
           OdbError.InvalidArgument(msg.some).asFailure
 
         val ids = masks.collect { case Defined(aid) => aid }.distinct
 
         if masks.contains(ToBeDefined) then invalid(DaytimeMaskRequiredMessage).pure[F]
-        else NonEmptyList.fromList(ids).fold(Result.unit.pure[F]): nel =>
+        else NonEmptyList.fromList(ids).fold(Map.empty.success.pure[F]): nel =>
           session.execute(Statements.selectMasks(nel))(nel.toList).map: rows =>
-            val found = rows.map((aid, name, inst) => aid -> (name, inst)).toMap
-            nel.parTraverse_ : aid =>
-              found.get(aid) match
-                case Some((maskName, maskInstrument)) if maskInstrument =!= instrument =>
-                  invalid(maskInstrumentMismatchMessage(maskName, maskInstrument, instrument))
-                case Some(_)                                                          =>
-                  Result.unit
-                case None                                                             =>
-                  invalid(daytimeMaskNotFoundMessage(aid))
+            val found = rows.map((aid, name, inst, width) => aid -> (name, inst, width)).toMap
+            nel
+              .parTraverse_ : aid =>
+                found.get(aid) match
+                  case Some((maskName, maskInstrument, _)) if maskInstrument =!= instrument =>
+                    invalid[Unit](maskInstrumentMismatchMessage(maskName, maskInstrument, instrument))
+                  case Some(_)                                                             =>
+                    Result.unit
+                  case None                                                                =>
+                    invalid[Unit](daytimeMaskNotFoundMessage(aid))
+              .as(found.collect { case (aid, (_, _, Some(width))) => aid -> width })
     }
 
   object Statements {
@@ -175,14 +183,23 @@ object AttachmentMetadataService {
       which.map(sql"$observation_id".apply).intercalate(void", ") |+|
       void")"
 
-    // Every mask attachment carries a name and an instrument.
-    def selectMasks(aids: NonEmptyList[Attachment.Id]): Query[List[Attachment.Id], (Attachment.Id, NonEmptyString, Instrument)] =
+    // Every mask attachment carries a name and an instrument.  A design
+    // without science slits records no average slit width.
+    def selectMasks(
+      aids: NonEmptyList[Attachment.Id]
+    ): Query[List[Attachment.Id], (Attachment.Id, NonEmptyString, Instrument, Option[(Angle, BigDecimal)])] =
       sql"""
-        SELECT c_attachment_id, c_mask_name, c_mask_instrument
+        SELECT
+          c_attachment_id,
+          c_mask_name,
+          c_mask_instrument,
+          (c_mask_definition->'averageSlitWidth'->>'microarcseconds')::bigint,
+          (c_mask_definition->>'pixelScale')::numeric
         FROM t_attachment
         WHERE c_attachment_type = $attachment_type
           AND c_attachment_id IN (${attachment_id.list(aids.size)})
-      """.query(attachment_id *: MaskNameAndInstrument)
+      """.query(attachment_id *: text_nonempty *: instrument *: int8.opt *: numeric.opt)
+         .map((aid, name, inst, µas, scale) => (aid, name, inst, (µas.map(Angle.fromMicroarcseconds), scale).tupled))
          .contramap[List[Attachment.Id]](ids => (AttachmentType.MosMask, ids))
 
     def getUpdatedAt(aids: NonEmptyList[Attachment.Id]): Query[List[Attachment.Id], (Attachment.Id, Timestamp)] =
