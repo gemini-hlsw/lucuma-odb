@@ -95,6 +95,9 @@ object Database extends Codecs {
 
   val SsoServiceUserName = "Lucuma SSO"
 
+  /** Raised when a disabled user tries to log in. */
+  case class UserDisabled(id: User.Id) extends RuntimeException(s"User $id is disabled.")
+
   def fromSession[F[_]: {Concurrent, Tracer as T}](s: Session[F]): Database[F] =
     new Database[F] {
 
@@ -317,9 +320,12 @@ object Database extends Codecs {
       /// HELPERS
 
       // Update the specified ORCID profile and yield the associated `StandardUser`, if any.
+      // Fails with `UserDisabled`, so the enclosing transaction rolls back.
       def updateProfile(access: OrcidAccess, person: OrcidPerson): F[Option[User.Id]] =
         T.span("updateProfile").surround:
-          s.prepareR(UpdateProfile).use(_.option(access, person))
+          s.prepareR(UpdateProfile).use(_.option(access, person)).flatMap:
+            case Some((id, false)) => Concurrent[F].raiseError(UserDisabled(id))
+            case other             => other.map(_._1).pure[F]
 
       def promoteGuest(
         access:    OrcidAccess,
@@ -407,7 +413,7 @@ object Database extends Codecs {
       RETURNING user_id
     """.query(user_id.map(GuestUser(_)))
 
-  private val UpdateProfile: Query[(OrcidAccess, OrcidPerson), User.Id] =
+  private val UpdateProfile: Query[(OrcidAccess, OrcidPerson), (User.Id, Boolean)] =
     sql"""
       UPDATE lucuma_user
       SET orcid_access_token     = $uuid,
@@ -417,9 +423,9 @@ object Database extends Codecs {
           orcid_family_name      = ${varchar.opt},
           orcid_email            = ${varchar.opt}
       WHERE orcid_id = $orcid_id
-      RETURNING (user_id)
+      RETURNING user_id, user_enabled
     """
-      .query(user_id)
+      .query(user_id *: bool)
       .contramap[(OrcidAccess, OrcidPerson)] {
         case (access, person) =>
           access.accessToken               *: // TODO: expiration
@@ -514,6 +520,7 @@ object Database extends Codecs {
       JOIN lucuma_role    r on r.user_id = s.user_id
       WHERE s.refresh_token = $session_token
       AND   s.user_type     = 'standard'
+      AND   u.user_enabled
     """.query(
         role_id *:
         (user_id *: orcid_id *: varchar.opt *: varchar.opt *: varchar.opt *: varchar.opt).map {
@@ -560,7 +567,8 @@ object Database extends Codecs {
       JOIN lucuma_user    u on u.user_id = k.user_id
       JOIN lucuma_role    r on r.user_id = k.user_id
       WHERE k.api_key_id = $varchar
-      AND   k.api_key_hash = md5($varchar);
+      AND   k.api_key_hash = md5($varchar)
+      AND   u.user_enabled;
     """
       .contramap[ApiKey](k => (k.id.value.toHexString, k.body))
       .query(
@@ -627,10 +635,12 @@ object Database extends Codecs {
 
   private val SelectGuestUserForSessionToken: Query[SessionToken, GuestUser] =
     sql"""
-      SELECT user_id
-      FROM lucuma_session
-      WHERE user_type = 'guest'
-      AND   refresh_token = $session_token
+      SELECT s.user_id
+      FROM lucuma_session s
+      JOIN lucuma_user    u on u.user_id = s.user_id
+      WHERE s.user_type     = 'guest'
+      AND   s.refresh_token = $session_token
+      AND   u.user_enabled
     """.query(user_id).map(GuestUser(_))
 
   private val CreateApiKey: Query[StandardRole.Id, ApiKey] =
