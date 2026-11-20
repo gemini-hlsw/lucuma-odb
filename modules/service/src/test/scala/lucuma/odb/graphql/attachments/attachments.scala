@@ -21,6 +21,7 @@ import lucuma.odb.data.SummaryStyle
 import lucuma.odb.service.AttachmentFileService
 import lucuma.odb.util.Codecs.*
 import org.http4s.*
+import org.typelevel.ci.*
 import skunk.*
 import skunk.codec.all.*
 import skunk.exception.PostgresErrorException
@@ -214,6 +215,25 @@ class attachments extends AttachmentsSuite {
       _      <- assertAttachmentsGql(pi, pid, (aid, mosMask1A))
       url    <- getPresignedUrl(pi, aid).toNonEmptyString
       _      <- getViaPresignedUrl(url).expectBodyBytes(mosMask1A.bytes)
+    } yield ()
+  }
+
+  // An HTML page uploaded under an image name.
+  val htmlAsPNG = TestAttachment("innocent.png", "finder", none, "<html><script>alert(document.domain)</script></html>")
+
+  test("download claims the type of the file extension, forbids sniffing and is not shown inline") {
+    for {
+      pid <- createProgramAs(pi)
+      aid <- insertAttachment(pi, pid, htmlAsPNG).toAttachmentId
+      hs  <- getAttachment(pi, aid).use: resp =>
+               IO(resp.status).assertEquals(Status.Ok) *>
+                 resp.body.compile.drain.as(
+                   List(ci"Content-Type", ci"X-Content-Type-Options", ci"Content-Disposition")
+                     .map(resp.headers.headerValue)
+                 )
+      _   <- IO(hs).assertEquals(
+               List("image/png".some, "nosniff".some, """attachment; filename="innocent.png"""".some)
+             )
     } yield ()
   }
 
