@@ -23,8 +23,12 @@ import org.http4s.*
 import org.http4s.headers.Authorization
 import org.http4s.implicits.*
 import org.typelevel.ci.*
+import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.noop.NoOpLogger
 
 class attachmentRoutes extends AttachmentRoutesSuite {
+
+  private given Logger[IO] = NoOpLogger[IO]
 
   private val attachmentId    = Attachment.Id(5.refined)
   private val fileName        = NonEmptyString.unsafeFrom("finder.png")

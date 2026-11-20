@@ -97,7 +97,7 @@ object AttachmentRoutes {
     )
 
   // used by tests
-  def apply[F[_]: Async](
+  def apply[F[_]: {Async, Logger}](
     service:     AttachmentFileService[F],
     ssoClient:   SsoClient[F, User],
     maxUploadMb: Int,
@@ -109,7 +109,7 @@ object AttachmentRoutes {
     )
 
 
-  def apply[F[_]: Concurrent](
+  def apply[F[_]: {Concurrent, Logger}](
     service:               [A] => User => (AttachmentFileService[F] => F[A]) => F[A],
     ssoClient:             SsoClient[F, User],
     maxUploadMb:           Int
@@ -148,9 +148,19 @@ object AttachmentRoutes {
     object AttachmentTypeMatcher extends QueryParamDecoderMatcher[AttachmentType]("attachmentType")
     object DescriptionMatcher    extends OptionalQueryParamDecoderMatcher[String]("description")
 
+    // Like `ssoClient.require`, but also logs a `403 Forbidden` response to an authenticated user.
+    def require(req: Request[F])(f: User => F[Response[F]]): F[Response[F]] =
+      ssoClient.require(req) { user =>
+        f(user).flatTap { res =>
+          Logger[F]
+            .warn(s"Not authorized: user ${user.id}, operation ${req.method} ${req.uri.path}: The route answered 403 Forbidden.")
+            .whenA(res.status === Status.Forbidden)
+        }
+      }
+
     val routes = HttpRoutes.of[F] {
       case req @ GET -> Root / "attachment" / AttachmentId(attachmentId) =>
-        ssoClient.require(req) { user =>
+        require(req) { user =>
           service(user) { s =>
             s.getAttachment(user, attachmentId)
               .toResponse(f => Response[F](Status.Ok, headers = downloadHeaders(f.fileName), body = f.data).pure)
@@ -162,7 +172,7 @@ object AttachmentRoutes {
           +& FileNameMatcher(fileName)
           +& AttachmentTypeMatcher(attachmentType)
           +& DescriptionMatcher(optDesc) =>
-        ssoClient.require(req) { user =>
+        require(req) { user =>
           service(user) { s =>
             val description = optDesc.flatMap(d => NonEmptyString.from(d).toOption)
             s
@@ -177,7 +187,7 @@ object AttachmentRoutes {
 
       case req @ PUT -> Root / "attachment" / AttachmentId(attachmentId)
           :? FileNameMatcher(fileName) +& DescriptionMatcher(optDesc) =>
-        ssoClient.require(req) { user =>
+        require(req) { user =>
           service(user) { s =>
             val description = optDesc.flatMap(d => NonEmptyString.from(d).toOption)
             s
@@ -191,7 +201,7 @@ object AttachmentRoutes {
         }
 
       case req @ DELETE -> Root / "attachment" / AttachmentId(attachmentId) =>
-        ssoClient.require(req) { user =>
+        require(req) { user =>
           service(user) { s =>
             s
               .deleteAttachment(user, attachmentId)
@@ -200,7 +210,7 @@ object AttachmentRoutes {
         }
 
       case req @ GET -> Root / "attachment" / "url" / AttachmentId(attachmentId) =>
-        ssoClient.require(req) { user =>
+        require(req) { user =>
           service(user) { s =>
             s
               .getPresignedUrl(user, attachmentId)
