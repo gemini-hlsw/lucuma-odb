@@ -1,5 +1,5 @@
 //
-// This file has _most_ of the functionality of the validate-schema action, but the main difference with the original action is that it supports loading schema files from JVM resource directories (in the same project). This is done by the LucumaResourceLoader
+// This file has _most_ of the functionality of the validate-schema action, but the main difference with the original action is that it supports loading schema files from JVM resource directories (in the same project). This is done with path aliases for local files and by the LucumaResourceGitLoader for files on main.
 // Annotations are emitted as workflow commands and the step fails through its exit code, so no GitHub API call is involved.
 // Resource import statements are used by schemas like resource.graphql that import from `"lucuma/odb/graphql/OdbSchema.graphql"`.
 // Most of the code is taken from https://github.com/graphql-hive/graphql-inspector
@@ -8,22 +8,20 @@
 // @ts-check
 
 import * as core from '@actions/core';
-import { diff } from '@graphql-inspector/action/action/helpers/diff';
-import {
-  AnnotationLevel,
-  CheckConclusion,
-} from '@graphql-inspector/action/action/helpers/types';
-import { createSummary } from '@graphql-inspector/action/action/helpers/utils';
 import { GitLoader } from '@graphql-tools/git-loader';
 import { loadFromGit } from '@graphql-tools/git-loader/load-git';
 import { GraphQLFileLoader } from '@graphql-tools/graphql-file-loader';
 import { processImport } from '@graphql-tools/import';
 import { loadSchema } from '@graphql-tools/load';
-import { parseGraphQLSDL } from '@graphql-tools/utils';
 import fs from 'fs';
-import { readFile } from 'fs/promises';
 import { glob } from 'glob';
 import { Source } from 'graphql';
+import {
+  AnnotationLevel,
+  CheckConclusion,
+  createSummary,
+  diff,
+} from './schema-diff.mjs';
 const APPROVE_LABEL = 'expected-breaking-change';
 
 const schemaPath = process.argv[2];
@@ -36,21 +34,13 @@ if (!fs.existsSync(schemaPath)) {
   process.exit(1);
 }
 
-// Map of resource path to content, used for handling #import statements in .graphql files
+// The #import statements in .graphql files use paths relative to the resource directories.
 const resourceLocations = await glob('**/src/main/resources/**/*.graphql');
-const resourceMapping = Object.fromEntries(
-  (
-    await Promise.all(
-      resourceLocations.map(async (l) => {
-        const content = await readFile(l, 'utf-8');
-        return [
-          [l.split('src/main/resources/')[1], content],
-          [l, content],
-        ];
-      }),
-    )
-  ).flat(),
-);
+const resourcePathAliases = {
+  mappings: Object.fromEntries(
+    resourceLocations.map((l) => [l.split('src/main/resources/')[1], `./${l}`]),
+  ),
+};
 
 const gitResourceMapping = Object.fromEntries(
   (
@@ -69,37 +59,6 @@ const gitResourceMapping = Object.fromEntries(
     )
   ).flat(),
 );
-
-/**
- * From @graphql-tools/graphql-file-loader, internal function used by handleFileContent
- * @param {string} rawSDL
- */
-function isGraphQLImportFile(rawSDL) {
-  const trimmedRawSDL = rawSDL.trim();
-  return (
-    trimmedRawSDL.startsWith('# import') || trimmedRawSDL.startsWith('#import')
-  );
-}
-
-class LucumaResourceLoader extends GraphQLFileLoader {
-  /**
-   * Same as the super, but passes along resourceMapping as predefinedImports
-   * @param {string} rawSDL
-   * @param {string} pointer
-   * @param {import('@graphql-tools/graphql-file-loader').GraphQLFileLoaderOptions} options
-   * @returns
-   */
-  handleFileContent(rawSDL, pointer, options) {
-    if (!options.skipGraphQLImport && isGraphQLImportFile(rawSDL)) {
-      const document = processImport(pointer, options.cwd, resourceMapping);
-      return {
-        location: pointer,
-        document,
-      };
-    }
-    return parseGraphQLSDL(pointer, rawSDL, options);
-  }
-}
 
 // @ts-ignore
 class LucumaResourceGitLoader extends GitLoader {
@@ -127,7 +86,8 @@ class LucumaResourceGitLoader extends GitLoader {
 }
 
 const schemaLoaderOptions = {
-  loaders: [new LucumaResourceLoader(), new LucumaResourceGitLoader()],
+  loaders: [new GraphQLFileLoader(), new LucumaResourceGitLoader()],
+  pathAliases: resourcePathAliases,
 };
 const newSchema = await loadSchema(schemaPath, schemaLoaderOptions);
 const oldSchemaPath = `git:origin/main:${schemaPath}`;
@@ -139,10 +99,7 @@ const action = await diff({
     old: oldSchema,
     new: newSchema,
   },
-  sources: {
-    old: new Source(gitResourceMapping[oldSchemaPath], `main:${schemaPath}`),
-    new: new Source(resourceMapping[schemaPath], schemaPath),
-  },
+  source: new Source(fs.readFileSync(schemaPath, 'utf-8'), schemaPath),
 });
 
 const annotations =
@@ -207,7 +164,7 @@ if (process.env.GITHUB_ACTIONS) {
   await core.summary
     .addHeading(`GraphQL Inspector: ${schemaPath}`, 3)
     .addEOL()
-    .addRaw(createSummary(action.changes ?? [], 100, false), true)
+    .addRaw(createSummary(action.changes ?? [], 100), true)
     .write();
   if (approved)
     core.info(`Breaking changes accepted by the "${APPROVE_LABEL}" label`);
