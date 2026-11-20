@@ -10,6 +10,7 @@ import cats.implicits.*
 import fs2.Stream
 import grackle.Mapping
 import grackle.Operation
+import grackle.Query
 import grackle.Result
 import grackle.Schema
 import grackle.skunk.SkunkMonitor
@@ -25,6 +26,8 @@ import lucuma.graphql.routes.RoutesConfig
 import lucuma.horizons.HorizonsClient
 import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
+import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.mapping.ConeCandidatesMapping
 import lucuma.odb.graphql.mapping.UserEnv
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
@@ -119,6 +122,21 @@ object GraphQLRoutes {
       def debug(ctx: RequestContext, message: String): F[Unit] =
         L.debug(s"${describe(ctx)}: $message")
 
+      // The kind of the operation and its root fields, for the log. For example
+      // `Mutation updatePrograms (UpdateMyPrograms)`, where the client chose the name in parentheses.
+      def describeOperation(request: Operation, operationName: Option[String]): String =
+        val fields = Query.ungroup(request.query).flatMap(Query.rootName(_).map(_._1)).distinct
+        val name   = operationName.fold("")(n => s" ($n)")
+        s"${request.rootTpe.name} ${if fields.isEmpty then "<unknown>" else fields.mkString(", ")}$name"
+
+      // Logs the `NotAuthorized` problems of `result`, if there are any, as one WARN line.
+      def logNotAuthorized(operation: => String, result: Result[?]): F[Unit] =
+        result.toProblems.toList.flatMap(p => p.asOdbError.collect { case OdbError.NotAuthorized(u, _) => (u, p.message) }) match
+          case Nil                         => F.unit
+          case all @ ((user, reason) :: _) =>
+            val more = if all.length > 1 then s" (and ${all.length - 1} more)" else ""
+            L.warn(s"Not authorized: user $user, operation ${operation.take(256)}: ${reason.take(256)}$more")
+
       val service: GraphQLService[F] =
         new GraphQLService[F](odbMapping, OdbMapping.slowQueryThreshold.some) {
 
@@ -161,7 +179,9 @@ object GraphQLRoutes {
                       case Result.InternalError(t: TooManyParametersException) =>
                         error(ctx, s"Internal error: ${t.getClass.getSimpleName}: ${t.getMessage}\nCompiled query:\n${request.query.render.take(4096)}", t)
                       case Result.InternalError(t) => error(ctx, s"Internal error: ${t.getClass.getSimpleName}: ${t.getMessage}", t)
-                      case _                       => debug(ctx, s"Query (success).")
+                      case r                       =>
+                        logNotAuthorized(describeOperation(request, operationName), r) >>
+                          debug(ctx, s"Query (success).")
                     }
                 ).flatMap: (elapsed, result) =>
                   val slow = elapsed > OdbMapping.slowQueryThreshold
@@ -190,6 +210,7 @@ object GraphQLRoutes {
                 .resource
             Stream.resource(spanResource).flatMap: res =>
               super.subscribe(ctx, request, document, operationName)
+                .evalTap(logNotAuthorized(describeOperation(request, operationName), _))
                 // use `res.trace` to make it the current context for each inner effect
                 .translate(res.trace)
         }
