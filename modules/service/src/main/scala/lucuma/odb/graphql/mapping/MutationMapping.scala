@@ -102,6 +102,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] with UserEnv {
       DeleteSequence,
       InsertSmartGcal,
       LinkUser,
+      UnfreezeTimeAccounting,
       RecordDataset,
       RecordFlamingos2Visit,
       RecordGmosNorthVisit,
@@ -395,6 +396,38 @@ trait MutationMapping[F[_]] extends AccessControl[F] with UserEnv {
                   Predicates.cloneObservationResult.newObservation.id.eql(ids.cloneId),
                   child
                 )
+
+  private lazy val UnfreezeTimeAccounting: MutationField =
+    MutationField("unfreezeTimeAccounting", UnfreezeTimeAccountingInput.Binding): (input, child) =>
+      services.useTransactionally:
+        requireStaffAccess:
+          val unfrozen: F[Result[(Observation.Id, List[Visit.Id])]] =
+            input match
+              case UnfreezeTimeAccountingInput.ForVisit(vid)            =>
+                timeAccountingService.unfreezeVisit(vid)
+              case UnfreezeTimeAccountingInput.ForObservation(oid, ref) =>
+                Services.asSuperUser(observationService.resolveOid(oid, ref)).flatMap: r =>
+                  r.flatTraverse: oid =>
+                    timeAccountingService.unfreezeObservation(oid).nestMap(vids => (oid, vids))
+
+          // Narrow the result's `visits` (a top-level field of the selection;
+          // mapFields doesn't descend into nested ones) to the unfrozen visits.
+          def onlyUnfrozen(vids: List[Visit.Id]): Query => Query =
+            case Select("visits", alias, c, loc) =>
+              val pred = if vids.isEmpty then False else Predicates.visit.id.in(vids)
+              Select(
+                "visits",
+                alias,
+                OrderBy(OrderSelections(List(OrderSelection[Visit.Id](VisitType / "id"))), Filter(pred, c)),
+                loc
+              )
+            case q                               => q
+
+          unfrozen.nestMap: (oid, vids) =>
+            Filter(
+              Predicates.unfreezeTimeAccountingResult.observation.id.eql(oid),
+              Query.mapFields(child)(onlyUnfrozen(vids))
+            )
 
   private lazy val RefreshArchiveDuplication: MutationField =
     MutationField("refreshArchiveDuplication", RefreshArchiveDuplicationInput.Binding): (input, child) =>

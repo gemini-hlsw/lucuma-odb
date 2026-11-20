@@ -65,6 +65,17 @@ sealed trait DatasetService[F[_]] {
   def selectDatasetsWithQaFailures(
     visitId: Visit.Id
   )(using Transaction[F]): F[List[(Atom.Id, List[Dataset.Id])]]
+
+  /**
+   * Whether the visit has written science datasets and none of them passes
+   * QA.  As in `v_observation_qa`, acquisition datasets and datasets that were
+   * never written (no end time) are ignored because nobody assesses them.
+   * Whether a dataset passes is decided by the `dataset_qa_passes` SQL
+   * function.
+   */
+  def allScienceDatasetsFail(
+    visitId: Visit.Id
+  )(using Transaction[F]): F[Boolean]
 }
 
 object DatasetService {
@@ -143,6 +154,11 @@ object DatasetService {
         session.execute(Statements.SelectQaFailures)(visitId).map {
           _.groupBy(_._1).view.mapValues(_.unzip._2).toList
         }
+
+      override def allScienceDatasetsFail(
+        visitId: Visit.Id
+      )(using Transaction[F]): F[Boolean] =
+        session.unique(Statements.AllScienceDatasetsFail)(visitId)
   }
 
   object Statements {
@@ -226,6 +242,22 @@ object DatasetService {
         )
       """.query(bool)
 
+    // bool_and of no rows is NULL, so a visit without written science
+    // datasets yields false.
+    val AllScienceDatasetsFail: Query[Visit.Id, Boolean] =
+      sql"""
+        SELECT COALESCE(
+                 bool_and(NOT dataset_qa_passes(d.c_qa_state)),
+                 false
+               )
+          FROM t_dataset d
+          JOIN t_step s ON s.c_step_id = d.c_step_id
+          JOIN t_atom a ON a.c_atom_id = s.c_atom_id
+         WHERE d.c_visit_id      = $visit_id
+           AND d.c_end_time      IS NOT NULL
+           AND a.c_sequence_type = 'science'
+      """.query(bool)
+
     val SelectQaFailures: Query[Visit.Id, (Atom.Id, Dataset.Id)] =
       sql"""
         SELECT s.c_atom_id,
@@ -233,7 +265,7 @@ object DatasetService {
           FROM t_dataset d
     INNER JOIN t_step s
             ON s.c_step_id = d.c_step_id
-         WHERE (d.c_qa_state = 'fail' OR d.c_qa_state = 'usable')
+         WHERE NOT dataset_qa_passes(d.c_qa_state)
            AND d.c_visit_id = $visit_id
       """.query(atom_id *: dataset_id)
   }

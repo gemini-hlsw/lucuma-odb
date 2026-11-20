@@ -28,11 +28,27 @@ object TimeAccounting {
     )
 
   object comment {
-    val NoData: String   = "Time spent during a visit in which no dataset sets were collected."
-    val Overlap: String  = "Time spent observing after an overlapping chargeable observation started."
-    val PreDusk: String  = "Time spent observing pre-dusk (nautical twilight)."
-    val PostDawn: String = "Time spent observing post-dawn (nautical twilight)."
-    val Qa: String       = "Time spent observing atoms with one or more datasets that don't pass QA."
+    val NoData: String        = "Time spent during a visit in which no dataset sets were collected."
+    val NoPassingData: String = "Time spent during a visit in which no datasets pass QA."
+    val Overlap: String       = "Time spent observing after an overlapping chargeable observation started."
+    val PreDusk: String       = "Time spent observing pre-dusk (nautical twilight)."
+    val PostDawn: String      = "Time spent observing post-dawn (nautical twilight)."
+    val Qa: String            = "Time spent observing atoms with one or more datasets that don't pass QA."
+  }
+
+  object version {
+
+    /**
+     * The version of the time accounting rules implemented here.  Each visit
+     * records the version that produced its stored charge
+     * (`t_visit.c_ta_version`), and visits on any other version are not
+     * recomputed.  When the rules change, increment it and add a migration
+     * that calls `add_time_accounting_version` with the new version and a
+     * description of the change.  A startup check requires it to match the
+     * latest version in `t_time_accounting_version`.
+     */
+    val Current: Short = 2
+
   }
 
   /**

@@ -422,6 +422,7 @@ trait BaseMapping[F[_]]
   lazy val RecordGmosSouthStepResultType           = schema.ref("RecordGmosSouthStepResult")
   lazy val RecordGmosSouthVisitResultType          = schema.ref("RecordGmosSouthVisitResult")
   lazy val RecordIgrins2VisitResultType            = schema.ref("RecordIgrins2VisitResult")
+  lazy val UnfreezeTimeAccountingResultType     = schema.ref("UnfreezeTimeAccountingResult")
   lazy val RecordVisitResultType                   = schema.ref("RecordVisitResult")
   lazy val RedeemUserInvitationResultType          = schema.ref("RedeemUserInvitationResult")
   lazy val RevokeGroupConstraintWaiverResultType   = schema.ref("RevokeGroupConstraintWaiverResult")

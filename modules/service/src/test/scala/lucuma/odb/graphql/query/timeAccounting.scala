@@ -43,14 +43,23 @@ import lucuma.core.model.sequence.TimeChargeCorrection
 import lucuma.core.syntax.string.*
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.CalculationState
+import lucuma.core.util.Enumerated
+import lucuma.core.util.Gid
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
+import lucuma.odb.data.OdbError
 import lucuma.odb.data.TimeCharge
 import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.graphql.input.TimeChargeCorrectionInput
+import lucuma.odb.sequence.syntax.qastate.*
+import lucuma.odb.service.ObscalcService
+import lucuma.odb.service.Services
 import lucuma.odb.service.TimeAccounting
 import lucuma.odb.util.Codecs.*
+import skunk.codec.boolean.bool
+import skunk.codec.numeric.int2
+import skunk.codec.text.text
 import skunk.syntax.all.*
 
 import java.time.Duration
@@ -786,6 +795,720 @@ class timeAccounting extends OdbSuite with DatabaseOperations with ExecutionTest
       _ <- expect(pi, invoiceQuery(v.oid), invoiceExected(invoice(v), Nil))
     } yield ()
 
+  }
+
+  // Marks the datasets written, as recording an EndWrite dataset event through
+  // the API would.  Only written datasets are considered by the no passing data
+  // rule.
+  def markWritten(dids: List[Dataset.Id], when: Timestamp): IO[Unit] =
+    withSession: s =>
+      s.transaction.use: _ =>
+        // The dataset update audit trigger records the user.
+        s.unique(sql"select set_config('lucuma.user', $text, true)".query(text))(Gid[User.Id].show(serviceUser.id)) >>
+        dids.traverse_ : did =>
+          s.execute(sql"""
+            UPDATE t_dataset
+               SET c_start_time = $core_timestamp,
+                   c_end_time   = $core_timestamp
+             WHERE c_dataset_id = $dataset_id
+          """.command)((when, when, did)).void
+
+  // Two atoms, each with one failing dataset, and the sequence paused between
+  // them.  The paused time [ts(5), ts(26)) belongs to neither atom.
+  private def pausedAllFailedTest(index: Int): IO[Unit] = {
+
+    val ts = (0 until 32).map(_.fromNightStart)
+
+    def events(v: VisitNode): List[ExecutionEvent] = {
+
+      val aid0 = v.atoms.head.aid
+      val sid0 = v.atoms.head.steps.head.sid
+      val did0 = v.atoms.head.steps.head.dids.head
+
+      val aid1 = v.atoms.last.aid
+      val sid1 = v.atoms.last.steps.head.sid
+      val did1 = v.atoms.last.steps.head.dids.head
+
+      List(
+        AtomEvent(    EventId, ts( 0), v.oid, v.vid, none, aid0,             AtomStage.StartAtom),
+        StepEvent(    EventId, ts( 1), v.oid, v.vid, none, aid0, sid0,       StepStage.StartStep),
+        DatasetEvent( EventId, ts( 2), v.oid, v.vid, none, aid0, sid0, did0, DatasetStage.StartExpose),
+        DatasetEvent( EventId, ts( 3), v.oid, v.vid, none, aid0, sid0, did0, DatasetStage.EndWrite),
+        StepEvent(    EventId, ts( 4), v.oid, v.vid, none, aid0, sid0,       StepStage.EndStep),
+        AtomEvent(    EventId, ts( 5), v.oid, v.vid, none, aid0,             AtomStage.EndAtom),
+
+        SequenceEvent(EventId, ts( 6), v.oid, v.vid, none, SequenceCommand.Pause),
+        SequenceEvent(EventId, ts(25), v.oid, v.vid, none, SequenceCommand.Continue),
+
+        AtomEvent(    EventId, ts(26), v.oid, v.vid, none, aid1,             AtomStage.StartAtom),
+        StepEvent(    EventId, ts(27), v.oid, v.vid, none, aid1, sid1,       StepStage.StartStep),
+        DatasetEvent( EventId, ts(28), v.oid, v.vid, none, aid1, sid1, did1, DatasetStage.StartExpose),
+        DatasetEvent( EventId, ts(29), v.oid, v.vid, none, aid1, sid1, did1, DatasetStage.EndWrite),
+        StepEvent(    EventId, ts(30), v.oid, v.vid, none, aid1, sid1,       StepStage.EndStep),
+        AtomEvent(    EventId, ts(31), v.oid, v.vid, none, aid1,             AtomStage.EndAtom)
+      )
+    }
+
+    def invoice(v: VisitNode): TimeCharge.Invoice = {
+      def qa(start: Int, end: Int, comment: String, dids: List[Dataset.Id]): TimeCharge.DiscountEntry =
+        TimeCharge.DiscountEntry.Qa(
+          TimeCharge.Discount(TimestampInterval.between(ts(start), ts(end)), (end - start).sec, comment),
+          dids.toSet
+        )
+
+      val did0 = v.atoms.head.steps.head.dids
+      val did1 = v.atoms.last.steps.head.dids
+
+      val perAtom = List(
+        qa( 0,  5, TimeAccounting.comment.Qa, did0),
+        qa(26, 31, TimeAccounting.comment.Qa, did1)
+      )
+
+      TimeCharge.Invoice(
+        CategorizedTime(ChargeClass.Program -> 31.sec),
+        List(perAtom.head, qa(5, 26, TimeAccounting.comment.NoPassingData, did0 ++ did1), perAtom.last),
+        CategorizedTime.Zero
+      )
+    }
+
+    for {
+      _ <- cleanup
+      v <- recordVisit(pi, serviceUser, mode, visitTime, 2, 1, 1, index)
+      _ <- insertEvents(v.pid, events(v))
+      _ <- updateDatasets(staff, DatasetQaState.Fail, v.atoms.flatMap(_.steps.flatMap(_.dids)))
+      _ <- markWritten(v.atoms.flatMap(_.steps.flatMap(_.dids)), ts(3))
+      _ <- withServices(serviceUser) { s => s.session.transaction use { xa => s.timeAccountingService.update(v.vid)(using xa) } }
+      _ <- expect(pi, invoiceQuery(v.oid), invoiceExected(invoice(v), Nil))
+    } yield ()
+  }
+
+  // The sequence starts before the first atom and stops after the last one.
+  // An acquisition atom, whose written dataset nobody assesses, precedes two
+  // science atoms with the sequence paused between them.  The first science
+  // dataset fails QA and the second is given `atom1Qa`.
+  private def mixedVisitTest(atom1Qa: Option[DatasetQaState], index: Int): IO[Unit] = {
+
+    val ts = (0 until 28).map(_.fromNightStart)
+
+    def events(v: VisitNode): List[ExecutionEvent] = {
+      def atomEvents(a: AtomNode, t: Int): List[ExecutionEvent] = {
+        val sid = a.steps.head.sid
+        val did = a.steps.head.dids.head
+        List(
+          AtomEvent(   EventId, ts(t    ), v.oid, v.vid, none, a.aid,           AtomStage.StartAtom),
+          StepEvent(   EventId, ts(t + 1), v.oid, v.vid, none, a.aid, sid,      StepStage.StartStep),
+          DatasetEvent(EventId, ts(t + 2), v.oid, v.vid, none, a.aid, sid, did, DatasetStage.StartExpose),
+          DatasetEvent(EventId, ts(t + 3), v.oid, v.vid, none, a.aid, sid, did, DatasetStage.EndWrite),
+          StepEvent(   EventId, ts(t + 4), v.oid, v.vid, none, a.aid, sid,      StepStage.EndStep),
+          AtomEvent(   EventId, ts(t + 5), v.oid, v.vid, none, a.aid,           AtomStage.EndAtom)
+        )
+      }
+
+      val List(acq, sci0, sci1) = v.atoms: @unchecked
+
+      List(SequenceEvent(EventId, ts(0), v.oid, v.vid, none, SequenceCommand.Start)) ++
+      atomEvents(acq,  1)                                                            ++  // [ 1,  6)
+      atomEvents(sci0, 7)                                                            ++  // [ 7, 12)
+      List(
+        SequenceEvent(EventId, ts(13), v.oid, v.vid, none, SequenceCommand.Pause),
+        SequenceEvent(EventId, ts(19), v.oid, v.vid, none, SequenceCommand.Continue)
+      )                                                                              ++
+      atomEvents(sci1, 20)                                                           ++  // [20, 25)
+      List(SequenceEvent(EventId, ts(27), v.oid, v.vid, none, SequenceCommand.Stop))
+    }
+
+    def invoice(v: VisitNode): TimeCharge.Invoice = {
+      def qa(start: Int, end: Int, comment: String, dids: List[Dataset.Id]): TimeCharge.DiscountEntry =
+        TimeCharge.DiscountEntry.Qa(
+          TimeCharge.Discount(TimestampInterval.between(ts(start), ts(end)), (end - start).sec, comment),
+          dids.toSet
+        )
+
+      val did0 = v.atoms(1).steps.head.dids
+      val did1 = v.atoms(2).steps.head.dids
+
+      atom1Qa match {
+        case Some(DatasetQaState.Usable | DatasetQaState.Fail) =>
+          // Nothing passes: the per-atom discounts plus one discount for each
+          // run of remaining time.
+          val dids = did0 ++ did1
+          TimeCharge.Invoice(
+            CategorizedTime(ChargeClass.Program -> 27.sec),
+            List(
+              qa( 0,  7, TimeAccounting.comment.NoPassingData, dids),
+              qa( 7, 12, TimeAccounting.comment.Qa,            did0),
+              qa(12, 20, TimeAccounting.comment.NoPassingData, dids),
+              qa(20, 25, TimeAccounting.comment.Qa,            did1),
+              qa(25, 27, TimeAccounting.comment.NoPassingData, dids)
+            ),
+            CategorizedTime.Zero
+          )
+
+        case _ =>
+          // The second science dataset passes or is unassessed, so only the
+          // failing atom is discounted.
+          TimeCharge.Invoice(
+            CategorizedTime(ChargeClass.Program -> 27.sec),
+            List(qa(7, 12, TimeAccounting.comment.Qa, did0)),
+            CategorizedTime(ChargeClass.Program -> 22.sec)
+          )
+      }
+    }
+
+    for {
+      _    <- cleanup
+      pid  <- createProgramAs(pi)
+      tid  <- createTargetWithProfileAs(pi, pid)
+      oid  <- createObservationAs(pi, pid, mode.some, tid)
+      acq  <- acquisitionSequenceIds(pi, oid)
+      sci  <- scienceSequenceIds(pi, oid)
+      vid  <- recordVisitAs(serviceUser, oid)
+      _    <- setVisitTime(vid, visitTime)
+      a0   <- recordAtom(serviceUser, vid, acq.head._1, acq.head._2, 1, 1, index)
+      a1   <- recordAtom(serviceUser, vid, sci.head._1, sci.head._2, 1, 1, index + 1)
+      a2   <- recordAtom(serviceUser, vid, sci.toList(1)._1, sci.toList(1)._2, 1, 1, index + 2)
+      v     = VisitNode(pid, oid, vid, List(a0, a1, a2))
+      _    <- insertEvents(pid, events(v))
+      _    <- markWritten(List(a0, a1, a2).flatMap(_.steps.flatMap(_.dids)), ts(3))
+      _    <- updateDatasets(staff, DatasetQaState.Fail, a1.steps.flatMap(_.dids))
+      _    <- atom1Qa.traverse_(q => updateDatasets(staff, q, a2.steps.flatMap(_.dids)))
+      _    <- withServices(serviceUser) { s => s.session.transaction use { xa => s.timeAccountingService.update(vid)(using xa) } }
+      _    <- expect(pi, invoiceQuery(oid), invoiceExected(invoice(v), Nil))
+    } yield ()
+  }
+
+  test("timeChargeInvoice (no passing data, unassessed acquisition and time outside atoms)") {
+    mixedVisitTest(DatasetQaState.Usable.some, 340)
+  }
+
+  test("timeChargeInvoice (an unassessed science dataset counts as passing)") {
+    mixedVisitTest(none, 350)
+  }
+
+  test("timeChargeInvoice (no passing data, sequence paused between atoms)") {
+    pausedAllFailedTest(310)
+  }
+
+  def setVersion(vid: Visit.Id, version: Short): IO[Unit] =
+    withSession(_.execute(sql"UPDATE t_visit SET c_ta_version = $int2 WHERE c_visit_id = $visit_id".command)((version, vid)).void)
+
+  def visitVersion(vid: Visit.Id): IO[Short] =
+    withSession(_.unique(sql"SELECT c_ta_version FROM t_visit WHERE c_visit_id = $visit_id".query(int2))(vid))
+
+  def unfreezeTimeAccountingQuery(oid: Observation.Id): String =
+    s"""
+      mutation {
+        unfreezeTimeAccounting(input: { observationId: "$oid" }) {
+          observation { id }
+        }
+      }
+    """
+
+  test("a visit on an older version of the rules is frozen") {
+    val events = List(
+      (SequenceCommand.Start, t00),
+      (SequenceCommand.Stop,  t10)
+    )
+
+    val frozen = 999.sec
+
+    for {
+      v <- recordVisit(pi, serviceUser, mode, visitTime, 1, 1, 1, 9300)
+      _ <- insertEvents(v.pid, events.map { (c, t) => SequenceEvent(EventId, t, v.oid, v.vid, none, c) })
+      _ <- runTimeAccounting(v.oid)
+      _ <- assertIO(visitFinalProgramTime(v.vid), 10.sec)
+
+      // Stand in a charge computed by older rules.
+      _ <- setVersion(v.vid, (TimeAccounting.version.Current - 1).toShort)
+      _ <- setFinalProgramTime(v.vid, frozen)
+
+      // A time accounting relevant change leaves it as it is ...
+      _ <- invalidateTimeAccounting(v.vid, v.oid)
+      _ <- runTimeAccounting(v.oid)
+      _ <- assertIO(visitFinalProgramTime(v.vid), frozen)
+
+      // ... but unfreezing it moves it to the current rules, right away
+      // rather than leaving it for the obscalc worker.
+      _ <- query(staff, unfreezeTimeAccountingQuery(v.oid))
+      _ <- assertIO(visitVersion(v.vid), TimeAccounting.version.Current)
+      _ <- assertIO(visitFinalProgramTime(v.vid), 10.sec)
+      _ <- assertIO(
+             withSession(_.unique(sql"SELECT c_ta_invalidation > c_ta_update FROM t_visit WHERE c_visit_id = $visit_id".query(bool))(v.vid)),
+             false
+           )
+    } yield ()
+  }
+
+  test("the invoice reports the rules version and whether the charge is frozen") {
+    val events = List(
+      (SequenceCommand.Start, t00),
+      (SequenceCommand.Stop,  t10)
+    )
+
+    val old    = (TimeAccounting.version.Current - 1).toShort
+    val frozen = 999.sec
+
+    def rulesAndFrozen(oid: Observation.Id): IO[(Int, Boolean)] =
+      query(pi, s"""
+        query {
+          observation(observationId: "$oid") {
+            execution {
+              visits {
+                matches {
+                  timeChargeInvoice {
+                    rulesVersion
+                    frozen
+                  }
+                }
+              }
+            }
+          }
+        }
+      """).map { json =>
+        val invoice = json.hcursor.downFields("observation", "execution", "visits", "matches").downArray.downField("timeChargeInvoice")
+        (invoice.downField("rulesVersion").require[Int], invoice.downField("frozen").require[Boolean])
+      }
+
+    for {
+      v <- recordVisit(pi, serviceUser, mode, visitTime, 1, 1, 1, 9940)
+      _ <- insertEvents(v.pid, events.map { (c, t) => SequenceEvent(EventId, t, v.oid, v.vid, none, c) })
+      _ <- runTimeAccounting(v.oid)
+      _ <- assertIO(rulesAndFrozen(v.oid), (TimeAccounting.version.Current.toInt, false))
+
+      // Stand in a charge computed by older rules.
+      _ <- setVersion(v.vid, old)
+      _ <- setFinalProgramTime(v.vid, frozen)
+      _ <- assertIO(rulesAndFrozen(v.oid), (old.toInt, true))
+
+      // A correction still applies to a frozen charge, right away, and leaves
+      // it frozen.
+      _ <- addTimeChargeCorrection(staff, v.vid, TimeChargeCorrectionInput(ChargeClass.Program, TimeChargeCorrection.Op.Add, 5.sec, none))
+      _ <- assertIO(visitFinalProgramTime(v.vid), 1004.sec)
+      _ <- assertIO(rulesAndFrozen(v.oid), (old.toInt, true))
+    } yield ()
+  }
+
+  test("unfreezeTimeAccounting keeps corrections") {
+    val events = List(
+      (SequenceCommand.Start, t00),
+      (SequenceCommand.Stop,  t10)
+    )
+
+    for {
+      v <- recordVisit(pi, serviceUser, mode, visitTime, 1, 1, 1, 9400)
+      _ <- insertEvents(v.pid, events.map { (c, t) => SequenceEvent(EventId, t, v.oid, v.vid, none, c) })
+      _ <- runTimeAccounting(v.oid)
+      _ <- addTimeChargeCorrection(staff, v.vid, TimeChargeCorrectionInput(ChargeClass.Program, TimeChargeCorrection.Op.Add, 5.sec, none))
+      _ <- setVersion(v.vid, (TimeAccounting.version.Current - 1).toShort)
+      _ <- query(staff, unfreezeTimeAccountingQuery(v.oid))
+      _ <- assertIO(visitFinalProgramTime(v.vid), 15.sec)
+    } yield ()
+  }
+
+  test("a correction added while frozen survives unfreezing") {
+    val events = List(
+      (SequenceCommand.Start, t00),
+      (SequenceCommand.Stop,  t10)
+    )
+
+    for {
+      v <- recordVisit(pi, serviceUser, mode, visitTime, 1, 1, 1, 9980)
+      _ <- insertEvents(v.pid, events.map { (c, t) => SequenceEvent(EventId, t, v.oid, v.vid, none, c) })
+      _ <- runTimeAccounting(v.oid)
+
+      // Frozen on an older version, then corrected.
+      _ <- setVersion(v.vid, (TimeAccounting.version.Current - 1).toShort)
+      _ <- setFinalProgramTime(v.vid, 999.sec)
+      _ <- addTimeChargeCorrection(staff, v.vid, TimeChargeCorrectionInput(ChargeClass.Program, TimeChargeCorrection.Op.Add, 5.sec, none))
+      _ <- assertIO(visitFinalProgramTime(v.vid), 1004.sec)
+
+      // Unfreezing recomputes the charge and applies the correction to it.
+      _ <- query(staff, unfreezeTimeAccountingQuery(v.oid))
+      _ <- assertIO(visitFinalProgramTime(v.vid), 15.sec)
+    } yield ()
+  }
+
+  test("unfreezeTimeAccounting with a visit id unfreezes just that visit") {
+    val events = List(
+      (SequenceCommand.Start, t00),
+      (SequenceCommand.Stop,  t10)
+    )
+
+    val frozen = 999.sec
+    val old    = (TimeAccounting.version.Current - 1).toShort
+
+    for {
+      // Two frozen visits of the same observation.  Only the first has events
+      // (and a dataset), so that the second doesn't overlap it.
+      v1 <- recordVisit(pi, serviceUser, mode, visitTime, 1, 1, 1, 9700)
+      v2 <- recordVisitAs(serviceUser, v1.oid)
+      _  <- insertEvents(v1.pid, events.map { (c, t) => SequenceEvent(EventId, t, v1.oid, v1.vid, none, c) })
+      _  <- runTimeAccounting(v1.oid)
+      _  <- List(v1.vid, v2).traverse_ { vid => setVersion(vid, old) *> setFinalProgramTime(vid, frozen) }
+
+      // The result's visits are just the unfrozen one, while the observation's
+      // own visits, selected alongside, are all of them.
+      _  <- query(staff, s"""
+              mutation {
+                unfreezeTimeAccounting(input: { visitId: "${v1.vid}" }) {
+                  observation {
+                    id
+                    execution { visits { matches { id } } }
+                  }
+                  visits {
+                    id
+                    timeChargeInvoice { frozen }
+                  }
+                }
+              }
+            """).map { json =>
+              val result = json.hcursor.downField("unfreezeTimeAccounting")
+              assertEquals(result.downFields("observation", "id").as[Observation.Id], Right(v1.oid))
+              assertEquals(
+                result.downFields("observation", "execution", "visits", "matches").as[List[Json]].map(_.flatMap(_.hcursor.downField("id").as[Visit.Id].toOption).toSet),
+                Right(Set(v1.vid, v2))
+              )
+              assertEquals(
+                result.downField("visits").as[List[Json]].map(_.map(_.hcursor.downField("id").as[Visit.Id])),
+                Right(List(Right(v1.vid)))
+              )
+              assertEquals(
+                result.downField("visits").downArray.downFields("timeChargeInvoice", "frozen").as[Boolean],
+                Right(false)
+              )
+            }
+
+      _  <- assertIO(visitVersion(v1.vid), TimeAccounting.version.Current)
+      _  <- assertIO(visitFinalProgramTime(v1.vid), 10.sec)
+      _  <- assertIO(visitVersion(v2), old)
+      _  <- assertIO(visitFinalProgramTime(v2), frozen)
+    } yield ()
+  }
+
+  test("unfreezeTimeAccounting rejects a visit and an observation together") {
+    for {
+      v <- recordVisit(pi, serviceUser, mode, visitTime, 1, 1, 1, 9800)
+      _ <- expectOdbError(
+             staff,
+             s"""
+               mutation {
+                 unfreezeTimeAccounting(input: { observationId: "${v.oid}", visitId: "${v.vid}" }) {
+                   observation { id }
+                 }
+               }
+             """,
+             { case OdbError.InvalidArgument(_) => () }
+           )
+    } yield ()
+  }
+
+  test("unfreezeTimeAccounting with an unknown visit") {
+    val vid = Visit.Id.fromLong(Long.MaxValue).get
+    expectOdbError(
+      staff,
+      s"""
+        mutation {
+          unfreezeTimeAccounting(input: { visitId: "$vid" }) {
+            observation { id }
+          }
+        }
+      """,
+      { case OdbError.InvalidVisit(`vid`, _) => () }
+    )
+  }
+
+  test("unfreezeTimeAccounting with nothing to unfreeze returns no visits") {
+    for {
+      pid <- createProgramAs(pi)
+      tid <- createTargetWithProfileAs(pi, pid)
+      oid <- createObservationAs(pi, pid, mode.some, tid)
+      _   <- expect(
+               staff,
+               s"""
+                 mutation {
+                   unfreezeTimeAccounting(input: { observationId: "$oid" }) {
+                     observation { id }
+                     visits { id }
+                   }
+                 }
+               """,
+               json"""
+                 {
+                   "unfreezeTimeAccounting": {
+                     "observation": { "id": $oid },
+                     "visits": []
+                   }
+                 }
+               """.asRight
+             )
+    } yield ()
+  }
+
+  test("unfreezeTimeAccounting with an unknown observation") {
+    val oid = Observation.Id.fromLong(Long.MaxValue).get
+    expectOdbError(
+      staff,
+      unfreezeTimeAccountingQuery(oid),
+      { case OdbError.InvalidObservation(`oid`, _) => () }
+    )
+  }
+
+  test("the latest time accounting version is the one implemented") {
+    assertIO(
+      withSession(_.unique(sql"SELECT current_time_accounting_version()".query(int2))),
+      TimeAccounting.version.Current
+    )
+  }
+
+  test("add_time_accounting_version moves unlocked visits and visits awaiting a recompute, on the replaced version only") {
+    val next = (TimeAccounting.version.Current + 1).toShort
+
+    def versionIn(s: skunk.Session[IO], vid: Visit.Id): IO[Short] =
+      s.unique(sql"SELECT c_ta_version FROM t_visit WHERE c_visit_id = $visit_id".query(int2))(vid)
+
+    for {
+      // Executed just now, so its night isn't over.
+      open   <- recordVisit(pi, serviceUser, mode, visitTime, 1, 1, 1, 9900)
+      now    <- IO.realTimeInstant.map(Timestamp.unsafeFromInstantTruncated)
+      _      <- setVisitTime(open.vid, now)
+
+      // Executed long ago, with no dataset awaiting QA, and up to date.
+      locked <- recordVisit(pi, serviceUser, mode, visitTime, 1, 1, 1, 9910)
+      _      <- runTimeAccounting(locked.oid)
+
+      // Locked too, but invalidated (say by a QA change) since its last
+      // update, so its recompute is still pending.
+      dirty  <- recordVisit(pi, serviceUser, mode, visitTime, 1, 1, 1, 9960)
+      _      <- runTimeAccounting(dirty.oid)
+      _      <- invalidateTimeAccounting(dirty.vid, dirty.oid)
+
+      // Already frozen on an older version: executed just now and awaiting a
+      // recompute, so it would be moved if it were on the replaced version.
+      older  <- recordVisit(pi, serviceUser, mode, visitTime, 1, 1, 1, 9970)
+      _      <- setVisitTime(older.vid, now)
+      _      <- setVersion(older.vid, (TimeAccounting.version.Current - 1).toShort)
+      _      <- invalidateTimeAccounting(older.vid, older.oid)
+
+      // The procedure changes global state, so roll it back.
+      _      <- withSession { s =>
+                  s.transaction.use { xa =>
+                    for {
+                      _ <- s.execute(sql"CALL add_time_accounting_version($int2, 'test')".command)(next)
+                      _ <- assertIO(versionIn(s, open.vid), next)
+                      _ <- assertIO(versionIn(s, locked.vid), TimeAccounting.version.Current)
+                      _ <- assertIO(versionIn(s, dirty.vid), next)
+                      _ <- assertIO(versionIn(s, older.vid), (TimeAccounting.version.Current - 1).toShort)
+                      _ <- xa.rollback
+                    } yield ()
+                  }
+                }
+      _      <- assertIO(visitVersion(open.vid), TimeAccounting.version.Current)
+    } yield ()
+  }
+
+  test("a visit on a newer version of the rules is left dirty") {
+    // As after a rollback to code that implements an older version.  The
+    // newer version only exists inside the transaction, which is rolled back.
+    val newer = (TimeAccounting.version.Current + 1).toShort
+
+    for {
+      v <- recordVisit(pi, serviceUser, mode, visitTime, 1, 1, 1, 9920)
+      _ <- setObscalcReady(v.pid, v.oid)
+      _ <- withServices(serviceUser) { s =>
+             s.session.transaction.use { xa =>
+               for {
+                 _ <- s.session.execute(sql"INSERT INTO t_time_accounting_version VALUES ($int2, 'test')".command)(newer)
+                 _ <- s.session.execute(sql"UPDATE t_visit SET c_ta_version = $int2 WHERE c_visit_id = $visit_id".command)((newer, v.vid))
+                 _ <- s.session.execute(sql"CALL invalidate_visit_time_accounting($visit_id, $observation_id)".command)((v.vid, v.oid))
+                 _ <- s.timeAccountingService.updateAll(v.oid)(using xa)
+
+                 // Still dirty, for code that implements the newer version ...
+                 d <- s.session.unique(sql"SELECT c_ta_invalidation > c_ta_update FROM t_visit WHERE c_visit_id = $visit_id".query(bool))(v.vid)
+                 _  = assert(d, "visit was marked updated")
+
+                 // ... but not counted as a failed recompute that obscalc should retry.
+                 r <- s.session.unique(ObscalcService.Statements.SelectLastInvalidationForUpdate)((TimeAccounting.version.Current, v.oid))
+                 _  = assert(!r._2, "obscalc would retry")
+
+                 _ <- xa.rollback
+               } yield ()
+             }
+           }
+    } yield ()
+  }
+
+  test("unfreezing leaves a visit on a newer version of the rules alone") {
+    // As after a rollback.  The newer version only exists inside the
+    // transaction, which is rolled back.
+    val newer  = (TimeAccounting.version.Current + 1).toShort
+    val frozen = 999.sec
+
+    for {
+      v <- recordVisit(pi, serviceUser, mode, visitTime, 1, 1, 1, 9930)
+      _ <- withServices(serviceUser) { s =>
+             s.session.transaction.use { xa =>
+               def version: IO[Short] =
+                 s.session.unique(sql"SELECT c_ta_version FROM t_visit WHERE c_visit_id = $visit_id".query(int2))(v.vid)
+
+               def charge: IO[TimeSpan] =
+                 s.session.unique(sql"SELECT c_final_program_time FROM t_visit WHERE c_visit_id = $visit_id".query(time_span))(v.vid)
+
+               for {
+                 _ <- s.session.execute(sql"INSERT INTO t_time_accounting_version VALUES ($int2, 'test')".command)(newer)
+                 _ <- s.session.execute(sql"""
+                        UPDATE t_visit
+                           SET c_ta_version         = $int2,
+                               c_final_program_time = $time_span
+                         WHERE c_visit_id = $visit_id
+                      """.command)((newer, frozen, v.vid))
+
+                 // Both succeed, but report that nothing was unfrozen.
+                 o <- Services.asSuperUser(s.timeAccountingService.unfreezeObservation(v.oid)(using xa, summon))
+                 _  = assertEquals(o.toOption, Some(Nil))
+                 _ <- assertIO(version, newer)
+                 _ <- assertIO(charge, frozen)
+
+                 r <- Services.asSuperUser(s.timeAccountingService.unfreezeVisit(v.vid)(using xa, summon))
+                 _  = assertEquals(r.toOption, Some((v.oid, Nil)))
+                 _ <- assertIO(version, newer)
+                 _ <- assertIO(charge, frozen)
+
+                 _ <- xa.rollback
+               } yield ()
+             }
+           }
+    } yield ()
+  }
+
+  test("add_time_accounting_version requires the next version") {
+    val skipped = (TimeAccounting.version.Current + 2).toShort
+    withSession { s =>
+      s.transaction.use { _ =>
+        s.execute(sql"CALL add_time_accounting_version($int2, 'test')".command)(skipped)
+      }.attempt.map(r => assert(r.isLeft, r.toString))
+    }
+  }
+
+  test("unfreezeTimeAccounting requires staff access") {
+    for {
+      v <- recordVisit(pi, serviceUser, mode, visitTime, 1, 1, 1, 9500)
+      _ <- setVersion(v.vid, (TimeAccounting.version.Current - 1).toShort)
+      _ <- expectOdbError(pi, unfreezeTimeAccountingQuery(v.oid), { case OdbError.NotAuthorized(_, _) => () })
+      _ <- assertIO(visitVersion(v.vid), (TimeAccounting.version.Current - 1).toShort)
+    } yield ()
+  }
+
+  test("observing_night_end agrees with ObservingNight") {
+    // Every 15 minutes over a few days, including both Santiago daylight
+    // saving time transitions of 2026, plus the instants either side of each
+    // 14:00 local boundary.
+    val starts = List(
+      LocalDateTime.of(2026, Month.APRIL,      3, 0, 0),
+      LocalDateTime.of(2026, Month.SEPTEMBER,  4, 0, 0),
+      LocalDateTime.of(2026, Month.DECEMBER,   1, 0, 0)
+    )
+
+    def instants(site: Site): List[Instant] =
+      starts.flatMap { start =>
+        val every15 = (0 until 4 * 24 * 4).toList.map(i => start.plusMinutes(15L * i).atZone(site.timezone).toInstant)
+        val edges   = (0 until 4).toList.flatMap { d =>
+          val boundary = start.plusDays(d.toLong).withHour(14).atZone(site.timezone).toInstant
+          List(boundary.minusNanos(1000), boundary, boundary.plusNanos(1000))
+        }
+        every15 ++ edges
+      }
+
+    withSession { s =>
+      List(Site.GN, Site.GS).traverse_ { st =>
+        instants(st).traverse_ { i =>
+          val t = Timestamp.unsafeFromInstantTruncated(i)
+          s.unique(sql"SELECT observing_night_end($site, $core_timestamp)".query(core_timestamp))((st, t)).map { end =>
+            assertEquals(end.toInstant, ObservingNight.fromSiteAndInstant(st, i).end, s"$st at $i")
+          }
+        }
+      }
+    }
+  }
+
+  test("visit_time_accounting_locked") {
+    def nightEnd(vid: Visit.Id): IO[Timestamp] =
+      withSession(_.unique(sql"""
+        SELECT observing_night_end(c_site, c_effective_time) FROM t_visit WHERE c_visit_id = $visit_id
+      """.query(core_timestamp))(vid))
+
+    def locked(vid: Visit.Id, at: Timestamp): IO[Boolean] =
+      withSession(_.unique(sql"SELECT visit_time_accounting_locked($visit_id, $core_timestamp)".query(bool))((vid, at)))
+
+    val week = 7L * 24 * 60 * 60 * 1000
+
+    for {
+      v      <- recordVisit(pi, serviceUser, mode, visitTime, 1, 1, 1, 9600)
+      dids    = v.atoms.flatMap(_.steps.flatMap(_.dids))
+      end    <- nightEnd(v.vid)
+      before  = end.plusMicrosOption(-1).get
+      weekEnd = end.plusMillisOption(week).get
+
+      // While its night is in progress the visit is open, but afterwards a
+      // dataset that was never written doesn't keep it open.
+      _      <- assertIO(locked(v.vid, before), false)
+      _      <- assertIO(locked(v.vid, end), true)
+
+      // A written science dataset awaiting QA keeps it open for a week.
+      _      <- markWritten(dids, visitTime)
+      _      <- assertIO(locked(v.vid, end), false)
+      _      <- assertIO(locked(v.vid, weekEnd.plusMicrosOption(-1).get), false)
+      _      <- assertIO(locked(v.vid, weekEnd), true)
+
+      // Once it is assessed, the visit locks when the night is over.
+      _      <- updateDatasets(staff, DatasetQaState.Pass, dids)
+      _      <- assertIO(locked(v.vid, before), false)
+      _      <- assertIO(locked(v.vid, end), true)
+
+      // A correction locks it right away.
+      _      <- addTimeChargeCorrection(staff, v.vid, TimeChargeCorrectionInput(ChargeClass.Program, TimeChargeCorrection.Op.Add, 1.sec, none))
+      _      <- assertIO(locked(v.vid, before), true)
+    } yield ()
+  }
+
+  test("dataset_qa_passes agrees with isPassing") {
+    def sqlPasses(qa: Option[DatasetQaState]): IO[Boolean] =
+      withSession(_.unique(sql"SELECT dataset_qa_passes(${dataset_qa_state.opt})".query(bool))(qa))
+
+    (none[DatasetQaState] :: Enumerated[DatasetQaState].all.map(_.some)).traverse_ { qa =>
+      assertIO(sqlPasses(qa), DatasetQaState.orPassing(qa).isPassing)
+    }
+  }
+
+  test("a dataset QA change invalidates time accounting only when passing changes") {
+    def isDirty(vid: Visit.Id): IO[Boolean] =
+      withSession(_.unique(sql"SELECT c_ta_invalidation > c_ta_update FROM t_visit WHERE c_visit_id = $visit_id".query(bool))(vid))
+
+    for {
+      v   <- recordVisit(pi, serviceUser, mode, visitTime, 1, 1, 1, 360)
+      dids = v.atoms.flatMap(_.steps.flatMap(_.dids))
+      _   <- runTimeAccounting(v.oid)
+      _   <- assertIO(isDirty(v.vid), false)
+
+      // Unassessed -> fail stops passing.
+      _   <- updateDatasets(staff, DatasetQaState.Fail, dids)
+      _   <- assertIO(isDirty(v.vid), true)
+      _   <- runTimeAccounting(v.oid)
+
+      // Fail -> usable fails either way.
+      _   <- updateDatasets(staff, DatasetQaState.Usable, dids)
+      _   <- assertIO(isDirty(v.vid), false)
+
+      // Usable -> pass starts passing.
+      _   <- updateDatasets(staff, DatasetQaState.Pass, dids)
+      _   <- assertIO(isDirty(v.vid), true)
+    } yield ()
+  }
+
+  test("new visits use the current time accounting version") {
+    for {
+      v <- recordVisit(pi, serviceUser, mode, visitTime, 1, 0, 0, 330)
+      r <- withSession(_.unique(sql"SELECT c_ta_version FROM t_visit WHERE c_visit_id = $visit_id".query(int2))(v.vid))
+    } yield assertEquals(r, TimeAccounting.version.Current)
   }
 
   private def correctionTest(
@@ -1553,6 +2276,46 @@ class timeAccounting extends OdbSuite with DatabaseOperations with ExecutionTest
       _           <- insertSequence(next, future(30), future(40))
       _           <- assertIO(runVisitorSweep, 0)
       _           <- assertIO(visitFinalProgramTime(v), 70.sec)
+    yield ()
+
+  test("visitor: the sweep leaves frozen visits alone"):
+    for
+      _           <- cleanup
+      (p, o, v)   <- recordVisitorVisit(futureTime)
+      _           <- insertSlew(p, o, v, future(0), future(10))
+      _           <- runTimeAccounting(o)
+
+      // Frozen on an older version of the rules.
+      _           <- setVersion(v, (TimeAccounting.version.Current - 1).toShort)
+
+      // A next visit would otherwise end its charge differently.
+      next        <- recordVisit(pi, serviceUser, mode, futureTime, 1, 1, 1, 3750)
+      _           <- insertSequence(next, future(30), future(40))
+      _           <- assertIO(runVisitorSweep, 0)
+    yield ()
+
+  test("visitor: unfreezing recomputes the charge and records where it ends"):
+    for
+      _           <- cleanup
+      (p, o, v)   <- recordVisitorVisit(futureTime)
+      _           <- insertSlew(p, o, v, future(0), future(10))
+      _           <- runTimeAccounting(o)
+      _           <- assertIO(visitFinalProgramTime(v), 10.sec)
+
+      // Frozen, so a next visit at the site doesn't extend its charge: the
+      // sweep leaves it alone.
+      _           <- setVersion(v, (TimeAccounting.version.Current - 1).toShort)
+      next        <- recordVisit(pi, serviceUser, mode, futureTime, 1, 1, 1, 3780)
+      _           <- insertSequence(next, future(30), future(40))
+      _           <- assertIO(runVisitorSweep, 0)
+      _           <- assertIO(visitFinalProgramTime(v), 10.sec)
+
+      // Unfreezing charges it until the next visit started and records that
+      // end, so the sweep still has nothing to do.
+      _           <- query(staff, unfreezeTimeAccountingQuery(o))
+      _           <- assertIO(visitVersion(v), TimeAccounting.version.Current)
+      _           <- assertIO(visitFinalProgramTime(v), 30.sec)
+      _           <- assertIO(runVisitorSweep, 0)
     yield ()
 
   test("visitor: once its night is over, the sweep extends the charge to dawn"):

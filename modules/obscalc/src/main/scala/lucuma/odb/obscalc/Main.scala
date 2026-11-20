@@ -28,6 +28,7 @@ import lucuma.core.util.CalculationState
 import lucuma.horizons.HorizonsClient
 import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
+import lucuma.odb.FMain
 import lucuma.odb.data.Obscalc
 import lucuma.odb.graphql.OdbMapping
 import lucuma.odb.graphql.enums.Enums
@@ -82,14 +83,24 @@ object ObscalcMain extends CommandIOApp(
   header = MainParams.Header
 ):
 
-  override def main: Opts[IO[ExitCode]] =
-    Opts(serve)
+  // obscalc doesn't migrate the database: this only skips waiting for the ODB
+  // service to finish doing so.  The startup diagnostics still run.  Waiting
+  // needs a JDBC connection that requires SSL, which a local database may not
+  // support.
+  val SkipMigrationWait: Opts[Boolean] =
+    Opts.flag(
+      "skip-migration-wait",
+      help = "Don't wait for pending database migrations on startup.  Ensure that your database is up-to-date."
+    ).orFalse
 
-  lazy val serve: IO[ExitCode] =
+  override def main: Opts[IO[ExitCode]] =
+    SkipMigrationWait.map(serve)
+
+  def serve(skipMigrationWait: Boolean): IO[ExitCode] =
     given LF: LoggerFactory[IO] = Slf4jFactory.create[IO]
     given Logger[IO] = LF.getLoggerFromName("obscalc-service")
 
-    CalcMain.runF
+    CalcMain.runF(skipMigrationWait)
 
 object CalcMain extends MainParams:
 
@@ -108,6 +119,41 @@ object CalcMain extends MainParams:
             |
             |""".stripMargin
     banner.linesIterator.toList.traverse_(Logger[F].info(_))
+
+  /**
+   * Runs the ODB service's startup diagnostics, which check that the database
+   * matches this code (enums, and the time accounting rules version), failing
+   * startup if it doesn't.  The ODB service migrates the database, and a
+   * deploy restarts both at once, so first wait for any pending migrations
+   * rather than fail against the old schema.  Crashing instead would leave
+   * obscalc down for a while, since Heroku waits a long time before retrying a
+   * dyno that crashed twice.  Each check for pending migrations also beats the
+   * worker heartbeat, so that obscalc doesn't look dead to monitoring while a
+   * long migration runs.  If migrations are still pending after
+   * `MigrationDeadline`, it fails, so that a wait that will never end shows as
+   * a crashed dyno rather than a healthy heartbeat.
+   */
+  def startupDiagnostics[F[_]: Async: Console: Network: Logger](
+    config:            Config.Database,
+    heartbeat:         F[Unit],
+    skipMigrationWait: Boolean
+  ): F[Unit] =
+    val awaitMigrations: F[Unit] =
+      if skipMigrationWait then
+        Logger[F].info("Not waiting for pending migrations.  Ensure that your database is up-to-date.")
+      else
+        FMain.awaitMigrations(heartbeat >> FMain.pendingMigrations[F](config), MigrationPollPeriod, MigrationDeadline)
+
+    awaitMigrations >>
+      FMain.runStartupDiagnostics[F](config, fatal = true, applicationName = "odb-obscalc")
+
+  val MigrationPollPeriod: FiniteDuration =
+    5.seconds
+
+  // Long enough for any migration we expect.  After it, obscalc exits so that
+  // a crashed dyno reveals that it can't start.
+  val MigrationDeadline: FiniteDuration =
+    15.minutes
 
   /** A resource that yields a Skunk session pool. */
   def databasePoolResource[F[_]: Temporal: TracerProvider: MeterProvider: Network: Console](
@@ -343,11 +389,14 @@ object CalcMain extends MainParams:
    * Our main server, as a resource that starts up our server on acquire and shuts it all down
    * in cleanup, yielding an `ExitCode`. Users will `use` this resource and hold it forever.
    */
-  def server[F[_]: Async: Compression: Parallel: Logger: LoggerFactory: Tracer: TracerProvider: Meter: MeterProvider: ContextManager: Console: Network: SecureRandom]: Resource[F, F[Outcome[F, Throwable, Unit]]] =
+  def server[F[_]: Async: Compression: Parallel: Logger: LoggerFactory: Tracer: TracerProvider: Meter: MeterProvider: ContextManager: Console: Network: SecureRandom](
+    skipMigrationWait: Boolean
+  ): Resource[F, F[Outcome[F, Throwable, Unit]]] =
     for
       c          <- Resource.eval(Config.fromCiris.load[F])
       _          <- Resource.eval(banner[F](c))
       heartbeat  <- WorkerHeartbeat.resource[F]("obscalc")
+      _          <- Resource.eval(startupDiagnostics[F](c.database, heartbeat, skipMigrationWait))
       pool       <- databasePoolResource[F](c.database)
       enums      <- Resource.eval(pool.use(Enums.load))
       http       <- c.httpClientResource
@@ -395,11 +444,11 @@ object CalcMain extends MainParams:
     yield o
 
   /** Our logical entry point. */
-  def runF(using Logger[IO], LoggerFactory[IO]): IO[ExitCode] =
+  def runF(skipMigrationWait: Boolean)(using Logger[IO], LoggerFactory[IO]): IO[ExitCode] =
     (for
       c                      <- Resource.eval(Config.fromCiris.load[IO])
       given OtelServices[IO] <- OdbTelemetry.otel(ServiceName, c)
-      o                      <- server[IO]
+      o                      <- server[IO](skipMigrationWait)
     yield o).use: o =>
       o.flatMap:
         case Outcome.Succeeded(_) => Logger[IO].info("Obscalc completed.")  >> ExitCode.Success.pure[IO]

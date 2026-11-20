@@ -14,6 +14,12 @@ when events arrive. An execution event only marks the affected visit dirty; the
 worker picks the observation up and recomputes the dirty visits. This keeps the
 event-ingestion path (from the "Observe" application) cheap.
 
+The rules themselves are **versioned**. Each visit records the version of the
+rules that produced its charge, and the code only implements the current one, so
+a visit left on an older version is **frozen**: never recomputed, whatever
+happens to it. A change to the rules decides once, when it ships, which visits
+move to the new rules. See [Rule versions and frozen visits](#rule-versions-and-frozen-visits).
+
 See [`obscalc-flow.md`](obscalc-flow.md) for the worker/daemon
 machinery this rides on.
 
@@ -21,24 +27,31 @@ machinery this rides on.
 
 | Concern | Location |
 |---|---|
-| Compute a visit's invoice, write `t_visit` + discounts | `TimeAccountingService.update(visitId)` |
+| Compute a visit's invoice, write `t_visit` + discounts | `TimeAccountingService.update(visitId)` (`Update.run`) |
 | Recompute all *dirty* visits of an observation | `TimeAccountingService.updateAll(observationId)` |
 | Manual staff correction | `TimeAccountingService.addCorrection(visitId, …)` (synchronous) |
+| Unfreeze (move to the current rules and recompute) | `unfreezeTimeAccounting` mutation → `TimeAccountingService.unfreezeObservation` / `unfreezeVisit` (synchronous) |
 | Record an execution event (marks a visit dirty) | `ExecutionEventService` insert methods |
 | Drive the recompute in the worker | obscalc daemon `Main.scala` `calcAndUpdateStream` |
+| Re-mark visitor-instrument visits whose charge end moved | `TimeAccountingService.invalidateStaleVisitorVisits`, obscalc `visitorTimeAccountingStream` |
 | Retry decision when a recompute fails | `ObscalcService.storeResult` |
-| Triggers, markers, procedures | migration `V1210__async_time_accounting.sql` |
+| Current rules version | `TimeAccounting.version.Current` (Scala) |
+| Triggers, markers, procedures | migrations `V1210__async_time_accounting.sql`; `V1420__visit_time_accounting_version.sql` (versions, lock rule, upgrade procedure); `V1421__dataset_qa_passes.sql` (what counts as passing QA) |
+| Startup check that code and database agree on the version | `StartupDiagnostics.checkTimeAccountingVersion` (ODB service and obscalc) |
 
 ## What causes time accounting to update
 
-**Exactly two things change a visit's charge**, and each is scoped to a single
-visit:
+In normal operation **two things change a visit's charge**, and each is scoped to
+a single visit:
 
 1. **An execution event** is recorded for the visit (`t_execution_event`, which
    has `c_visit_id NOT NULL`).
-2. **A dataset's QA state** crosses `Pass`/null ↔ `Fail`/`Usable`
-   (`t_dataset`, also `c_visit_id NOT NULL`) — this adds or removes a QA
-   discount for the visit that contains the dataset.
+2. **A dataset starts or stops passing QA** (`t_dataset`, also
+   `c_visit_id NOT NULL`) — this adds or removes a QA discount for the visit
+   that contains the dataset. "Passing" is decided in one place, the
+   `dataset_qa_passes` SQL function: an unassessed (null) or `pass` state
+   passes, anything else, including states added later, doesn't. It mirrors
+   `isPassing`/`orPassing` in the sequence module.
 
 Both go through `invalidate_visit_time_accounting(visit_id, observation_id)`,
 which:
@@ -47,9 +60,24 @@ which:
 - `CALL invalidate_obscalc(observation_id)` so the worker picks the observation
   up (and the obscalc digest/workflow refresh too).
 
-Manual corrections are handled **synchronously** in `addCorrection` (staff, rare)
-and do **not** go through this path — they write the correction row and adjust
-`t_visit` immediately.
+Three more paths exist:
+
+- **The visitor sweep.** A visitor-instrument visit is charged until the next
+  chargeable visit at the site starts or, once the night is over, until dawn, so
+  its charge can change without anything happening to the visit itself. The
+  obscalc worker periodically re-marks recent visitor visits whose charge would
+  now end differently (`invalidateStaleVisitorVisits`), through the same
+  procedure.
+- **A change to the rules.** The migration that introduces a new rules version
+  marks the visits it moves to it dirty (see
+  [Rule versions and frozen visits](#rule-versions-and-frozen-visits)).
+- **Staff actions.** Manual corrections are handled **synchronously** in
+  `addCorrection` (staff, rare) and do **not** go through this path — they write
+  the correction row and adjust `t_visit` immediately, even on a frozen visit.
+  `unfreezeTimeAccounting` recomputes synchronously too.
+
+A visit that is **frozen** (on an older rules version) still gets marked dirty
+by these paths, but the recompute leaves it alone.
 
 ## The per-visit dirty markers
 
@@ -61,9 +89,16 @@ and do **not** go through this path — they write the correction row and adjust
 | `c_ta_update` | Set to the invalidation value that was just recomputed. |
 
 A visit is **dirty** iff `c_ta_invalidation > c_ta_update`.
-`updateAll(observationId)` selects only the observation's dirty visits,
-recomputes each with `update(visitId)`, and sets that visit's `c_ta_update` to
-the invalidation timestamp it observed.
+`updateAll(observationId)` selects only the observation's dirty visits, in visit
+id order, recomputes each with `update(visitId)`, and sets that visit's
+`c_ta_update` to the invalidation timestamp it observed.
+
+`updateAll` only selects visits on the current rules version **or older**. A
+frozen visit (older) is selected and marked updated, but `Update.run` leaves its
+stored charge alone. A visit on a **newer** version than the code (only possible
+after a rollback) is left dirty on purpose, so that the newer code recomputes it
+when it returns; `storeResult` doesn't count such visits as a failed recompute
+either.
 
 Existing visits (at migration time) get equal default timestamps → not dirty →
 never recomputed until a genuine change occurs.
@@ -89,12 +124,16 @@ from the value staff reviewed and approved. That is worse than losing the
 corrections outright: it looks authoritative but no longer matches the human
 decision.
 
-Scoping the recompute to the **visit that actually changed** prevents this: V2's
-events touch only V2; V1 is inviolate unless *it* receives an event or a QA
-change. Recompute is fine when a human is actively making a relevant change
-(even a post-deploy QA correction re-prices with the new algorithm — someone is
-in the loop expecting it); the danger is only an *unrelated* trigger silently
-picking up an algorithm change.
+Two mechanisms prevent this:
+
+1. **Per-visit scoping.** Recompute only the **visit that actually changed**:
+   V2's events touch only V2; V1 is recomputed only if *it* receives an event or
+   a QA change.
+2. **Rule versions.** Even V1's own changes can't silently re-price it under a
+   new algorithm once it is settled: if V1 was locked when the algorithm changed,
+   it stayed on the old version and is now frozen. A late QA change on V1 is then
+   ignored; staff adjust it with a correction or explicitly unfreeze it (see
+   [Rule versions and frozen visits](#rule-versions-and-frozen-visits)).
 
 Two corollaries fall out of per-visit scoping:
 
@@ -102,8 +141,133 @@ Two corollaries fall out of per-visit scoping:
   edit, or a migration that blanket-sets observations to `pending`, invalidates
   obscalc but marks no visit dirty, so `updateAll` is a no-op. (This is why the
   markers are on `t_visit`, not `t_obscalc`.)
-- **QA changes are handled correctly** even on an old, closed visit, because the
-  QA trigger marks *that* visit dirty.
+- **QA changes reach old, closed visits** that aren't frozen, because the QA
+  trigger marks *that* visit dirty. A frozen visit's charge doesn't follow QA
+  changes; `TimeChargeInvoice.frozen` says which visits those are.
+
+## Rule versions and frozen visits
+
+### Versions
+
+Each change to the time accounting rules gets a new **version**:
+
+| Where | What |
+|---|---|
+| `t_time_accounting_version` | One row per version (`c_version`, `c_description`). The latest is the one the service implements. |
+| `TimeAccounting.version.Current` | The version the code implements. A startup check requires it to match the table (see [Deploys and rollbacks](#deploys-and-rollbacks)). |
+| `t_visit.c_ta_version` | The version that produced the visit's stored charge. Defaults to `current_time_accounting_version()`, the latest row, so new visits get the current rules. |
+| `TimeChargeInvoice.rulesVersion` / `.frozen` | The same, exposed in GraphQL; `frozen` is true when the visit's version isn't `Current`. |
+
+The code implements **only** the current rules and never branches on a visit's
+version. `Update.run` recomputes a visit only when its version equals `Current`;
+any other visit keeps its stored charge.
+
+| Version | Rules |
+|---|---|
+| 1 | The rules before versions were recorded. |
+| 2 | A visit in which no written science dataset passes QA is not charged at all (see [What a recompute actually computes](#what-a-recompute-actually-computes)). |
+
+### Frozen vs. locked
+
+These are easy to confuse:
+
+- **Frozen**: the visit is on a version other than `Current`. Nothing recomputes
+  it; later events and QA changes don't affect its charge. This is what
+  `TimeChargeInvoice.frozen` reports.
+- **Locked**: `visit_time_accounting_locked(visit, as_of)` is true when
+  - staff have corrected its charge (recomputing under different rules could
+    count the correction twice), or
+  - its observing night is over and none of its *written science* datasets is
+    awaiting QA (acquisition datasets and never-written ones aren't expected to
+    be assessed, as in `v_observation_qa`), or
+  - a week has passed since its observing night ended.
+
+  The night's end comes from `observing_night_end(site, t)`, which mirrors
+  lucuma-core's `ObservingNight` (14:00 local at the site; a test compares them).
+
+Being locked **changes nothing on its own**. It matters only at the moment a new
+version is added, when it decides which visits stay behind and become frozen.
+Until then a locked visit on the current version keeps following its changes.
+For example:
+
+1. A visit is observed tonight on version 2: not locked, not frozen.
+2. Its datasets are assessed the next day: locked, but not frozen, so the QA
+   changes apply.
+3. Version 3 ships months later: the visit is locked, so it stays on version 2
+   and is now frozen.
+4. A later QA change is ignored; `frozen` says so.
+
+### Adding a version
+
+1. Change the rules in the code. Don't branch on the visit's version: older
+   visits are simply frozen.
+2. Increment `TimeAccounting.version.Current`.
+3. In the accompanying migration, call
+   `add_time_accounting_version(<new version>, '<description>')`.
+
+The code and the migration must ship together; the startup check refuses to run
+a service whose version is ahead of the database.
+
+`add_time_accounting_version(version, description)`:
+
+1. Raises unless `version` is the current one + 1 (versions are explicit
+   numbers, not a serial, so that the migration and the Scala constant visibly
+   agree and a version can't be skipped or reused).
+2. Inserts the row, which makes it the column default for new visits.
+3. Moves every visit that **wasn't frozen when the upgrade started** (it is on
+   the version being replaced, `version - 1`) and is **either awaiting a
+   recompute or not locked**, marking it dirty. Visits frozen on older versions
+   stay frozen. A locked visit that is awaiting a recompute (say a QA change the
+   worker hasn't reached yet) moves too, since the code for the old rules is
+   gone and leaving it behind would silently drop that change.
+4. Invalidates obscalc for the moved visits' observations, so the worker
+   recomputes them under the new rules.
+
+It updates `t_visit` before invalidating obscalc and takes no execution locks,
+the reverse of the [usual order](#order). That is safe only because migrations
+run as the ODB service starts, before it accepts requests, while obscalc waits
+for them; run against a live database it could deadlock, and rerunning is the
+remedy.
+
+### Unfreezing
+
+Staff can move a visit, or every visit of an observation, to the current rules
+with the `unfreezeTimeAccounting` mutation (`observationId`,
+`observationReference` or `visitId`). Unlike the worker it recomputes
+**synchronously**:
+
+1. Takes the observation's execution lock and invalidates obscalc (the
+   [usual order](#order)).
+2. Moves the targeted visits to `Current`, locking them in visit id order and
+   bumping their invalidation.
+3. Recomputes each and records the invalidation it set, as `updateAll` does, so
+   the worker doesn't redo them.
+
+Corrections are reapplied to the recomputed charge, so a correction that
+compensated for the old rules may need revisiting. A visit that isn't frozen is
+simply recomputed. A visit on a newer version than the code is left alone. The
+result's `visits` lists the visits actually moved and recomputed, so a caller
+can see when something was skipped.
+
+### Deploys and rollbacks
+
+- **Migrations run in the ODB service** (Flyway, at startup). **obscalc waits**
+  for them before its startup diagnostics: it polls Flyway's pending migrations
+  every 5 seconds, beating its worker heartbeat each time, retries a check that
+  fails, and gives up (crashing the dyno visibly) after 15 minutes.
+  `--skip-migration-wait` skips the wait, e.g. against a local database without
+  SSL.
+- **The startup check** (`checkTimeAccountingVersion`, in both services): a
+  database *behind* the code, or an empty version table, is fatal. A database
+  *ahead* of the code (after a rollback past a rules change) only logs a
+  warning: the code leaves visits on the newer version alone (dirty, never
+  unfrozen), so it is safe to run, just not complete. New visits created during
+  such a rollback get the newer version by default and wait for the newer code.
+- **The release that introduced versions** had a narrow window in which an old,
+  pre-version obscalc worker, still shutting down, could have recomputed a visit
+  the migration had just moved to version 2 under the version-1 rules. The two
+  versions only differ for visits whose science datasets all failed QA, and
+  later releases are protected by the version filter above.
 
 ## Flow
 
@@ -239,6 +403,29 @@ observations is not serialized against another spanning the same set, so
 multi-observation work needs its own deterministic ordering (lock them in a fixed
 order, e.g. by id).
 
+#### Visit and discount rows
+
+The worker's `updateAll` recomputes an observation's dirty visits **without** the
+mutex (taking it would hold up execution events while time accounting runs),
+while `unfreezeTimeAccounting` recomputes **with** it, so the two can run at once
+on the same visits. Two rules keep them from deadlocking (see the "Lock order"
+comment above `Update` in `TimeAccountingService`):
+
+- **A recompute writes the visit row before the discount rows.** `Update.run`
+  computes the charge without taking any locks, then updates `t_visit`, then
+  deletes and rewrites the visit's `t_time_charge_discount` rows. The other way
+  round, the worker could hold a visit's discount rows while waiting for the
+  visit row that unfreeze holds, while unfreeze waited for those discount rows.
+  Locking the visit row only when it is written, not before computing, keeps
+  execution events for the visit (which update its row) from waiting out the
+  whole recompute.
+- **An observation's visits are locked in visit id order.** `updateAll` takes
+  its dirty visits in that order, and unfreeze locks all of its targets in that
+  order (`FOR NO KEY UPDATE`) before updating them.
+
+Execution events and QA changes take the mutex and then a visit row, never
+discount rows, so they can't join a cycle with these.
+
 #### Mode: `FOR NO KEY UPDATE`, never `FOR UPDATE`
 
 This is the part that is easy to get wrong, and it is *also* why the mutex was
@@ -320,14 +507,24 @@ assuming.
 
 ## What a recompute actually computes
 
-`update(visitId)` rebuilds the visit's `TimeAccountingState` from **all** of its
-events, then applies discounts and corrections to produce the invoice:
+`update(visitId)` first checks the visit's rules version: a frozen visit is left
+as it is. Otherwise it rebuilds the visit's `TimeAccountingState` from **all** of
+its events, then applies discounts and corrections to produce the invoice:
 
 - **No-data discount** — visit has no datasets → whole charge discounted.
+  Visitor-instrument visits, which never have datasets, are exempt; they are
+  charged from their slew to the next chargeable visit at the site or dawn.
 - **Daylight discount** — time outside the night's nautical twilight.
 - **Overlap discount** — the portion overlapping another chargeable visit at the
   same site.
-- **QA discount** — atoms whose datasets failed QA.
+- **QA discount** — atoms with a dataset that doesn't pass QA
+  (`dataset_qa_passes`). Since version 2, when **no written science dataset**
+  in the visit passes QA, whatever remains is discounted too: time between atoms
+  (e.g., while the sequence was paused), before the first atom and after the
+  last. The remainder is discounted one run of adjacent intervals at a time, so
+  that no discount's interval overlaps another's. Acquisition datasets and
+  datasets that were never written are ignored here, since nobody assesses them,
+  so an unassessed acquisition image doesn't keep the rule from applying.
 - **Corrections** — staff `Add`/`Subtract` entries from `t_time_charge_correction`
   are reapplied on top (so corrections survive a recompute; only the base they
   apply to reflects the current algorithm).
@@ -352,7 +549,8 @@ write/execution path), so eventual consistency is safe:
 
 - `Visit.timeChargeInvoice` — `TimeChargeInvoiceMapping` over `VisitTable`
   (`executionTime`/`finalCharge` are the stored `c_raw_*`/`c_final_*` columns;
-  discounts/corrections from their tables). **Stored, not recomputed on read.**
+  discounts/corrections from their tables; `rulesVersion`/`frozen` from
+  `c_ta_version`). **Stored, not recomputed on read.**
 - `Observation.execution` time charge — `ExecutionMapping` via
   `timeAccountingService.selectObservations` (sums the visits).
 - `Program` banded time — `ProgramMapping` via `selectProgram`.

@@ -203,6 +203,23 @@ sealed class TimeAccountingState private (val toMap: SortedMap[TimestampInterval
     (new TimeAccountingState(in), new TimeAccountingState(out))
   }
 
+  /**
+   * Splits the state into runs of adjacent intervals, each interval in a run
+   * ending where the next one starts.
+   *
+   * @return the runs, in order
+   */
+  def contiguous: List[TimeAccountingState] =
+    toMap
+      .foldLeft(List.empty[SortedMap[TimestampInterval, TimeAccounting.Context]]) { case (runs, (interval, ctx)) =>
+        runs match {
+          case run :: rest if run.lastKey.end === interval.start => (run + (interval -> ctx)) :: rest
+          case _                                                 => (Empty.toMap + (interval -> ctx)) :: runs
+        }
+      }
+      .reverse
+      .map(new TimeAccountingState(_))
+
   override def equals(that: Any): Boolean =
     that match {
       case s: TimeAccountingState => toMap === s.toMap

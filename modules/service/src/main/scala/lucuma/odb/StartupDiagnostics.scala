@@ -6,10 +6,12 @@ package lucuma.odb
 import cats.data.NonEmptyList
 import cats.data.StateT
 import cats.effect.Concurrent
+import cats.syntax.all.*
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.util.Enumerated
 import lucuma.odb.StartupChecks.*
 import lucuma.odb.service.ObservationWorkflowService
+import lucuma.odb.service.TimeAccounting
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Flamingos2Codecs.flamingos_2_acquisition_type
 import lucuma.odb.util.GhostCodecs.ghost_ifu_mapping_type
@@ -17,7 +19,9 @@ import lucuma.odb.util.GmosCodecs.*
 import lucuma.odb.util.GnirsCodecs.*
 import org.typelevel.log4cats.Logger
 import skunk.Session
+import skunk.codec.numeric.int2
 import skunk.data.Type
+import skunk.syntax.all.*
 
 trait StartupDiagnostics[F[_]]:
 
@@ -199,10 +203,44 @@ object StartupDiagnostics:
           assertUnusedPostgresEnum(Type("e_source_profile_type")),
           assertUnusedPostgresEnum(Type("e_summary_job_state")),
 
+          // The time accounting rules
+          checkTimeAccountingVersion,
+
           // This should come last
           checkEnumCoverage,
 
         )
+
+      // The rules that the service implements must be the latest ones that the
+      // database knows about, or else visits would be computed under one
+      // version of the rules and recorded as another.
+      def checkTimeAccountingVersion: Check[F] =
+        StateT.modifyF: ds =>
+          val current = TimeAccounting.version.Current
+          db.unique(sql"SELECT current_time_accounting_version()".query(int2.opt)).flatMap:
+            case Some(v) if v === current =>
+              ds.pure[F]
+
+            // The database is ahead of the code, as after a rollback.  This
+            // code leaves visits on the newer version alone (they stay dirty
+            // and aren't unfrozen), so it is safe to run, just not complete:
+            // those visits aren't recomputed until code for their version
+            // runs again.
+            case Some(v) if v > current =>
+              Logger[F].warn(
+                s"Time accounting: the latest rules version in t_time_accounting_version is $v, newer than version $current, which this service implements (e.g., after a rollback).  Visits on version $v won't be recomputed until a service that implements it runs."
+              ).as(ds)
+
+            // The database is behind the code: a migration is missing.
+            case Some(v) =>
+              ds.updated(List(
+                s"Time accounting: the service implements rules version $current but the latest version in t_time_accounting_version is $v.  The migration that adds version $current is missing."
+              )).pure[F]
+
+            case None    =>
+              ds.updated(List(
+                s"Time accounting: t_time_accounting_version is empty, but the service implements rules version $current."
+              )).pure[F]
 
       def runAllDiagnostics(fatal: Boolean): F[Unit] =
         runChecks(allDiagnostics, fatal)

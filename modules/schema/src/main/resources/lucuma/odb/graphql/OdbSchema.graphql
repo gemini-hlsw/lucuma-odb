@@ -4185,6 +4185,22 @@ type Mutation {
   ): ReplaceGhostSequenceResult!
 
   """
+  Moves a visit, or every visit of an observation, to the current time
+  accounting rules and recomputes its charge right away, unfreezing any whose
+  time accounting was frozen when the rules changed (see
+  `TimeChargeInvoice.frozen`).  A visit that isn't frozen is simply
+  recomputed, which is harmless since its charge already follows its changes.
+  A visit on a newer version of the rules than this service implements (as
+  after a rollback) is left alone and is missing from the result's `visits`.
+  Existing time charge corrections are applied to the recomputed charge, so a
+  correction that compensated for the old rules may need to be revisited.
+  Requires staff (or better) access.
+  """
+  unfreezeTimeAccounting(
+    input: UnfreezeTimeAccountingInput!
+  ): UnfreezeTimeAccountingResult!
+
+  """
   Re-runs the Archive Duplication Search for an observation, replacing its
   stored result with what the Gemini Observatory Archive holds now.
 
@@ -4916,6 +4932,33 @@ input SpiralTelescopeConfigGeneratorInput {
 
   "Random generator seed, which will default to a random value if not specified."
   seed: Long
+}
+
+"""
+Input parameters for unfreezing time accounting.  Select one of
+`observationId` or `observationReference` to unfreeze every visit of an
+observation, or `visitId` to unfreeze just that visit.
+"""
+input UnfreezeTimeAccountingInput {
+  observationId: ObservationId
+  observationReference: ObservationReferenceLabel
+  visitId: VisitId
+}
+
+"""
+The result of unfreezing time accounting.
+"""
+type UnfreezeTimeAccountingResult {
+  "The observation whose time accounting was unfrozen, or the visit's observation."
+  observation: Observation!
+
+  """
+  The visits that were moved to the current time accounting rules and
+  recomputed, in visit id order.  A visit on a newer version of the rules than
+  this service implements (as after a rollback) is left alone and doesn't
+  appear, so this may be empty.
+  """
+  visits: [Visit!]!
 }
 
 """
@@ -23516,6 +23559,23 @@ type TimeChargeInvoice {
   initial 'executionTime'.
   """
   finalCharge: CategorizedTime!
+
+  """
+  The version of the time accounting rules that produced this charge.  Each
+  change to the rules gets a new version.
+  """
+  rulesVersion: Int!
+
+  """
+  Whether the charge is frozen: worked out under earlier time accounting rules
+  than the ones in effect now.  A visit's charge follows the rules in effect
+  while it was observed and reviewed, and a later change to the rules leaves it
+  as it was.  A frozen charge isn't recomputed, so later changes to the visit,
+  such as dataset QA updates, don't affect it.  Staff can still add
+  corrections, which apply right away, or recompute it under the current rules
+  with `unfreezeTimeAccounting`.
+  """
+  frozen: Boolean!
 }
 
 """

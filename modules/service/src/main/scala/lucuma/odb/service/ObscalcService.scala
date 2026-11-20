@@ -48,6 +48,7 @@ import lucuma.odb.util.Codecs.*
 import org.typelevel.log4cats.Logger
 import skunk.*
 import skunk.codec.boolean.bool
+import skunk.codec.numeric.int2
 import skunk.codec.numeric.int4
 import skunk.implicits.*
 
@@ -347,7 +348,7 @@ object ObscalcService:
         expected:     CalculationState
       )(using ServiceAccess): F[Option[Obscalc.Meta]] =
         for
-          lu <- session.option(Statements.SelectLastInvalidationForUpdate)(pending.observationId)
+          lu <- session.option(Statements.SelectLastInvalidationForUpdate)(TimeAccounting.version.Current, pending.observationId)
           ns  = lu.map: (lastInvalidation, timeAccountingDirty) =>
                   // Re-invalidated during the calculation: go back to 'pending'.
                   val reinvalidated = lastInvalidation =!= pending.lastInvalidation
@@ -863,14 +864,18 @@ object ObscalcService:
     // Along with the last invalidation timestamp, reports whether any of the
     // observation's visits still has dirty time accounting (its recompute failed
     // or did not complete) so that the entry can be retried rather than left
-    // 'ready' with stale data.
-    val SelectLastInvalidationForUpdate: Query[Observation.Id, (Timestamp, Boolean)] =
+    // 'ready' with stale data.  Visits on a newer version of the time
+    // accounting rules than this code implements are left dirty on purpose
+    // (see TimeAccountingService.Statements.SelectDirtyVisits), so they don't
+    // count: retrying could never clean them.
+    val SelectLastInvalidationForUpdate: Query[(Short, Observation.Id), (Timestamp, Boolean)] =
       sql"""
         SELECT
           o.c_last_invalidation,
           EXISTS (
             SELECT 1 FROM t_visit v
             WHERE v.c_observation_id  = o.c_observation_id
+              AND v.c_ta_version     <= $int2
               AND v.c_ta_invalidation > v.c_ta_update
           )
         FROM t_obscalc o

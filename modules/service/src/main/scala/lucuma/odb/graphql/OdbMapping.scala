@@ -299,6 +299,7 @@ object OdbMapping {
           with SubaruProposalTypeMapping[F]
           with QueryMapping[F]
           with RadialVelocityMapping[F]
+          with UnfreezeTimeAccountingResultMapping[F]
           with RecordDatasetResultMapping[F]
           with RecordVisitResultMapping[F]
           with RedeemUserInvitationResultMapping[F]
@@ -574,6 +575,7 @@ object OdbMapping {
                 QueryMapping,
                 QueueMapping,
                 RadialVelocityMapping,
+                UnfreezeTimeAccountingResultMapping,
                 RecordDatasetResultMapping,
                 RecordFlamingos2VisitResultMapping,
                 RecordGmosNorthVisitResultMapping,

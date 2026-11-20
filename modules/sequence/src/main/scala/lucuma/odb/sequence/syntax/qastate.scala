@@ -6,6 +6,8 @@ package lucuma.odb.sequence.syntax
 import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.DatasetQaState.*
 
+// Keep in sync with the `dataset_qa_passes` SQL function, which gives the
+// database the same notion of a passing dataset.
 trait ToDatasetQaStateOps {
 
   extension (self: DatasetQaState)
