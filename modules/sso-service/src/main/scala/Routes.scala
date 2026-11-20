@@ -202,7 +202,8 @@ object Routes {
             cookie   <- cookies.sessionCookie(token)
             res      <- Found(Location(redir))
           } yield res.addCookie(cookie)
-        }
+        } .recoverWith:
+          case Database.UserDisabled(id = _) => Forbidden("Account disabled.")
 
     }
   }
