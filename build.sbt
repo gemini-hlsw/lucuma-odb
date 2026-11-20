@@ -460,6 +460,11 @@ def validateSchemaStep(schema: String, name: String): WorkflowStep = WorkflowSte
 
 lazy val schemaValidationSteps: List[WorkflowStep] = List(
   CheckoutFull,
+  WorkflowStep.Use(
+    UseRef.Public("actions", "setup-node", "v7"),
+    name = Some("Setup Node.js"),
+    params = Map("node-version" -> "lts/*")
+  ),
   WorkflowStep.Run(List("npm ci"), name = Some("Install npm dependencies")),
   validateSchemaStep(
     "modules/schema/src/main/resources/lucuma/odb/graphql/OdbSchema.graphql",
