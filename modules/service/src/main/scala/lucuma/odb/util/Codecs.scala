@@ -124,7 +124,12 @@ trait Codecs extends CoreCodecs {
     )
 
   def gid[A](implicit ev: Gid[A]): Codec[A] =
-    codecFromPrism(ev.fromString, Type.varchar)
+    GidCodec(codecFromPrism(ev.fromString, Type.varchar))
+
+  /** Marks a column as holding ids, which sort as the numbers they encode and not as text. */
+  final case class GidCodec[A](codec: Codec[A]) extends Codec[A]:
+    export codec.*
+    override def opt: Codec[Option[A]] = GidCodec(codec.opt)
 
   /** Codec for an array of ids, so that a list of any length binds as one parameter. */
   def _gid[A](implicit ev: Gid[A]): Codec[List[A]] =
