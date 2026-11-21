@@ -808,7 +808,7 @@ object TimeAccountingService {
 
             -- The edge case where the start times are the same on two visits.
             -- Here we just pick the one with the newer id to be charged.
-            (v2.c_start = v.c_start AND v2.c_visit_id > v.c_visit_id)
+            (v2.c_start = v.c_start AND gid_index(v2.c_visit_id) > gid_index(v.c_visit_id))
 
             -- If v2.c_start < v.c_start then these don't overlap
           )
