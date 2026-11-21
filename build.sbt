@@ -74,6 +74,11 @@ ThisBuild / libraryDependencySchemes ++= Seq(
   "org.tpolecat" %% "skunk-circe" % VersionScheme.Always
 )
 
+// TEMPORARY: the grackle snapshot counts as incompatible with the 0.31.0 that
+// lucuma-graphql-routes declares.  Remove with the snapshot.
+ThisBuild / libraryDependencySchemes +=
+  "org.typelevel" %% "grackle-core" % VersionScheme.Always
+
 ThisBuild / tlBaseVersion      := "0.112"
 ThisBuild / scalaVersion       := "3.9.0"
 ThisBuild / crossScalaVersions := Seq("3.9.0")
