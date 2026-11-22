@@ -105,6 +105,15 @@ class staffOnlyFpusAndFilters extends OdbSuite:
       setup(ObservingModeType.Flamingos2LongSlit).flatMap: (_, _, oid) =>
         updateMode(pi, oid, "{ flamingos2LongSlit: { fpu: SUB_PIX_PINHOLE } }")
 
+  test("PI cannot select the blank mask on update"):
+    expectNotAuthorized:
+      setup(ObservingModeType.Flamingos2LongSlit).flatMap: (_, _, oid) =>
+        updateMode(pi, oid, "{ flamingos2LongSlit: { fpu: BLANK_MASK } }")
+
+  test("Staff can select the blank mask on update"):
+    setup(ObservingModeType.Flamingos2LongSlit).flatMap: (_, _, oid) =>
+      updateMode(staff, oid, "{ flamingos2LongSlit: { fpu: BLANK_MASK } }")
+
   test("PI can edit other fields once staff selected a pinhole"):
     for
       (_, _, oid) <- setup(ObservingModeType.Flamingos2LongSlit)

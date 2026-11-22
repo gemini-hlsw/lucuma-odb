@@ -18,6 +18,7 @@ import lucuma.core.enums.Flamingos2Decker
 import lucuma.core.enums.Flamingos2Disperser
 import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.Flamingos2Fpu
+import lucuma.core.enums.Flamingos2FpuType
 import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.Flamingos2ReadoutMode
 import lucuma.core.enums.Flamingos2Reads
@@ -85,7 +86,7 @@ object Flamingos2LongSlitInput:
     def observingModeType: ObservingModeType =
       ObservingModeType.Flamingos2LongSlit
 
-    def needsStaffAccess: Boolean = fpu.isPinhole
+    def needsStaffAccess: Boolean = fpu.fpuType =!= Flamingos2FpuType.LongSlit
 
     private val stored = explicitTelescopeConfigs.map(storedSlitTelescopeConfigs)
 
@@ -171,7 +172,7 @@ object Flamingos2LongSlitInput:
     val observingModeType: ObservingModeType =
       ObservingModeType.Flamingos2LongSlit
 
-    def needsStaffAccess: Boolean = fpu.exists(_.isPinhole)
+    def needsStaffAccess: Boolean = fpu.exists(_.fpuType =!= Flamingos2FpuType.LongSlit)
 
     private val stored = explicitTelescopeConfigs.map(storedSlitTelescopeConfigs)
 
