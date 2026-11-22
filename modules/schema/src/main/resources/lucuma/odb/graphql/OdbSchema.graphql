@@ -11257,7 +11257,7 @@ enum Flamingos2Fpu {
   LONG_SLIT_8
 
   """
-  Flamingos2Fpu GS2018BSV301-8
+  Flamingos2Fpu Blank Mask
   """
   BLANK_MASK
 }
