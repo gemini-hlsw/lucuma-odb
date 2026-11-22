@@ -11255,6 +11255,11 @@ enum Flamingos2Fpu {
   Flamingos2Fpu 8-Pixel Long Slit
   """
   LONG_SLIT_8
+
+  """
+  Flamingos2Fpu GS2018BSV301-8
+  """
+  BLANK_MASK
 }
 
 """

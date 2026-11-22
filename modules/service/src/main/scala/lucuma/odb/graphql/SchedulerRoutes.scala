@@ -240,7 +240,7 @@ object SchedulerRoutes:
   private def lastOfFull[A](page: List[A], limit: PosInt): Option[A] =
     page.lastOption.filter(_ => page.sizeIs >= limit.value)
 
-  def apply[F[_]: Async](
+  def apply[F[_]: Async: Logger](
     services:  [A] => User => (Services[F] => F[A]) => F[A],
     ssoClient: SsoClient[F, User],
     pageSizes: PageSizes
