@@ -108,16 +108,17 @@ object DaytimeCalibrationService:
         which: List[Observation.Id]
       )(using Transaction[F]): F[Result[Unit]] =
         (for
-          widths <- ResultT(validateMasks(input.instrument, input.sets))
+          widths <- ResultT(validateMasks(input.instrument, input.sets, which))
           sets   <- ResultT(resolveSlitWidths(input.sets, widths).pure[F])
           _      <- ResultT(insertUnchecked(Config(input.instrument, sets), which))
         yield ()).value
 
       private def validateMasks(
         instrument: Instrument,
-        sets:       List[CalibrationSetInput]
+        sets:       List[CalibrationSetInput],
+        which:      List[Observation.Id]
       )(using Transaction[F]): F[Result[Map[Attachment.Id, (Angle, BigDecimal)]]] =
-        attachmentMetadataService.validateDaytimeMasks(instrument, sets.flatMap(_.set.setup.customMask))
+        attachmentMetadataService.validateDaytimeMasks(instrument, sets.flatMap(_.set.setup.customMask), which)
 
       // A custom mask entered without a slit width takes the width of its mask.
       private def resolveSlitWidths(
@@ -199,7 +200,7 @@ object DaytimeCalibrationService:
               SET.sets
                 .traverse: sets =>
                   existing.values.map(c => SET.instrument.getOrElse(c.instrument)).toList.distinct
-                    .traverse(validateMasks(_, sets))
+                    .traverse(validateMasks(_, sets, which))
                     .map(_.sequence.flatMap(ws => resolveSlitWidths(sets, ws.foldLeft(Map.empty)(_ ++ _))))
                 .map(_.sequence)
 
