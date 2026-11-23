@@ -22,6 +22,10 @@ import lucuma.core.model.sequence.gnirs.GnirsDynamicConfig
 import lucuma.core.model.sequence.gnirs.GnirsStaticConfig
 import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig
 import lucuma.core.model.sequence.igrins2.Igrins2StaticConfig
+import lucuma.core.model.sequence.scorpio.ScorpioChannelConfig
+import lucuma.core.model.sequence.scorpio.ScorpioDynamicConfig
+import lucuma.core.model.sequence.scorpio.ScorpioFpuMask
+import lucuma.core.model.sequence.scorpio.ScorpioStaticConfig
 import lucuma.core.util.TimeSpan
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.refined.*
@@ -112,6 +116,17 @@ object DetectorEstimator {
         )
     }
 
+    extension (sco: ScorpioDynamicConfig) {
+      def datasetEstimate(channel: ScorpioChannelConfig.Vis): DatasetEstimate =
+        DatasetEstimate(
+          channel.exposureTime,
+          sco.fpu match
+            case ScorpioFpuMask.Imaging => channel.readoutMode.imagingReadoutTime
+            case _                      => channel.readoutMode.longSlitReadoutTime,
+          ctx.enums.TimeEstimate.ScorpioWrite.time
+        )
+    }
+
     extension (gn: GnirsDynamicConfig) {
       def datasetEstimate: DatasetEstimate =
         // c_exposure is per coadd, so both exposure and readout scale with the coadd count.
@@ -182,6 +197,19 @@ object DetectorEstimator {
           1.refined
         )
       )
+
+    // Only the visible channels are estimated; the IR ones are not generated yet.
+    lazy val scorpio: DetectorEstimator[ScorpioStaticConfig, ScorpioDynamicConfig] =
+      (_: ScorpioStaticConfig, step: ProtoStep[ScorpioDynamicConfig]) =>
+        val sco = step.value
+        List("g" -> sco.g, "r" -> sco.r, "i" -> sco.i, "z" -> sco.z).collect:
+          case (name, Some(channel)) =>
+            DetectorEstimate(
+              s"SCORPIO $name",
+              s"SCORPIO $name Detector Array",
+              sco.datasetEstimate(channel),
+              NonNegInt.unsafeFrom(channel.exposureCount.value)
+            )
 
     lazy val gnirs: DetectorEstimator[GnirsStaticConfig, GnirsDynamicConfig] =
       (_: GnirsStaticConfig, step: ProtoStep[GnirsDynamicConfig]) => List(

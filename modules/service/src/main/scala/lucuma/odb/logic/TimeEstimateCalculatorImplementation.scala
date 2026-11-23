@@ -20,6 +20,8 @@ import lucuma.core.model.sequence.gnirs.GnirsDynamicConfig
 import lucuma.core.model.sequence.gnirs.GnirsStaticConfig
 import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig
 import lucuma.core.model.sequence.igrins2.Igrins2StaticConfig
+import lucuma.core.model.sequence.scorpio.ScorpioDynamicConfig
+import lucuma.core.model.sequence.scorpio.ScorpioStaticConfig
 import lucuma.core.refined.numeric.NonZeroInt
 import lucuma.core.util.TimeSpan
 import lucuma.odb.graphql.enums.Enums
@@ -171,6 +173,15 @@ object TimeEstimateCalculatorImplementation:
         ctx.enums.TimeEstimate.Igrins2LongslitMaxVisit.time
       )
 
+    lazy val scorpioLongSlitSetup: SetupTimeEstimateCalculator =
+      setupCalculatorfromEstimation(
+        SetupTime(
+          ctx.enums.TimeEstimate.ScorpioLongslitSetup.time,
+          ctx.enums.TimeEstimate.ScorpioReacquisition.time
+        ),
+        ctx.enums.TimeEstimate.ScorpioLongslitMaxVisit.time
+      )
+
     lazy val gnirsLongSlitSetup: SetupTimeEstimateCalculator =
       gnirsSetup(ctx.enums.TimeEstimate.GnirsLongslitSetup.time)
 
@@ -206,6 +217,9 @@ object TimeEstimateCalculatorImplementation:
 
     lazy val igrins2Step: StepTimeEstimateCalculator[Igrins2StaticConfig, Igrins2DynamicConfig] =
       stepCalculatorfromEstimators(cce.igrins2, de.igrins2)
+
+    lazy val scorpioStep: StepTimeEstimateCalculator[ScorpioStaticConfig, ScorpioDynamicConfig] =
+      stepCalculatorfromEstimators(cce.scorpio, de.scorpio)
 
     lazy val gnirsStep: StepTimeEstimateCalculator[GnirsStaticConfig, GnirsDynamicConfig] =
       stepCalculatorfromEstimators(cce.gnirs, de.gnirs)

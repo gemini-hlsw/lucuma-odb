@@ -18,6 +18,7 @@ import lucuma.core.model.sequence.gnirs.GnirsAcquisitionMirrorMode
 import lucuma.core.model.sequence.gnirs.GnirsDynamicConfig
 import lucuma.core.model.sequence.gnirs.GnirsGratingWavelength
 import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig
+import lucuma.core.model.sequence.scorpio.ScorpioDynamicConfig
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.sequence.StepTimeEstimateCalculator
 import lucuma.odb.sequence.data.ProtoStep
@@ -94,6 +95,15 @@ object ConfigChangeEstimator:
           present: ProtoStep[Igrins2DynamicConfig]
         ): List[Option[ConfigChangeEstimate]] =
           // IGRINS-2 has no configurable mechanisms
+          Nil
+
+    lazy val scorpio: ConfigChangeEstimator[ScorpioDynamicConfig] =
+      new ForInstrument[ScorpioDynamicConfig]:
+        override def instrumentChecks(
+          past: StepTimeEstimateCalculator.Last[ScorpioDynamicConfig],
+          present: ProtoStep[ScorpioDynamicConfig]
+        ): List[Option[ConfigChangeEstimate]] =
+          // The slit and disperser do not change within a sequence yet.
           Nil
 
     lazy val gnirs: ConfigChangeEstimator[GnirsDynamicConfig] =

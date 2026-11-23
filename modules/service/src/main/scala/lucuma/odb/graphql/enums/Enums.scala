@@ -112,6 +112,11 @@ final class Enums(
     case OffsetDistance             extends TimeEstimate("offset_distance")
     case ScienceFold                extends TimeEstimate("science_fold")
 
+    case ScorpioLongslitMaxVisit    extends TimeEstimate("scorpio_longslit_max_visit")
+    case ScorpioLongslitSetup       extends TimeEstimate("scorpio_longslit_setup")
+    case ScorpioReacquisition       extends TimeEstimate("scorpio_reacquisition")
+    case ScorpioWrite               extends TimeEstimate("scorpio_write")
+
     // For resident visitors
     case AlopekeSpeckleSetup        extends TimeEstimate("alopeke_speckle_setup")
     case AlopekeSpeckleReadout      extends TimeEstimate("alopeke_speckle_readout")
