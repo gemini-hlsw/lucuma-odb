@@ -280,9 +280,9 @@ object SchedulerRoutes:
               // The ids are read in batches, and each batch in pages of rows,
               // each page in its own short transaction, so that memory and bind
               // parameters stay bounded however many ids or atoms there are.
-              // The database sorts the ids first, so that the batches come out
-              // in the same order as the rows within each one: the response
-              // order then doesn't depend on the request order or batch size.
+              // The ids are sorted first, as the rows are within a batch, so that
+              // the batches come out in that same order: the response order
+              // then doesn't depend on the request order or batch size.
               //
               // A page never ends partway through an observation: each
               // observation's atoms come from a single statement, so a sequence
@@ -313,10 +313,11 @@ object SchedulerRoutes:
                               .selectAtomDigests(List(last), None, PosInt.MaxValue)
                               .map(whole => (whole, cursor.copy(after = last.some).some))
 
-              superUserTransaction(user)(sequenceService.sortObservationIds(validIds)).flatMap: sortedIds =>
-                sortedIds.grouped(pageSizes.observationBatchSize.value).toList match
-                  case Nil     => Ok()
-                  case b :: bs => pagedBody(AtomCursor(b, bs, None))(fetch).flatMap(rows => Ok(encode(rows.map(tsv))))
+              val sortedIds: List[Observation.Id] = validIds.distinct.sorted
+
+              sortedIds.grouped(pageSizes.observationBatchSize.value).toList match
+                case Nil     => Ok()
+                case b :: bs => pagedBody(AtomCursor(b, bs, None))(fetch).flatMap(rows => Ok(encode(rows.map(tsv))))
         }
 
       case req @ GET -> Root / "scheduler" / "visibility-changes" :? SinceMatcher(since) =>
