@@ -12,6 +12,7 @@ import grackle.ResultT
 import grackle.syntax.*
 import lucuma.core.enums.CalibrationSetType
 import lucuma.core.enums.GcalArc
+import lucuma.core.enums.GhostResolutionMode
 import lucuma.core.enums.Instrument
 import lucuma.core.math.Angle
 import lucuma.core.math.units.PixelScale
@@ -88,7 +89,7 @@ object DaytimeCalibrationService:
               sets  <- session.prepareR(Statements.selectSets(nel)).use(_.stream(nel, 1024).compile.toList)
             yield
               val byObs = sets.groupMap(_._1)(_._2)
-              insts.map((oid, inst) => oid -> Config(inst, byObs.getOrElse(oid, Nil))).toMap
+              insts.map((oid, inst, res) => oid -> Config(inst, byObs.getOrElse(oid, Nil), res)).toMap
 
       private def insertSets(
         oid:  Observation.Id,
@@ -111,7 +112,7 @@ object DaytimeCalibrationService:
         (for
           widths <- ResultT(validateMasks(input.instrument, input.sets, which))
           sets   <- ResultT(resolveSlitWidths(input.sets, widths).pure[F])
-          _      <- ResultT(insertUnchecked(Config(input.instrument, sets), which))
+          _      <- ResultT(insertUnchecked(Config(input.instrument, sets, input.ghostResolutionMode), which))
         yield ()).value
 
       private def validateMasks(
@@ -152,7 +153,7 @@ object DaytimeCalibrationService:
           session.prepareR(Statements.Insert).use: ps =>
             which
               .traverse: oid =>
-                ps.execute((oid, input.instrument)).flatMap:
+                ps.execute((oid, input.instrument, Config.ghostResolutionModeFor(input.instrument, input.ghostResolutionMode))).flatMap:
                   case Completion.Insert(1) => insertSets(oid, input.sets).as(Result.unit)
                   case other                => Result.failure(s"Expected single insert, got $other.").pure
               .map(_.sequenceVoid)
@@ -181,6 +182,15 @@ object DaytimeCalibrationService:
             s"Cannot change the calibration sets of a daytime calibration with a stored sequence (${materialized.mkString(", ")}). Delete the sequence first.".some
           ).asFailure
 
+      // The resolution mode is saved with the sequence, so a stored sequence freezes it.
+      private def checkResolutionNotMaterialized(oids: List[Observation.Id]): F[Result[Unit]] =
+        NonEmptyList.fromList(oids).fold(Result.unit.pure[F]): nel =>
+          session.execute(Statements.selectMaterialized(nel))(nel).map: materialized =>
+            if materialized.isEmpty then Result.unit
+            else OdbError.InvalidArgument(
+              s"Cannot change the GHOST resolution mode of a daytime calibration with a stored sequence (${materialized.mkString(", ")}). Delete the sequence first.".some
+            ).asFailure
+
       override def update(
         SET: DaytimeCalibrationInput.Edit,
         which: List[Observation.Id]
@@ -191,8 +201,20 @@ object DaytimeCalibrationService:
               existing.toList.traverse_ : (_, config) =>
                 val inst = SET.instrument.getOrElse(config.instrument)
                 val sets = SET.sets.fold(config.sets)(_.map(_.set))
-                CalibrationSetInput.instrumentMismatch(inst, sets).fold(Result.unit): m =>
+                val setsCheck = CalibrationSetInput.instrumentMismatch(inst, sets).fold(Result.unit): m =>
                   OdbError.InvalidArgument(m.some).asFailure
+                val ghostCheck =
+                  if SET.ghostResolutionMode.isEmpty || inst === Instrument.Ghost then Result.unit
+                  else OdbError.InvalidArgument(DaytimeCalibrationInput.GhostNotAllowed.some).asFailure
+                (setsCheck, ghostCheck).parTupled.void
+
+            val resolutionChanged: List[Observation.Id] =
+              SET.ghostResolutionMode.toList.flatMap: res =>
+                existing.toList.collect:
+                  case (oid, config) if config.ghostResolutionMode.exists(_ =!= res) => oid
+
+            val resolutionMaterialized: F[Result[Unit]] =
+              checkResolutionNotMaterialized(resolutionChanged)
 
             val materialized: F[Result[Unit]] =
               if SET.sets.isDefined then checkNotMaterialized(oids) else Result.unit.pure
@@ -206,8 +228,8 @@ object DaytimeCalibrationService:
                 .map(_.sequence)
 
             val updateInstrument: F[Unit] =
-              SET.instrument.traverse_ : inst =>
-                val af = Statements.updateInstrument(inst, oids)
+              Option.when(SET.instrument.isDefined || SET.ghostResolutionMode.isDefined)(()).traverse_ : _ =>
+                val af = Statements.updateMode(SET.instrument, SET.ghostResolutionMode, oids)
                 session.prepareR(af.fragment.command).use(_.execute(af.argument)).void
 
             def replaceSets(resolved: Option[List[CalibrationSet[InstrumentSetup]]]): F[Unit] =
@@ -218,6 +240,7 @@ object DaytimeCalibrationService:
             (for
               _ <- ResultT(checks.pure)
               _ <- ResultT(materialized)
+              _ <- ResultT(resolutionMaterialized)
               s <- ResultT(resolved)
               _ <- ResultT.liftF(updateInstrument *> replaceSets(s))
             yield ()).value
@@ -285,16 +308,17 @@ object DaytimeCalibrationService:
         case (k, n, g, None, None, None, None, None, Some(gh))    => CalibrationSet(k, n, g, InstrumentSetup.Ghost(gh)).asRight
         case _                                                    => "Calibration set without exactly one instrument setup".asLeft
 
-    def selectInstrument[A <: NonEmptyList[Observation.Id]](a: A): Query[a.type, (Observation.Id, Instrument)] =
+    def selectInstrument[A <: NonEmptyList[Observation.Id]](a: A): Query[a.type, (Observation.Id, Instrument, Option[GhostResolutionMode])] =
       sql"""
         SELECT
           c_observation_id,
-          c_instrument
+          c_instrument,
+          c_ghost_resolution_mode
         FROM
           t_daytime_calibration
         WHERE
           c_observation_id IN (${observation_id.nel(a)})
-      """.query(observation_id *: instrument)
+      """.query(observation_id *: instrument *: ghost_resolution_mode.opt)
 
     def selectSets[A <: NonEmptyList[Observation.Id]](a: A): Query[a.type, (Observation.Id, CalibrationSet[InstrumentSetup])] =
       sql"""
@@ -328,14 +352,16 @@ object DaytimeCalibrationService:
         ORDER BY s.c_observation_id, s.c_position
       """.query(observation_id *: calibration_set)
 
-    val Insert: Command[(Observation.Id, Instrument)] =
+    val Insert: Command[(Observation.Id, Instrument, Option[GhostResolutionMode])] =
       sql"""
         INSERT INTO t_daytime_calibration (
           c_observation_id,
-          c_instrument
+          c_instrument,
+          c_ghost_resolution_mode
         ) VALUES (
           $observation_id,
-          $instrument
+          $instrument,
+          ${ghost_resolution_mode.opt}
         )
       """.command
 
@@ -427,12 +453,21 @@ object DaytimeCalibrationService:
         WHERE c_observation_id IN (${observation_id.nel(a)})
       """.command
 
-    def updateInstrument(inst: Instrument, oids: NonEmptyList[Observation.Id]): AppliedFragment =
+    // A GHOST row always holds a resolution mode and no other row does.
+    def updateMode(
+      inst: Option[Instrument],
+      res:  Option[GhostResolutionMode],
+      oids: NonEmptyList[Observation.Id]
+    ): AppliedFragment =
       sql"""
         UPDATE t_daytime_calibration
-        SET c_instrument = $instrument
+        SET c_instrument            = COALESCE(${instrument.opt}, c_instrument),
+            c_ghost_resolution_mode =
+              CASE WHEN COALESCE(${instrument.opt}, c_instrument) = 'Ghost'
+                   THEN COALESCE(${ghost_resolution_mode.opt}, c_ghost_resolution_mode, 'standard')
+              END
         WHERE c_observation_id IN (${observation_id.nel(oids)})
-      """(inst, oids)
+      """(inst, inst, res, oids)
 
     def selectMaterialized[A <: NonEmptyList[Observation.Id]](a: A): Query[a.type, Observation.Id] =
       sql"""

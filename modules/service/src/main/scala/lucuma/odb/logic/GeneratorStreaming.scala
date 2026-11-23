@@ -15,7 +15,6 @@ import fs2.Pure
 import fs2.Stream
 import lucuma.core.enums.Flamingos2AcquisitionType
 import lucuma.core.enums.GnirsAcquisitionType
-import lucuma.core.enums.Instrument
 import lucuma.core.enums.SequenceType
 import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
@@ -41,6 +40,7 @@ import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.sequence.ObservingMode.Syntax.*
 import lucuma.odb.sequence.data.StreamingExecutionConfig
+import lucuma.odb.sequence.daytimecal.Config as DaytimeConfig
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.sequence.util.SequenceIds
 import lucuma.odb.service.Services
@@ -59,8 +59,8 @@ import java.util.UUID
  */
 sealed trait GeneratorStreaming[F[_]]:
 
-  /** The daytime calibration pieces of an instrument, or none for one without daytime calibrations. */
-  def daytimeInstrument(instrument: Instrument): Option[DaytimeInstrument[F]]
+  /** The daytime calibration pieces of a config's instrument, or none for one without daytime calibrations. */
+  def daytimeInstrument(config: DaytimeConfig): Option[DaytimeInstrument[F]]
 
   /** The stored science sequence of a daytime calibration, or else the sequence its sets generate. */
   def selectDaytime(
@@ -330,8 +330,8 @@ object GeneratorStreaming:
             else gen.unsplit(context.oid)
           ).map(_.covary[F])
 
-      override def daytimeInstrument(instrument: Instrument): Option[DaytimeInstrument[F]] =
-        DaytimeInstrument.forInstrument(instrument, calculator, exp, sequenceService)
+      override def daytimeInstrument(config: DaytimeConfig): Option[DaytimeInstrument[F]] =
+        DaytimeInstrument.forConfig(config, calculator, exp, sequenceService)
 
       // Daytime calibrations have no acquisition, so a stored science sequence
       // alone decides: generating from the sets only when none is stored.  The

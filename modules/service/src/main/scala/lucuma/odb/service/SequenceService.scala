@@ -27,6 +27,7 @@ import grackle.ResultT
 import lucuma.core.enums.Breakpoint
 import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.CloneSequenceMode
+import lucuma.core.enums.GhostResolutionMode
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
@@ -69,6 +70,7 @@ import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.StreamingExecutionConfig
 import lucuma.odb.sequence.data.UnsplittableAtom
 import lucuma.odb.sequence.daytimecal.InstrumentSetup
+import lucuma.odb.sequence.daytimecal.Config as DaytimeConfig
 import lucuma.odb.sequence.daytimecal.StaticConfigs as DaytimeStatics
 import lucuma.odb.sequence.gcalClass
 import lucuma.odb.sequence.util.AtomBuilder
@@ -855,7 +857,7 @@ object SequenceService:
       ): F[Option[Instrument]] =
         session.option(Statements.SelectDaytimeCalibration)(observationId).map(_.flatten)
 
-      // Daytime calibrations have a fixed static config.
+      // A daytime calibration's static config comes from its mode, never from the stored one.
       private def staticFor[S](
         observationId: Observation.Id,
         instrument:    Instrument,
@@ -869,8 +871,9 @@ object SequenceService:
       private def ghostStaticFor(
         observationId: Observation.Id
       )(using Transaction[F]): ResultT[F, GhostStaticConfig] =
-        staticFor(observationId, Instrument.Ghost, DaytimeStatics.Ghost):
-          ResultT(selectOrComputeGhostStatic(observationId).map(e => Result.fromEither(e.leftMap(_.asProblem))))
+        ResultT.liftF(session.option(Statements.SelectDaytimeGhostResolutionMode)(observationId)).flatMap: res =>
+          staticFor(observationId, Instrument.Ghost, DaytimeConfig(Instrument.Ghost, Nil, res.flatten).ghostStatic):
+            ResultT(selectOrComputeGhostStatic(observationId).map(e => Result.fromEither(e.leftMap(_.asProblem))))
 
       private def selectStatic[S](
         observationId: Observation.Id,
@@ -1653,6 +1656,13 @@ object SequenceService:
          WHERE c_observation_id   = $observation_id
            AND c_calibration_role = 'daytime_calibration'
       """.query(instrument.opt)
+
+    val SelectDaytimeGhostResolutionMode: Query[Observation.Id, Option[GhostResolutionMode]] =
+      sql"""
+        SELECT c_ghost_resolution_mode
+          FROM t_daytime_calibration
+         WHERE c_observation_id = $observation_id
+      """.query(ghost_resolution_mode.opt)
 
     val AbandonAndDeleteUnexecuted: Command[(Observation.Id, SequenceType)] =
       sql"""

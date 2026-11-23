@@ -149,7 +149,7 @@ object ObservingMode:
 
       def name: String =
         m match
-          case DaytimeCalibration(_, _) => DaytimeCalibrationName
+          case DaytimeCalibration(_, _, _) => DaytimeCalibrationName
           case _: Exchange              => ExchangeName
           case _: Flamingos2Imaging     => Flamingos2ImagingName
           case _: Flamingos2LongSlit    => Flamingos2LongSlitName
@@ -171,7 +171,7 @@ object ObservingMode:
 
       def modeType: ObservingModeType =
         m match
-          case d @ DaytimeCalibration(_, _) => d.mode
+          case d @ DaytimeCalibration(_, _, _) => d.mode
           case e @ Exchange(_, _)           => e.mode
           case _: Flamingos2Imaging         => ObservingModeType.Flamingos2Imaging
           case _: Flamingos2LongSlit        => ObservingModeType.Flamingos2LongSlit
@@ -196,7 +196,7 @@ object ObservingMode:
 
       def asDaytimeCalibration: Option[DaytimeCalibration] =
         m match
-          case a @ DaytimeCalibration(_, _) => a.some
+          case a @ DaytimeCalibration(_, _, _) => a.some
           case _                            => none
 
       def asExchange: Option[Exchange] =

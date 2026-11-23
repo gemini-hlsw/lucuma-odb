@@ -90,14 +90,14 @@ object DaytimeInstrument:
       )(using Transaction[F], Services.ServiceAccess): F[Unit] =
         materialize0(oid, stream, sequenceTypes)
 
-  /** The instrument's daytime pieces, or none for an instrument without daytime calibrations. */
-  def forInstrument[F[_]](
-    instrument: Instrument,
+  /** The daytime pieces of the config's instrument, or none for an instrument without daytime calibrations. */
+  def forConfig[F[_]](
+    config:     Config,
     calculator: TimeEstimateCalculatorImplementation.ForInstrumentMode,
     exp:        SmartGcalImplementation.ForInstrument[F],
     sequence:   SequenceService[F]
   ): Option[DaytimeInstrument[F]] =
-    instrument match
+    config.instrument match
       case Instrument.Flamingos2 =>
         instance(
           StaticConfigs.Flamingos2,
@@ -110,7 +110,7 @@ object DaytimeInstrument:
         ).some
       case Instrument.Ghost =>
         instance(
-          StaticConfigs.Ghost,
+          config.ghostStatic,
           calculator.ghostStep,
           exp.ghost,
           _.ghostSets,

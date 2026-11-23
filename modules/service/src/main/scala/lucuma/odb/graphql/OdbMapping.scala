@@ -487,6 +487,7 @@ object OdbMapping {
                 ElevationRangeMapping,
                 ExampleProgramReferenceMapping,
                 DaytimeCalibrationMapping,
+                DaytimeCalibrationGhostMapping,
                 CalibrationSetMapping,
                 CalibrationSetGcalMapping,
                 ExchangeMapping,

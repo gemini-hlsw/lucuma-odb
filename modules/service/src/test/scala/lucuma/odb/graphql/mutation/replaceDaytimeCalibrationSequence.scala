@@ -11,7 +11,7 @@ import lucuma.core.enums.Instrument
 import lucuma.core.enums.SequenceType
 import lucuma.core.model.Observation
 import lucuma.odb.data.OdbError
-import lucuma.odb.sequence.daytimecal.StaticConfigs
+import lucuma.odb.sequence.daytimecal.Config
 import lucuma.odb.service.Services.Syntax.*
 
 class replaceDaytimeCalibrationSequence extends OdbSuite with DatabaseOperations with DaytimeCalibrationOps:
@@ -161,9 +161,9 @@ class replaceDaytimeCalibrationSequence extends OdbSuite with DatabaseOperations
       oid <- createDaytimeCalibrationAs(staff, pid, Instrument.Ghost)
       res <- withServices(serviceUser): services =>
                services.transactionally:
-                 ghostSequenceService.insertStatic(oid, StaticConfigs.Ghost) *>
+                 ghostSequenceService.insertStatic(oid, Config(Instrument.Ghost, Nil).ghostStatic) *>
                  ghostSequenceService.selectStatic(oid)
-    yield assertEquals(res, Some(StaticConfigs.Ghost))
+    yield assertEquals(res, Some(Config(Instrument.Ghost, Nil).ghostStatic))
 
   test("defined once a sequence is entered"):
     for

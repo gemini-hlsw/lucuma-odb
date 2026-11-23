@@ -6,6 +6,7 @@ package table
 
 import grackle.skunk.SkunkMapping
 import lucuma.odb.util.Codecs.*
+import lucuma.odb.util.GhostCodecs.*
 
 trait DaytimeCalibrationView[F[_]] extends BaseMapping[F]:
 
@@ -13,3 +14,7 @@ trait DaytimeCalibrationView[F[_]] extends BaseMapping[F]:
     val ObservationId     = col("c_observation_id", observation_id)
     val ObservingModeType = col("c_observing_mode_type", daytime_calibration_observing_mode_type)
     val Instrument        = col("c_instrument", instrument)
+
+    object Ghost:
+      val Id             = col("c_ghost_id", observation_id.embedded)
+      val ResolutionMode = col("c_ghost_resolution_mode", ghost_resolution_mode.embedded)
