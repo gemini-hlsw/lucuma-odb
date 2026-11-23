@@ -6456,6 +6456,36 @@ type DaytimeCalibration {
   rows (or enter the sequence by hand).
   """
   calibrationSets: [CalibrationSet!]!
+
+  """
+  GHOST settings, null for any other instrument.
+  """
+  ghost: DaytimeCalibrationGhost
+
+  """
+  GNIRS settings, null for any other instrument.
+  """
+  gnirs: DaytimeCalibrationGnirs
+}
+
+"""
+GNIRS settings of a daytime calibration, shared by all its calibration sets.
+"""
+type DaytimeCalibrationGnirs {
+  """
+  Well depth of the sequence.  It also selects the Smart GCAL rows.
+  """
+  wellDepth: GnirsWellDepth!
+}
+
+"""
+GHOST settings of a daytime calibration, shared by all its calibration sets.
+"""
+type DaytimeCalibrationGhost {
+  """
+  Resolution mode of the sequence.  It also selects the Smart GCAL rows.
+  """
+  resolutionMode: GhostResolutionMode!
 }
 
 """
@@ -6475,6 +6505,42 @@ input DaytimeCalibrationInput {
   materialized (first visit or a hand edit).
   """
   calibrationSets: [CalibrationSetInput!]
+
+  """
+  GHOST settings.  Only allowed when the instrument is GHOST.
+  """
+  ghost: DaytimeCalibrationGhostInput
+
+  """
+  GNIRS settings.  Only allowed when the instrument is GNIRS.
+  """
+  gnirs: DaytimeCalibrationGnirsInput
+}
+
+"""
+GNIRS settings of a daytime calibration.
+"""
+input DaytimeCalibrationGnirsInput {
+  """
+  Well depth, SHALLOW when never set.  Omit it to keep the current value; it
+  may not be null.  It is frozen once the sequence has been materialized
+  (first visit or a hand edit), and once the sequence has atoms every edit of
+  the mode is rejected, even one that changes nothing.
+  """
+  wellDepth: GnirsWellDepth
+}
+
+"""
+GHOST settings of a daytime calibration.
+"""
+input DaytimeCalibrationGhostInput {
+  """
+  Resolution mode, STANDARD when never set.  Omit it to keep the current
+  value; it may not be null.  It is frozen once the sequence has been
+  materialized (first visit or a hand edit), and once the sequence has atoms
+  every edit of the mode is rejected, even one that changes nothing.
+  """
+  resolutionMode: GhostResolutionMode
 }
 
 """

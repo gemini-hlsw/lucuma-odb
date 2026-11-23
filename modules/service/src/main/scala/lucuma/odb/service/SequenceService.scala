@@ -27,6 +27,8 @@ import grackle.ResultT
 import lucuma.core.enums.Breakpoint
 import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.CloneSequenceMode
+import lucuma.core.enums.GhostResolutionMode
+import lucuma.core.enums.GnirsWellDepth
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
@@ -68,6 +70,7 @@ import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.StreamingExecutionConfig
 import lucuma.odb.sequence.data.UnsplittableAtom
+import lucuma.odb.sequence.daytimecal.Config as DaytimeConfig
 import lucuma.odb.sequence.daytimecal.InstrumentSetup
 import lucuma.odb.sequence.daytimecal.StaticConfigs as DaytimeStatics
 import lucuma.odb.sequence.gcalClass
@@ -855,21 +858,40 @@ object SequenceService:
       ): F[Option[Instrument]] =
         session.option(Statements.SelectDaytimeCalibration)(observationId).map(_.flatten)
 
-      // Daytime calibrations have a fixed static config.
+      // A daytime calibration's static config comes from its mode, never from the stored one.
       private def staticFor[S](
         observationId: Observation.Id,
         instrument:    Instrument,
         daytime:       S
       )(select: => ResultT[F, S]): ResultT[F, S] =
+        staticForF(observationId, instrument, daytime.pure[F])(select)
+
+      private def staticForF[S](
+        observationId: Observation.Id,
+        instrument:    Instrument,
+        daytime:       F[S]
+      )(select: => ResultT[F, S]): ResultT[F, S] =
         ResultT.liftF(selectDaytimeCalibration(observationId)).flatMap:
-          case Some(i) if i === instrument => ResultT.pure(daytime)
+          case Some(i) if i === instrument => ResultT.liftF(daytime)
           case Some(i)                     => ResultT(OdbError.InvalidArgument(s"Observation $observationId is a ${i.longName} daytime calibration.".some).asFailureF)
           case None                        => select
+
+      private def gnirsStaticFor(
+        observationId: Observation.Id
+      )(using Transaction[F]): ResultT[F, GnirsStaticConfig] =
+        val daytime: F[GnirsStaticConfig] =
+          session.option(Statements.SelectDaytimeGnirsWellDepth)(observationId).map: w =>
+            DaytimeConfig(Instrument.Gnirs, Nil, gnirsWellDepth = w.flatten).gnirsStatic
+        staticForF(observationId, Instrument.Gnirs, daytime):
+          selectStatic(observationId, "GNIRS", gnirsSequenceService.selectStaticOrDefault)
 
       private def ghostStaticFor(
         observationId: Observation.Id
       )(using Transaction[F]): ResultT[F, GhostStaticConfig] =
-        staticFor(observationId, Instrument.Ghost, DaytimeStatics.Ghost):
+        val daytime: F[GhostStaticConfig] =
+          session.option(Statements.SelectDaytimeGhostResolutionMode)(observationId).map: res =>
+            DaytimeConfig(Instrument.Ghost, Nil, res.flatten).ghostStatic
+        staticForF(observationId, Instrument.Ghost, daytime):
           ResultT(selectOrComputeGhostStatic(observationId).map(e => Result.fromEither(e.leftMap(_.asProblem))))
 
       private def selectStatic[S](
@@ -1107,7 +1129,7 @@ object SequenceService:
         namespace:          Option[UUID] = None
       )(using Transaction[F]): F[Result[Stream[Pure, Atom[GnirsDynamicConfig]]]] =
         (for
-          s <- staticFor(observationId, Instrument.Gnirs, DaytimeStatics.Gnirs)(selectStatic(observationId, "GNIRS", gnirsSequenceService.selectStaticOrDefault))
+          s <- gnirsStaticFor(observationId)
           b <- ResultT.liftF(atomBuilder(sequenceType, s, namespace, estimator.gnirsStep))
           r <- replaceSequence(
                  Instrument.Gnirs,
@@ -1637,7 +1659,7 @@ object SequenceService:
                 case Instrument.Igrins2    =>
                   insert(o, selectStatic(observationId, "IGRINS-2", igrins2SequenceService.selectStaticOrDefault), Statements.Igrins2Table, estimator.igrins2Step, expanders.igrins2, Igrins2SequenceService.Statements.insertDynamics)
                 case Instrument.Gnirs      =>
-                  insert(o, selectStatic(observationId, "GNIRS", gnirsSequenceService.selectStaticOrDefault), Statements.GnirsTable, estimator.gnirsStep, expanders.gnirs, GnirsSequenceService.Statements.insertDynamics)
+                  insert(o, gnirsStaticFor(observationId), Statements.GnirsTable, estimator.gnirsStep, expanders.gnirs, GnirsSequenceService.Statements.insertDynamics)
                 case i                     =>
                   ResultT(OdbError.InvalidArgument(s"Smart GCAL steps cannot be inserted into a ${i.longName} sequence.".some).asFailureF)
             case None    =>
@@ -1653,6 +1675,20 @@ object SequenceService:
          WHERE c_observation_id   = $observation_id
            AND c_calibration_role = 'daytime_calibration'
       """.query(instrument.opt)
+
+    val SelectDaytimeGhostResolutionMode: Query[Observation.Id, Option[GhostResolutionMode]] =
+      sql"""
+        SELECT c_ghost_resolution_mode
+          FROM t_daytime_calibration
+         WHERE c_observation_id = $observation_id
+      """.query(ghost_resolution_mode.opt)
+
+    val SelectDaytimeGnirsWellDepth: Query[Observation.Id, Option[GnirsWellDepth]] =
+      sql"""
+        SELECT c_gnirs_well_depth
+          FROM t_daytime_calibration
+         WHERE c_observation_id = $observation_id
+      """.query(gnirs_well_depth.opt)
 
     val AbandonAndDeleteUnexecuted: Command[(Observation.Id, SequenceType)] =
       sql"""

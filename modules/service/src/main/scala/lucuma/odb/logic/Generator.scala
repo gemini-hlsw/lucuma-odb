@@ -56,6 +56,7 @@ import lucuma.odb.sequence.SetupTimeEstimateCalculator
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.ItcInput
 import lucuma.odb.sequence.data.StreamingExecutionConfig
+import lucuma.odb.sequence.daytimecal.Config as DaytimeConfig
 import lucuma.odb.sequence.exchange.Config as ExchangeConfig
 import lucuma.odb.sequence.sciClass
 import lucuma.odb.sequence.syntax.sequencedigest.*
@@ -264,8 +265,8 @@ object Generator:
           _ <- ExecutionDigestCache.store(ctx, d)
         yield d
 
-      private def daytimeInstrument(ctx: GeneratorContext): Instrument =
-        ctx.params.observingMode.asDaytimeCalibration.fold(Instrument.GmosNorth)(_.instrument)
+      private def daytimeConfig(ctx: GeneratorContext): DaytimeConfig =
+        ctx.params.observingMode.asDaytimeCalibration.getOrElse(DaytimeConfig(Instrument.GmosNorth, Nil))
 
       private def unsupportedDaytimeInstrument(ctx: GeneratorContext, inst: Instrument): OdbError =
         GeneratorError.sequenceUnavailable(ctx.oid, s"Daytime calibrations are not supported for ${inst.longName}")
@@ -277,9 +278,9 @@ object Generator:
       private def daytimeCalibration[A](ctx: GeneratorContext)(
         f: (di: DaytimeInstrument[F]) => StreamingExecutionConfig[F, di.S, di.D] => EitherT[F, OdbError, A]
       )(using Transaction[F]): EitherT[F, OdbError, A] =
-        streaming.daytimeInstrument(daytimeInstrument(ctx)) match
+        streaming.daytimeInstrument(daytimeConfig(ctx)) match
           case Some(di) => EitherT(streaming.selectDaytime(di, ctx)).flatMap(f(di))
-          case None     => EitherT.leftT(unsupportedDaytimeInstrument(ctx, daytimeInstrument(ctx)))
+          case None     => EitherT.leftT(unsupportedDaytimeInstrument(ctx, daytimeConfig(ctx).instrument))
 
       // No target means no sequence, so charge a fixed time instead.
       private def isUnresolvedTelluric(ctx: GeneratorContext): Boolean =
@@ -867,7 +868,7 @@ object Generator:
               def unlessMaterialized(gen: => EitherT[F, OdbError, Unit]): EitherT[F, OdbError, Unit] =
                 EitherT.liftF(sequenceService.isMaterialized(oid, SequenceType.Science)).flatMap: m =>
                   if m || !hasSets then EitherT.pure(()) else gen
-              streaming.daytimeInstrument(daytimeInstrument(ctx)) match
+              streaming.daytimeInstrument(daytimeConfig(ctx)) match
                 case Some(di) =>
                   unlessMaterialized:
                     EitherT(streaming.generateDaytime(di, ctx))

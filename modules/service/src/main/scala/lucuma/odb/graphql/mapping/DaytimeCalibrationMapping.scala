@@ -25,7 +25,21 @@ trait DaytimeCalibrationMapping[F[_]] extends DaytimeCalibrationView[F]
       SqlField("observationId", DaytimeCalibrationView.ObservationId, key = true, hidden = true),
       SqlField("mode", DaytimeCalibrationView.ObservingModeType),
       SqlField("instrument", DaytimeCalibrationView.Instrument),
-      SqlObject("calibrationSets", Join(DaytimeCalibrationView.ObservationId, DaytimeCalibrationSetView.ObservationId))
+      SqlObject("calibrationSets", Join(DaytimeCalibrationView.ObservationId, DaytimeCalibrationSetView.ObservationId)),
+      SqlObject("ghost"),
+      SqlObject("gnirs")
+    )
+
+  lazy val DaytimeCalibrationGnirsMapping =
+    ObjectMapping(DaytimeCalibrationGnirsType)(
+      SqlField("id", DaytimeCalibrationView.Gnirs.Id, key = true, hidden = true),
+      SqlField("wellDepth", DaytimeCalibrationView.Gnirs.WellDepth)
+    )
+
+  lazy val DaytimeCalibrationGhostMapping =
+    ObjectMapping(DaytimeCalibrationGhostType)(
+      SqlField("id", DaytimeCalibrationView.Ghost.Id, key = true, hidden = true),
+      SqlField("resolutionMode", DaytimeCalibrationView.Ghost.ResolutionMode)
     )
 
   lazy val DaytimeCalibrationElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =

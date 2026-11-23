@@ -73,7 +73,7 @@ trait CalibrationSetMapping[F[_]: Concurrent] extends DaytimeCalibrationSetView[
           val exp = SmartGcalImplementation.fromService(smartGcalService)
           daytimeCalibrationService.select(keys.map(_._1).distinct).flatMap: cfgs =>
             cfgs.toList.traverse: (oid, cfg) =>
-              val di = DaytimeInstrument.forInstrument(cfg.instrument, timeEstimateCalculator, exp, sequenceService)
+              val di = DaytimeInstrument.forConfig(cfg, timeEstimateCalculator, exp, sequenceService)
               DaytimeCalibrationExpansion.setCounts(di, oid, cfg).map: counts =>
                 counts.zipWithIndex.map((n, i) => (oid, i) -> n.success)
             .map: all =>
