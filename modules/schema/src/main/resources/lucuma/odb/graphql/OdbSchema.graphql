@@ -6461,6 +6461,21 @@ type DaytimeCalibration {
   GHOST settings, null for any other instrument.
   """
   ghost: DaytimeCalibrationGhost
+
+  """
+  GNIRS settings, null for any other instrument.
+  """
+  gnirs: DaytimeCalibrationGnirs
+}
+
+"""
+GNIRS settings of a daytime calibration, shared by all its calibration sets.
+"""
+type DaytimeCalibrationGnirs {
+  """
+  Well depth of the sequence.  It also selects the Smart GCAL rows.
+  """
+  wellDepth: GnirsWellDepth!
 }
 
 """
@@ -6495,6 +6510,23 @@ input DaytimeCalibrationInput {
   GHOST settings.  Only allowed when the instrument is GHOST.
   """
   ghost: DaytimeCalibrationGhostInput
+
+  """
+  GNIRS settings.  Only allowed when the instrument is GNIRS.
+  """
+  gnirs: DaytimeCalibrationGnirsInput
+}
+
+"""
+GNIRS settings of a daytime calibration.
+"""
+input DaytimeCalibrationGnirsInput {
+  """
+  Well depth, SHALLOW when never set.  Omit it to keep the current value; it
+  may not be null.  A different value is rejected once the sequence has been
+  materialized (first visit or a hand edit).
+  """
+  wellDepth: GnirsWellDepth
 }
 
 """

@@ -299,7 +299,7 @@ A system-generated per-program calibration observation that images one Mask Atta
 _Avoid_: mask image, MOS imaging, mask flat (alone, ambiguous with a spectroscopic flat through the mask).
 
 **Daytime Calibration Mode**:
-A single observing mode holding the Gemini facility instrument of a Daytime Calibration and the ordered list of its Daytime Calibration Sets. Staff-only. For GHOST it also holds the resolution mode, standard unless staff choose high: one value for the whole observation, shared by every Daytime Calibration Set, which also selects the rows the Smart GCAL Lookup matches. Like the sets it is frozen once the sequence is materialized. The sequence it generates follows the usual Materialized Sequence rule: generated until the first visit or a hand edit, stored and editable afterwards.
+A single observing mode holding the Gemini facility instrument of a Daytime Calibration and the ordered list of its Daytime Calibration Sets. Staff-only. For GHOST it also holds the resolution mode, standard unless staff choose high, and for GNIRS the well depth, shallow unless staff choose deep (never derived from the camera, as it is for science): one value for the whole observation, shared by every Daytime Calibration Set, which also selects the rows the Smart GCAL Lookup matches. Like the sets it is frozen once the sequence is materialized. The sequence it generates follows the usual Materialized Sequence rule: generated until the first visit or a hand edit, stored and editable afterwards.
 _Avoid_: daytime mode (ambiguous with the time of day), instrument-only mode, one mode per instrument (the instrument is a parameter, not a kind).
 
 **Daytime Calibration Set**:

@@ -140,7 +140,7 @@ object DaytimeInstrument:
         ).some
       case Instrument.Gnirs =>
         instance(
-          StaticConfigs.Gnirs,
+          config.gnirsStatic,
           calculator.gnirsStep,
           exp.gnirs,
           _.gnirsSets,

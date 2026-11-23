@@ -13,6 +13,7 @@ import grackle.syntax.*
 import lucuma.core.enums.CalibrationSetType
 import lucuma.core.enums.GcalArc
 import lucuma.core.enums.GhostResolutionMode
+import lucuma.core.enums.GnirsWellDepth
 import lucuma.core.enums.Instrument
 import lucuma.core.math.Angle
 import lucuma.core.math.units.PixelScale
@@ -90,7 +91,7 @@ object DaytimeCalibrationService:
               sets  <- session.prepareR(Statements.selectSets(nel)).use(_.stream(nel, 1024).compile.toList)
             yield
               val byObs = sets.groupMap(_._1)(_._2)
-              insts.map((oid, inst, res) => oid -> Config(inst, byObs.getOrElse(oid, Nil), res)).toMap
+              insts.map((oid, inst, res, wd) => oid -> Config(inst, byObs.getOrElse(oid, Nil), res, wd)).toMap
 
       private def insertSets(
         oid:  Observation.Id,
@@ -113,7 +114,7 @@ object DaytimeCalibrationService:
         (for
           widths <- ResultT(validateMasks(input.instrument, input.sets, which))
           sets   <- ResultT(resolveSlitWidths(input.sets, widths).pure[F])
-          _      <- ResultT(insertUnchecked(Config(input.instrument, sets, input.ghostResolutionMode), which))
+          _      <- ResultT(insertUnchecked(Config(input.instrument, sets, input.ghostResolutionMode, input.gnirsWellDepth), which))
         yield ()).value
 
       private def validateMasks(
@@ -154,7 +155,12 @@ object DaytimeCalibrationService:
           session.prepareR(Statements.Insert).use: ps =>
             which
               .traverse: oid =>
-                ps.execute((oid, input.instrument, Config.ghostResolutionModeFor(input.instrument, input.ghostResolutionMode))).flatMap:
+                ps.execute((
+                  oid,
+                  input.instrument,
+                  Config.ghostResolutionModeFor(input.instrument, input.ghostResolutionMode),
+                  Config.gnirsWellDepthFor(input.instrument, input.gnirsWellDepth)
+                )).flatMap:
                   case Completion.Insert(1) => insertSets(oid, input.sets).as(Result.unit)
                   case other                => Result.failure(s"Expected single insert, got $other.").pure
               .map(_.sequenceVoid)
@@ -183,13 +189,13 @@ object DaytimeCalibrationService:
             s"Cannot change the calibration sets of a daytime calibration with a stored sequence (${materialized.mkString(", ")}). Delete the sequence first.".some
           ).asFailure
 
-      // The resolution mode is saved with the sequence, so a stored sequence freezes it.
-      private def checkResolutionNotMaterialized(oids: List[Observation.Id]): F[Result[Unit]] =
+      // An instrument setting is saved with the sequence, so a stored sequence freezes it.
+      private def checkSettingNotMaterialized(setting: String, oids: List[Observation.Id]): F[Result[Unit]] =
         NonEmptyList.fromList(oids).fold(Result.unit.pure[F]): nel =>
           session.execute(Statements.selectMaterialized(nel))(nel).map: materialized =>
             if materialized.isEmpty then Result.unit
             else OdbError.InvalidArgument(
-              s"Cannot change the GHOST resolution mode of a daytime calibration with a stored sequence (${materialized.mkString(", ")}). Delete the sequence first.".some
+              s"Cannot change the $setting of a daytime calibration with a stored sequence (${materialized.mkString(", ")}). Delete the sequence first.".some
             ).asFailure
 
       override def update(
@@ -205,9 +211,10 @@ object DaytimeCalibrationService:
                 val setsCheck = CalibrationSetInput.instrumentMismatch(inst, sets).fold(Result.unit): m =>
                   OdbError.InvalidArgument(m.some).asFailure
                 val ghostCheck = DaytimeCalibrationInput.validateGhost(inst, SET.ghostResolutionMode).asValidation
-                (setsCheck, ghostCheck).parTupled.void
+                val gnirsCheck = DaytimeCalibrationInput.validateGnirs(inst, SET.gnirsWellDepth).asValidation
+                (setsCheck, ghostCheck, gnirsCheck).parTupled.void
 
-            // An instrument switch to or from GHOST changes it too.
+            // An instrument switch to or from the setting's instrument changes it too.
             val resolutionChanged: List[Observation.Id] =
               existing.toList.collect:
                 case (oid, config) if Config.ghostResolutionModeFor(
@@ -215,8 +222,18 @@ object DaytimeCalibrationService:
                   SET.ghostResolutionMode.orElse(config.ghostResolutionMode)
                 ) =!= config.ghostResolutionMode => oid
 
-            val resolutionMaterialized: F[Result[Unit]] =
-              checkResolutionNotMaterialized(resolutionChanged)
+            val wellDepthChanged: List[Observation.Id] =
+              existing.toList.collect:
+                case (oid, config) if Config.gnirsWellDepthFor(
+                  SET.instrument.getOrElse(config.instrument),
+                  SET.gnirsWellDepth.orElse(config.gnirsWellDepth)
+                ) =!= config.gnirsWellDepth => oid
+
+            val settingsMaterialized: F[Result[Unit]] =
+              (
+                checkSettingNotMaterialized("GHOST resolution mode", resolutionChanged),
+                checkSettingNotMaterialized("GNIRS well depth", wellDepthChanged)
+              ).mapN((a, b) => (a, b).parTupled.void)
 
             val materialized: F[Result[Unit]] =
               if SET.sets.isDefined then checkNotMaterialized(oids) else Result.unit.pure
@@ -230,8 +247,8 @@ object DaytimeCalibrationService:
                 .map(_.sequence)
 
             val updateInstrument: F[Unit] =
-              Option.when(SET.instrument.isDefined || SET.ghostResolutionMode.isDefined)(()).traverse_ : _ =>
-                val af = Statements.updateMode(SET.instrument, SET.ghostResolutionMode, oids)
+              Option.when(SET.instrument.isDefined || SET.ghostResolutionMode.isDefined || SET.gnirsWellDepth.isDefined)(()).traverse_ : _ =>
+                val af = Statements.updateMode(SET.instrument, SET.ghostResolutionMode, SET.gnirsWellDepth, oids)
                 session.prepareR(af.fragment.command).use(_.execute(af.argument)).void
 
             def replaceSets(resolved: Option[List[CalibrationSet[InstrumentSetup]]]): F[Unit] =
@@ -242,7 +259,7 @@ object DaytimeCalibrationService:
             (for
               _ <- ResultT(checks.pure)
               _ <- ResultT(materialized)
-              _ <- ResultT(resolutionMaterialized)
+              _ <- ResultT(settingsMaterialized)
               s <- ResultT(resolved)
               _ <- ResultT.liftF(updateInstrument *> replaceSets(s))
             yield ()).value
@@ -310,17 +327,18 @@ object DaytimeCalibrationService:
         case (k, n, g, None, None, None, None, None, Some(gh))    => CalibrationSet(k, n, g, InstrumentSetup.Ghost(gh)).asRight
         case _                                                    => "Calibration set without exactly one instrument setup".asLeft
 
-    def selectInstrument[A <: NonEmptyList[Observation.Id]](a: A): Query[a.type, (Observation.Id, Instrument, Option[GhostResolutionMode])] =
+    def selectInstrument[A <: NonEmptyList[Observation.Id]](a: A): Query[a.type, (Observation.Id, Instrument, Option[GhostResolutionMode], Option[GnirsWellDepth])] =
       sql"""
         SELECT
           c_observation_id,
           c_instrument,
-          c_ghost_resolution_mode
+          c_ghost_resolution_mode,
+          c_gnirs_well_depth
         FROM
           t_daytime_calibration
         WHERE
           c_observation_id IN (${observation_id.nel(a)})
-      """.query(observation_id *: instrument *: ghost_resolution_mode.opt)
+      """.query(observation_id *: instrument *: ghost_resolution_mode.opt *: gnirs_well_depth.opt)
 
     def selectSets[A <: NonEmptyList[Observation.Id]](a: A): Query[a.type, (Observation.Id, CalibrationSet[InstrumentSetup])] =
       sql"""
@@ -354,16 +372,18 @@ object DaytimeCalibrationService:
         ORDER BY s.c_observation_id, s.c_position
       """.query(observation_id *: calibration_set)
 
-    val Insert: Command[(Observation.Id, Instrument, Option[GhostResolutionMode])] =
+    val Insert: Command[(Observation.Id, Instrument, Option[GhostResolutionMode], Option[GnirsWellDepth])] =
       sql"""
         INSERT INTO t_daytime_calibration (
           c_observation_id,
           c_instrument,
-          c_ghost_resolution_mode
+          c_ghost_resolution_mode,
+          c_gnirs_well_depth
         ) VALUES (
           $observation_id,
           $instrument,
-          ${ghost_resolution_mode.opt}
+          ${ghost_resolution_mode.opt},
+          ${gnirs_well_depth.opt}
         )
       """.command
 
@@ -455,10 +475,11 @@ object DaytimeCalibrationService:
         WHERE c_observation_id IN (${observation_id.nel(a)})
       """.command
 
-    // A GHOST row always holds a resolution mode and no other row does.
+    // A GHOST row always holds a resolution mode and a GNIRS row a well depth; no other row does.
     def updateMode(
       inst: Option[Instrument],
       res:  Option[GhostResolutionMode],
+      wd:   Option[GnirsWellDepth],
       oids: NonEmptyList[Observation.Id]
     ): AppliedFragment =
       sql"""
@@ -467,9 +488,13 @@ object DaytimeCalibrationService:
             c_ghost_resolution_mode =
               CASE WHEN COALESCE(${instrument.opt}, c_instrument) = 'Ghost'
                    THEN COALESCE(${ghost_resolution_mode.opt}, c_ghost_resolution_mode, 'standard')
+              END,
+            c_gnirs_well_depth      =
+              CASE WHEN COALESCE(${instrument.opt}, c_instrument) = 'Gnirs'
+                   THEN COALESCE(${gnirs_well_depth.opt}, c_gnirs_well_depth, 'Shallow')
               END
         WHERE c_observation_id IN (${observation_id.nel(oids)})
-      """(inst, inst, res, oids)
+      """(inst, inst, res, inst, wd, oids)
 
     def selectMaterialized[A <: NonEmptyList[Observation.Id]](a: A): Query[a.type, Observation.Id] =
       sql"""

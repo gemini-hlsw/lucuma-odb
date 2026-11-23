@@ -28,6 +28,7 @@ import lucuma.core.enums.Breakpoint
 import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.CloneSequenceMode
 import lucuma.core.enums.GhostResolutionMode
+import lucuma.core.enums.GnirsWellDepth
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
@@ -1119,7 +1120,8 @@ object SequenceService:
         namespace:          Option[UUID] = None
       )(using Transaction[F]): F[Result[Stream[Pure, Atom[GnirsDynamicConfig]]]] =
         (for
-          s <- staticFor(observationId, Instrument.Gnirs, DaytimeStatics.Gnirs)(selectStatic(observationId, "GNIRS", gnirsSequenceService.selectStaticOrDefault))
+          w <- ResultT.liftF(session.option(Statements.SelectDaytimeGnirsWellDepth)(observationId))
+          s <- staticFor(observationId, Instrument.Gnirs, DaytimeConfig(Instrument.Gnirs, Nil, gnirsWellDepth = w.flatten).gnirsStatic)(selectStatic(observationId, "GNIRS", gnirsSequenceService.selectStaticOrDefault))
           b <- ResultT.liftF(atomBuilder(sequenceType, s, namespace, estimator.gnirsStep))
           r <- replaceSequence(
                  Instrument.Gnirs,
@@ -1672,6 +1674,13 @@ object SequenceService:
           FROM t_daytime_calibration
          WHERE c_observation_id = $observation_id
       """.query(ghost_resolution_mode.opt)
+
+    val SelectDaytimeGnirsWellDepth: Query[Observation.Id, Option[GnirsWellDepth]] =
+      sql"""
+        SELECT c_gnirs_well_depth
+          FROM t_daytime_calibration
+         WHERE c_observation_id = $observation_id
+      """.query(gnirs_well_depth.opt)
 
     val AbandonAndDeleteUnexecuted: Command[(Observation.Id, SequenceType)] =
       sql"""
