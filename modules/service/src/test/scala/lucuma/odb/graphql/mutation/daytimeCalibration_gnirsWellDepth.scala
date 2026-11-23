@@ -24,6 +24,7 @@ import lucuma.core.enums.GnirsPixelScale
 import lucuma.core.enums.GnirsPrism
 import lucuma.core.enums.GnirsWellDepth
 import lucuma.core.enums.SequenceType
+import lucuma.core.enums.SmartGcalType
 import lucuma.core.math.BoundedInterval
 import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
@@ -38,7 +39,7 @@ import lucuma.odb.smartgcal.data.SmartGcalValue
 import lucuma.odb.smartgcal.data.SmartGcalValue.LegacyInstrumentConfig
 import skunk.Session
 
-class daytimeCalibration_gnirsWellDepth extends OdbSuite with DatabaseOperations with DaytimeCalibrationOps:
+class daytimeCalibration_gnirsWellDepth extends OdbSuite with DatabaseOperations with DaytimeCalibrationOps with InsertSmartGcalOps:
 
   val staff       = TestUsers.Standard.staff(3, 103)
   val serviceUser = TestUsers.service(4)
@@ -260,6 +261,44 @@ class daytimeCalibration_gnirsWellDepth extends OdbSuite with DatabaseOperations
       gid <- create(pid, "{ instrument: GMOS_NORTH }")
       _   <- enterEmptySequence(gid, "replaceGmosNorthSequence")
       _   <- expectRejected(updateQuery(gid, "{ instrument: GNIRS }"), frozen)
+    yield ()
+
+  private val longSlitDarkStep: String =
+    """
+      {
+        instrumentConfig: {
+          exposure: { seconds: 1 }
+          coadds: 1
+          filter: ORDER3
+          decker: SHORT_CAM_LONG_SLIT
+          fpuSlit: LONG_SLIT_0_30
+          acquisitionMirrorOut: { prism: MIRROR, grating: D32, wavelength: { micrometers: 2.2 } }
+          camera: SHORT_BLUE
+          readMode: BRIGHT
+        }
+        stepConfig: { dark: true }
+        observeClass: DAY_CAL
+      }
+    """
+
+  private def insertedFlats(daytimeCalibration: String): IO[Int] =
+    for
+      pid <- createProgramAs(staff)
+      oid <- create(pid, daytimeCalibration)
+      _   <- query(staff, s"""
+        mutation {
+          replaceGnirsSequence(input: ${input(oid, SequenceType.Science, atomInput("Darks", longSlitDarkStep))}) {
+            sequence { description }
+          }
+        }
+      """)
+      ids <- insertReturningIdsAs(staff, oid, List(SmartGcalType.Flat))
+    yield ids.size
+
+  test("a Smart GCAL step inserted into a hand-entered sequence uses it"):
+    for
+      _ <- assertIO(insertedFlats("{ instrument: GNIRS }"), 1)
+      _ <- assertIO(insertedFlats("{ instrument: GNIRS, gnirs: { wellDepth: DEEP } }"), 3)
     yield ()
 
   test("a clone keeps it"):

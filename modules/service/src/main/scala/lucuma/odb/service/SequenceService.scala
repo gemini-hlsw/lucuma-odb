@@ -876,9 +876,14 @@ object SequenceService:
           case Some(i)                     => ResultT(OdbError.InvalidArgument(s"Observation $observationId is a ${i.longName} daytime calibration.".some).asFailureF)
           case None                        => select
 
-      private def daytimeGnirsStatic(observationId: Observation.Id): F[GnirsStaticConfig] =
-        session.option(Statements.SelectDaytimeGnirsWellDepth)(observationId).map: w =>
-          DaytimeConfig(Instrument.Gnirs, Nil, gnirsWellDepth = w.flatten).gnirsStatic
+      private def gnirsStaticFor(
+        observationId: Observation.Id
+      )(using Transaction[F]): ResultT[F, GnirsStaticConfig] =
+        val daytime: F[GnirsStaticConfig] =
+          session.option(Statements.SelectDaytimeGnirsWellDepth)(observationId).map: w =>
+            DaytimeConfig(Instrument.Gnirs, Nil, gnirsWellDepth = w.flatten).gnirsStatic
+        staticForF(observationId, Instrument.Gnirs, daytime):
+          selectStatic(observationId, "GNIRS", gnirsSequenceService.selectStaticOrDefault)
 
       private def ghostStaticFor(
         observationId: Observation.Id
@@ -1124,7 +1129,7 @@ object SequenceService:
         namespace:          Option[UUID] = None
       )(using Transaction[F]): F[Result[Stream[Pure, Atom[GnirsDynamicConfig]]]] =
         (for
-          s <- staticForF(observationId, Instrument.Gnirs, daytimeGnirsStatic(observationId))(selectStatic(observationId, "GNIRS", gnirsSequenceService.selectStaticOrDefault))
+          s <- gnirsStaticFor(observationId)
           b <- ResultT.liftF(atomBuilder(sequenceType, s, namespace, estimator.gnirsStep))
           r <- replaceSequence(
                  Instrument.Gnirs,
@@ -1654,7 +1659,7 @@ object SequenceService:
                 case Instrument.Igrins2    =>
                   insert(o, selectStatic(observationId, "IGRINS-2", igrins2SequenceService.selectStaticOrDefault), Statements.Igrins2Table, estimator.igrins2Step, expanders.igrins2, Igrins2SequenceService.Statements.insertDynamics)
                 case Instrument.Gnirs      =>
-                  insert(o, selectStatic(observationId, "GNIRS", gnirsSequenceService.selectStaticOrDefault), Statements.GnirsTable, estimator.gnirsStep, expanders.gnirs, GnirsSequenceService.Statements.insertDynamics)
+                  insert(o, gnirsStaticFor(observationId), Statements.GnirsTable, estimator.gnirsStep, expanders.gnirs, GnirsSequenceService.Statements.insertDynamics)
                 case i                     =>
                   ResultT(OdbError.InvalidArgument(s"Smart GCAL steps cannot be inserted into a ${i.longName} sequence.".some).asFailureF)
             case None    =>
