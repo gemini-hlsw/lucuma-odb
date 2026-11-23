@@ -10,6 +10,8 @@ import io.circe.testing.ArbitraryInstances
 import io.circe.testing.CodecTests
 import lucuma.core.enums.ExecutionState
 import lucuma.core.enums.ObserveClass
+import lucuma.core.enums.ScorpioChannelSelection
+import lucuma.core.enums.ScorpioFpu
 import lucuma.core.enums.StepGuideState
 import lucuma.core.math.Offset
 import lucuma.core.model.sequence.Atom
@@ -37,11 +39,18 @@ import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.model.sequence.gmos.StaticConfig
 import lucuma.core.model.sequence.gmos.arb.ArbDynamicConfig
 import lucuma.core.model.sequence.gmos.arb.ArbStaticConfig
+import lucuma.core.model.sequence.scorpio.ScorpioDynamicConfig
+import lucuma.core.model.sequence.scorpio.ScorpioFpuMask
+import lucuma.core.model.sequence.scorpio.ScorpioStaticConfig
+import lucuma.core.model.sequence.scorpio.arb.ArbScorpioDynamicConfig
+import lucuma.core.util.arb.ArbEnumerated.given
 import lucuma.core.util.arb.ArbGid
 import lucuma.refined.*
 import munit.DisciplineSuite
 import org.scalacheck.Arbitrary
+import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Cogen
+import org.scalacheck.Gen
 
 import scala.collection.immutable.SortedSet
 
@@ -53,12 +62,33 @@ class SequenceSuite extends DisciplineSuite with ArbitraryInstances:
   import ArbGid.given
   import ArbExecutionConfig.given
 
-  // SCORPIO has no sequence codec yet.
+  // The SCORPIO codec covers only the visible channels and the long slit.
+  private val scorpioStatic: Arbitrary[ScorpioStaticConfig] =
+    Arbitrary(arbitrary[ScorpioChannelSelection].map(ScorpioStaticConfig(_)))
+
+  private val scorpioDynamic: Arbitrary[ScorpioDynamicConfig] =
+    import ArbScorpioDynamicConfig.given
+    Arbitrary:
+      for
+        d <- arbitrary[ScorpioDynamicConfig]
+        f <- arbitrary[ScorpioFpu]
+      yield d.copy(y = None, j = None, h = None, ks = None, fpu = ScorpioFpuMask.LongSlit(f))
+
+  private val scorpioExecutionConfig: Gen[InstrumentExecutionConfig] =
+    given Arbitrary[ScorpioStaticConfig]  = scorpioStatic
+    given Arbitrary[ScorpioDynamicConfig] = scorpioDynamic
+    arbitrary[ExecutionConfig[ScorpioStaticConfig, ScorpioDynamicConfig]]
+      .map(InstrumentExecutionConfig.Scorpio(_))
+
   given Arbitrary[InstrumentExecutionConfig] =
     Arbitrary:
-      ArbInstrumentExecutionConfig.given_Arbitrary_InstrumentExecutionConfig.arbitrary.filter:
-        case InstrumentExecutionConfig.Scorpio(_) => false
-        case _                                    => true
+      Gen.frequency(
+        6 -> ArbInstrumentExecutionConfig.given_Arbitrary_InstrumentExecutionConfig.arbitrary.filter:
+          case InstrumentExecutionConfig.Scorpio(_) => false
+          case _                                    => true
+        ,
+        1 -> scorpioExecutionConfig
+      )
 
   given Cogen[InstrumentExecutionConfig] = ArbInstrumentExecutionConfig.given_Cogen_InstrumentExecutionConfig
   import ArbExecutionDigest.given

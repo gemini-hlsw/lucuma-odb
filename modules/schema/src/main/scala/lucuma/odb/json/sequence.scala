@@ -301,6 +301,7 @@ trait SequenceCodec {
   import lucuma.odb.json.gmos.given
   import lucuma.odb.json.gnirs.given
   import lucuma.odb.json.igrins2.given
+  import lucuma.odb.json.scorpio.given
 
   private def rootDecoder[R, S: Decoder, D: Decoder](instrumentExecutionConfig: ExecutionConfig[S, D] => R): Decoder[R] =
     Decoder.instance { _.as[ExecutionConfig[S, D]].map(instrumentExecutionConfig) }
@@ -322,6 +323,9 @@ trait SequenceCodec {
 
   given Decoder[InstrumentExecutionConfig.Igrins2] =
     rootDecoder(InstrumentExecutionConfig.Igrins2.apply)
+
+  given Decoder[InstrumentExecutionConfig.Scorpio] =
+    rootDecoder(InstrumentExecutionConfig.Scorpio.apply)
 
   given Decoder[InstrumentExecutionConfig.Visitor] = hc =>
     hc.downField("instrument").as[Instrument].map(InstrumentExecutionConfig.Visitor.apply)
@@ -349,6 +353,9 @@ trait SequenceCodec {
   given (using Encoder[Offset], Encoder[TimeSpan], Encoder[Wavelength]): Encoder[InstrumentExecutionConfig.Igrins2] =
     rootEncoder(_.executionConfig)
 
+  given (using Encoder[Offset], Encoder[TimeSpan]): Encoder[InstrumentExecutionConfig.Scorpio] =
+    rootEncoder(_.executionConfig)
+
   given Encoder[InstrumentExecutionConfig.Visitor] = v =>
     Json.obj("instrument" -> v.visitorInstrument.asJson)
 
@@ -364,6 +371,7 @@ trait SequenceCodec {
         case Some(Instrument.GmosSouth)    => c.downField("gmosSouth").as[InstrumentExecutionConfig.GmosSouth]
         case Some(Instrument.Gnirs)        => c.downField("gnirs").as[InstrumentExecutionConfig.Gnirs]
         case Some(Instrument.Igrins2)      => c.downField("igrins2").as[InstrumentExecutionConfig.Igrins2]
+        case Some(Instrument.Scorpio)      => c.downField("scorpio").as[InstrumentExecutionConfig.Scorpio]
         case Some(i) if Instrument.visitorInstruments(i) =>
           InstrumentExecutionConfig.Visitor(i).asRight
         case Some(i)                                     =>
@@ -379,6 +387,7 @@ trait SequenceCodec {
         "gmosSouth"  -> Json.Null, // one of these may be replaced
         "gnirs"      -> Json.Null, // one of these may be replaced
         "igrins2"    -> Json.Null, // one of these may be replaced
+        "scorpio"    -> Json.Null, // one of these may be replaced
         a match
           case InstrumentExecutionConfig.Exchange        => "instrument" -> Json.Null // no exchange instance
           case i@InstrumentExecutionConfig.Flamingos2(_) => "flamingos2" -> i.asJson
@@ -387,7 +396,7 @@ trait SequenceCodec {
           case i@InstrumentExecutionConfig.GmosSouth(_)  => "gmosSouth"  -> i.asJson
           case i@InstrumentExecutionConfig.Gnirs(_)      => "gnirs"      -> i.asJson
           case i@InstrumentExecutionConfig.Igrins2(_)    => "igrins2"    -> i.asJson
-          case InstrumentExecutionConfig.Scorpio(_)      => "instrument" -> Instrument.Scorpio.asJson // no SCORPIO sequence codec yet
+          case i@InstrumentExecutionConfig.Scorpio(_)    => "scorpio"    -> i.asJson
           case InstrumentExecutionConfig.Visitor(vi)     => "instrument" -> vi.asJson  // no visitor instance
       )
 

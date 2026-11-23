@@ -17,6 +17,7 @@ import lucuma.odb.util.Flamingos2Codecs.flamingos_2_acquisition_type
 import lucuma.odb.util.GhostCodecs.ghost_ifu_mapping_type
 import lucuma.odb.util.GmosCodecs.*
 import lucuma.odb.util.GnirsCodecs.*
+import lucuma.odb.util.ScorpioCodecs.*
 import org.typelevel.log4cats.Logger
 import skunk.Session
 import skunk.codec.numeric.int2
@@ -107,6 +108,9 @@ object StartupDiagnostics:
           checkPostgresEnum(program_user_role),
           checkPostgresEnum(science_band),
           checkPostgresEnum(science_subtype),
+          checkPostgresEnum(scorpio_channel_selection),
+          checkPostgresEnum(scorpio_disperser),
+          checkPostgresEnum(scorpio_vis_readout_mode),
           checkPostgresEnum(sequence_command),
           checkPostgresEnum(sequence_type),
           checkPostgresEnum(site),

@@ -226,7 +226,9 @@ object OdbMapping {
           with Flamingos2StaticMapping[F]
           with Igrins2DynamicMapping[F]
           with Igrins2LongSlitMapping[F]
+          with ScorpioDynamicMapping[F]
           with ScorpioLongSlitMapping[F]
+          with ScorpioStaticMapping[F]
           with GnirsImagingMapping[F]
           with GnirsSpectroscopyMapping[F]
           with ArchiveDuplicationMapping[F]
@@ -519,6 +521,7 @@ object OdbMapping {
                 GroupElementMapping,
                 Igrins2LongSlitMapping,
                 ScorpioLongSlitMapping,
+                ScorpioStaticMapping,
                 Igrins2StaticMapping,
                 GnirsSpectroscopyAcquisitionMapping,
                 GnirsSpectroscopyMapping,
@@ -721,6 +724,7 @@ object OdbMapping {
                 GmosSouthFpuMappings,
                 GmosSouthGratingConfigMappings,
                 Igrins2DynamicMappings,
+                ScorpioDynamicMappings,
                 LeafMappings,
                 ObservationSelectResultMappings,
                 ObservationTimeEstimateMappings,

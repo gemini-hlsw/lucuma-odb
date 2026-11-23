@@ -25,6 +25,7 @@ import table.GhostDynamicTable
 import table.GmosDynamicTables
 import table.GnirsDynamicView
 import table.Igrins2DynamicTable
+import table.ScorpioDynamicView
 import table.StepRecordView
 import table.VisitTable
 
@@ -37,6 +38,7 @@ trait StepRecordMapping[F[_]] extends StepRecordView[F]
                                  with GmosDynamicTables[F]
                                  with GnirsDynamicView[F]
                                  with Igrins2DynamicTable[F]
+                                 with ScorpioDynamicView[F]
                                  with Predicates[F]
                                  with SelectSubquery
                                  with VisitTable[F] {
@@ -70,7 +72,8 @@ trait StepRecordMapping[F[_]] extends StepRecordView[F]
       SqlObject("gmosNorth",      Join(StepRecordView.Id, GmosNorthDynamicTable.Id)),
       SqlObject("gmosSouth",      Join(StepRecordView.Id, GmosSouthDynamicTable.Id)),
       SqlObject("igrins2",        Join(StepRecordView.Id, Igrins2DynamicTable.Id)),
-      SqlObject("gnirs",          Join(StepRecordView.Id, GnirsDynamicView.Id))
+      SqlObject("gnirs",          Join(StepRecordView.Id, GnirsDynamicView.Id)),
+      SqlObject("scorpio",        Join(StepRecordView.Id, ScorpioDynamicView.Id))
     )
 
   lazy val StepRecordElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
