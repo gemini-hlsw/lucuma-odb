@@ -8,6 +8,9 @@ UPDATE t_daytime_calibration
    SET c_ghost_resolution_mode = 'standard'
  WHERE c_instrument = 'Ghost';
 
+-- Run the deferred triggers the update queued, or the ALTER TABLE below fails.
+SET CONSTRAINTS ALL IMMEDIATE;
+
 ALTER TABLE t_daytime_calibration
   ADD CONSTRAINT t_daytime_calibration_ghost_resolution_mode_check
     CHECK ((c_ghost_resolution_mode IS NOT NULL) = (c_instrument = 'Ghost'));
