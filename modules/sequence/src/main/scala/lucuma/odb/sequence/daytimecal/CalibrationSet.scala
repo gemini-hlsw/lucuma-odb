@@ -12,6 +12,7 @@ import lucuma.core.enums.CalibrationSetType
 import lucuma.core.enums.Flamingos2CustomSlitWidth
 import lucuma.core.enums.GmosCustomSlitWidth
 import lucuma.core.math.Angle
+import lucuma.core.math.units.PixelScale
 import lucuma.core.model.MaskDefinition
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
@@ -87,17 +88,16 @@ enum InstrumentSetup:
   /**
    * The setup with its custom mask slit width set to the allowed width nearest
    * the given one, or None if it has no custom mask or the width cannot be
-   * expressed.  Flamingos 2 widths are in pixels, hence the pixel scale, in
-   * arcseconds per pixel.  `Other` is never chosen: it has no Smart GCAL
-   * equivalent.
+   * expressed.  Flamingos 2 widths are in pixels, hence the pixel scale.
+   * `Other` is never chosen: it has no Smart GCAL equivalent.
    */
-  def withNearestCustomSlitWidth(width: Angle, pixelScale: BigDecimal): Option[InstrumentSetup] =
+  def withNearestCustomSlitWidth(width: Angle, pixelScale: PixelScale): Option[InstrumentSetup] =
     def gmos: GmosCustomSlitWidth =
       GmosCustomSlitWidth.values.minBy(w => (w.width.toMicroarcseconds - width.toMicroarcseconds).abs)
 
     def flamingos2: Option[Flamingos2CustomSlitWidth] =
-      Option.when(pixelScale > 0):
-        val pixels = BigDecimal(width.toMicroarcseconds) / 1_000_000 / pixelScale
+      Option.when(pixelScale.value > 0):
+        val pixels = BigDecimal(width.toMicroarcseconds) / 1_000_000 / pixelScale.value
         InstrumentSetup.Flamingos2PixelWidths.minBy((n, _) => (pixels - n).abs)._2
 
     this match

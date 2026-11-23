@@ -11,6 +11,8 @@ import grackle.Result
 import grackle.syntax.*
 import lucuma.core.enums.Instrument
 import lucuma.core.math.Angle
+import lucuma.core.math.syntax.units.*
+import lucuma.core.math.units.PixelScale
 import lucuma.core.model.Attachment
 import lucuma.core.model.Defined
 import lucuma.core.model.MaskDefinition
@@ -52,14 +54,13 @@ trait AttachmentMetadataService [F[_]] {
    * Checks the custom masks of a daytime calibration's sets or steps: each
    * must name a MOS mask attachment cut for the instrument, in the program
    * of the given observations.  Gives the mean science slit width and the
-   * pixel scale, in arcseconds per pixel, of each mask whose design records
-   * both.
+   * pixel scale of each mask whose design records both.
    */
   def validateDaytimeMasks(
     instrument: Instrument,
     masks:      List[MaskDefinition],
     which:      List[Observation.Id]
-  )(using Transaction[F]): F[Result[Map[Attachment.Id, (Angle, BigDecimal)]]]
+  )(using Transaction[F]): F[Result[Map[Attachment.Id, (Angle, PixelScale)]]]
 }
 
 object AttachmentMetadataService {
@@ -122,7 +123,7 @@ object AttachmentMetadataService {
         instrument: Instrument,
         masks:      List[MaskDefinition],
         which:      List[Observation.Id]
-      )(using Transaction[F]): F[Result[Map[Attachment.Id, (Angle, BigDecimal)]]] =
+      )(using Transaction[F]): F[Result[Map[Attachment.Id, (Angle, PixelScale)]]] =
         def invalid[A](msg: String): Result[A] =
           OdbError.InvalidArgument(msg.some).asFailure
 
@@ -192,9 +193,9 @@ object AttachmentMetadataService {
       which.map(sql"$observation_id".apply).intercalate(void", ") |+|
       void")"
 
-    val MaskRow: Decoder[(Attachment.Id, NonEmptyString, Instrument, Boolean, Option[(Angle, BigDecimal)])] =
+    val MaskRow: Decoder[(Attachment.Id, NonEmptyString, Instrument, Boolean, Option[(Angle, PixelScale)])] =
       (attachment_id *: text_nonempty *: instrument *: bool *: int8.opt *: numeric.opt)
-        .map((aid, name, inst, own, µas, scale) => (aid, name, inst, own, (µas.map(Angle.fromMicroarcseconds), scale).tupled))
+        .map((aid, name, inst, own, µas, scale) => (aid, name, inst, own, (µas.map(Angle.fromMicroarcseconds), scale.map(_.pixelScale)).tupled))
 
     // Every mask attachment carries a name and an instrument.  The fourth
     // column tells whether the mask is in the program of every observation.

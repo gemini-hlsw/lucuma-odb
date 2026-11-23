@@ -14,6 +14,7 @@ import lucuma.core.enums.CalibrationSetType
 import lucuma.core.enums.GcalArc
 import lucuma.core.enums.Instrument
 import lucuma.core.math.Angle
+import lucuma.core.math.units.PixelScale
 import lucuma.core.model.Attachment
 import lucuma.core.model.Defined
 import lucuma.core.model.Observation
@@ -117,13 +118,13 @@ object DaytimeCalibrationService:
         instrument: Instrument,
         sets:       List[CalibrationSetInput],
         which:      List[Observation.Id]
-      )(using Transaction[F]): F[Result[Map[Attachment.Id, (Angle, BigDecimal)]]] =
+      )(using Transaction[F]): F[Result[Map[Attachment.Id, (Angle, PixelScale)]]] =
         attachmentMetadataService.validateDaytimeMasks(instrument, sets.flatMap(_.set.setup.customMask), which)
 
       // A custom mask entered without a slit width takes the width of its mask.
       private def resolveSlitWidths(
         sets:   List[CalibrationSetInput],
-        widths: Map[Attachment.Id, (Angle, BigDecimal)]
+        widths: Map[Attachment.Id, (Angle, PixelScale)]
       ): Result[List[CalibrationSet[InstrumentSetup]]] =
         def attachmentId(s: CalibrationSetInput): Option[Attachment.Id] =
           s.set.setup.customMask.collect { case Defined(aid) => aid }
