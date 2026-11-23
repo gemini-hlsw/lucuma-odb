@@ -863,17 +863,26 @@ object SequenceService:
         instrument:    Instrument,
         daytime:       S
       )(select: => ResultT[F, S]): ResultT[F, S] =
+        staticForF(observationId, instrument, daytime.pure[F])(select)
+
+      private def staticForF[S](
+        observationId: Observation.Id,
+        instrument:    Instrument,
+        daytime:       F[S]
+      )(select: => ResultT[F, S]): ResultT[F, S] =
         ResultT.liftF(selectDaytimeCalibration(observationId)).flatMap:
-          case Some(i) if i === instrument => ResultT.pure(daytime)
+          case Some(i) if i === instrument => ResultT.liftF(daytime)
           case Some(i)                     => ResultT(OdbError.InvalidArgument(s"Observation $observationId is a ${i.longName} daytime calibration.".some).asFailureF)
           case None                        => select
 
       private def ghostStaticFor(
         observationId: Observation.Id
       )(using Transaction[F]): ResultT[F, GhostStaticConfig] =
-        ResultT.liftF(session.option(Statements.SelectDaytimeGhostResolutionMode)(observationId)).flatMap: res =>
-          staticFor(observationId, Instrument.Ghost, DaytimeConfig(Instrument.Ghost, Nil, res.flatten).ghostStatic):
-            ResultT(selectOrComputeGhostStatic(observationId).map(e => Result.fromEither(e.leftMap(_.asProblem))))
+        val daytime: F[GhostStaticConfig] =
+          session.option(Statements.SelectDaytimeGhostResolutionMode)(observationId).map: res =>
+            DaytimeConfig(Instrument.Ghost, Nil, res.flatten).ghostStatic
+        staticForF(observationId, Instrument.Ghost, daytime):
+          ResultT(selectOrComputeGhostStatic(observationId).map(e => Result.fromEither(e.leftMap(_.asProblem))))
 
       private def selectStatic[S](
         observationId: Observation.Id,

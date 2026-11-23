@@ -27,6 +27,7 @@ import lucuma.core.model.sequence.gnirs.GnirsDynamicConfig
 import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
+import lucuma.odb.graphql.binding.Matcher.asValidation
 import lucuma.odb.graphql.input.CalibrationSetInput
 import lucuma.odb.graphql.input.DaytimeCalibrationInput
 import lucuma.odb.graphql.input.GmosCustomMaskInput
@@ -203,15 +204,16 @@ object DaytimeCalibrationService:
                 val sets = SET.sets.fold(config.sets)(_.map(_.set))
                 val setsCheck = CalibrationSetInput.instrumentMismatch(inst, sets).fold(Result.unit): m =>
                   OdbError.InvalidArgument(m.some).asFailure
-                val ghostCheck =
-                  if SET.ghostResolutionMode.isEmpty || inst === Instrument.Ghost then Result.unit
-                  else OdbError.InvalidArgument(DaytimeCalibrationInput.GhostNotAllowed.some).asFailure
+                val ghostCheck = DaytimeCalibrationInput.validateGhost(inst, SET.ghostResolutionMode).asValidation
                 (setsCheck, ghostCheck).parTupled.void
 
+            // An instrument switch to or from GHOST changes it too.
             val resolutionChanged: List[Observation.Id] =
-              SET.ghostResolutionMode.toList.flatMap: res =>
-                existing.toList.collect:
-                  case (oid, config) if config.ghostResolutionMode.exists(_ =!= res) => oid
+              existing.toList.collect:
+                case (oid, config) if Config.ghostResolutionModeFor(
+                  SET.instrument.getOrElse(config.instrument),
+                  SET.ghostResolutionMode.orElse(config.ghostResolutionMode)
+                ) =!= config.ghostResolutionMode => oid
 
             val resolutionMaterialized: F[Result[Unit]] =
               checkResolutionNotMaterialized(resolutionChanged)

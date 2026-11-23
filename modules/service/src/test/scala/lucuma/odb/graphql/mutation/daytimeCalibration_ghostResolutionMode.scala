@@ -144,6 +144,15 @@ class daytimeCalibration_ghostResolutionMode extends OdbSuite with DatabaseOpera
       }
     """).void
 
+  private def enterEmptySequence(oid: Observation.Id, mutation: String): IO[Unit] =
+    query(staff, s"""
+      mutation {
+        $mutation(input: ${input(oid, SequenceType.Science)}) {
+          sequence { description }
+        }
+      }
+    """).void
+
   test("standard when not given"):
     for
       pid <- createProgramAs(staff)
@@ -215,8 +224,23 @@ class daytimeCalibration_ghostResolutionMode extends OdbSuite with DatabaseOpera
       oid <- create(pid, "{ instrument: GHOST, ghost: { resolutionMode: HIGH } }")
       _   <- enterSequence(oid)
       _   <- assertIO(staticResolutionMode(oid), "HIGH")
-      _   <- expectRejected(updateQuery(oid, "{ ghost: { resolutionMode: STANDARD } }"), "with a stored sequence")
+      _   <- expectRejected(updateQuery(oid, "{ ghost: { resolutionMode: STANDARD } }"), "Cannot change the observing mode")
       _   <- assertIO(resolutionMode(oid), Some("HIGH"))
+    yield ()
+
+  test("a materialized sequence without atoms freezes it"):
+    val frozen = "Cannot change the GHOST resolution mode"
+    for
+      pid <- createProgramAs(staff)
+      oid <- create(pid, "{ instrument: GHOST, ghost: { resolutionMode: HIGH } }")
+      _   <- enterEmptySequence(oid, "replaceGhostSequence")
+      _   <- expectRejected(updateQuery(oid, "{ ghost: { resolutionMode: STANDARD } }"), frozen)
+      _   <- expectRejected(updateQuery(oid, "{ instrument: GMOS_NORTH }"), frozen)
+      _   <- update(oid, "{ ghost: { resolutionMode: HIGH } }")
+      _   <- assertIO(resolutionMode(oid), Some("HIGH"))
+      gid <- create(pid, "{ instrument: GMOS_NORTH }")
+      _   <- enterEmptySequence(gid, "replaceGmosNorthSequence")
+      _   <- expectRejected(updateQuery(gid, "{ instrument: GHOST }"), frozen)
     yield ()
 
   test("a clone keeps it"):
