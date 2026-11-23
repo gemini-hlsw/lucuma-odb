@@ -6,11 +6,19 @@ package lucuma.odb.graphql
 import grackle.circe.CirceMappingLike
 import grackle.skunk.SkunkMapping
 import lucuma.odb.graphql.util.MappingExtras
+import lucuma.odb.util.Codecs.GidCodec
 
 trait BaseMapping[F[_]]
   extends SkunkMapping[F]
      with MappingExtras[F]
      with CirceMappingLike[F] {
+
+  // As text, ids stop sorting in the order of their numbers each time they gain a digit.
+  override def orderingToFragment(col: SqlColumn): Option[Fragment => Fragment] =
+    col.codec._1 match
+      case GidCodec(_) =>
+        Some((ref: Fragment) => Fragments.const("gid_index(") |+| ref |+| Fragments.const(")"))
+      case _           => None
 
   // TODO: auto-generate this
   lazy val AddConditionsEntryResultType            = schema.ref("AddConditionsEntryResult")
