@@ -219,6 +219,7 @@ trait Flamingos2FpuSyntax:
         case LongSlit4     => "LONGSLIT_4"
         case LongSlit6     => "LONGSLIT_6"
         case LongSlit8     => "LONGSLIT_8"
+        case BlankMask     => "PINHOLE"
 
 object flamingos2fpu extends Flamingos2FpuSyntax
 
