@@ -987,7 +987,22 @@ object ObscalcService:
       val upRetryAt      = void"c_retry_at      = " |+|
                            (if isRetry then void"now() + (interval '1 minute' * POWER(2, LEAST(c_failure_count, 5)))" else void"NULL")
 
-      val updates = upState :: upLastUpdate :: upFailureCount :: upRetryAt :: updatesForResult(result, basePosition, archiveStale)
+      // The executed science steps are counted from the database as the result
+      // is stored, so they go with the digest's remaining step count.  A step
+      // of this observation that finishes in the meantime re-invalidates it, so
+      // its state returns to 'pending'.  A step abandoned by another
+      // observation's visit is the exception: the visit only marks this
+      // observation (V1422), so until the mark is swept and the observation
+      // recalculated, which takes up to a poll period, the step may be counted
+      // both as executed and as remaining.
+      val upExecuted     = void"""
+        (c_sci_executed_successful_count, c_sci_executed_unsuccessful_count) = (
+          SELECT e.c_successful, e.c_unsuccessful
+            FROM executed_science_steps(t_obscalc.c_observation_id) e
+        )
+      """
+
+      val updates = upState :: upLastUpdate :: upFailureCount :: upRetryAt :: upExecuted :: updatesForResult(result, basePosition, archiveStale)
 
       void"UPDATE t_obscalc " |+|
         void"SET " |+| updates.intercalate(void", ") |+| void" " |+|

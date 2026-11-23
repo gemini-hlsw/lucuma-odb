@@ -9977,6 +9977,18 @@ type Execution {
   digest: CalculatedExecutionDigest
 
   """
+  The science sequence's steps of type SCIENCE that have been executed, by
+  outcome.  Calculated along with the `digest`, so that the executed count goes
+  with the remaining count in `digest.value.science.steps.science`: progress
+  through the sequence is `total` executed out of `total` plus remaining.
+  Acquisition steps and calibration steps (such as flats and arcs) are not
+  counted.  Observations without a sequence (for example visitor instrument
+  observations) have no executed steps.  Null, like `digest`, only if the
+  background calculation has no entry for the observation.
+  """
+  executedSteps: CalculatedExecutedSteps
+
+  """
   Determines the execution state as a whole of this observation.
   """
   executionState: ExecutionState!
@@ -10354,6 +10366,38 @@ type CalibrationEstimate {
   "Their estimated time, by charge class."
   time: CategorizedTime!
 
+}
+
+"""
+Steps that have been executed, by outcome.  A step counts once it has
+finished, however it finished.
+"""
+type ExecutedSteps {
+  """
+  Steps that completed or were stopped, and none of whose datasets has been
+  marked USABLE or FAIL (datasets not yet assessed count as passing).
+  """
+  successful: NonNegInt!
+
+  """
+  Steps that were aborted or abandoned, or that have a dataset marked USABLE or
+  FAIL.
+  """
+  unsuccessful: NonNegInt!
+
+  "All executed steps: `successful` plus `unsuccessful`."
+  total: NonNegInt!
+}
+
+"""
+Wraps ExecutedSteps with the background calculation state.
+"""
+type CalculatedExecutedSteps {
+  "Background calculation state, shared with the execution digest."
+  calculationState: CalculationState!
+
+  "The executed steps themselves."
+  value: ExecutedSteps!
 }
 
 """

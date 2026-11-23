@@ -58,6 +58,7 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
       SqlField("id", ObservationView.Id, key = true, hidden = true),
       SqlField("programId", ObservationView.ProgramId, hidden = true),
       EffectField("digest", digestHandler, List("id", "programId")),
+      SqlObject("executedSteps", Join(ObservationView.Id, ObscalcTable.ObservationId)),
       EffectField("executionState",  executionStateHandler, List("id")),
       SqlObject("atomRecords"),
       SqlObject("datasets"),
