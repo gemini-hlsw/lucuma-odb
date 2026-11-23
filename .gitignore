@@ -87,7 +87,9 @@ TODO.md
 TASK.md
 TASK_*.md
 *_TASK.md
-.claude/
+!.claude/
+.claude/*
+!.claude/skills/
 
 *.bkp
 .pi/

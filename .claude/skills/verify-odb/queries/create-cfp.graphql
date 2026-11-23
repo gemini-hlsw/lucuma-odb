@@ -1,0 +1,12 @@
+mutation($semester: Semester!, $start: Date!, $end: Date!) {
+  createCallForProposals(input: {
+    SET: {
+      semester: $semester
+      activeStart: $start
+      activeEnd: $end
+      gemini: { type: REGULAR_SEMESTER }
+    }
+  }) {
+    callForProposals { id semester gemini { type } }
+  }
+}

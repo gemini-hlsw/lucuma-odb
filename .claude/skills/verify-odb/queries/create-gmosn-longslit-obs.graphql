@@ -1,0 +1,30 @@
+mutation($p: ProgramId!, $t: TargetId!) {
+  createObservation(input: {
+    programId: $p
+    SET: {
+      constraintSet: { cloudExtinction: POINT_FIVE, imageQuality: ONE_POINT_ZERO, skyBackground: DARK }
+      targetEnvironment: { asterism: [$t] }
+      scienceRequirements: {
+        exposureTimeMode: { signalToNoise: { value: 100.0, at: { nanometers: 650 } } }
+        spectroscopy: {
+          wavelength: { nanometers: 650 }
+          resolution: 100
+          wavelengthCoverage: { nanometers: 20 }
+          focalPlane: SINGLE_SLIT
+          focalPlaneAngle: { microarcseconds: 0 }
+        }
+      }
+      observingMode: {
+        gmosNorthLongSlit: {
+          grating: R831_G5302
+          filter: R_PRIME
+          fpu: LONG_SLIT_0_50
+          centralWavelength: { nanometers: 650 }
+          explicitYBin: TWO
+        }
+      }
+    }
+  }) {
+    observation { id workflow { value { state } } }
+  }
+}

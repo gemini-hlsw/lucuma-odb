@@ -1,0 +1,5 @@
+mutation($name: NonEmptyString!) {
+  createProgram(input: { SET: { name: $name } }) {
+    program { id name pi { user { id } } }
+  }
+}

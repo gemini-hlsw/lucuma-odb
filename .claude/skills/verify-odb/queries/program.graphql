@@ -1,0 +1,3 @@
+query($p: ProgramId!) {
+  program(programId: $p) { id name pi { user { id } } }
+}

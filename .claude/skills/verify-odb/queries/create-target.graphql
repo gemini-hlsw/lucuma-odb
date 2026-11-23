@@ -1,0 +1,29 @@
+mutation($p: ProgramId!) {
+  createTarget(input: {
+    programId: $p
+    SET: {
+      name: "V1647 Orionis"
+      sidereal: {
+        ra: { hms: "05:46:13.137" }
+        dec: { dms: "-00:06:04.89" }
+        epoch: "J2000.0"
+        properMotion: { ra: { milliarcsecondsPerYear: 0.918 }, dec: { milliarcsecondsPerYear: -1.057 } }
+        radialVelocity: { kilometersPerSecond: 27.58 }
+        parallax: { milliarcseconds: 2.422 }
+      }
+      sourceProfile: {
+        point: {
+          bandNormalized: {
+            sed: { stellarLibrary: O5_V }
+            brightnesses: [
+              { band: J, value: 10.0, units: VEGA_MAGNITUDE }
+              { band: V, value: 10.0, units: VEGA_MAGNITUDE }
+            ]
+          }
+        }
+      }
+    }
+  }) {
+    target { id name }
+  }
+}

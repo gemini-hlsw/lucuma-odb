@@ -1,0 +1,17 @@
+query($o: ObservationId!) {
+  observation(observationId: $o) {
+    id
+    workflow { value { state validationErrors { code messages } } }
+    itc {
+      itcType
+      ... on ItcSpectroscopy {
+        spectroscopyScience { selected { exposureCount exposureTime { seconds } } }
+      }
+    }
+  }
+  executionConfig(observationId: $o) {
+    gmosNorth {
+      science { nextAtom { steps { stepConfig { stepType } instrumentConfig { exposure { seconds } } } } }
+    }
+  }
+}
