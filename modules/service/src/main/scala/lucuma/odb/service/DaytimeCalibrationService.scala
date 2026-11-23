@@ -9,9 +9,14 @@ import cats.implicits.*
 import eu.timepit.refined.types.numeric.PosInt
 import grackle.Result
 import grackle.ResultT
+import grackle.syntax.*
 import lucuma.core.enums.CalibrationSetType
 import lucuma.core.enums.GcalArc
 import lucuma.core.enums.Instrument
+import lucuma.core.math.Angle
+import lucuma.core.math.units.PixelScale
+import lucuma.core.model.Attachment
+import lucuma.core.model.Defined
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
@@ -23,6 +28,7 @@ import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.input.CalibrationSetInput
 import lucuma.odb.graphql.input.DaytimeCalibrationInput
+import lucuma.odb.graphql.input.GmosCustomMaskInput
 import lucuma.odb.sequence.daytimecal.CalibrationSet
 import lucuma.odb.sequence.daytimecal.Config
 import lucuma.odb.sequence.daytimecal.InstrumentSetup
@@ -102,17 +108,44 @@ object DaytimeCalibrationService:
         input: DaytimeCalibrationInput.Create,
         which: List[Observation.Id]
       )(using Transaction[F]): F[Result[Unit]] =
-        validateMasks(input.instrument, input.sets).flatMap(_.traverse(_ => insertUnchecked(input, which)).map(_.flatten))
+        (for
+          widths <- ResultT(validateMasks(input.instrument, input.sets, which))
+          sets   <- ResultT(resolveSlitWidths(input.sets, widths).pure[F])
+          _      <- ResultT(insertUnchecked(Config(input.instrument, sets), which))
+        yield ()).value
 
       private def validateMasks(
         instrument: Instrument,
-        sets:       List[CalibrationSet[InstrumentSetup]]
-      )(using Transaction[F]): F[Result[Unit]] =
-        attachmentMetadataService.validateDaytimeMasks(instrument, sets.flatMap(_.setup.customMask))
+        sets:       List[CalibrationSetInput],
+        which:      List[Observation.Id]
+      )(using Transaction[F]): F[Result[Map[Attachment.Id, (Angle, PixelScale)]]] =
+        attachmentMetadataService.validateDaytimeMasks(instrument, sets.flatMap(_.set.setup.customMask), which)
+
+      // A custom mask entered without a slit width takes the width of its mask.
+      private def resolveSlitWidths(
+        sets:   List[CalibrationSetInput],
+        widths: Map[Attachment.Id, (Angle, PixelScale)]
+      ): Result[List[CalibrationSet[InstrumentSetup]]] =
+        def attachmentId(s: CalibrationSetInput): Option[Attachment.Id] =
+          s.set.setup.customMask.collect { case Defined(aid) => aid }
+
+        sets.traverse: s =>
+          if !s.needsSlitWidth then s.set.success
+          else
+            (for
+              aid        <- attachmentId(s)
+              (w, scale) <- widths.get(aid)
+              setup      <- s.set.setup.withNearestCustomSlitWidth(w, scale)
+            yield s.set.copy(setup = setup)) match
+              case Some(set) => set.success
+              case None      =>
+                OdbError.InvalidArgument(
+                  attachmentId(s).fold(GmosCustomMaskInput.SlitWidthRequiredMessage)(AttachmentMetadataService.daytimeMaskSlitWidthMessage).some
+                ).asFailure
 
       // A clone keeps a set whose mask has since been deleted, so it skips the mask check.
       private def insertUnchecked(
-        input: DaytimeCalibrationInput.Create,
+        input: Config,
         which: List[Observation.Id]
       ): F[Result[Unit]] =
         val doInsert: F[Result[Unit]] =
@@ -157,34 +190,36 @@ object DaytimeCalibrationService:
             val checks: Result[Unit] =
               existing.toList.traverse_ : (_, config) =>
                 val inst = SET.instrument.getOrElse(config.instrument)
-                val sets = SET.sets.getOrElse(config.sets)
+                val sets = SET.sets.fold(config.sets)(_.map(_.set))
                 CalibrationSetInput.instrumentMismatch(inst, sets).fold(Result.unit): m =>
                   OdbError.InvalidArgument(m.some).asFailure
 
             val materialized: F[Result[Unit]] =
               if SET.sets.isDefined then checkNotMaterialized(oids) else Result.unit.pure
 
-            val masks: F[Result[Unit]] =
-              SET.sets.fold(Result.unit.pure[F]): sets =>
-                existing.values.map(c => SET.instrument.getOrElse(c.instrument)).toList.distinct
-                  .traverse(validateMasks(_, sets))
-                  .map(_.sequenceVoid)
+            val resolved: F[Result[Option[List[CalibrationSet[InstrumentSetup]]]]] =
+              SET.sets
+                .traverse: sets =>
+                  existing.values.map(c => SET.instrument.getOrElse(c.instrument)).toList.distinct
+                    .traverse(validateMasks(_, sets, which))
+                    .map(_.sequence.flatMap(ws => resolveSlitWidths(sets, ws.foldLeft(Map.empty)(_ ++ _))))
+                .map(_.sequence)
 
             val updateInstrument: F[Unit] =
               SET.instrument.traverse_ : inst =>
                 val af = Statements.updateInstrument(inst, oids)
                 session.prepareR(af.fragment.command).use(_.execute(af.argument)).void
 
-            val replaceSets: F[Unit] =
-              SET.sets.traverse_ : sets =>
+            def replaceSets(resolved: Option[List[CalibrationSet[InstrumentSetup]]]): F[Unit] =
+              resolved.traverse_ : sets =>
                 session.prepareR(Statements.deleteSets(oids)).use(_.execute(oids)) *>
                   which.traverse_(oid => insertSets(oid, sets))
 
             (for
               _ <- ResultT(checks.pure)
               _ <- ResultT(materialized)
-              _ <- ResultT(masks)
-              _ <- ResultT.liftF(updateInstrument *> replaceSets)
+              s <- ResultT(resolved)
+              _ <- ResultT.liftF(updateInstrument *> replaceSets(s))
             yield ()).value
 
       override def clone(

@@ -55,38 +55,37 @@ class customMaskInUse
       _ <- query(pi, mutation(Instrument.GmosNorth, input(o, SequenceType.Science, atomInput("Masked", gmosStep(m)))))
     yield o
 
-  private def daytimeCalibration(a: Attachment.Id): IO[Observation.Id] =
-    createProgramAs(staff).flatMap: cal =>
-      query(
-        user  = staff,
-        query = s"""
-          mutation {
-            createObservation(input: {
-              programId: ${cal.asJson}
-              SET: {
-                observingMode: {
-                  daytimeCalibration: {
-                    instrument: GMOS_NORTH
-                    calibrationSets: [{
-                      kind: DARK
-                      explicitCount: 1
-                      gmosNorth: {
-                        exposure: { seconds: 10 }
-                        readout: { xBin: ONE, yBin: ONE, ampCount: TWELVE, ampGain: LOW, ampReadMode: FAST }
-                        dtax: ZERO
-                        roi: FULL_FRAME
-                        fpu: { customMask: { attachmentId: ${a.asJson}, slitWidth: $SlitWidth } }
-                      }
-                    }]
-                  }
+  private def daytimeCalibration(a: Attachment.Id, cal: Program.Id): IO[Observation.Id] =
+    query(
+      user  = staff,
+      query = s"""
+        mutation {
+          createObservation(input: {
+            programId: ${cal.asJson}
+            SET: {
+              observingMode: {
+                daytimeCalibration: {
+                  instrument: GMOS_NORTH
+                  calibrationSets: [{
+                    kind: DARK
+                    explicitCount: 1
+                    gmosNorth: {
+                      exposure: { seconds: 10 }
+                      readout: { xBin: ONE, yBin: ONE, ampCount: TWELVE, ampGain: LOW, ampReadMode: FAST }
+                      dtax: ZERO
+                      roi: FULL_FRAME
+                      fpu: { customMask: { attachmentId: ${a.asJson}, slitWidth: $SlitWidth } }
+                    }
+                  }]
                 }
               }
-            }) {
-              observation { id }
             }
+          }) {
+            observation { id }
           }
-        """
-      ).map(_.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id])
+        }
+      """
+    ).map(_.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id])
 
   private def daytimeMask(o: Observation.Id): IO[Json] =
     query(
@@ -125,11 +124,11 @@ class customMaskInUse
       _ <- expectDeleted(pi, a)
     yield ()
 
-  test("a daytime calibration set in another program does not block the owner"):
+  test("a daytime calibration set does not block the delete"):
     for
       p <- createProgram
       a <- insertMosMaskAttachment(p, "GN2025AQ001-06_ODF.fits", Instrument.GmosNorth)
-      o <- daytimeCalibration(a)
+      o <- daytimeCalibration(a, p)
       _ <- expectDeleted(pi, a)
       m <- daytimeMask(o)
     yield assertEquals(m, json"""{ "attachmentId": null, "slitWidth": "CUSTOM_WIDTH_0_50" }""")
@@ -151,7 +150,7 @@ class customMaskInUse
     for
       p <- createProgram
       a <- insertMosMaskAttachment(p, "GN2025AQ001-07_ODF.fits", Instrument.GmosNorth)
-      o <- daytimeCalibration(a)
+      o <- daytimeCalibration(a, p)
       _ <- query(staff, mutation(Instrument.GmosNorth, input(o, SequenceType.Science, atomInput("Mask", step(a)))))
       _ <- expectInUse(pi, a)
     yield ()

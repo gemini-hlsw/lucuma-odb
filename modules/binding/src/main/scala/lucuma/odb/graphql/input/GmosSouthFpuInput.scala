@@ -10,10 +10,13 @@ import lucuma.odb.graphql.binding.*
 
 object GmosSouthFpuInput {
 
-  val Binding: Matcher[GmosFpuMask[GmosSouthFpu]] =
+  /** @see [[GmosCustomMaskInput.OptionalWidthBinding]] */
+  val OptionalWidthBinding: Matcher[(GmosFpuMask[GmosSouthFpu], Boolean)] =
     OneOfBinding(
-      "customMask" -> GmosCustomMaskInput.Binding,
-      "builtin"    -> GmosSouthFpuBinding.map(GmosFpuMask.Builtin(_))
+      "customMask" -> GmosCustomMaskInput.OptionalWidthBinding.map((c, widthless) => (c: GmosFpuMask[GmosSouthFpu], widthless)),
+      "builtin"    -> GmosSouthFpuBinding.map(f => (GmosFpuMask.Builtin(f): GmosFpuMask[GmosSouthFpu], false))
     )
 
+  val Binding: Matcher[GmosFpuMask[GmosSouthFpu]] =
+    GmosCustomMaskInput.requireSlitWidth(OptionalWidthBinding)
 }

@@ -10,7 +10,8 @@ import lucuma.odb.graphql.binding.*
 
 object GmosNorthDynamicInput {
 
-  val Binding: Matcher[GmosNorth] =
+  /** @see [[GmosCustomMaskInput.OptionalWidthBinding]] */
+  val OptionalWidthBinding: Matcher[(GmosNorth, Boolean)] =
     ObjectFieldsBinding.rmap {
       case List(
         TimeSpanInput.Binding("exposure", rExposure),
@@ -19,18 +20,21 @@ object GmosNorthDynamicInput {
         GmosRoiBinding("roi", rRoi),
         GmosNorthGratingConfigInput.Binding.Option("gratingConfig", rGrating),
         GmosNorthFilterBinding.Option("filter", rFilter),
-        GmosNorthFpuInput.Binding.Option("fpu", rFpu)
+        GmosNorthFpuInput.OptionalWidthBinding.Option("fpu", rFpu)
       ) => (rExposure, rReadout, rDtax, rRoi, rGrating, rFilter, rFpu).parMapN { (exposure, readout, dtax, roi, grating, filter, fpu) =>
-        GmosNorth(
+        (GmosNorth(
           exposure,
           readout,
           dtax,
           roi,
           grating,
           filter,
-          fpu
-        )
+          fpu.map(_._1)
+        ), fpu.exists(_._2))
       }
     }
+
+  val Binding: Matcher[GmosNorth] =
+    GmosCustomMaskInput.requireSlitWidth(OptionalWidthBinding)
 
 }

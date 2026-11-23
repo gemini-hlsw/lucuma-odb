@@ -816,7 +816,7 @@ object SequenceService:
               else if badClass then
                 ResultT(OdbError.InvalidArgument("Every step of a daytime calibration must have observe class DAY_CAL.".some).asFailureF)
               else
-                ResultT(attachmentMetadataService.validateDaytimeMasks(i, masks)).as:
+                ResultT(attachmentMetadataService.validateDaytimeMasks(i, masks, List(observationId))).as:
                   sequence.map: atom =>
                     atom.copy(steps = atom.steps.map(step => step.copy(telescopeConfig = step.telescopeConfig.copy(guiding = StepGuideState.Disabled))))
 

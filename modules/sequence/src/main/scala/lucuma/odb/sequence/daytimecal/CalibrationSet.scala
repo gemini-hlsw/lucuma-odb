@@ -4,12 +4,19 @@
 package lucuma.odb.sequence.daytimecal
 
 import cats.Eq
+import cats.syntax.apply.*
 import cats.syntax.eq.*
+import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.CalibrationSetType
+import lucuma.core.enums.Flamingos2CustomSlitWidth
+import lucuma.core.enums.GmosCustomSlitWidth
+import lucuma.core.math.Angle
+import lucuma.core.math.units.PixelScale
 import lucuma.core.model.MaskDefinition
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
+import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
 import lucuma.core.model.sequence.ghost.GhostDynamicConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.model.sequence.gmos.GmosFpuMask
@@ -79,6 +86,27 @@ enum InstrumentSetup:
       case _             => None
 
   /**
+   * The setup with its custom mask slit width set to the allowed width nearest
+   * the given one, or None if it has no custom mask or the width cannot be
+   * expressed.  Flamingos 2 widths are in pixels, hence the pixel scale.
+   * `Other` is never chosen: it has no Smart GCAL equivalent.
+   */
+  def withNearestCustomSlitWidth(width: Angle, pixelScale: PixelScale): Option[InstrumentSetup] =
+    def gmos: GmosCustomSlitWidth =
+      GmosCustomSlitWidth.values.minBy(w => (w.width.toMicroarcseconds - width.toMicroarcseconds).abs)
+
+    def flamingos2: Option[Flamingos2CustomSlitWidth] =
+      Option.when(pixelScale.value > 0):
+        val pixels = BigDecimal(width.toMicroarcseconds) / 1_000_000 / pixelScale.value
+        InstrumentSetup.Flamingos2PixelWidths.minBy((n, _) => (pixels - n).abs)._2
+
+    this match
+      case GmosNorth(c)  => c.fpu.collect { case GmosFpuMask.Custom(m, _) => GmosNorth(c.copy(fpu = GmosFpuMask.Custom(m, gmos).some)) }
+      case GmosSouth(c)  => c.fpu.collect { case GmosFpuMask.Custom(m, _) => GmosSouth(c.copy(fpu = GmosFpuMask.Custom(m, gmos).some)) }
+      case Flamingos2(c) => (c.fpu.custom, flamingos2).mapN((m, w) => Flamingos2(c.copy(fpu = Flamingos2FpuMask.Custom(m.mask, w))))
+      case _             => None
+
+  /**
    * The set kinds this instrument may be given.  The Flamingos 2, IGRINS-2,
    * GNIRS and GHOST lists are mirrored by the kind triggers in V1380, V1379,
    * V1389 and V1390, keep them in step.  With the acquisition mirror in GNIRS
@@ -105,6 +133,10 @@ enum InstrumentSetup:
       case Igrins2(_)    => true
 
 object InstrumentSetup:
+
+  // `Other` has no equivalent FPU, so it is never a candidate.
+  private val Flamingos2PixelWidths: List[(Int, Flamingos2CustomSlitWidth)] =
+    Flamingos2CustomSlitWidth.values.toList.flatMap(w => w.fpu.map(_.slitWidth.value -> w))
 
   given Eq[InstrumentSetup] =
     Eq.instance:

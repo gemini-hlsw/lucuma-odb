@@ -9,8 +9,12 @@ import lucuma.odb.graphql.binding.*
 
 object Flamingos2FpuMaskInput:
 
-  val Binding: Matcher[Flamingos2FpuMask] =
-    OneOfOrDefaultBinding(Flamingos2FpuMask.Imaging)(
-      "customMask" -> Flamingos2CustomMaskInput.Binding,
-      "builtin"    -> Flamingos2FpuBinding.map(Flamingos2FpuMask.Builtin.apply)
+  /** @see [[GmosCustomMaskInput.OptionalWidthBinding]] */
+  val OptionalWidthBinding: Matcher[(Flamingos2FpuMask, Boolean)] =
+    OneOfOrDefaultBinding[(Flamingos2FpuMask, Boolean)]((Flamingos2FpuMask.Imaging, false))(
+      "customMask" -> Flamingos2CustomMaskInput.OptionalWidthBinding.map((c, widthless) => (c: Flamingos2FpuMask, widthless)),
+      "builtin"    -> Flamingos2FpuBinding.map(f => (Flamingos2FpuMask.Builtin(f): Flamingos2FpuMask, false))
     )
+
+  val Binding: Matcher[Flamingos2FpuMask] =
+    GmosCustomMaskInput.requireSlitWidth(OptionalWidthBinding)
