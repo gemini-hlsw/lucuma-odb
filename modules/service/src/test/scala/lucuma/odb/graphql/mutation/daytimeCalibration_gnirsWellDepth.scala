@@ -154,6 +154,15 @@ class daytimeCalibration_gnirsWellDepth extends OdbSuite with DatabaseOperations
       }
     """).map(_.hcursor.downFields("executionConfig", "gnirs", "static", "wellDepth").require[String])
 
+  private def enterEmptySequence(oid: Observation.Id, mutation: String): IO[Unit] =
+    query(staff, s"""
+      mutation {
+        $mutation(input: ${input(oid, SequenceType.Science)}) {
+          sequence { description }
+        }
+      }
+    """).void
+
   private def enterSequence(oid: Observation.Id): IO[Unit] =
     query(staff, s"""
       mutation {
@@ -234,8 +243,23 @@ class daytimeCalibration_gnirsWellDepth extends OdbSuite with DatabaseOperations
       oid <- create(pid, "{ instrument: GNIRS, gnirs: { wellDepth: DEEP } }")
       _   <- enterSequence(oid)
       _   <- assertIO(staticWellDepth(oid), "DEEP")
-      _   <- expectRejected(updateQuery(oid, "{ gnirs: { wellDepth: SHALLOW } }"), "with a stored sequence")
+      _   <- expectRejected(updateQuery(oid, "{ gnirs: { wellDepth: SHALLOW } }"), "Cannot change the observing mode")
       _   <- assertIO(wellDepth(oid), Some("DEEP"))
+    yield ()
+
+  test("a materialized sequence without atoms freezes it"):
+    val frozen = "Cannot change the GNIRS well depth"
+    for
+      pid <- createProgramAs(staff)
+      oid <- create(pid, "{ instrument: GNIRS, gnirs: { wellDepth: DEEP } }")
+      _   <- enterEmptySequence(oid, "replaceGnirsSequence")
+      _   <- expectRejected(updateQuery(oid, "{ gnirs: { wellDepth: SHALLOW } }"), frozen)
+      _   <- expectRejected(updateQuery(oid, "{ instrument: GMOS_NORTH }"), frozen)
+      _   <- update(oid, "{ gnirs: { wellDepth: DEEP } }")
+      _   <- assertIO(wellDepth(oid), Some("DEEP"))
+      gid <- create(pid, "{ instrument: GMOS_NORTH }")
+      _   <- enterEmptySequence(gid, "replaceGmosNorthSequence")
+      _   <- expectRejected(updateQuery(gid, "{ instrument: GNIRS }"), frozen)
     yield ()
 
   test("a clone keeps it"):

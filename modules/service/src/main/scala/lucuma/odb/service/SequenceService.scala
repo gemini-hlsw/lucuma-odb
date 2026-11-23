@@ -876,6 +876,10 @@ object SequenceService:
           case Some(i)                     => ResultT(OdbError.InvalidArgument(s"Observation $observationId is a ${i.longName} daytime calibration.".some).asFailureF)
           case None                        => select
 
+      private def daytimeGnirsStatic(observationId: Observation.Id): F[GnirsStaticConfig] =
+        session.option(Statements.SelectDaytimeGnirsWellDepth)(observationId).map: w =>
+          DaytimeConfig(Instrument.Gnirs, Nil, gnirsWellDepth = w.flatten).gnirsStatic
+
       private def ghostStaticFor(
         observationId: Observation.Id
       )(using Transaction[F]): ResultT[F, GhostStaticConfig] =
@@ -1120,8 +1124,7 @@ object SequenceService:
         namespace:          Option[UUID] = None
       )(using Transaction[F]): F[Result[Stream[Pure, Atom[GnirsDynamicConfig]]]] =
         (for
-          w <- ResultT.liftF(session.option(Statements.SelectDaytimeGnirsWellDepth)(observationId))
-          s <- staticFor(observationId, Instrument.Gnirs, DaytimeConfig(Instrument.Gnirs, Nil, gnirsWellDepth = w.flatten).gnirsStatic)(selectStatic(observationId, "GNIRS", gnirsSequenceService.selectStaticOrDefault))
+          s <- staticForF(observationId, Instrument.Gnirs, daytimeGnirsStatic(observationId))(selectStatic(observationId, "GNIRS", gnirsSequenceService.selectStaticOrDefault))
           b <- ResultT.liftF(atomBuilder(sequenceType, s, namespace, estimator.gnirsStep))
           r <- replaceSequence(
                  Instrument.Gnirs,

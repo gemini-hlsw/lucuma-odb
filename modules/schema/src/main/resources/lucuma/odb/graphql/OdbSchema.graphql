@@ -6523,8 +6523,9 @@ GNIRS settings of a daytime calibration.
 input DaytimeCalibrationGnirsInput {
   """
   Well depth, SHALLOW when never set.  Omit it to keep the current value; it
-  may not be null.  A different value is rejected once the sequence has been
-  materialized (first visit or a hand edit).
+  may not be null.  It is frozen once the sequence has been materialized
+  (first visit or a hand edit), and once the sequence has atoms every edit of
+  the mode is rejected, even one that changes nothing.
   """
   wellDepth: GnirsWellDepth
 }
