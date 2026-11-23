@@ -29,6 +29,8 @@ import lucuma.core.model.sequence.gmos.StaticConfig.GmosNorth as GmosNorthStatic
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosSouth as GmosSouthStatic
 import lucuma.core.model.sequence.gnirs.GnirsDynamicConfig as GnirsDynamic
 import lucuma.core.model.sequence.gnirs.GnirsStaticConfig as GnirsStatic
+import lucuma.core.model.sequence.scorpio.ScorpioDynamicConfig as ScorpioDynamic
+import lucuma.core.model.sequence.scorpio.ScorpioStaticConfig as ScorpioStatic
 import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig as Igrins2Dynamic
 import lucuma.core.model.sequence.igrins2.Igrins2StaticConfig as Igrins2Static
 import lucuma.itc.IntegrationTime
@@ -182,6 +184,14 @@ sealed trait GeneratorStreaming[F[_]]:
   def generateIgrins2LongSlit(
     context: GeneratorContext
   ): F[Either[OdbError, StreamingExecutionConfig[F, Igrins2Static, Igrins2Dynamic]]]
+
+  def selectOrGenerateScorpioLongSlit(
+    context: GeneratorContext
+  )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, ScorpioStatic, ScorpioDynamic]]]
+
+  def generateScorpioLongSlit(
+    context: GeneratorContext
+  ): F[Either[OdbError, StreamingExecutionConfig[F, ScorpioStatic, ScorpioDynamic]]]
 
   def selectOrGenerateGnirsSpectroscopy(
     context: GeneratorContext
@@ -470,6 +480,30 @@ object GeneratorStreaming:
           sci  = spectroscopyScienceTime(context.oid, context.itcRes)
           rol  = context.params.calibrationRole
           gen <- EitherT.fromEither(LongSlit.instantiate(context.oid, calculator.igrins2Step, context.namespace, cfg, sci, rol))
+          res <- collapseIfNecessary(context, gen)
+        yield res).value
+
+      override def selectOrGenerateScorpioLongSlit(
+        context: GeneratorContext
+      )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, ScorpioStatic, ScorpioDynamic]]] =
+        (for
+          _   <- extractMode(ObservingMode.ScorpioLongSlitName, context)(_.asScorpioLongSlit)
+          stc <- EitherT.liftF(sequenceService.selectOrComputeScorpioStatic(context.oid))
+          res <- EitherT(selectOrGenerate(
+                   stc,
+                   sequenceService.selectScorpioSequence(context.oid, _, _),
+                   generateScorpioLongSlit(context)
+                 ))
+        yield res).value
+
+      override def generateScorpioLongSlit(
+        context: GeneratorContext
+      ): F[Either[OdbError, StreamingExecutionConfig[F, ScorpioStatic, ScorpioDynamic]]] =
+        import lucuma.odb.sequence.scorpio.longslit.LongSlit
+        (for
+          cfg <- extractMode(ObservingMode.ScorpioLongSlitName, context)(_.asScorpioLongSlit)
+          rol  = context.params.calibrationRole
+          gen <- EitherT.fromEither(LongSlit.instantiate(context.oid, calculator.scorpioStep, context.namespace, cfg, rol))
           res <- collapseIfNecessary(context, gen)
         yield res).value
 

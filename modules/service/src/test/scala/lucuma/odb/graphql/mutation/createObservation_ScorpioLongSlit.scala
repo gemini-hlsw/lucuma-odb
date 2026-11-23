@@ -17,7 +17,6 @@ import lucuma.core.model.Program
 import lucuma.core.model.StandardUser
 import lucuma.core.model.User
 import lucuma.core.syntax.timespan.*
-import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.scorpio.longslit.Config
 
 class createObservation_ScorpioLongSlit extends OdbSuite:
@@ -462,16 +461,14 @@ class createObservation_ScorpioLongSlit extends OdbSuite:
            )
     yield ()
 
-  test("the sequence is reported as unavailable"):
+  test("a sequence is generated"):
     for
       p <- createProgramAs(pi)
       t <- createTargetAs(pi, p)
       o <- createObservationAs(pi, p, Some(ScorpioLongSlit), t)
-      _ <- expectOdbError(
+      _ <- expect(
              user     = pi,
              query    = s"""query { executionConfig(observationId: "$o") { instrument } }""",
-             expected = {
-               case OdbError.SequenceUnavailable(`o`, Some(m)) if m.contains("Sequences are not supported for SCORPIO") => // ok
-             }
+             expected = json"""{ "executionConfig": { "instrument": "SCORPIO" } }""".asRight
            )
     yield ()

@@ -167,6 +167,10 @@ case class ObservationValidationInfo(
   def isExchange: Boolean =
     observingMode.exists(_.isExchange)
 
+  // SCORPIO has no ITC support yet.
+  def hasNoItc: Boolean =
+    isVisitor || isExchange || observingMode.contains(ObservingModeType.ScorpioLongSlit)
+
   def isDaytimeCalibration: Boolean =
     calibrationRole.contains(CalibrationRole.DaytimeCalibration)
 

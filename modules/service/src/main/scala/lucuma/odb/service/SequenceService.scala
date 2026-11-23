@@ -35,6 +35,7 @@ import lucuma.core.enums.SequenceType
 import lucuma.core.enums.SmartGcalType
 import lucuma.core.enums.StepGuideState
 import lucuma.core.enums.StepType
+import lucuma.core.model.MaskDefinition
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.AtomDigest
@@ -55,6 +56,8 @@ import lucuma.core.model.sequence.gnirs.GnirsDynamicConfig
 import lucuma.core.model.sequence.gnirs.GnirsStaticConfig
 import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig
 import lucuma.core.model.sequence.igrins2.Igrins2StaticConfig
+import lucuma.core.model.sequence.scorpio.ScorpioDynamicConfig
+import lucuma.core.model.sequence.scorpio.ScorpioStaticConfig
 import lucuma.core.util.Enumerated
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Uid
@@ -73,12 +76,14 @@ import lucuma.odb.sequence.data.UnsplittableAtom
 import lucuma.odb.sequence.daytimecal.Config as DaytimeConfig
 import lucuma.odb.sequence.daytimecal.InstrumentSetup
 import lucuma.odb.sequence.daytimecal.StaticConfigs as DaytimeStatics
+import lucuma.odb.sequence.scorpio.longslit.LongSlit as ScorpioLongSlit
 import lucuma.odb.sequence.gcalClass
 import lucuma.odb.sequence.util.AtomBuilder
 import lucuma.odb.sequence.util.StepInsertion
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Flamingos2Codecs.*
 import lucuma.odb.util.GhostCodecs.*
+import lucuma.odb.util.ScorpioCodecs.*
 import lucuma.odb.util.GmosCodecs.*
 import lucuma.odb.util.GnirsCodecs.*
 import lucuma.odb.util.Igrins2Codecs.*
@@ -332,6 +337,38 @@ trait SequenceService[F[_]]:
     sequenceType:  SequenceType,
     staticConfig:  Igrins2StaticConfig
   )(using Transaction[F]): F[Option[Stream[F, Atom[Igrins2DynamicConfig]]]]
+
+  def selectOrComputeScorpioStatic(
+    observationId: Observation.Id
+  )(using Transaction[F]): F[ScorpioStaticConfig]
+
+  def replaceScorpioSequence(
+    observationId:      Observation.Id,
+    sequenceType:       SequenceType,
+    sequence:           List[ProtoAtom[ProtoStep[ScorpioDynamicConfig]]],
+    batch:              AtomBatch,
+    abandonOngoingStep: Boolean,
+    customized:         Boolean      = true,
+    namespace:          Option[UUID] = None
+  )(using Transaction[F]): F[Result[Stream[Pure, Atom[ScorpioDynamicConfig]]]]
+
+  def insertScorpioSequence(
+    observationId:  Observation.Id,
+    sequenceType:   SequenceType,
+    sequence:       Stream[F, Atom[ScorpioDynamicConfig]]
+  )(using Transaction[F], Services.ServiceAccess): F[Unit]
+
+  def materializeScorpioExecutionConfig(
+    observationId: Observation.Id,
+    stream:        StreamingExecutionConfig[F, ScorpioStaticConfig, ScorpioDynamicConfig],
+    sequenceTypes: Set[SequenceType] = Enumerated[SequenceType].all.toSet
+  )(using Transaction[F], Services.ServiceAccess): F[Unit]
+
+  def selectScorpioSequence(
+    observationId: Observation.Id,
+    sequenceType:  SequenceType,
+    staticConfig:  ScorpioStaticConfig
+  )(using Transaction[F]): F[Option[Stream[F, Atom[ScorpioDynamicConfig]]]]
 
   def replaceGnirsSequence(
     observationId:      Observation.Id,
@@ -783,7 +820,7 @@ object SequenceService:
         customized:         Boolean,
         insertInstConfig:   (rows: List[(Step.Id, D)]) => Command[rows.type],
         atomBuilder:        AtomBuilder[D],
-        setup:              D => InstrumentSetup
+        customMask:         D => Option[MaskDefinition]
       )(using Transaction[F]): ResultT[F, Stream[Pure, Atom[D]]] =
 
         val checkAtomLength: ResultT[F, Unit] =
@@ -814,7 +851,7 @@ object SequenceService:
           ResultT.liftF(selectDaytimeCalibration(observationId)).flatMap:
             case None    => ResultT.pure(sequence)
             case Some(i) =>
-              val masks    = sequence.flatMap(_.steps.toList).flatMap(s => setup(s.value).customMask).distinct
+              val masks    = sequence.flatMap(_.steps.toList).flatMap(s => customMask(s.value)).distinct
               val badClass = sequence.flatMap(_.steps.toList).exists(_.observeClass =!= ObserveClass.DayCal)
               if sequenceType =!= SequenceType.Science then
                 ResultT(OdbError.InvalidArgument("Daytime calibrations have no acquisition sequence.".some).asFailureF)
@@ -941,7 +978,7 @@ object SequenceService:
                  customized,
                  Flamingos2SequenceService.Statements.insertDynamics,
                  b,
-                 InstrumentSetup.Flamingos2(_)
+                 InstrumentSetup.Flamingos2(_).customMask
                )
         yield r).value
 
@@ -989,7 +1026,7 @@ object SequenceService:
                  customized,
                  GhostSequenceService.Statements.insertDynamics,
                  b,
-                 InstrumentSetup.Ghost(_)
+                 InstrumentSetup.Ghost(_).customMask
                )
         yield r).value
 
@@ -1029,7 +1066,7 @@ object SequenceService:
                  customized,
                  GmosSequenceService.Statements.insertNorthDynamics,
                  b,
-                 InstrumentSetup.GmosNorth(_)
+                 InstrumentSetup.GmosNorth(_).customMask
                )
         yield r).value
 
@@ -1069,7 +1106,7 @@ object SequenceService:
                  customized,
                  GmosSequenceService.Statements.insertSouthDynamics,
                  b,
-                 InstrumentSetup.GmosSouth(_)
+                 InstrumentSetup.GmosSouth(_).customMask
                )
         yield r).value
 
@@ -1110,7 +1147,7 @@ object SequenceService:
                  customized,
                  Igrins2SequenceService.Statements.insertDynamics,
                  b,
-                 InstrumentSetup.Igrins2(_)
+                 InstrumentSetup.Igrins2(_).customMask
                )
         yield r).value
 
@@ -1150,7 +1187,7 @@ object SequenceService:
                  customized,
                  GnirsSequenceService.Statements.insertDynamics,
                  b,
-                 InstrumentSetup.Gnirs(_)
+                 InstrumentSetup.Gnirs(_).customMask
                )
         yield r).value
 
@@ -1349,6 +1386,72 @@ object SequenceService:
           estimator.gmosSouthStep
         )
 
+      override def selectOrComputeScorpioStatic(
+        observationId: Observation.Id
+      )(using Transaction[F]): F[ScorpioStaticConfig] =
+        scorpioSequenceService.selectStatic(observationId).map(_.getOrElse(ScorpioLongSlit.Static))
+
+      override def replaceScorpioSequence(
+        observationId:      Observation.Id,
+        sequenceType:       SequenceType,
+        sequence:           List[ProtoAtom[ProtoStep[ScorpioDynamicConfig]]],
+        batch:              AtomBatch,
+        abandonOngoingStep: Boolean,
+        customized:         Boolean      = true,
+        namespace:          Option[UUID] = None
+      )(using Transaction[F]): F[Result[Stream[Pure, Atom[ScorpioDynamicConfig]]]] =
+        (for
+          s <- ResultT.liftF(selectOrComputeScorpioStatic(observationId))
+          b <- ResultT.liftF(atomBuilder(sequenceType, s, namespace, estimator.scorpioStep))
+          r <- replaceSequence(
+                 Instrument.Scorpio,
+                 observationId,
+                 sequenceType,
+                 sequence,
+                 batch,
+                 abandonOngoingStep,
+                 customized,
+                 ScorpioSequenceService.Statements.insertDynamics,
+                 b,
+                 _ => none
+               )
+        yield r).value
+
+      override def insertScorpioSequence(
+        observationId:  Observation.Id,
+        sequenceType:   SequenceType,
+        sequence:       Stream[F, Atom[ScorpioDynamicConfig]]
+      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
+        insertSequence(
+          Instrument.Scorpio,
+          observationId,
+          sequenceType,
+          sequence,
+          AtomBatch.Next,
+          ScorpioSequenceService.Statements.insertDynamics
+        )
+
+      override def materializeScorpioExecutionConfig(
+        observationId: Observation.Id,
+        stream:        StreamingExecutionConfig[F, ScorpioStaticConfig, ScorpioDynamicConfig],
+        sequenceTypes: Set[SequenceType]
+      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
+        materializeExecutionConfig(observationId, stream, sequenceTypes, scorpioSequenceService.insertStatic)(insertScorpioSequence)
+
+      override def selectScorpioSequence(
+        observationId: Observation.Id,
+        sequenceType:  SequenceType,
+        staticConfig:  ScorpioStaticConfig
+      )(using Transaction[F]): F[Option[Stream[F, Atom[ScorpioDynamicConfig]]]] =
+        selectSequence(
+          Instrument.Scorpio,
+          observationId,
+          sequenceType,
+          Statements.SelectScorpioSequence,
+          staticConfig,
+          estimator.scorpioStep
+        )
+
       override def selectIgrins2Sequence(
         observationId: Observation.Id,
         sequenceType:  SequenceType,
@@ -1479,6 +1582,7 @@ object SequenceService:
           instrument match
             case Instrument.Flamingos2 => copy(instrument, sequenceType, Statements.Flamingos2Table, pendingOnly, replaceFlamingos2Sequence(clone, sequenceType, _, AtomBatch.Current, abandonOngoingStep = false, customized))
             case Instrument.Ghost      => copy(instrument, sequenceType, Statements.GhostTable,      pendingOnly, replaceGhostSequence(clone, sequenceType, _, AtomBatch.Current, abandonOngoingStep = false, customized))
+            case Instrument.Scorpio    => copy(instrument, sequenceType, Statements.ScorpioTable,    pendingOnly, replaceScorpioSequence(clone, sequenceType, _, AtomBatch.Current, abandonOngoingStep = false, customized))
             case Instrument.GmosNorth  => copy(instrument, sequenceType, Statements.GmosNorthTable,  pendingOnly, replaceGmosNorthSequence(clone, sequenceType, _, AtomBatch.Current, abandonOngoingStep = false, customized))
             case Instrument.GmosSouth  => copy(instrument, sequenceType, Statements.GmosSouthTable,  pendingOnly, replaceGmosSouthSequence(clone, sequenceType, _, AtomBatch.Current, abandonOngoingStep = false, customized))
             case Instrument.Igrins2    => copy(instrument, sequenceType, Statements.Igrins2Table,    pendingOnly, replaceIgrins2Sequence(clone, sequenceType, _, AtomBatch.Current, abandonOngoingStep = false, customized))
@@ -1955,6 +2059,9 @@ object SequenceService:
     val GhostTable: DynamicTable[GhostDynamicConfig] =
       DynamicTable("t_ghost_dynamic", GhostSequenceService.Statements.DynamicColumns, ghost_dynamic)
 
+    val ScorpioTable: DynamicTable[ScorpioDynamicConfig] =
+      DynamicTable("t_scorpio_dynamic", ScorpioSequenceService.Statements.DynamicColumns, scorpio_dynamic)
+
     val GmosNorthTable: DynamicTable[GmosNorth] =
       DynamicTable("t_gmos_north_dynamic", GmosSequenceService.Statements.GmosDynamicColumns, gmos_north_dynamic)
 
@@ -2246,6 +2353,9 @@ object SequenceService:
 
     val SelectGhostSequence: Query[(Instrument, Observation.Id, SequenceType), (Atom.Id, Option[String], Step.Id, ProtoStep[GhostDynamicConfig])] =
       selectRemainingSequence(GhostTable)
+
+    val SelectScorpioSequence: Query[(Instrument, Observation.Id, SequenceType), (Atom.Id, Option[String], Step.Id, ProtoStep[ScorpioDynamicConfig])] =
+      selectRemainingSequence(ScorpioTable)
 
     val SelectGmosNorthSequence: Query[(Instrument, Observation.Id, SequenceType), (Atom.Id, Option[String], Step.Id, ProtoStep[GmosNorth])] =
       selectRemainingSequence(GmosNorthTable)
