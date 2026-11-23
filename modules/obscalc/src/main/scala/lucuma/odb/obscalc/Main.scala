@@ -288,6 +288,27 @@ object CalcMain extends MainParams:
               .handleErrorWith: t =>
                 Logger[F].warn(t)("Calibration estimate refresh failed")
 
+    // Invalidates the observations marked by transactions that changed their
+    // inputs without locking their obscalc rows (see V1422).  Invalidation
+    // moves them to pending, which brings them back through
+    // calcAndUpdateStream.  A failure is logged and retried on the next poll.
+    // Each observation takes a transaction of its own; the limit keeps a
+    // backlog from tying up the sweep's connection, and is worked off over the
+    // following polls.
+    val invalidateMarkedStream: Stream[F, Unit] =
+      Stream
+        .awakeEvery(pollPeriod)
+        .evalMap: _ =>
+          T.noopScope:
+            services
+              .useNonTransactionally:
+                requireServiceAccessOrThrow:
+                  obscalcService.invalidateMarked(64)
+              .flatMap: n =>
+                Logger[F].debug(s"Invalidated $n marked observations.").whenA(n > 0)
+              .handleErrorWith: t =>
+                Logger[F].warn(t)("Marked observation invalidation failed")
+
     // Visitor instrument visits are charged until the next chargeable visit at
     // the site starts (which happens in some other observation) or, once the
     // night is over, until dawn.  Rather than lock that other observation from
@@ -346,6 +367,7 @@ object CalcMain extends MainParams:
       (Stream.exec(resetCalculating) ++
         calcAndUpdateStream
           .merge(refreshCalibrationsStream)
+          .merge(invalidateMarkedStream)
           .merge(visitorTimeAccountingStream)
           .merge(refreshGroupStandingsStream))
         .attempts(Stream.constant(WaitToRestart))

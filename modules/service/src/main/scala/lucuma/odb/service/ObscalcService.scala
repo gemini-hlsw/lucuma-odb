@@ -127,6 +127,21 @@ sealed trait ObscalcService[F[_]]:
   def refreshCalibrations(max: Int)(using ServiceAccess, Transaction[F]): F[Int]
 
   /**
+   * Invalidates up to `max` of the observations named in `t_obscalc_mark`,
+   * oldest mark first, deleting their marks, and returns how many were
+   * invalidated.  Marks are left by transactions that change another
+   * observation's obscalc inputs but must not lock its `t_obscalc` row (see
+   * V1422).  Each observation is invalidated in its own transaction so that no
+   * more than one `t_obscalc` row is ever locked at a time.  A mark committed
+   * after its observation's marks are deleted survives, and the observation is
+   * invalidated again on a later call.  An observation that fails keeps its
+   * marks, moved behind every other mark so that it cannot hold up the rest,
+   * and the next one is tried.  Stops early, leaving the rest for the next
+   * call, only once the database session itself has failed.
+   */
+  def invalidateMarked(max: Int)(using ServiceAccess, NoTransaction[F]): F[Int]
+
+  /**
    * Loads the PendingCalc entry for the given observation, if it exists and is
    * in fact `pending` (or `retry`).  The state is update to `calculating`
    * before the entry is returned.
@@ -266,6 +281,47 @@ object ObscalcService:
                     session.execute(Statements.UpdateCalibrations)(ObsExtract.calibrationEstimate(p, t), oid)
               }
               .as(stale.size)
+
+      override def invalidateMarked(
+        max: Int
+      )(using ServiceAccess, NoTransaction[F]): F[Int] =
+        services
+          .transactionally(session.execute(Statements.SelectMarked)(max))
+          .flatMap: oids =>
+            (oids, 0).tailRecM:
+              case (Nil, count)         => count.asRight[(List[Observation.Id], Int)].pure[F]
+              case (oid :: rest, count) =>
+                invalidateMarkedObservation(oid).flatMap:
+                  case Some(done) =>
+                    (rest, if done then count + 1 else count).asLeft[Int].pure[F]
+                  case None       =>
+                    Logger[F]
+                      .warn(s"Stopping the marked observation invalidation, whose database session failed, with ${rest.length} observations left for the next one")
+                      .as(count.asRight[(List[Observation.Id], Int)])
+
+      // Invalidates one marked observation: Some(whether it was invalidated) to
+      // go on with the next, or None to stop.  One that fails keeps its marks,
+      // requeued behind the others.  If even that fails, it may be the session,
+      // which every later observation would find failed as well; it is the
+      // session only if it no longer answers.
+      private def invalidateMarkedObservation(
+        oid: Observation.Id
+      )(using ServiceAccess, NoTransaction[F]): F[Option[Boolean]] =
+        services
+          .transactionally:
+            session.execute(Statements.DeleteMarks)(oid) *>
+            session.execute(Statements.InvalidateObscalc)(oid)
+          .as(true.some)
+          .handleErrorWith: e =>
+            Logger[F].warn(e)(s"Failed to invalidate marked observation $oid, which is left for a later attempt") *>
+            services
+              .transactionally(session.execute(Statements.RequeueMarks)(oid))
+              .as(false.some)
+              .handleErrorWith: _ =>
+                session
+                  .unique(Statements.Ping)
+                  .attempt
+                  .map(r => Option.when(r.contains(true))(false))
 
       override def calculateOnly(
         pending: Obscalc.PendingCalc
@@ -681,6 +737,38 @@ object ObscalcService:
           END
         WHERE c_obscalc_state = 'calculating'
       """.command
+
+    // Marked observations, oldest mark first.
+    val SelectMarked: Query[Int, Observation.Id] =
+      sql"""
+        SELECT   c_observation_id
+        FROM     t_obscalc_mark
+        GROUP BY c_observation_id
+        ORDER BY MIN(c_mark_id)
+        LIMIT    $int4
+      """.query(observation_id)
+
+    val DeleteMarks: Command[Observation.Id] =
+      sql"""
+        DELETE FROM t_obscalc_mark
+        WHERE c_observation_id = $observation_id
+      """.command
+
+    val InvalidateObscalc: Command[Observation.Id] =
+      sql"""
+        CALL invalidate_obscalc($observation_id)
+      """.command
+
+    // Moves an observation's marks behind every other mark.
+    val RequeueMarks: Command[Observation.Id] =
+      sql"""
+        UPDATE t_obscalc_mark
+        SET    c_mark_id = DEFAULT
+        WHERE  c_observation_id = $observation_id
+      """.command
+
+    val Ping: Query[Void, Boolean] =
+      sql"SELECT true".query(bool)
 
     // The science time is missing when there is no digest to refresh.
     val LockStaleCalibrations: Query[Int, (Observation.Id, Option[TimeSpan])] =

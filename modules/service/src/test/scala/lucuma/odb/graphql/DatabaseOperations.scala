@@ -137,6 +137,32 @@ trait DatabaseOperations { this: OdbSuite =>
           srv.calculateAndUpdate(Obscalc.PendingCalc(pid, oid, t))
     .void
 
+  // Claims a pending obscalc entry, moving it to calculating, as the daemon
+  // does before it calculates.
+  def claimObscalcAs(user: ServiceUser, oid: Observation.Id): IO[Obscalc.PendingCalc] =
+    withServicesForObscalc(user): services =>
+      given Services[IO] = services
+      requireServiceAccessOrThrow:
+        services
+          .transactionally(ObscalcService.instantiate[IO].loadObs(oid))
+          .flatMap(_.liftTo[IO](new RuntimeException(s"No pending obscalc entry for $oid")))
+
+  // Calculates and stores an entry claimed with `claimObscalcAs`, as the daemon
+  // does, returning the calculation state it was left in.
+  def finishObscalcAs(user: ServiceUser, pending: Obscalc.PendingCalc): IO[Option[CalculationState]] =
+    withServicesForObscalc(user): services =>
+      given Services[IO] = services
+      requireServiceAccessOrThrow:
+        services.transactionally(timeAccountingService.updateAll(pending.observationId)) *>
+        ObscalcService.instantiate[IO].calculateAndUpdate(pending).map(_.map(_.state))
+
+  // Runs the obscalc daemon's invalidation of marked observations on demand.
+  def invalidateMarkedAs(user: ServiceUser): IO[Int] =
+    withServicesForObscalc(user): services =>
+      given Services[IO] = services
+      requireServiceAccessOrThrow:
+        ObscalcService.instantiate[IO].invalidateMarked(1024)
+
   // Runs the obscalc daemon's calibration estimate refresh on demand.
   def refreshCalibrationsAs(user: ServiceUser): IO[Int] =
     withServicesForObscalc(user): services =>
