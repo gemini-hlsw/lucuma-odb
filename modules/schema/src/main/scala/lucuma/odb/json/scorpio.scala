@@ -22,9 +22,9 @@ import lucuma.core.util.TimeSpan
 import time.decoder.given
 
 /**
- * Only the visible channels and the long slit are represented.  The IR
- * channels, the other FPU states, and the static ADC, SVC and nod-and-shift
- * settings are dropped on encoding and take their defaults on decoding.
+ * Only the visible channels and the long slit are represented, so a config
+ * with anything else does not round trip.  The ODB rejects those before they
+ * are stored (see ScorpioSequenceService).
  */
 trait ScorpioCodec:
 

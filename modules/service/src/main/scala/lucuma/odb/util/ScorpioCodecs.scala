@@ -52,8 +52,8 @@ trait ScorpioCodecs:
   val scorpio_static: Codec[ScorpioStaticConfig] =
     scorpio_channel_selection.imap(ScorpioStaticConfig(_))(_.channelSelection)
 
-  // The IR channels are not stored, and a step that is not long slit is
-  // rejected by the NOT NULL constraint on c_fpu.
+  // Only the visible channels and the long slit are stored.  See the checks
+  // in ScorpioSequenceService.
   val scorpio_dynamic: Codec[ScorpioDynamicConfig] =
     (
       scorpio_vis_channel *:

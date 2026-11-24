@@ -4,12 +4,15 @@
 package lucuma.odb.service
 
 import cats.effect.Concurrent
-import cats.syntax.functor.*
-import cats.syntax.option.*
+import cats.syntax.all.*
+import grackle.Result
+import lucuma.core.enums.ScorpioChannelSelection
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.scorpio.ScorpioDynamicConfig
 import lucuma.core.model.sequence.scorpio.ScorpioStaticConfig
+import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.ScorpioCodecs.*
 import skunk.*
@@ -23,18 +26,32 @@ trait ScorpioSequenceService[F[_]]:
   def insertDynamic(
     stepId:  Step.Id,
     dynamic: ScorpioDynamicConfig
-  )(using Transaction[F], Services.ServiceAccess): F[Unit]
+  )(using Transaction[F], Services.ServiceAccess): F[Result[Unit]]
 
   def insertStatic(
     observationId: Observation.Id,
     static:        ScorpioStaticConfig
-  )(using Transaction[F], Services.ServiceAccess): F[Option[Long]]
+  )(using Transaction[F], Services.ServiceAccess): F[Result[Option[Long]]]
 
   def selectStatic(
     observationId: Observation.Id
   )(using Transaction[F]): F[Option[ScorpioStaticConfig]]
 
 object ScorpioSequenceService:
+
+  private def unsupported(what: String): Result[Unit] =
+    OdbError.InvalidArgument(s"SCORPIO $what not supported yet.".some).asFailure
+
+  // Only what is stored can be read back, so anything else is rejected.
+  def checkDynamic(dynamic: ScorpioDynamicConfig): Result[Unit] =
+    if dynamic.fpu.longSlit.isEmpty then unsupported("steps that are not long slit are")
+    else if List(dynamic.y, dynamic.j, dynamic.h, dynamic.ks).exists(_.isDefined) then unsupported("IR channels are")
+    else Result.unit
+
+  def checkStatic(static: ScorpioStaticConfig): Result[Unit] =
+    if static.channelSelection =!= ScorpioChannelSelection.VisOnly then unsupported("IR channels are")
+    else if static =!= ScorpioStaticConfig(ScorpioChannelSelection.VisOnly) then unsupported("ADC, SVC and nod and shift settings are")
+    else Result.unit
 
   def instantiate[F[_]: Concurrent](using Services[F]): ScorpioSequenceService[F] =
 
@@ -43,14 +60,14 @@ object ScorpioSequenceService:
       override def insertDynamic(
         stepId:  Step.Id,
         dynamic: ScorpioDynamicConfig
-      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
-        session.execute(Statements.InsertDynamic)(stepId, dynamic).void
+      )(using Transaction[F], Services.ServiceAccess): F[Result[Unit]] =
+        checkDynamic(dynamic).traverse(_ => session.execute(Statements.InsertDynamic)(stepId, dynamic).void)
 
       override def insertStatic(
         observationId: Observation.Id,
         static:        ScorpioStaticConfig
-      )(using Transaction[F], Services.ServiceAccess): F[Option[Long]] =
-        session.option(Statements.InsertStatic)(observationId, static)
+      )(using Transaction[F], Services.ServiceAccess): F[Result[Option[Long]]] =
+        checkStatic(static).traverse(_ => session.option(Statements.InsertStatic)(observationId, static))
 
       override def selectStatic(
         observationId: Observation.Id
