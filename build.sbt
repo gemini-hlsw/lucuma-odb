@@ -23,7 +23,7 @@ val declineVersion               = "2.6.2"
 val flywayVersion                = "13.13.0"
 val fs2AwsVersion                = "6.2.0"
 val fs2Version                   = "3.16.0"
-val grackleVersion               = "0.31.0-13-ada6f40-SNAPSHOT"
+val grackleVersion               = "0.31.0-32-a799adb"
 val http4sVersion                = "0.23.39"
 val http4sBlazeVersion           = "0.23.18"
 val http4sJdkHttpClientVersion   = "0.10.0"
@@ -74,8 +74,8 @@ ThisBuild / libraryDependencySchemes ++= Seq(
   "org.tpolecat" %% "skunk-circe" % VersionScheme.Always
 )
 
-// TEMPORARY: the grackle snapshot counts as incompatible with the 0.31.0 that
-// lucuma-graphql-routes declares.  Remove with the snapshot.
+// TEMPORARY: the grackle build counts as incompatible with the 0.31.0 that
+// lucuma-graphql-routes declares.  Remove with the next grackle release.
 ThisBuild / libraryDependencySchemes +=
   "org.typelevel" %% "grackle-core" % VersionScheme.Always
 
