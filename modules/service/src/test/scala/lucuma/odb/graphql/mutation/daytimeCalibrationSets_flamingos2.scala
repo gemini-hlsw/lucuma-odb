@@ -217,11 +217,30 @@ class daytimeCalibrationSets_flamingos2 extends OdbSuite with DatabaseOperations
       )
     yield ()
 
-  test("a bias or daytime observe is rejected"):
+  test("a bias is rejected"):
     for
       pid <- createProgramAs(staff)
-      _   <- expectRejected(pid, s"{ kind: BIAS, explicitCount: 1, ${setup(0)} }", "must be one of DARK, FLAT, ARC, SMART_FLAT, SMART_ARC, DAY_BASELINE, not BIAS")
-      _   <- expectRejected(pid, s"{ kind: DAYTIME_OBSERVE, explicitCount: 1, ${setup(1)} }", "must be one of DARK, FLAT, ARC, SMART_FLAT, SMART_ARC, DAY_BASELINE, not DAYTIME_OBSERVE")
+      _   <- expectRejected(pid, s"{ kind: BIAS, explicitCount: 1, ${setup(0)} }", "must be one of DARK, FLAT, ARC, DAYTIME_OBSERVE, SMART_FLAT, SMART_ARC, DAY_BASELINE, not BIAS")
+    yield ()
+
+  test("a daytime observe takes science steps with either window cover"):
+    val sets = List(
+      s"{ kind: DAYTIME_OBSERVE, explicitCount: 2, ${setup(5, windowCover = "OPEN".some)} }",
+      s"{ kind: DAYTIME_OBSERVE, explicitCount: 1, ${setup(7, windowCover = "CLOSE".some)} }",
+      s"{ kind: DAYTIME_OBSERVE, explicitCount: 1, ${setup(9)} }"
+    ).mkString(", ")
+    for
+      pid <- createProgramAs(staff)
+      oid <- createWithSets(pid, sets)
+      _   <- expect(
+        staff,
+        executionQuery(oid),
+        expectedExecution(List(merged(
+          atom("DaytimeObserve", 2, "SCIENCE", 5, "OPEN".asJson, Json.Null),
+          atom("DaytimeObserve", 1, "SCIENCE", 7, "CLOSE".asJson, Json.Null),
+          atom("DaytimeObserve", 1, "SCIENCE", 9, Json.Null, Json.Null)
+        ))).asRight
+      )
     yield ()
 
   test("the setup must be for the mode's instrument"):
