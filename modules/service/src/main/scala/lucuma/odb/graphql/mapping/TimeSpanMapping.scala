@@ -23,6 +23,7 @@ import lucuma.odb.graphql.table.Igrins2DynamicTable
 import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.graphql.table.ProgramView
 import lucuma.odb.graphql.table.ProposalView
+import lucuma.odb.graphql.table.ScorpioDynamicView
 import lucuma.odb.graphql.table.StepRecordView
 import lucuma.odb.graphql.table.TacFeedbackTable
 import lucuma.odb.graphql.table.TimeChargeCorrectionTable
@@ -43,6 +44,7 @@ trait TimeSpanMapping[F[_]] extends AllocationTable[F]
                                with GmosDynamicTables[F]
                                with GnirsDynamicView[F]
                                with Igrins2DynamicTable[F]
+                               with ScorpioDynamicView[F]
                                with ProgramView[F]
                                with ProposalView[F]
                                with ObservationView[F]
@@ -72,6 +74,10 @@ trait TimeSpanMapping[F[_]] extends AllocationTable[F]
       timeSpanMappingAtPath(LargeProgramType / "totalTime", ProposalView.LargeProgram.TotalTime)(ProposalView.ProgramId),
       timeSpanMappingAtPath(ProposalType / "explicitTimeRequest", ProposalView.TimeRequestExplicit)(ProposalView.TimeRequestExplicitId),
       timeSpanMappingAtPath(StepRecordType / "estimate", StepRecordView.TimeEstimate)(StepRecordView.Id),
+      timeSpanMappingAtPath(StepRecordType / "scorpio" / "g" / "exposureTime", ScorpioDynamicView.G.ExposureTime)(ScorpioDynamicView.G.SyntheticId),
+      timeSpanMappingAtPath(StepRecordType / "scorpio" / "r" / "exposureTime", ScorpioDynamicView.R.ExposureTime)(ScorpioDynamicView.R.SyntheticId),
+      timeSpanMappingAtPath(StepRecordType / "scorpio" / "i" / "exposureTime", ScorpioDynamicView.I.ExposureTime)(ScorpioDynamicView.I.SyntheticId),
+      timeSpanMappingAtPath(StepRecordType / "scorpio" / "z" / "exposureTime", ScorpioDynamicView.Z.ExposureTime)(ScorpioDynamicView.Z.SyntheticId),
       timeSpanMappingAtPath(StepRecordType / "flamingos2" / "exposure", Flamingos2DynamicView.ExposureTime)(Flamingos2DynamicView.Id),
       timeSpanMappingAtPath(StepRecordType / "ghost" / "red" / "exposureTime", GhostDynamicTable.Red.ExposureTime)(GhostDynamicTable.Id),
       timeSpanMappingAtPath(StepRecordType / "ghost" / "blue" / "exposureTime", GhostDynamicTable.Blue.ExposureTime)(GhostDynamicTable.Id),

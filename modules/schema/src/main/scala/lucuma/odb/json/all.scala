@@ -17,6 +17,7 @@ object all:
        with ItcCodec
        with NumericCodec
        with PartnerLinkCodec
+       with ScorpioCodec
        with SequenceCodec
        with SourceProfileCodec
        with StepConfigCodec
