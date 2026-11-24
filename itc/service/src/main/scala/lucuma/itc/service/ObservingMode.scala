@@ -237,7 +237,14 @@ object ObservingMode {
     }
   }
 
-  sealed trait ImagingMode extends ObservingMode derives Hash
+  sealed trait ImagingMode extends ObservingMode derives Hash {
+
+    /**
+     * Locates an imaging calculation in the spectrum, as the science wavelength does for
+     * spectroscopy.
+     */
+    def filterWavelength: Wavelength
+  }
 
   object ImagingMode {
 
@@ -256,6 +263,8 @@ object ObservingMode {
     ) extends GmosImaging {
       val centralWavelength: Wavelength = Wavelength.Min // Ignored for imaging
 
+      val filterWavelength: Wavelength = filter.wavelength
+
       val instrument: Instrument =
         Instrument.GmosNorth
 
@@ -270,6 +279,8 @@ object ObservingMode {
     ) extends GmosImaging {
       val centralWavelength: Wavelength = Wavelength.Min // Ignored for imaging
 
+      val filterWavelength: Wavelength = filter.wavelength
+
       val instrument: Instrument =
         Instrument.GmosSouth
 
@@ -283,6 +294,8 @@ object ObservingMode {
       portDisposition: PortDisposition
     ) extends ImagingMode {
       val instrument: Instrument = Instrument.Flamingos2
+
+      val filterWavelength: Wavelength = filter.wavelength
 
       def analysisMethod: ItcObservationDetails.AnalysisMethod =
         ItcObservationDetails.AnalysisMethod.Aperture.Auto(
@@ -306,6 +319,8 @@ object ObservingMode {
 
       // Central wavelength is ignored for imaging; report the filter's.
       val centralWavelength: Wavelength = filter.centralWavelength
+
+      val filterWavelength: Wavelength = filter.centralWavelength
 
       def analysisMethod: ItcObservationDetails.AnalysisMethod =
         ItcObservationDetails.AnalysisMethod.Aperture.Auto(

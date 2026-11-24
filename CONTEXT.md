@@ -128,6 +128,14 @@ _Avoid_: MOS imaging, mask imaging.
 
 ### ITC Results
 
+**Filter Wavelength**:
+The single representative wavelength each imaging filter carries. For an imaging ITC calculation it plays the part the science wavelength plays in spectroscopy: it locates the calculation in the spectrum. One per filter, fixed, never user-supplied.
+_Avoid_: effective wavelength, filter central wavelength, the exposure time mode's "at" (a user-supplied wavelength that has no say in imaging).
+
+**Selected Brightness**:
+The one brightness of a target that an ITC calculation is normalized to, when the target has several: the one whose photometric band lies nearest the calculation's wavelength (the science wavelength for spectroscopy, the Filter Wavelength for imaging). For an emission-line target, the nearest line by the same rule. Chosen per ITC call, so a multi-filter imaging observation and its acquisition may each select a different one. Brightnesses in other bands have no effect on the result.
+_Avoid_: normalization band, band (alone, ambiguous with Science Band).
+
 **Peak Pixel Flux**:
 The highest electron count in any single pixel of any CCD in an ITC calculation, used to judge how close an exposure comes to saturating the detector. One number per target per configuration, taken as the maximum across the CCDs the ITC reports. Absent whenever no CCD data reached the ODB.
 _Avoid_: peak counts, peak e- count, ADU (a gain-scaled view of the same quantity), percent full well (a well-depth-scaled view).

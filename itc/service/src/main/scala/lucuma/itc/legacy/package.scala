@@ -147,6 +147,18 @@ def spectroscopyGraphParams(
     )
   (parameters, bandOrLine)
 
+/**
+ * The wavelength a calculation's brightness (or emission line) is selected by. Imaging uses the
+ * filter's own wavelength: the exposure time mode's `at` is arbitrary there.
+ */
+def selectionWavelength(
+  observingMode:    ObservingMode,
+  exposureTimeMode: ExposureTimeMode
+): Wavelength =
+  observingMode match
+    case i: ObservingMode.ImagingMode      => i.filterWavelength
+    case s: ObservingMode.SpectroscopyMode => exposureTimeMode.at
+
 def toItcParameters(
   target:           TargetData,
   observingMode:    ObservingMode,
@@ -154,7 +166,7 @@ def toItcParameters(
   exposureTimeMode: ExposureTimeMode
 ): (ItcParameters, Either[Band, Wavelength]) = // Bubble up the selected band or line
   val (sourceDefinition: ItcSourceDefinition, bandOrLine: Either[Band, Wavelength]) =
-    buildSourceDefinition(target, exposureTimeMode.at)
+    buildSourceDefinition(target, selectionWavelength(observingMode, exposureTimeMode))
   val parameters: ItcParameters                                                     =
     ItcParameters(
       source = sourceDefinition,
