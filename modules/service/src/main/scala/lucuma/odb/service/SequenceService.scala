@@ -112,24 +112,13 @@ trait SequenceService[F[_]]:
   )(using Transaction[F], Services.ServiceAccess): F[Unit]
 
   /**
-   * The distinct ids among `which`, in the order the database sorts
-   * observation ids, which is the order `selectAtomDigests` returns them in.
-   * Sorting a request before splitting it into batches makes the batches
-   * together come out in one overall order, whatever the batch size.  (The
-   * database's text order differs from the numeric order of `Observation.Id`.)
-   */
-  def sortObservationIds(
-    which: List[Observation.Id]
-  )(using Transaction[F], Services.ServiceAccess): F[List[Observation.Id]]
-
-  /**
    * Selects up to `limit` atom digests of the given observations, ordered by
-   * observation and atom index, starting with the first observation after
-   * `after` (or from the beginning if `None`).  The result is fully
-   * materialized so that it cannot outlive the transaction; callers read a
-   * large result one page per transaction, and pass many observations in
-   * batches to stay within the bind-parameter limit.  The last observation of
-   * a full page may be cut short by the limit.
+   * observation (as `Observation.Id` orders them) and atom index, starting with
+   * the first observation after `after` (or from the beginning if `None`).  The
+   * result is fully materialized so that it cannot outlive the transaction;
+   * callers read a large result one page per transaction, and pass many
+   * observations in batches to stay within the bind-parameter limit.  The last
+   * observation of a full page may be cut short by the limit.
    */
   def selectAtomDigests(
     which: List[Observation.Id],
@@ -454,12 +443,6 @@ object SequenceService:
           _ <- session.execute(Statements.DeleteAtomDigests)(observationId)
           _ <- insert.compile.drain
         yield ()
-
-      override def sortObservationIds(
-        which: List[Observation.Id]
-      )(using Transaction[F], Services.ServiceAccess): F[List[Observation.Id]] =
-        if which.isEmpty then List.empty.pure[F]
-        else session.execute(Statements.SortObservationIds)(which)
 
       override def selectAtomDigests(
         which: List[Observation.Id],
@@ -1907,14 +1890,6 @@ object SequenceService:
         ) VALUES $enc
       """.command
 
-    // Sorted as the column is, so the order matches selectAtomDigests.
-    val SortObservationIds: Query[List[Observation.Id], Observation.Id] =
-      sql"""
-        SELECT DISTINCT c_observation_id
-        FROM unnest(${_gid[Observation.Id]}::d_observation_id[]) AS t(c_observation_id)
-        ORDER BY c_observation_id
-      """.query(observation_id)
-
     // The cursor condition is added only when there is a cursor, so that first
     // and later pages are separate statements.  A single statement with an
     // optional cursor gets a generic plan that rereads every row of the batch
@@ -1934,11 +1909,11 @@ object SequenceService:
       """.apply(which) |+|
       after.foldMap: a =>
         sql"""
-          AND c_observation_id > $observation_id
+          AND gid_index(c_observation_id) > gid_index($observation_id)
         """.apply(a)
       |+|
       sql"""
-        ORDER BY c_observation_id, c_atom_index
+        ORDER BY gid_index(c_observation_id), c_atom_index
         LIMIT $int4
       """.apply(limit.value)
 

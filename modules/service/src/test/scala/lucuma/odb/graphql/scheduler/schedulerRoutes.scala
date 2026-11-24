@@ -24,6 +24,7 @@ import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
 import lucuma.odb.util.Codecs.observation_id
 import org.http4s.*
 import org.http4s.implicits.*
+import skunk.codec.numeric.int8
 import skunk.implicits.*
 
 class schedulerRoutes extends SchedulerRoutesSuite with ExecutionTestSupportForGmos:
@@ -294,15 +295,32 @@ class schedulerRoutes extends SchedulerRoutesSuite with ExecutionTestSupportForG
         assertEquals(reversed, forward)
         assertEquals(single, forward)
 
-  test("requested ids are sorted as the database orders them, not numerically"):
-    // The batches must come out in the order rows are sorted within each one,
-    // which is Postgres's text order: o-1000 < o-1a < o-a < o-fff.  Ordering
-    // Observation.Id numerically would give o-a < o-1a < o-fff < o-1000.
-    val ids = List("o-fff", "o-a", "o-1000", "o-1a", "o-a").flatMap(Observation.Id.parse)
-    withServices(serviceUser): services =>
-      services.transactionally(services.sequenceService.sortObservationIds(ids))
-    .map: sorted =>
-      assertEquals(sorted.map(_.toString), List("o-1000", "o-1a", "o-a", "o-fff"))
+  test("atoms come in the order of the ids' numbers, across a new hex digit"):
+    // As text, o-1000 sorts before o-ffe.
+    val setup: IO[List[Observation.Id]] =
+      for
+        p  <- createProgram
+        t  <- createTargetWithProfileAs(pi, p)
+        _  <- withSession(_.unique(sql"SELECT setval('s_observation_id', $int8, false)".query(int8))(0xffeL))
+        os <- createGmosNorthLongSlitObservationAs(pi, p, List(t)).replicateA(3)
+        _  <- os.traverse_(runObscalcUpdate(p, _))
+      yield os
+
+    def body(pageSizes: SchedulerRoutes.PageSizes, oids: Observation.Id*): IO[String] =
+      atomsRequest(serviceUser, oids.map(_.toString)*).flatMap: request =>
+        withRoutes(serviceUser, request, pageSizes).flatMap(_.as[String])
+
+    def observations(tsv: String): List[String] =
+      tsv.linesIterator.map(_.takeWhile(_ != '\t')).toList.distinct
+
+    setup.flatMap: oids =>
+      for
+        whole  <- body(SchedulerRoutes.PageSizes.Default, oids.reverse*)
+        single <- body(SinglePages, oids.reverse*)
+      yield
+        assertEquals(oids.map(_.toString), List("o-ffe", "o-fff", "o-1000"))
+        assertEquals(observations(whole), oids.map(_.toString))
+        assertEquals(single, whole)
 
   test("gzip"):
     val setup: IO[Observation.Id] =
