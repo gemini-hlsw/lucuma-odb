@@ -29,6 +29,7 @@ import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.StreamingExecutionConfig
 import lucuma.odb.sequence.util.AtomBuilder
 import lucuma.odb.sequence.util.definitionError
+import lucuma.refined.*
 
 import java.util.UUID
 
@@ -39,8 +40,7 @@ import java.util.UUID
  */
 object LongSlit:
 
-  val NodCycleTitle: NonEmptyString =
-    NonEmptyString.unsafeFrom("Nod Cycle")
+  val NodCycleTitle: NonEmptyString = "Nod Cycle".refined
 
   val Static: ScorpioStaticConfig =
     ScorpioStaticConfig(ScorpioChannelSelection.VisOnly)

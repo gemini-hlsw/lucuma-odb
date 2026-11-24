@@ -76,17 +76,17 @@ import lucuma.odb.sequence.data.UnsplittableAtom
 import lucuma.odb.sequence.daytimecal.Config as DaytimeConfig
 import lucuma.odb.sequence.daytimecal.InstrumentSetup
 import lucuma.odb.sequence.daytimecal.StaticConfigs as DaytimeStatics
-import lucuma.odb.sequence.scorpio.longslit.LongSlit as ScorpioLongSlit
 import lucuma.odb.sequence.gcalClass
+import lucuma.odb.sequence.scorpio.longslit.LongSlit as ScorpioLongSlit
 import lucuma.odb.sequence.util.AtomBuilder
 import lucuma.odb.sequence.util.StepInsertion
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Flamingos2Codecs.*
 import lucuma.odb.util.GhostCodecs.*
-import lucuma.odb.util.ScorpioCodecs.*
 import lucuma.odb.util.GmosCodecs.*
 import lucuma.odb.util.GnirsCodecs.*
 import lucuma.odb.util.Igrins2Codecs.*
+import lucuma.odb.util.ScorpioCodecs.*
 import skunk.*
 import skunk.codec.boolean.bool
 import skunk.codec.numeric.int2
@@ -1401,6 +1401,7 @@ object SequenceService:
         namespace:          Option[UUID] = None
       )(using Transaction[F]): F[Result[Stream[Pure, Atom[ScorpioDynamicConfig]]]] =
         (for
+          _ <- ResultT.fromResult(sequence.flatMap(_.steps.toList).traverse_(step => ScorpioSequenceService.checkDynamic(step.value)))
           s <- ResultT.liftF(selectOrComputeScorpioStatic(observationId))
           b <- ResultT.liftF(atomBuilder(sequenceType, s, namespace, estimator.scorpioStep))
           r <- replaceSequence(
@@ -1436,7 +1437,8 @@ object SequenceService:
         stream:        StreamingExecutionConfig[F, ScorpioStaticConfig, ScorpioDynamicConfig],
         sequenceTypes: Set[SequenceType]
       )(using Transaction[F], Services.ServiceAccess): F[Unit] =
-        materializeExecutionConfig(observationId, stream, sequenceTypes, scorpioSequenceService.insertStatic)(insertScorpioSequence)
+        // The generator has already checked the config.
+        materializeExecutionConfig(observationId, stream, sequenceTypes, scorpioSequenceService.insertStatic(_, _).map(_.toOption.flatten))(insertScorpioSequence)
 
       override def selectScorpioSequence(
         observationId: Observation.Id,
