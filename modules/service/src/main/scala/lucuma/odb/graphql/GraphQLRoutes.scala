@@ -127,19 +127,6 @@ object GraphQLRoutes {
         val name   = operationName.fold("")(n => s" ($n)")
         s"${request.rootTpe.name} ${if fields.isEmpty then "<unknown>" else fields.mkString(", ")}$name"
 
-      // Logs the `NotAuthorized` problems of `result`, if there are any, as one WARN line.
-      def logNotAuthorized(operation: => String, result: Result[?]): F[Unit] =
-        NotAuthorizedLog.warnResult(operation, result).void
-
-      // Like `logNotAuthorized`, but only for the first result of a subscription
-      def logNotAuthorizedOnce(operation: String): F[Result[?] => F[Unit]] =
-        Ref[F].of(false).map: logged =>
-          result =>
-            logged.flatModify: done =>
-              NotAuthorizedLog.fromResult(operation, result).filterNot(_ => done) match
-                case Some(line) => (true, L.warn(line))
-                case None       => (done, F.unit)
-
       val service: GraphQLService[F] =
         new GraphQLService[F](odbMapping, OdbMapping.slowQueryThreshold.some) {
 
@@ -183,7 +170,7 @@ object GraphQLRoutes {
                         error(ctx, s"Internal error: ${t.getClass.getSimpleName}: ${t.getMessage}\nCompiled query:\n${request.query.render.take(4096)}", t)
                       case Result.InternalError(t) => error(ctx, s"Internal error: ${t.getClass.getSimpleName}: ${t.getMessage}", t)
                       case r                       =>
-                        logNotAuthorized(describeOperation(request, operationName), r) >>
+                        NotAuthorizedLog.warnResult(describeOperation(request, operationName), r) >>
                           debug(ctx, s"Query (success).")
                     }
                 ).flatMap: (elapsed, result) =>
@@ -212,11 +199,15 @@ object GraphQLRoutes {
                 .build
                 .resource
             Stream.resource(spanResource).flatMap: res =>
-              Stream.eval(logNotAuthorizedOnce(describeOperation(request, operationName))).flatMap: log =>
-                super.subscribe(ctx, request, document, operationName)
-                  .evalTap(log)
-                  // use `res.trace` to make it the current context for each inner effect
-                  .translate(res.trace)
+              super.subscribe(ctx, request, document, operationName)
+                // Log the `NotAuthorized` problems of the first result that has any, as one WARN line.
+                .evalMapAccumulate(false) { (logged, result) =>
+                  val log = if logged then true.pure[F] else NotAuthorizedLog.warnResult(describeOperation(request, operationName), result)
+                  log.tupleRight(result)
+                }
+                .map(_._2)
+                // use `res.trace` to make it the current context for each inner effect
+                .translate(res.trace)
         }
 
       // Resolves the user of a request. If the user has never hit the ODB using http then there

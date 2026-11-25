@@ -145,7 +145,8 @@ class SsoClientSuite extends SsoSuite with Fixture {
   test("A refused JWT or API key is logged at DEBUG") {
     SsoSimulator[IO].use { case (_, _, sso, reader, writer) =>
       val Bearer = CIString("Bearer")
-      val badKey = ApiKey.fromString.reverseGet(ApiKey(PosLong.unsafeFrom(0xfffL), "0" * 96))
+      val keyId  = PosLong.unsafeFrom(0xfffL)
+      val badKey = ApiKey.fromString.reverseGet(ApiKey(keyId, "0" * 96))
       for {
         log        <- IO(TestingLogger.impl[IO]())
         serviceJwt <- writer.newJwt(ServiceUser(User.Id(1L.refined), "bogus"))
@@ -161,7 +162,7 @@ class SsoClientSuite extends SsoSuite with Fixture {
         ms         <- log.logged
       } yield {
         assert(jwt.isLeft, jwt)
-        assertEquals(key, Left(SsoClient.invalidApiKey(PosLong.unsafeFrom(0xfffL))))
+        assertEquals(key, Left(SsoClient.invalidApiKey(keyId)))
         assert(key.left.exists(_.endsWith(" fff")), key)
         assertEquals(ms.collect { case TestingLogger.WARN(m, _) => m }, Vector.empty)
         assertEquals(ms.count { case TestingLogger.DEBUG(_, _) => true; case _ => false }, 2, ms)

@@ -133,9 +133,9 @@ object ChownRoutes:
 
           // Not a service user, reject with no information given.
           case u =>
-            notAuthorized(u.id, "Only service users may change program ownership.") >> Forbidden()
+            NotAuthorizedLog.warn(u.id, Operation, "Only service users may change program ownership.") >> Forbidden()
 
-  val Operation: String = "POST /chown"
+  private val Operation: String = "POST /chown"
 
   def response[F[_]: {Monad, Logger}](
     caller:   ServiceUser,
@@ -154,6 +154,3 @@ object ChownRoutes:
         case InternalError(error)        =>
           Logger[F].error(error)(s"${caller.id}: chown from ${guest.id} to ${standard.id} failed.") >>
             InternalServerError("Internal server error.")
-
-  private def notAuthorized[F[_]: Logger](user: User.Id, reason: String): F[Unit] =
-    NotAuthorizedLog.warn(user, Operation, reason)

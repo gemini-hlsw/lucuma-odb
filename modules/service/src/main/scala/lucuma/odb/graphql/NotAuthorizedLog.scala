@@ -19,7 +19,7 @@ import org.typelevel.log4cats.Logger
 object NotAuthorizedLog:
 
   /** The line for `user`, refused `operation` for `reason`. The operation and the reason are truncated. */
-  def line(user: User.Id, operation: String, reason: String): String =
+  private def line(user: User.Id, operation: String, reason: String): String =
     s"Not authorized: user $user, operation ${operation.take(MaxLogLength)}: ${reason.take(MaxLogLength)}"
 
   /** Logs the line for `user`, refused `operation` for `reason`. */
@@ -30,7 +30,7 @@ object NotAuthorizedLog:
    * The line for the `NotAuthorized` problems of `result`, if there are any. The line names the
    * first problem, and gives the count of the others.
    */
-  def fromResult(operation: => String, result: Result[?]): Option[String] =
+  private def fromResult(operation: => String, result: Result[?]): Option[String] =
     result.toProblems.toList.flatMap(p => p.asOdbError.collect { case OdbError.NotAuthorized(u, _) => (u, p.message) }) match
       case Nil                         => none
       case all @ ((user, reason) :: _) =>
