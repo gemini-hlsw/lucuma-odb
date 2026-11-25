@@ -161,7 +161,8 @@ class SsoClientSuite extends SsoSuite with Fixture {
         ms         <- log.logged
       } yield {
         assert(jwt.isLeft, jwt)
-        assertEquals(key, Left(SsoClient.InvalidApiKey))
+        assertEquals(key, Left(SsoClient.invalidApiKey(PosLong.unsafeFrom(0xfffL))))
+        assert(key.left.exists(_.endsWith(" fff")), key)
         assertEquals(ms.collect { case TestingLogger.WARN(m, _) => m }, Vector.empty)
         assertEquals(ms.count { case TestingLogger.DEBUG(_, _) => true; case _ => false }, 2, ms)
       }

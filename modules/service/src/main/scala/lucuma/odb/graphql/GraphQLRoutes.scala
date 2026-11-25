@@ -26,8 +26,6 @@ import lucuma.graphql.routes.RoutesConfig
 import lucuma.horizons.HorizonsClient
 import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
-import lucuma.odb.data.OdbError
-import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.mapping.ConeCandidatesMapping
 import lucuma.odb.graphql.mapping.UserEnv
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
@@ -131,11 +129,16 @@ object GraphQLRoutes {
 
       // Logs the `NotAuthorized` problems of `result`, if there are any, as one WARN line.
       def logNotAuthorized(operation: => String, result: Result[?]): F[Unit] =
-        result.toProblems.toList.flatMap(p => p.asOdbError.collect { case OdbError.NotAuthorized(u, _) => (u, p.message) }) match
-          case Nil                         => F.unit
-          case all @ ((user, reason) :: _) =>
-            val more = if all.length > 1 then s" (and ${all.length - 1} more)" else ""
-            L.warn(s"Not authorized: user $user, operation ${operation.take(256)}: ${reason.take(256)}$more")
+        NotAuthorizedLog.warnResult(operation, result).void
+
+      // Like `logNotAuthorized`, but only for the first result of a subscription
+      def logNotAuthorizedOnce(operation: String): F[Result[?] => F[Unit]] =
+        Ref[F].of(false).map: logged =>
+          result =>
+            logged.flatModify: done =>
+              NotAuthorizedLog.fromResult(operation, result).filterNot(_ => done) match
+                case Some(line) => (true, L.warn(line))
+                case None       => (done, F.unit)
 
       val service: GraphQLService[F] =
         new GraphQLService[F](odbMapping, OdbMapping.slowQueryThreshold.some) {
@@ -209,10 +212,11 @@ object GraphQLRoutes {
                 .build
                 .resource
             Stream.resource(spanResource).flatMap: res =>
-              super.subscribe(ctx, request, document, operationName)
-                .evalTap(logNotAuthorized(describeOperation(request, operationName), _))
-                // use `res.trace` to make it the current context for each inner effect
-                .translate(res.trace)
+              Stream.eval(logNotAuthorizedOnce(describeOperation(request, operationName))).flatMap: log =>
+                super.subscribe(ctx, request, document, operationName)
+                  .evalTap(log)
+                  // use `res.trace` to make it the current context for each inner effect
+                  .translate(res.trace)
         }
 
       // Resolves the user of a request. If the user has never hit the ODB using http then there

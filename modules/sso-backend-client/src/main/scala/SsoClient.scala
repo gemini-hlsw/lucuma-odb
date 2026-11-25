@@ -90,6 +90,13 @@ object SsoClient {
   val InvalidApiKey: String = s"$AccessDenied: invalid API key"
 
   /**
+   * The message for the denied API key with id `id`. The id is not secret, and the log shows it, so
+   * an operator can tell which key the SSO server refused.
+   */
+  def invalidApiKey(id: ApiKey.Id): String =
+    s"$InvalidApiKey ${ApiKey.Id.fromString.reverseGet(id)}"
+
+  /**
    * The message of `t`, safe to send to the client and to write to the log. The message of a
    * `JwtLengthException` contains the whole token, so we replace it.
    */
@@ -163,8 +170,10 @@ object SsoClient {
           .map(_.asRight[String])
           .recoverWith {
             case UnexpectedStatus(Status.Forbidden, _, _) =>
-              // DEBUG: a caller can call `get` more than once per request. `require` logs the refusal.
-              Logger[F].debug(s"SSO refused to exchange API key ${apiKey.id}").as(InvalidApiKey.asLeft[UserInfo])
+              // DEBUG: a caller can call `get` more than once per request. `require` and the GraphQL
+              // routes log the refusal, with the reason that names the key.
+              val reason = invalidApiKey(apiKey.id)
+              Logger[F].debug(s"SSO refused to exchange API key: $reason").as(reason.asLeft[UserInfo])
             // Any other status is a server error. Remove the request URI, which contains the key.
             case UnexpectedStatus(status, method, uri) =>
               UnexpectedStatus(status, method, uri.removeQueryParam("key")).raiseError[F, Either[String, UserInfo]]
@@ -211,6 +220,12 @@ object SsoClient {
     def find(req: Request[F]): F[Either[String, A]] =
       req.headers.get[Authorization].fold(AccessDenied.asLeft[A].pure[F])(get)
 
+    /**
+     * Runs `f` with the value that `find` resolves, else answers `403 Forbidden` and logs the
+     * refusal at WARN as "Authentication denied", the wording of the GraphQL routes. A client made
+     * with `filter` or `collect` also refuses a user with valid credentials, and that refusal gets
+     * the same line, without the user id.
+     */
     final def require(req: Request[F])(f: A => F[Response[F]]): F[Response[F]] =
       EitherT(find(req)).foldF(reason => authenticationDenied(req, reason) >> Forbidden(reason), f)
 

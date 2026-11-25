@@ -21,6 +21,7 @@ import lucuma.sso.client.util.JwtDecoder
 import org.http4s.*
 import org.http4s.headers.Authorization
 import org.typelevel.ci.CIString
+import org.typelevel.log4cats.Logger
 import pdi.jwt.Jwt
 import pdi.jwt.JwtAlgorithm
 import pdi.jwt.JwtClaim
@@ -48,7 +49,7 @@ object TestSso:
   private val reader: SsoJwtReader[IO] =
     SsoJwtReader(JwtDecoder.withPublicKey[IO](publicKey))
 
-  def ssoClient: SsoClient[IO, User] =
+  def ssoClient(using Logger[IO]): SsoClient[IO, User] =
     new SsoClient.AbstractSsoClient[IO, User]:
       def get(authorization: Authorization): IO[Either[String, User]] =
         authorization match

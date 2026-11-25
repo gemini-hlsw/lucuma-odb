@@ -43,9 +43,9 @@ class ChownResponseSuite extends CatsEffectSuite:
       assert(!body.contains("\tat ") && !body.contains(".scala:"), body)
       assert(ms.exists { case ERROR(_, Some(t)) => t eq error; case _ => false }, ms)
 
-  test("A NotAuthorized failure is logged with the user and the operation."):
+  test("A NotAuthorized failure gives status 403, and is logged with the user and the operation."):
     respond(OdbError.NotAuthorized(service.id).asFailure).map: (status, _, ms) =>
-      assertEquals(status, Status.InternalServerError)
+      assertEquals(status, Status.Forbidden)
       val ws = ms.collect { case WARN(m, _) => m }
       assertEquals(ws.length, 1, ms)
       assert(ws.head.contains(service.id.toString), ws.head)

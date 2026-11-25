@@ -38,7 +38,7 @@ abstract class AttachmentRoutesSuite extends CatsEffectSuite with TestSsoClient 
   // This isn't really what the errors depend on, but we're not testing the service.
   // Only the result matters.
   protected  def getError(user: User): Option[AttachmentException] =
-    if (user === forbiddenUser) AttachmentException.Forbidden.some
+    if (user === forbiddenUser) AttachmentException.Forbidden("No write access.").some
     else if (user === fileNotFoundUser) AttachmentException.FileNotFound.some
     else if (user === invalidFileUser) AttachmentException.InvalidRequest(invalidFileName).some
     else none

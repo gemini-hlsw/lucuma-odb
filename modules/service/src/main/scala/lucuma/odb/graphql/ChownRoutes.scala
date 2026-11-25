@@ -28,8 +28,6 @@ import lucuma.core.model.User
 import lucuma.horizons.HorizonsClient
 import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
-import lucuma.odb.data.OdbError
-import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.NoTransaction
@@ -146,16 +144,16 @@ object ChownRoutes:
     result:   Result[List[Program.Id]]
   ): F[Response[F]] =
     val dsl = Http4sDsl[F]; import dsl.*
-    val denied = result.toProblems.toList.collectFirstSome(p => p.asOdbError.collect { case OdbError.NotAuthorized(u, _) => (u, p.message) })
-    denied.traverse_((u, m) => notAuthorized(u, m.take(256))) >> (result match
-      case Success(Nil)             => Ok(s"User ${guest.id} owns no programs, so nothing was done.")
-      case Success(value)           => Ok(s"Changed ownership from ${guest.id} to ${standard.id} for ${value.mkString(", ")}.")
-      case Warning(problems, value) => Ok(s"Changed ownership from ${guest.id} to ${standard.id} for ${value.mkString(", ")} with warnings:\n${problems.toList.mkString("\n")}.")
-      case Failure(problems)        => InternalServerError(problems.toList.mkString("\n"))
-      case InternalError(error)     =>
-        Logger[F].error(error)(s"${caller.id}: chown from ${guest.id} to ${standard.id} failed.") >>
-          InternalServerError("Internal server error.")
-    )
+    NotAuthorizedLog.warnResult(Operation, result).flatMap: denied =>
+      result match
+        case Success(Nil)                => Ok(s"User ${guest.id} owns no programs, so nothing was done.")
+        case Success(value)              => Ok(s"Changed ownership from ${guest.id} to ${standard.id} for ${value.mkString(", ")}.")
+        case Warning(problems, value)    => Ok(s"Changed ownership from ${guest.id} to ${standard.id} for ${value.mkString(", ")} with warnings:\n${problems.toList.mkString("\n")}.")
+        case Failure(problems) if denied => Forbidden(problems.toList.mkString("\n"))
+        case Failure(problems)           => InternalServerError(problems.toList.mkString("\n"))
+        case InternalError(error)        =>
+          Logger[F].error(error)(s"${caller.id}: chown from ${guest.id} to ${standard.id} failed.") >>
+            InternalServerError("Internal server error.")
 
   private def notAuthorized[F[_]: Logger](user: User.Id, reason: String): F[Unit] =
-    Logger[F].warn(s"Not authorized: user $user, operation $Operation: $reason")
+    NotAuthorizedLog.warn(user, Operation, reason)

@@ -117,18 +117,20 @@ object AttachmentRoutes {
     val dsl = Http4sDsl[F]
     import dsl._
 
+    // A `Forbidden` refusal of an authenticated user is logged with the user, the operation and the reason.
     extension (exc: AttachmentException)
-      def toErrorResponse: F[Response[F]] = exc match
-        case AttachmentException.Forbidden           => Forbidden()
-        case AttachmentException.FileNotFound        => NotFound()
-        case AttachmentException.InvalidRequest(msg) => BadRequest(msg)
+      def toErrorResponse(user: User, req: Request[F]): F[Response[F]] = exc match
+        case AttachmentException.Forbidden(reason)    =>
+          NotAuthorizedLog.warn(user.id, s"${req.method} ${req.uri.path}", reason) >> Forbidden()
+        case AttachmentException.FileNotFound         => NotFound()
+        case AttachmentException.InvalidRequest(msg)  => BadRequest(msg)
         case AttachmentException.AttachmentInUse(msg) => Conflict(msg)
 
     extension[A](fe: F[Either[AttachmentException, A]])
-      def toResponse(fa: A => F[Response[F]]): F[Response[F]] =
+      def toResponse(user: User, req: Request[F])(fa: A => F[Response[F]]): F[Response[F]] =
         fe.flatMap {
           case Right(a) => fa(a)
-          case Left(e) => e.toErrorResponse
+          case Left(e) => e.toErrorResponse(user, req)
         }
 
     def attachmentTypeFailure(s: String): ParseFailure =
@@ -148,22 +150,12 @@ object AttachmentRoutes {
     object AttachmentTypeMatcher extends QueryParamDecoderMatcher[AttachmentType]("attachmentType")
     object DescriptionMatcher    extends OptionalQueryParamDecoderMatcher[String]("description")
 
-    // Like `ssoClient.require`, but also logs a `403 Forbidden` response to an authenticated user.
-    def require(req: Request[F])(f: User => F[Response[F]]): F[Response[F]] =
-      ssoClient.require(req) { user =>
-        f(user).flatTap { res =>
-          Logger[F]
-            .warn(s"Not authorized: user ${user.id}, operation ${req.method} ${req.uri.path}: The route answered 403 Forbidden.")
-            .whenA(res.status === Status.Forbidden)
-        }
-      }
-
     val routes = HttpRoutes.of[F] {
       case req @ GET -> Root / "attachment" / AttachmentId(attachmentId) =>
-        require(req) { user =>
+        ssoClient.require(req) { user =>
           service(user) { s =>
             s.getAttachment(user, attachmentId)
-              .toResponse(f => Response[F](Status.Ok, headers = downloadHeaders(f.fileName), body = f.data).pure)
+              .toResponse(user, req)(f => Response[F](Status.Ok, headers = downloadHeaders(f.fileName), body = f.data).pure)
           }
         }
 
@@ -172,12 +164,12 @@ object AttachmentRoutes {
           +& FileNameMatcher(fileName)
           +& AttachmentTypeMatcher(attachmentType)
           +& DescriptionMatcher(optDesc) =>
-        require(req) { user =>
+        ssoClient.require(req) { user =>
           service(user) { s =>
             val description = optDesc.flatMap(d => NonEmptyString.from(d).toOption)
             s
               .insertAttachment(user, programId, attachmentType, fileName, description, req.body)
-              .toResponse(id => Ok(id.toString))
+              .toResponse(user, req)(id => Ok(id.toString))
               .recoverWith {
                 case EntityLimiter.EntityTooLarge(_) =>
                   BadRequest(s"File too large. Limit of $maxUploadMb MB")
@@ -187,12 +179,12 @@ object AttachmentRoutes {
 
       case req @ PUT -> Root / "attachment" / AttachmentId(attachmentId)
           :? FileNameMatcher(fileName) +& DescriptionMatcher(optDesc) =>
-        require(req) { user =>
+        ssoClient.require(req) { user =>
           service(user) { s =>
             val description = optDesc.flatMap(d => NonEmptyString.from(d).toOption)
             s
               .updateAttachment(user, attachmentId, fileName, description, req.body)
-              .toResponse(_ => Ok())
+              .toResponse(user, req)(_ => Ok())
               .recoverWith {
                 case EntityLimiter.EntityTooLarge(_) =>
                   BadRequest(s"File too large. Limit of $maxUploadMb MB")
@@ -201,20 +193,20 @@ object AttachmentRoutes {
         }
 
       case req @ DELETE -> Root / "attachment" / AttachmentId(attachmentId) =>
-        require(req) { user =>
+        ssoClient.require(req) { user =>
           service(user) { s =>
             s
               .deleteAttachment(user, attachmentId)
-              .toResponse(Ok(_))
+              .toResponse(user, req)(Ok(_))
           }
         }
 
       case req @ GET -> Root / "attachment" / "url" / AttachmentId(attachmentId) =>
-        require(req) { user =>
+        ssoClient.require(req) { user =>
           service(user) { s =>
             s
               .getPresignedUrl(user, attachmentId)
-              .toResponse(Ok(_))
+              .toResponse(user, req)(Ok(_))
           }
         }
     }
