@@ -9,15 +9,13 @@ import ciris.*
 
 /** The execution environment of a service. */
 enum Environment:
-  case Local, Development, Staging, Production
+  case Local, Dev, Staging, Production
 
   /** The canonical lowercase name, for example for telemetry. */
-  def name: String =
-    this match
-      case Local       => "local"
-      case Development => "development"
-      case Staging     => "staging"
-      case Production  => "production"
+  def name: String = toString.toLowerCase
+
+  /** True only for `Local`, the one environment that relaxes security settings. */
+  def isLocal: Boolean = this == Local
 
 object Environment:
 
@@ -26,7 +24,7 @@ object Environment:
   given ConfigDecoder[String, Environment] =
     ConfigDecoder[String].map(_.trim.toLowerCase).collect("Environment") {
       case "local"               => Local
-      case "dev" | "development" => Development
+      case "dev" | "development" => Dev
       case "staging"             => Staging
       case "production"          => Production
     }

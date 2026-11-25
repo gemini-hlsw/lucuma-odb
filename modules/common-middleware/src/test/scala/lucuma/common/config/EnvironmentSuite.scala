@@ -53,9 +53,9 @@ class EnvironmentSuite extends CatsEffectSuite {
   }
 
   List(
-    "dev"         -> Environment.Development,
-    "development" -> Environment.Development,
-    "Development" -> Environment.Development,
+    "dev"         -> Environment.Dev,
+    "development" -> Environment.Dev,
+    "Development" -> Environment.Dev,
     "staging"     -> Environment.Staging,
     "production"  -> Environment.Production
   ).foreach { case (value, expected) =>

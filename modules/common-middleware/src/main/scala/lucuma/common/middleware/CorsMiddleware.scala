@@ -5,6 +5,7 @@ package lucuma.common.middleware
 
 import cats.*
 import cats.implicits.*
+import lucuma.common.config.Environment
 import org.http4s.HttpRoutes
 import org.http4s.Uri
 import org.http4s.Uri.Scheme
@@ -32,15 +33,16 @@ object CorsMiddleware:
 
   /**
    * A middleware that adds CORS headers. Credentials are allowed, so the origin must match one
-   * of the configured domains.
-   * When `corsOverHttps` is true, only HTTPS origins are accepted. (plain http is for dev)
+   * of the configured domains. Only the `Local` environment accepts plain HTTP origins. Every
+   * other environment requires HTTPS.
    *
-   * @param corsOverHttps whether to additionally require the origin to use HTTPS
+   * @param environment the execution environment of the service
    * @param domain the trusted domains allowed to make credentialed cross-origin requests
    */
-  def cors[F[_]: Monad](corsOverHttps: Boolean = false, domain: List[String]): Middleware[F] =
+  def cors[F[_]: Monad](environment: Environment, domain: List[String]): Middleware[F] =
+    val allowHttp = environment.isLocal
     CORS.policy
       .withAllowCredentials(true)
-      .withAllowOriginHost(u => (!corsOverHttps || (u.scheme === Scheme.https)) && isAllowed(u.host, domain))
+      .withAllowOriginHost(u => (allowHttp || (u.scheme === Scheme.https)) && isAllowed(u.host, domain))
       .withMaxAge(1.day)
       .apply
