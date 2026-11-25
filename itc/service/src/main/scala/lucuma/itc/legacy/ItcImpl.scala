@@ -92,7 +92,8 @@ object ItcImpl {
               _      <- debug"Target $target"
               _      <- traceParams
               _      <- span.addAttributes(
-                          Attribute("params.at", at.nm.value.value.toDouble),
+                          Attribute("params.at", exposureTimeMode.at.nm.value.value.toDouble),
+                          Attribute("params.selection_wavelength", at.nm.value.value.toDouble),
                           Attribute("params.observing_mode", observingMode.description)
                         )
               _      <- debug"${request.noSpaces}"
