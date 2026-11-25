@@ -237,14 +237,13 @@ object ObservingMode {
     }
   }
 
-  sealed trait ImagingMode extends ObservingMode derives Hash {
+  sealed trait ImagingMode extends ObservingMode derives Hash:
 
     /**
      * Locates an imaging calculation in the spectrum, as the science wavelength does for
      * spectroscopy.
      */
     def filterWavelength: Wavelength
-  }
 
   object ImagingMode {
 
