@@ -73,7 +73,7 @@ object Config {
     envOrProp("EXAMPLE_PORT").as[Int].as[Port],
     envOrProp("EXAMPLE_SSO_ROOT").as[Uri],
     envOrProp("EXAMPLE_SSO_PUBLIC_KEY").as[PublicKey],
-    envOrProp("EXAMPLE_SERVICE_JWT"),
+    envOrProp("EXAMPLE_SERVICE_JWT").redacted,
   ).parMapN(Config.apply)
 
 }

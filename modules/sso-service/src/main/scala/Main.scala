@@ -187,7 +187,7 @@ object FMain extends AnsiColor {
   /** A resource that yields an OrcidService. */
   def orcidServiceResource[F[_]: Async: Tracer: Network](config: OrcidConfig, env: Environment) =
     EmberClientBuilder.default[F].build
-      .map(LoggingMiddleware.client[F](revealSensitiveHeaders = env == Environment.Local))
+      .map(LoggingMiddleware.client[F](revealSensitiveHeaders = env.isLocal))
       .map: client =>
         OrcidService(config.orcidHost, config.clientId, config.clientSecret, client)
 

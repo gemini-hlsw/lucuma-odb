@@ -63,7 +63,7 @@ final case class Config(
       authority = Some(
         Authority(
           host = authority.host,
-          port = if (environment == Local) Some(httpPort.value) else None
+          port = if (environment.isLocal) Some(httpPort.value) else None
         )
       )
     )

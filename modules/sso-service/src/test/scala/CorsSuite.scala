@@ -4,6 +4,7 @@
 package lucuma.sso.service
 
 import cats.effect.*
+import lucuma.common.config.Environment
 import lucuma.common.middleware.CorsMiddleware
 import org.http4s.*
 import org.http4s.implicits.*
@@ -13,7 +14,7 @@ import org.typelevel.otel4s.trace.Tracer.Implicits.noop
 class CorsSuite extends SsoSuite {
 
   def routes(domain: String): HttpRoutes[IO] =
-    CorsMiddleware.cors[IO](domain = List(domain)).apply(
+    CorsMiddleware.cors[IO](Environment.Production, List(domain)).apply(
       Routes[IO](
         dbPool    = null,
         odb       = null,
@@ -45,23 +46,7 @@ class CorsSuite extends SsoSuite {
       }
     }
 
-  // def headerTestForArbitraryDomain(env: Environment): Unit =
-  //   test(s"CORS headers must be added for arbitrary origin. ($env)") {
-  //     val req = Request[IO](uri = uri"/api/v1/whoami").putHeaders(Header.Raw(CIString("Origin"), "https://wozle.com"))
-  //     routes(env).orNotFound(req).map { res =>
-  //       forEach(CorsHeaders)(s => expect(res.headers.headers.exists(_.name.toString == s)))
-  //     }
-  //   }
-
   noHeaderTest("foo.bar")
-  // noHeaderTest(Environment.Development)
-  // noHeaderTest(Environment.Staging)
-  // noHeaderTest(Environment.Production)
-
-  // failing … why?
-  // headerTestForArbitraryDomain(Environment.Local)
-  // headerTestForArbitraryDomain(Environment.Development)
-  // headerTestForArbitraryDomain(Environment.Staging)
 
   test("CORS headers must not be added if origin is mismatched.") {
     val req = Request[IO](uri = uri"/api/v1/whoami").putHeaders(Header.Raw(CIString("Origin"), "https://woozle.com"))

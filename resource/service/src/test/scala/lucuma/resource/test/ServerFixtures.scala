@@ -8,6 +8,7 @@ import com.comcast.ip4s.*
 import com.dimafeng.testcontainers.GenericContainer
 import com.dimafeng.testcontainers.PostgreSQLContainer
 import com.dimafeng.testcontainers.munit.TestContainerForAll
+import lucuma.common.config.Environment
 import lucuma.otel.OtelServices
 import lucuma.otel.OtelServices.given
 import lucuma.otel.OtelSetup
@@ -120,7 +121,7 @@ trait ServerFixtures extends DatabaseFixtures:
       config                 <- IO(databaseConfig).toResource
       given OtelServices[IO] <- OtelSetup.noop[IO]("test").toResource
       a                      <- ResourceMain
-                                  .routesResource[IO](config, true, Seq("unused"), TestSso.ssoClient)
+                                  .routesResource[IO](config, Environment.Production, Seq("unused"), TestSso.ssoClient)
       s                      <- EmberServerBuilder
                                   .default[IO]
                                   .withHost(ipv4"0.0.0.0")

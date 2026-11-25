@@ -14,6 +14,7 @@ import fs2.compression.Compression
 import fs2.io.file.Files
 import fs2.io.net.*
 import grackle.skunk.SkunkMonitor
+import lucuma.common.config.Environment
 import lucuma.core.model.User
 import lucuma.graphql.routes.GraphQLService
 import lucuma.odb.StartupChecks.runChecks
@@ -59,7 +60,7 @@ object ResourceMain extends IOApp.Simple {
                                  conf.otel
                                )
       ssoClient             <- ssoClientResource[F](conf.sso)
-      r                     <- routesResource[F](conf.database, conf.corsOverHttps, conf.domain, ssoClient)
+      r                     <- routesResource[F](conf.database, conf.environment, conf.domain, ssoClient)
       s                     <- server(conf, r)
     yield s
 
@@ -94,7 +95,7 @@ object ResourceMain extends IOApp.Simple {
       Files, Compression}
   ](
     databaseConfig: DatabaseConfiguration,
-    corsOverHttps:  Boolean,
+    environment:    Environment,
     domain:         Seq[String],
     ssoClient:      SsoClient[F, User]
   ): Resource[F, WebSocketBuilder2[F] => HttpApp[F]] =
@@ -104,7 +105,7 @@ object ResourceMain extends IOApp.Simple {
       service    <-
         GraphQLService[F](ResourceMapping(pool, SkunkMonitor.noopMonitor[F])(schema)).toResource
       r           = routes(service, ssoClient)
-      middleware  = ServerMiddleware(corsOverHttps, domain, ssoClient)
+      middleware  = ServerMiddleware(environment, domain, ssoClient)
       instrument <- ServerMiddleware.instrumentation[F].toResource
     yield wsb => instrument(middleware(r(wsb)).orNotFound)
 

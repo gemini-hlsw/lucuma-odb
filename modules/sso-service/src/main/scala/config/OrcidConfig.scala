@@ -32,7 +32,7 @@ object OrcidConfig {
 
   def config(env: Environment): ConfigValue[Effect, OrcidConfig] = (
     envOrProp("LUCUMA_ORCID_CLIENT_ID"),
-    envOrProp("LUCUMA_ORCID_CLIENT_SECRET")
+    envOrProp("LUCUMA_ORCID_CLIENT_SECRET").redacted
   ).parMapN(apply(_, _, orcidHost(env)))
 
 }

@@ -6,7 +6,6 @@ package lucuma.sso.service
 import cats.*
 import cats.effect.*
 import lucuma.common.config.Environment
-import lucuma.common.config.Environment.*
 import lucuma.common.middleware.CorsMiddleware
 import lucuma.common.middleware.LoggingMiddleware
 import lucuma.otel.HttpInstrumentation
@@ -32,11 +31,7 @@ object ServerMiddleware:
   def logging[F[_]: Async](
     env:          Environment,
   ): Middleware[F] =
-    LoggingMiddleware.logging[F](revealSensitiveHeaders =
-      env match
-        case Local                              => true
-        case Development | Staging | Production => false
-    )
+    LoggingMiddleware.logging[F](revealSensitiveHeaders = env.isLocal)
 
   /** A middleware that reports errors during requets processing. */
   def errorReporting[F[_]: MonadThrow: Logger]: Middleware[F] = routes =>
@@ -51,7 +46,7 @@ object ServerMiddleware:
     config: Config,
   ): Middleware[F] =
     List[Middleware[F]](
-      CorsMiddleware.cors(domain = List(config.cookieDomain)),
+      CorsMiddleware.cors(config.environment, List(config.cookieDomain)),
       logging(config.environment),
       errorReporting,
     ).reduce(_ andThen _) // N.B. the monoid for Endo uses `compose`
