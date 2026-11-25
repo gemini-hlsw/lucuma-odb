@@ -18174,8 +18174,8 @@ type ItcSpectroscopy implements Itc {
 
 """
 ITC results for spectroscopy observations that have no acquisition estimate:
-IGRINS-2, GMOS MOS and Flamingos 2 MOS.  For IGRINS-2 the SVC acquisition
-sequence, when present, uses the SVC exposure time configuration.
+IGRINS-2.  Its SVC acquisition sequence, when present, uses the SVC exposure
+time configuration.
 """
 type ItcScienceOnlySpectroscopy implements Itc {
   itcType: ItcType!
