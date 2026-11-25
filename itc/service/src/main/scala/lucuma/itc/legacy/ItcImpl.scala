@@ -76,6 +76,8 @@ object ItcImpl {
                 exposureTimeMode
               ).leftMap(_.asJson)
 
+            val at: Wavelength = selectionWavelength(observingMode, exposureTimeMode)
+
             def traceParams: F[Unit] =
               exposureTimeMode match
                 case ExposureTimeMode.SignalToNoiseMode(sn, at)         =>
@@ -91,10 +93,11 @@ object ItcImpl {
               _      <- traceParams
               _      <- span.addAttributes(
                           Attribute("params.at", exposureTimeMode.at.nm.value.value.toDouble),
+                          Attribute("params.selection_wavelength", at.nm.value.value.toDouble),
                           Attribute("params.observing_mode", observingMode.description)
                         )
               _      <- debug"${request.noSpaces}"
-              a      <- itcLocal.calculate(request.noSpaces, exposureTimeMode.at)
+              a      <- itcLocal.calculate(request.noSpaces, at)
               result <- T.span("convert integration_time_result")
                           .surround:
                             convertIntegrationTimeRemoteResult(a, bandOrLine)
