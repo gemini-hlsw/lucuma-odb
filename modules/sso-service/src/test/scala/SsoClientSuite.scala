@@ -6,6 +6,7 @@ package lucuma.sso.service
 import cats.effect.*
 import cats.syntax.all.*
 import eu.timepit.refined.numeric.Positive
+import eu.timepit.refined.types.numeric.PosLong
 import lucuma.core.model.ServiceUser
 import lucuma.core.model.User
 import lucuma.core.refined.auto.*
@@ -18,6 +19,7 @@ import org.http4s.dsl.io.*
 import org.http4s.headers.*
 import org.http4s.implicits.*
 import org.typelevel.ci.CIString
+import org.typelevel.log4cats.testing.TestingLogger
 
 import scala.concurrent.duration.*
 
@@ -137,6 +139,34 @@ class SsoClientSuite extends SsoSuite with Fixture {
                   )
     
       } yield assertEq(Status.Forbidden, status)
+    }
+  }
+
+  test("A refused JWT or API key is logged at DEBUG") {
+    SsoSimulator[IO].use { case (_, _, sso, reader, writer) =>
+      val Bearer = CIString("Bearer")
+      val keyId  = PosLong.unsafeFrom(0xfffL)
+      val badKey = ApiKey.fromString.reverseGet(ApiKey(keyId, "0" * 96))
+      for {
+        log        <- IO(TestingLogger.impl[IO]())
+        serviceJwt <- writer.newJwt(ServiceUser(User.Id(1L.refined), "bogus"))
+        ssoClient  <- SsoClient.initial[IO](
+                        httpClient  = sso,
+                        ssoRoot     = SsoRoot,
+                        jwtReader   = reader,
+                        gracePeriod = 5.minutes,
+                        serviceJwt  = serviceJwt
+                      )(using summon[Concurrent[IO]], summon[Clock[IO]], log)
+        jwt        <- ssoClient.get(Authorization(Credentials.Token(Bearer, "not.a.jwt")))
+        key        <- ssoClient.get(Authorization(Credentials.Token(Bearer, badKey)))
+        ms         <- log.logged
+      } yield {
+        assert(jwt.isLeft, jwt)
+        assertEquals(key, Left(SsoClient.invalidApiKey(keyId)))
+        assert(key.left.exists(_.endsWith(" fff")), key)
+        assertEquals(ms.collect { case TestingLogger.WARN(m, _) => m }, Vector.empty)
+        assertEquals(ms.count { case TestingLogger.DEBUG(_, _) => true; case _ => false }, 2, ms)
+      }
     }
   }
 

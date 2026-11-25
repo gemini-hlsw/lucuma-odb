@@ -79,7 +79,7 @@ ThisBuild / libraryDependencySchemes ++= Seq(
 ThisBuild / libraryDependencySchemes +=
   "org.typelevel" %% "grackle-core" % VersionScheme.Always
 
-ThisBuild / tlBaseVersion      := "0.112"
+ThisBuild / tlBaseVersion      := "0.113"
 ThisBuild / scalaVersion       := "3.9.0"
 ThisBuild / crossScalaVersions := Seq("3.9.0")
 ThisBuild / scalacOptions     ++= Seq("-Xmax-inlines", "50") // Hash derivation fails with default of 32
@@ -631,6 +631,7 @@ lazy val ssoService = project
       "io.circe"            %% "circe-literal"                   % circeVersion               % Test,
       "org.scalameta"       %% "munit"                           % munitVersion               % Test,
       "org.typelevel"       %% "munit-cats-effect"               % munitCatsEffectVersion     % Test,
+      "org.typelevel"       %% "log4cats-testing"                % log4catsVersion            % Test,
       "com.dimafeng"        %% "testcontainers-scala-munit"      % testcontainersScalaVersion % Test,
       "com.dimafeng"        %% "testcontainers-scala-postgresql" % testcontainersScalaVersion % Test,
 
@@ -1179,6 +1180,7 @@ lazy val service = project
       "edu.gemini"                       %% "lucuma-core-testkit"                        % lucumaCoreVersion            % Test,
       "io.opentelemetry"                  % "opentelemetry-sdk-testing"                  % openTelemetryVersion         % Test,
       "org.typelevel"                    %% "munit-cats-effect"                          % munitCatsEffectVersion       % Test,
+      "org.typelevel"                    %% "log4cats-testing"                           % log4catsVersion              % Test,
     ),
     reStart / envVars += "PORT" -> "8082",
     reStartArgs += "serve",

@@ -16,6 +16,7 @@ import lucuma.sso.service.database.Database
 import org.http4s.Credentials.Token
 import org.http4s.headers.Authorization
 import org.typelevel.ci.CIString
+import org.typelevel.log4cats.Logger
 
 /**
  * Constructor for an SsoClient that runs locally, which we need for endpoints that are going to be
@@ -26,7 +27,7 @@ object LocalSsoClient {
   /** A standard user and whether a raw API key, rather than a JWT, authenticated the request. */
   case class Authenticated(user: StandardUser, viaApiKey: Boolean)
 
-  def apply[F[_]: Sync](
+  def apply[F[_]: Sync: Logger](
     jwtReader: SsoJwtReader[F],
     dbPool:    Resource[F, Database[F]]
   ): SsoClient[F, Authenticated] =

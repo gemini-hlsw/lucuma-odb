@@ -23,8 +23,13 @@ import org.http4s.*
 import org.http4s.headers.Authorization
 import org.http4s.implicits.*
 import org.typelevel.ci.*
+import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.noop.NoOpLogger
+import org.typelevel.log4cats.testing.TestingLogger
 
 class attachmentRoutes extends AttachmentRoutesSuite {
+
+  private given Logger[IO] = NoOpLogger[IO]
 
   private val attachmentId    = Attachment.Id(5.refined)
   private val fileName        = NonEmptyString.unsafeFrom("finder.png")
@@ -304,6 +309,19 @@ class attachmentRoutes extends AttachmentRoutesSuite {
                                 headers = hs
       )
       routes.run(request).assertResponse(Status.Forbidden, none)
+  }
+
+  test("A Forbidden refusal is logged at WARN with the user, the operation and the reason") {
+    val log = TestingLogger.impl[IO]()
+    val app = AttachmentRoutes(service, ssoClient, 1)(using summon, log).orNotFound
+    headers(forbiddenUser).flatMap: hs =>
+      val request = Request[IO](method = Method.GET, uri = uri"attachment/a-1", headers = hs)
+      app.run(request).assertResponse(Status.Forbidden, none) >>
+        log.logged.map: ms =>
+          val ws = ms.collect { case TestingLogger.WARN(m, _) => m }
+          assertEquals(ws.length, 1, ms)
+          assert(ws.head.startsWith(s"Not authorized: user ${forbiddenUser.id}, operation GET "), ws.head)
+          assert(ws.head.endsWith("attachment/a-1: No write access."), ws.head)
   }
 
   test("GET returns NotFound if service returns FileNotFound") {

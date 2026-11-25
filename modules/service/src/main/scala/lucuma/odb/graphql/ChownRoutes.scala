@@ -3,6 +3,7 @@
 
 package lucuma.odb.graphql
 
+import cats.Monad
 import cats.Parallel
 import cats.effect.Async
 import cats.effect.Resource
@@ -128,13 +129,28 @@ object ChownRoutes:
                             programUserService.chown(guest, standard)
 
                       // Do the thing and map the result to an HTTP response
-                      (canonicalizeUsers >> chown).flatMap:
-                        case Success(Nil)             => Ok(s"User ${guest.id} owns no programs, so nothing was done.")
-                        case Success(value)           => Ok(s"Changed ownership from ${guest.id} to ${standard.id} for ${value.mkString(", ")}.")
-                        case Warning(problems, value) => Ok(s"Changed ownership from ${guest.id} to ${standard.id} for ${value.mkString(", ")} with warnings:\n${problems.toList.mkString("\n")}.")
-                        case Failure(problems)        => InternalServerError(problems.toList.mkString("\n"))
-                        case InternalError(error)     => InternalServerError(error.getMessage + "\n" + error.getStackTrace().mkString("\n"))
+                      (canonicalizeUsers >> chown).flatMap(response(u, guest, standard, _))
 
           // Not a service user, reject with no information given.
-          case _ => Forbidden()
+          case u =>
+            NotAuthorizedLog.warn(u.id, Operation, "Only service users may change program ownership.") >> Forbidden()
 
+  private val Operation: String = "POST /chown"
+
+  def response[F[_]: {Monad, Logger}](
+    caller:   ServiceUser,
+    guest:    GuestUser,
+    standard: StandardUser,
+    result:   Result[List[Program.Id]]
+  ): F[Response[F]] =
+    val dsl = Http4sDsl[F]; import dsl.*
+    NotAuthorizedLog.warnResult(Operation, result).flatMap: denied =>
+      result match
+        case Success(Nil)                => Ok(s"User ${guest.id} owns no programs, so nothing was done.")
+        case Success(value)              => Ok(s"Changed ownership from ${guest.id} to ${standard.id} for ${value.mkString(", ")}.")
+        case Warning(problems, value)    => Ok(s"Changed ownership from ${guest.id} to ${standard.id} for ${value.mkString(", ")} with warnings:\n${problems.toList.mkString("\n")}.")
+        case Failure(problems) if denied => Forbidden(problems.toList.mkString("\n"))
+        case Failure(problems)           => InternalServerError(problems.toList.mkString("\n"))
+        case InternalError(error)        =>
+          Logger[F].error(error)(s"${caller.id}: chown from ${guest.id} to ${standard.id} failed.") >>
+            InternalServerError("Internal server error.")

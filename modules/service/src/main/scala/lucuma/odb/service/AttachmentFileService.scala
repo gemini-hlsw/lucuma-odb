@@ -96,7 +96,7 @@ object AttachmentFileService {
   }
 
   object AttachmentException {
-    case object Forbidden                      extends AttachmentException
+    case class Forbidden(reason: String)       extends AttachmentException
     case class InvalidRequest(message: String) extends AttachmentException
     case object FileNotFound                   extends AttachmentException
     case class AttachmentInUse(message: String) extends AttachmentException
@@ -279,7 +279,7 @@ object AttachmentFileService {
       onNoAccess: AttachmentException
     )(using Services[F], Transaction[F]): EitherT[F, AttachmentException, Unit] = user match {
       // guest users not allowed to upload files
-      case GuestUser(_) => Forbidden.asLeftT
+      case GuestUser(_) => Forbidden("Guest users may not use attachments.").asLeftT
       case _            =>
         val check: F[Boolean] = required match
           case AccessRequired.Read => programUserService.userHasReadAccess(programId)
@@ -504,7 +504,7 @@ object AttachmentFileService {
               mn     <- services.transactionallyEitherT:
                           for {
                             _  <- checkNotOdbGenerated(attachmentType).liftF
-                            _  <- checkAccess(user, programId, AccessRequired.Write, Forbidden)
+                            _  <- checkAccess(user, programId, AccessRequired.Write, Forbidden(s"No write access to program $programId."))
                             _  <- validateFileExtensionByType(attachmentType, fn).liftF
                             mn <- deriveMaskName(attachmentType, fn).liftF
                             _  <- checkForDuplicateType(programId, attachmentType).asEitherT

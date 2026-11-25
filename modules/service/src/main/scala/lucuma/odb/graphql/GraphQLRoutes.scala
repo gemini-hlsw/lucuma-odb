@@ -10,6 +10,7 @@ import cats.implicits.*
 import fs2.Stream
 import grackle.Mapping
 import grackle.Operation
+import grackle.Query
 import grackle.Result
 import grackle.Schema
 import grackle.skunk.SkunkMonitor
@@ -119,6 +120,13 @@ object GraphQLRoutes {
       def debug(ctx: RequestContext, message: String): F[Unit] =
         L.debug(s"${describe(ctx)}: $message")
 
+      // The kind of the operation and its root fields, for the log. For example
+      // `Mutation updatePrograms (UpdateMyPrograms)`, where the client chose the name in parentheses.
+      def describeOperation(request: Operation, operationName: Option[String]): String =
+        val fields = Query.ungroup(request.query).flatMap(Query.rootName(_).map(_._1)).distinct
+        val name   = operationName.fold("")(n => s" ($n)")
+        s"${request.rootTpe.name} ${if fields.isEmpty then "<unknown>" else fields.mkString(", ")}$name"
+
       val service: GraphQLService[F] =
         new GraphQLService[F](odbMapping, OdbMapping.slowQueryThreshold.some) {
 
@@ -161,7 +169,9 @@ object GraphQLRoutes {
                       case Result.InternalError(t: TooManyParametersException) =>
                         error(ctx, s"Internal error: ${t.getClass.getSimpleName}: ${t.getMessage}\nCompiled query:\n${request.query.render.take(4096)}", t)
                       case Result.InternalError(t) => error(ctx, s"Internal error: ${t.getClass.getSimpleName}: ${t.getMessage}", t)
-                      case _                       => debug(ctx, s"Query (success).")
+                      case r                       =>
+                        NotAuthorizedLog.warnResult(describeOperation(request, operationName), r) >>
+                          debug(ctx, s"Query (success).")
                     }
                 ).flatMap: (elapsed, result) =>
                   val slow = elapsed > OdbMapping.slowQueryThreshold
@@ -190,6 +200,12 @@ object GraphQLRoutes {
                 .resource
             Stream.resource(spanResource).flatMap: res =>
               super.subscribe(ctx, request, document, operationName)
+                // Log the `NotAuthorized` problems of the first result that has any, as one WARN line.
+                .evalMapAccumulate(false) { (logged, result) =>
+                  val log = if logged then true.pure[F] else NotAuthorizedLog.warnResult(describeOperation(request, operationName), result)
+                  log.tupleRight(result)
+                }
+                .map(_._2)
                 // use `res.trace` to make it the current context for each inner effect
                 .translate(res.trace)
         }
