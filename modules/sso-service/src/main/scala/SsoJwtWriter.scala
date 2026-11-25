@@ -34,9 +34,6 @@ object SsoJwtWriter {
   private val lucumaUser   = SsoJwtClaim.lucumaUser
   private val padSeconds   = 10L // pretend we're issuing this many seconds in the past, to allow for some clock skew
 
-  val HttpOnly = true // JS can't see the cookie
-  val SameSite = org.http4s.SameSite.None // We don't care
-
   def apply[F[_]: Sync](
     jwtEncoder: JwtEncoder[F],
     jwtTimeout: FiniteDuration,

@@ -9,6 +9,7 @@ import cats.data.OptionT
 import cats.effect.*
 import cats.effect.std.MapRef
 import cats.implicits.*
+import lucuma.common.config.Environment
 import lucuma.common.middleware.CorsMiddleware
 import lucuma.common.middleware.ErrorReportingMiddleware
 import lucuma.common.middleware.LoggingMiddleware
@@ -88,14 +89,14 @@ object ServerMiddleware {
 
   /** A middleware that composes all the others defined in this module, except instrumentation. */
   def apply[F[_]: Async: Tracer: Logger](
-    corsOverHttps: Boolean,
+    environment: Environment,
     domain: List[String],
     client: SsoClient[F, User],
     userService: UserService[F],
   ): Resource[F, Middleware[F]] =
     Resource.eval(userCache(client, userService)).map { userCache =>
       List[Middleware[F]](
-        CorsMiddleware.cors(corsOverHttps, domain),
+        CorsMiddleware.cors(environment, domain),
         LoggingMiddleware.logging[F](),
         TracingMiddleware.traceUser(client),
         ErrorReportingMiddleware.errorReporting,

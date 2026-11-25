@@ -5,10 +5,11 @@ package lucuma.sso.service.config
 
 import cats.implicits.*
 import ciris.*
-import lucuma.sso.service.config.Environment.Local
-import lucuma.sso.service.config.Environment.Production
-import lucuma.sso.service.config.Environment.Review
-import lucuma.sso.service.config.Environment.Staging
+import lucuma.common.config.Environment
+import lucuma.common.config.Environment.Dev
+import lucuma.common.config.Environment.Local
+import lucuma.common.config.Environment.Production
+import lucuma.common.config.Environment.Staging
 import org.http4s.Uri.Host
 import org.http4s.Uri.RegName
 
@@ -25,13 +26,13 @@ object OrcidConfig {
 
   def orcidHost(env: Environment): Host =
     env match {
-      case Local   | Review     => RegName("sandbox.orcid.org")
+      case Local   | Dev        => RegName("sandbox.orcid.org")
       case Staging | Production => RegName("orcid.org")
     }
 
-  def config(env: Environment): ConfigValue[Effect, OrcidConfig] = (
+  val config: ConfigValue[Effect, Environment => OrcidConfig] = (
     envOrProp("LUCUMA_ORCID_CLIENT_ID"),
-    envOrProp("LUCUMA_ORCID_CLIENT_SECRET")
-  ).parMapN(apply(_, _, orcidHost(env)))
+    envOrProp("LUCUMA_ORCID_CLIENT_SECRET").redacted
+  ).parMapN((id, secret) => env => apply(id, secret, orcidHost(env)))
 
 }

@@ -5,6 +5,7 @@ package resource.server.http4s
 import cats.*
 import cats.effect.*
 import fs2.compression.Compression
+import lucuma.common.config.Environment
 import lucuma.common.middleware.CorsMiddleware
 import lucuma.common.middleware.ErrorReportingMiddleware
 import lucuma.common.middleware.LoggingMiddleware
@@ -34,14 +35,14 @@ object ServerMiddleware {
    * Create a combined middleware to all server routes, except instrumentation
    */
   def apply[F[_]: {Async, Compression, Tracer}](
-    corsOverHttps: Boolean,
-    domain:        Seq[String],
-    ssoClient:     SsoClient[F, User]
+    environment: Environment,
+    domain:      Seq[String],
+    ssoClient:   SsoClient[F, User]
   ): Middleware[F] = {
     given Logger[F] = Slf4jLogger.getLogger[F]
 
     List[Middleware[F]](
-      CorsMiddleware.cors[F](corsOverHttps, domain.toList),
+      CorsMiddleware.cors[F](environment, domain.toList),
       LoggingMiddleware.logging[F](),
       TracingMiddleware.traceUser(ssoClient),
       ErrorReportingMiddleware.errorReporting,

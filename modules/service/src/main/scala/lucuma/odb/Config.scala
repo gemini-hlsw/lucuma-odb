@@ -20,6 +20,7 @@ import lucuma.catalog.clients.SimbadClient
 import lucuma.catalog.goa.GoaClient
 import lucuma.catalog.simbad.SEDDataLoader
 import lucuma.catalog.telluric.TelluricTargetsClient
+import lucuma.common.config.Environment
 import lucuma.core.data.EmailAddress
 import lucuma.core.enums.ExchangePartner
 import lucuma.core.enums.GeminiCallForProposalsType
@@ -57,6 +58,7 @@ import java.util.UUID
 import scala.concurrent.duration.*
 
 case class Config(
+  environment:   Environment,
   port:          Port,                          // Our port, nothing fancy.
   itc:           Config.Itc,                    // ITC config
   sso:           Config.Sso,                    // SSO config
@@ -66,7 +68,6 @@ case class Config(
   database:      Config.Database,               // Database config
   aws:           Config.Aws,                    // AWS config
   email:         Config.Email,                  // Mailgun config
-  corsOverHttps: Boolean,                       // Whether to require CORS over HTTPS
   domain:        List[String],                  // Domains, for CORS headers
   commitHash:    CommitHash,                    // From Heroku Dyno Metadata
   goaUsers:      Set[User.Id],                  // Gemini Observatory Archive user id(s)
@@ -258,7 +259,7 @@ object Config:
       poolSize("OBSCALC_MAX_CONNECTIONS", Default.MaxConnections, ReservedSessions),
       // The pdf-summary dyno renders serially and holds no connection while doing so.
       poolSize("PDF_SUMMARY_MAX_CONNECTIONS", Default.PdfSummaryConnections, PdfSummaryJobDaemon.ReservedSessions),
-      envOrProp("DATABASE_URL").as[URI] // passed by Heroku
+      envOrProp("DATABASE_URL").redacted.as[URI] // passed by Heroku
     ).parTupled.as[Database]
 
   /** The pdf-summary dyno: where pyexplore's Python lives and how long a render may take. */
@@ -335,9 +336,9 @@ object Config:
 
   object Email:
     lazy val fromCiris: ConfigValue[Effect, Email] = (
-      envOrProp("MAILGUN_API_KEY").as[NonEmptyString],
+      envOrProp("MAILGUN_API_KEY").redacted.as[NonEmptyString],
       envOrProp("MAILGUN_DOMAIN").as[NonEmptyString],
-      envOrProp("MAILGUN_WEBHOOK_SIGNING_KEY").as[NonEmptyString],
+      envOrProp("MAILGUN_WEBHOOK_SIGNING_KEY").redacted.as[NonEmptyString],
       envOrProp("INVITATION_SENDER_EMAIL").as[EmailAddress],
       envOrProp("EXPLORE_URL").as[Uri],
       ProposalEmails.fromCiris
@@ -481,20 +482,20 @@ object Config:
     value.fold(ConfigValue.failed(ConfigError("Missing value"))): v =>
       ConfigValue.loaded(ConfigKey(key), v)
 
-  private val otelConfig: ConfigValue[Effect, Option[OtelConfig]] =
-    OtelConfig.fromEnv("ODB_OTEL", envOrProp("ODB_ENVIRONMENT").default("local"))
+  private lazy val environment: ConfigValue[Effect, Environment] =
+    Environment.fromCiris("ODB_ENVIRONMENT")
 
   lazy val fromCiris: ConfigValue[Effect, Config] = (
+    environment,
     envOrProp("PORT").as[Int].as[Port], // passed by Heroku
     Itc.fromCiris,
     Sso.fromCiris,
     Telluric.fromCiris,
-    envOrProp("ODB_SERVICE_JWT"),
-    otelConfig,
+    envOrProp("ODB_SERVICE_JWT").redacted,
+    OtelConfig.fromEnv("ODB_OTEL", environment.map(_.name)),
     Database.fromCiris,
     Aws.fromCiris,
     Email.fromCiris,
-    envOrProp("CORS_OVER_HTTPS").as[Boolean].default(true), // By default require https
     envOrProp("ODB_DOMAIN").as[List[String]],
     optValue("CommitHash", BuildInfo.gitHeadCommit).as[CommitHash].default(CommitHash.Zero),
     envOrProp("GOA_USER_IDS").as[List[User.Id]].map(_.toSet).default(Set.empty),

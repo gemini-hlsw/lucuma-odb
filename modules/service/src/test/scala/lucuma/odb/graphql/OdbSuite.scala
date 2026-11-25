@@ -48,6 +48,7 @@ import lucuma.catalog.goa.GoaClient
 import lucuma.catalog.goa.GoaClientMock
 import lucuma.catalog.telluric.TelluricTargetsClient
 import lucuma.catalog.votable.CatalogAdapter
+import lucuma.common.config.Environment
 import lucuma.common.middleware.UserContext
 import lucuma.core.data.EmailAddress
 import lucuma.core.data.Zipper
@@ -516,7 +517,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       ssoClient.pure[Resource[IO, *]],
       uri"https://sso.unused",
       uri"https://itc.unused",
-      true,
+      Environment.Production,
       List("unused"),
       s3ClientOpsResource,
       s3PresignerResource,

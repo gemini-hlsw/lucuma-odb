@@ -7,11 +7,12 @@ import cats.effect.*
 import cats.syntax.all.*
 import ciris.*
 import com.comcast.ip4s.Port
+import lucuma.common.config.Environment
+import lucuma.common.config.Environment.Local
 import lucuma.otel.OtelConfig
 import lucuma.sso.client.SsoJwtReader
 import lucuma.sso.client.util.JwtDecoder
 import lucuma.sso.service.SsoJwtWriter
-import lucuma.sso.service.config.Environment.Local
 import lucuma.sso.service.util.JwtEncoder
 import org.http4s.Uri
 import org.http4s.Uri.Authority
@@ -62,7 +63,7 @@ final case class Config(
       authority = Some(
         Authority(
           host = authority.host,
-          port = if (environment == Local) Some(httpPort.value) else None
+          port = if (environment.isLocal) Some(httpPort.value) else None
         )
       )
     )
@@ -101,36 +102,35 @@ object Config {
 
   }
 
-  private def otelConfig(env: Environment): ConfigValue[Effect, Option[OtelConfig]] =
-    OtelConfig.fromEnv("LUCUMA_SSO_OTEL", ConfigValue.default(env.toString.toLowerCase))
-
   def config: ConfigValue[Effect, Config] =
-    envOrProp("LUCUMA_SSO_ENVIRONMENT")
-      .as[Environment]
-      .default(Local)
-      .flatMap {
+    val environment = Environment.fromCiris("LUCUMA_SSO_ENVIRONMENT")
+    (
+      environment,
+      OrcidConfig.config,
+      OtelConfig.fromEnv("LUCUMA_SSO_OTEL", environment.map(_.name))
+    ).parFlatMapN {
+      case (Local, orcid, otel) => default(local(orcid(Local), otel))
+      case (env, orcid, otel)   => deployed(env, orcid(env), otel)
+    }
 
-        case Local =>
-          (OrcidConfig.config(Local), otelConfig(Local)).parMapN(local)
-
-        case envi => (
-          envOrProp("PORT").as[Int].as[Port],
-          DatabaseConfig.config,
-          OrcidConfig.config(envi),
-          envOrProp("GPG_SSO_PUBLIC_KEY").as[PublicKey],
-          envOrProp("GPG_SSO_PRIVATE_KEY").redacted,
-          envOrProp("GPG_SSO_PASSPHRASE").redacted,
-          envOrProp("LUCUMA_SSO_COOKIE_DOMAIN"),
-          envOrProp("LUCUMA_SSO_HOSTNAME"),
-          HerokuConfig.config.option,
-          otelConfig(envi),
-          envOrProp("LUCUMA_ODB_HOSTNAME"),
-        ).parFlatMapN { (port, dbc, orc, pkey, text, pass, domain, host, heroku, otel, odb) =>
-          for {
-            skey <- default(text).as[PrivateKey](using privateKey(pass))
-          } yield Config(envi, dbc, orc, pkey, skey, port, domain, Uri.Scheme.https, host, heroku, otel, odb)
-        }
-
-      }
+  private def deployed(
+    env:   Environment,
+    orcid: OrcidConfig,
+    otel:  Option[OtelConfig]
+  ): ConfigValue[Effect, Config] = (
+    envOrProp("PORT").as[Int].as[Port],
+    DatabaseConfig.config,
+    envOrProp("GPG_SSO_PUBLIC_KEY").as[PublicKey],
+    envOrProp("GPG_SSO_PRIVATE_KEY").redacted,
+    envOrProp("GPG_SSO_PASSPHRASE").redacted,
+    envOrProp("LUCUMA_SSO_COOKIE_DOMAIN"),
+    envOrProp("LUCUMA_SSO_HOSTNAME"),
+    HerokuConfig.config.option,
+    envOrProp("LUCUMA_ODB_HOSTNAME"),
+  ).parFlatMapN { (port, dbc, pkey, text, pass, domain, host, heroku, odb) =>
+    for {
+      skey <- default(text).as[PrivateKey](using privateKey(pass))
+    } yield Config(env, dbc, orcid, pkey, skey, port, domain, Uri.Scheme.https, host, heroku, otel, odb)
+  }
 
 }

@@ -109,6 +109,10 @@ yMvjw3Rl9GQnMoTGYsNsunNy4Q==
               value = "gemini.edu";
             }
             {
+              name = "ODB_ENVIRONMENT";
+              value = "local";
+            }
+            {
               name = "CLOUDCUBE_URL";
               value = "https://cloud-cube-us2.s3.amazonaws.com/lucuma-staging";
             }

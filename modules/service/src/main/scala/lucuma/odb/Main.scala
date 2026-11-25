@@ -20,6 +20,7 @@ import io.laserdisc.pure.s3.tagless.S3AsyncClientOp
 import lucuma.catalog.clients.GaiaClient
 import lucuma.catalog.goa.GoaClient
 import lucuma.catalog.telluric.TelluricTargetsClient
+import lucuma.common.config.Environment
 import lucuma.core.model.User
 import lucuma.horizons.HorizonsClient
 import lucuma.itc.client.ItcClient
@@ -231,7 +232,7 @@ object FMain extends MainParams {
       config.ssoClient,
       config.sso.root,
       config.itc.root,
-      config.corsOverHttps,
+      config.environment,
       config.domain,
       S3FileService.s3AsyncClientOpsResource(config.aws),
       S3FileService.s3PresignerResource(config.aws),
@@ -254,7 +255,7 @@ object FMain extends MainParams {
     ssoClientResource:    Resource[F, SsoClient[F, User]],
     ssoRoot:              Uri,
     itcRoot:              Uri,
-    corsOverHttps:        Boolean,
+    environment:          Environment,
     domain:               List[String],
     s3OpsResource:        Resource[F, S3AsyncClientOp[F]],
     s3PresignerResource:  Resource[F, S3Presigner],
@@ -273,7 +274,7 @@ object FMain extends MainParams {
       horizonsClient    <- horizonsClientResource
       goaClient         <- goaClientResource
       userSvc            = UserService.fromPool(pool)
-      middleware        <- ServerMiddleware(corsOverHttps, domain, ssoClient, userSvc)
+      middleware        <- ServerMiddleware(environment, domain, ssoClient, userSvc)
       instrumentation   <- Resource.eval(ServerMiddleware.instrumentation[F])
       enums             <- Resource.eval(pool.use(Enums.load))
       ptc               <- Resource.eval(pool.use(TimeEstimateCalculatorImplementation.fromSession(_, enums)))
