@@ -79,7 +79,7 @@ ThisBuild / libraryDependencySchemes ++= Seq(
 ThisBuild / libraryDependencySchemes +=
   "org.typelevel" %% "grackle-core" % VersionScheme.Always
 
-ThisBuild / tlBaseVersion      := "0.112"
+ThisBuild / tlBaseVersion      := "0.113"
 ThisBuild / scalaVersion       := "3.9.0"
 ThisBuild / crossScalaVersions := Seq("3.9.0")
 ThisBuild / scalacOptions     ++= Seq("-Xmax-inlines", "50") // Hash derivation fails with default of 32
