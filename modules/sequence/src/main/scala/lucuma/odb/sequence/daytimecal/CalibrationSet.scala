@@ -109,7 +109,7 @@ enum InstrumentSetup:
   /**
    * The set kinds this instrument may be given.  The Flamingos 2, IGRINS-2,
    * GNIRS and GHOST lists are mirrored by the kind triggers in V1430, V1379,
-   * V1389 and V1390, keep them in step.  With the acquisition mirror in GNIRS
+   * V1389 and V1394, keep them in step.  With the acquisition mirror in GNIRS
    * also drops the arc kinds, which the trigger does not check.
    */
   def allowedKinds: List[CalibrationSetType] =
