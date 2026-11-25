@@ -750,7 +750,7 @@ ThisBuild / ocsLocal       := ocsBuildInfo.value._4
 // Contains the grackle server
 lazy val itcService = project
   .in(file("itc/service"))
-  .dependsOn(itcModel.jvm, binding, otel)
+  .dependsOn(itcModel.jvm, binding, otel, common)
   .enablePlugins(BuildInfoPlugin, LucumaDockerPlugin, JavaServerAppPackaging)
   .settings(itcCommonSettings)
   .settings(
@@ -788,7 +788,10 @@ lazy val itcService = project
       "io.chrisdavenport"    %% "keysemaphore"                          % keySemaphoreVersion,
       "org.typelevel"        %% "munit-cats-effect"                     % munitCatsEffectVersion % Test
     ),
-    envVars ++= Map("ODB_BASE_URL" -> "https://lucuma-postgres-odb-dev.herokuapp.com"), // Used for local development
+    envVars ++= Map(
+      "ODB_BASE_URL"    -> "https://lucuma-postgres-odb-dev.herokuapp.com",
+      "ODB_ENVIRONMENT" -> "local"
+    ), // Used for local development
     buildInfoKeys         := Seq[BuildInfoKey](
       scalaVersion,
       sbtVersion,

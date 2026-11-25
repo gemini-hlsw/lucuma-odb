@@ -30,9 +30,9 @@ object OrcidConfig {
       case Staging | Production => RegName("orcid.org")
     }
 
-  def config(env: Environment): ConfigValue[Effect, OrcidConfig] = (
+  val config: ConfigValue[Effect, Environment => OrcidConfig] = (
     envOrProp("LUCUMA_ORCID_CLIENT_ID"),
     envOrProp("LUCUMA_ORCID_CLIENT_SECRET").redacted
-  ).parMapN(apply(_, _, orcidHost(env)))
+  ).parMapN((id, secret) => env => apply(id, secret, orcidHost(env)))
 
 }

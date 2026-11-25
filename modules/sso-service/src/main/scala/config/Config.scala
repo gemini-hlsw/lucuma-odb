@@ -102,34 +102,35 @@ object Config {
 
   }
 
-  private def otelConfig(env: Environment): ConfigValue[Effect, Option[OtelConfig]] =
-    OtelConfig.fromEnv("LUCUMA_SSO_OTEL", ConfigValue.default(env.name))
-
   def config: ConfigValue[Effect, Config] =
-    Environment.fromCiris("LUCUMA_SSO_ENVIRONMENT")
-      .flatMap {
+    val environment = Environment.fromCiris("LUCUMA_SSO_ENVIRONMENT")
+    (
+      environment,
+      OrcidConfig.config,
+      OtelConfig.fromEnv("LUCUMA_SSO_OTEL", environment.map(_.name))
+    ).parFlatMapN {
+      case (Local, orcid, otel) => default(local(orcid(Local), otel))
+      case (env, orcid, otel)   => deployed(env, orcid(env), otel)
+    }
 
-        case Local =>
-          (OrcidConfig.config(Local), otelConfig(Local)).parMapN(local)
-
-        case envi => (
-          envOrProp("PORT").as[Int].as[Port],
-          DatabaseConfig.config,
-          OrcidConfig.config(envi),
-          envOrProp("GPG_SSO_PUBLIC_KEY").as[PublicKey],
-          envOrProp("GPG_SSO_PRIVATE_KEY").redacted,
-          envOrProp("GPG_SSO_PASSPHRASE").redacted,
-          envOrProp("LUCUMA_SSO_COOKIE_DOMAIN"),
-          envOrProp("LUCUMA_SSO_HOSTNAME"),
-          HerokuConfig.config.option,
-          otelConfig(envi),
-          envOrProp("LUCUMA_ODB_HOSTNAME"),
-        ).parFlatMapN { (port, dbc, orc, pkey, text, pass, domain, host, heroku, otel, odb) =>
-          for {
-            skey <- default(text).as[PrivateKey](using privateKey(pass))
-          } yield Config(envi, dbc, orc, pkey, skey, port, domain, Uri.Scheme.https, host, heroku, otel, odb)
-        }
-
-      }
+  private def deployed(
+    env:   Environment,
+    orcid: OrcidConfig,
+    otel:  Option[OtelConfig]
+  ): ConfigValue[Effect, Config] = (
+    envOrProp("PORT").as[Int].as[Port],
+    DatabaseConfig.config,
+    envOrProp("GPG_SSO_PUBLIC_KEY").as[PublicKey],
+    envOrProp("GPG_SSO_PRIVATE_KEY").redacted,
+    envOrProp("GPG_SSO_PASSPHRASE").redacted,
+    envOrProp("LUCUMA_SSO_COOKIE_DOMAIN"),
+    envOrProp("LUCUMA_SSO_HOSTNAME"),
+    HerokuConfig.config.option,
+    envOrProp("LUCUMA_ODB_HOSTNAME"),
+  ).parFlatMapN { (port, dbc, pkey, text, pass, domain, host, heroku, odb) =>
+    for {
+      skey <- default(text).as[PrivateKey](using privateKey(pass))
+    } yield Config(env, dbc, orcid, pkey, skey, port, domain, Uri.Scheme.https, host, heroku, otel, odb)
+  }
 
 }

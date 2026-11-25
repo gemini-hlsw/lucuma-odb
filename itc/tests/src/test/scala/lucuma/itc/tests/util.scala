@@ -6,6 +6,7 @@ package lucuma.itc.tests
 import cats.effect.IO
 import fs2.io.file.Files
 import fs2.io.file.Path
+import lucuma.common.config.Environment
 import lucuma.core.model.Attachment
 import lucuma.graphql.routes.GraphQLService
 import lucuma.graphql.routes.Routes
@@ -15,7 +16,6 @@ import lucuma.itc.input.customSed.CustomSedDatResolver
 import lucuma.itc.service.Itc
 import lucuma.itc.service.ItcMapping
 import lucuma.itc.service.config.Config
-import lucuma.itc.service.config.ExecutionEnvironment
 import org.http4s.HttpApp
 import org.http4s.HttpRoutes
 import org.http4s.Uri
@@ -52,7 +52,7 @@ def routesForWsb(
   itc: Itc[IO]
 )(using Logger[IO], Tracer[IO]): IO[WebSocketBuilder2[IO] => HttpRoutes[IO]] =
   val testConfig = Config(
-    environment = ExecutionEnvironment.Local,
+    environment = Environment.Local,
     port = 6060,
     redisUrl = None,
     odbBaseUrl = Uri.unsafeFromString("http://localhost"),
