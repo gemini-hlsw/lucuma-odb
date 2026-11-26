@@ -8,6 +8,7 @@ import cats.Show
 import cats.effect.*
 import cats.syntax.all.*
 import ciris.*
+import ciris.http4s.*
 import ciris.refined.*
 import com.comcast.ip4s.Port
 import eu.timepit.refined.types.string.NonEmptyString
@@ -20,7 +21,9 @@ import lucuma.catalog.clients.SimbadClient
 import lucuma.catalog.goa.GoaClient
 import lucuma.catalog.simbad.SEDDataLoader
 import lucuma.catalog.telluric.TelluricTargetsClient
+import lucuma.common.config.DatabaseConnection
 import lucuma.common.config.Environment
+import lucuma.common.config.envOrProp
 import lucuma.core.data.EmailAddress
 import lucuma.core.enums.ExchangePartner
 import lucuma.core.enums.GeminiCallForProposalsType
@@ -51,8 +54,6 @@ import org.typelevel.otel4s.metrics.MeterProvider
 import org.typelevel.otel4s.trace.Tracer
 import org.typelevel.otel4s.trace.TracerProvider
 
-import java.net.URI
-import java.net.URISyntaxException
 import java.security.PublicKey
 import java.util.UUID
 import scala.concurrent.duration.*
@@ -166,18 +167,12 @@ object Config:
         .map(Telluric.apply)
 
   case class Database(
+    connection:                DatabaseConnection,
     maxConnections:            Int,
     maxCalibrationConnections: Int,
     maxObscalcConnections:     Int,
-    maxPdfSummaryConnections:  Int,
-    host:                      String,
-    port:                      Int,
-    database:                  String,
-    user:                      String,
-    password:                  String
+    maxPdfSummaryConnections:  Int
   ):
-    // We use Flyway (which uses JDBC) to perform schema migrations. Savor the irony.
-    def jdbcUrl: String = s"jdbc:postgresql://${host}:${port}/${database}?sslmode=require"
 
     /**
      * Connections available to daemon workers, given a pool of `maxConnections`.
@@ -219,48 +214,14 @@ object Config:
       val MaxConnections        = Runtime.getRuntime.availableProcessors * 2 + 1
       val PdfSummaryConnections = 4
 
-    // postgres://username:password@host:port/database name
-    def fromHerokuUri(
-      maxConnections:            Int,
-      maxCalibrationConnections: Int,
-      maxObscalcConnections:     Int,
-      maxPdfSummaryConnections:  Int,
-      uri:                       URI
-    ): Option[Database] =
-      uri.getUserInfo.split(":") match
-        case Array(user, password) =>
-          Some(Database(
-            maxConnections            = maxConnections,
-            maxCalibrationConnections = maxCalibrationConnections,
-            maxObscalcConnections     = maxObscalcConnections,
-            maxPdfSummaryConnections  = maxPdfSummaryConnections,
-            host     = uri.getHost,
-            port     = uri.getPort,
-            database = uri.getPath.drop(1),
-            user     = user,
-            password = password,
-          ))
-        case _ => None
-
-    private given ConfigDecoder[String, URI] =
-      ConfigDecoder[String].mapOption("URI"): s =>
-        try Some(new URI(s))
-        catch { case _: URISyntaxException => None }
-
-    private given Show[URI] =
-      Show.fromToString
-
-    private given ConfigDecoder[(Int, Int, Int, Int, URI), Database] =
-      ConfigDecoder[(Int, Int, Int, Int, URI)].mapOption("Database")(Database.fromHerokuUri)
-
-    lazy val fromCiris: ConfigValue[Effect, Database] = (
+    def fromCiris(environment: ConfigValue[Effect, Environment]): ConfigValue[Effect, Database] = (
+      environment.flatMap(DatabaseConnection.fromCiris), // DATABASE_URL is passed by Heroku
       poolSize("ODB_MAX_CONNECTIONS", Default.MaxConnections, ReservedSessions),
       poolSize("CALIBRATIONS_MAX_CONNECTIONS", Default.MaxConnections, ReservedSessions),
       poolSize("OBSCALC_MAX_CONNECTIONS", Default.MaxConnections, ReservedSessions),
       // The pdf-summary dyno renders serially and holds no connection while doing so.
-      poolSize("PDF_SUMMARY_MAX_CONNECTIONS", Default.PdfSummaryConnections, PdfSummaryJobDaemon.ReservedSessions),
-      envOrProp("DATABASE_URL").redacted.as[URI] // passed by Heroku
-    ).parTupled.as[Database]
+      poolSize("PDF_SUMMARY_MAX_CONNECTIONS", Default.PdfSummaryConnections, PdfSummaryJobDaemon.ReservedSessions)
+    ).parMapN(Database.apply)
 
   /** The pdf-summary dyno: where pyexplore's Python lives and how long a render may take. */
   case class PdfSummary(
@@ -456,10 +417,6 @@ object Config:
     ConfigDecoder[String].mapOption("Public Key"): s =>
       GpgPublicKeyReader.publicKey(s).toOption
 
-  private given ConfigDecoder[String, Uri] =
-    ConfigDecoder[String].mapOption("URI"): s =>
-      Uri.fromString(s).toOption
-
   private given ConfigDecoder[Int, Port] =
     ConfigDecoder[Int].mapOption("Port")(Port.fromInt)
 
@@ -474,9 +431,6 @@ object Config:
       .map(_.split(",").map(_.trim).toList)
       .mapEither: (key, ss) =>
         ss.traverse(ConfigDecoder[String, A].decode(key, _))
-
-  private def envOrProp(name: String): ConfigValue[Effect, String] =
-    env(name).or(prop(name))
 
   private def optValue[A](key: String, value: => Option[A]): ConfigValue[Effect, A] =
     value.fold(ConfigValue.failed(ConfigError("Missing value"))): v =>
@@ -493,7 +447,7 @@ object Config:
     Telluric.fromCiris,
     envOrProp("ODB_SERVICE_JWT").redacted,
     OtelConfig.fromEnv("ODB_OTEL", environment.map(_.name)),
-    Database.fromCiris,
+    Database.fromCiris(environment),
     Aws.fromCiris,
     Email.fromCiris,
     envOrProp("ODB_DOMAIN").as[List[String]],

@@ -84,9 +84,7 @@ object ObscalcMain extends CommandIOApp(
 ):
 
   // obscalc doesn't migrate the database: this only skips waiting for the ODB
-  // service to finish doing so.  The startup diagnostics still run.  Waiting
-  // needs a JDBC connection that requires SSL, which a local database may not
-  // support.
+  // service to finish doing so.  The startup diagnostics still run.
   val SkipMigrationWait: Opts[Boolean] =
     Opts.flag(
       "skip-migration-wait",
@@ -159,19 +157,8 @@ object CalcMain extends MainParams:
   def databasePoolResource[F[_]: Temporal: TracerProvider: MeterProvider: Network: Console](
     config: Config.Database
   ): Resource[F, Resource[F, Session[F]]] =
-    Session.Builder[F]
-      .withHost(config.host)
-      .withPort(config.port)
-      .withUserAndPassword(config.user, config.password)
-      .withDatabase(config.database)
-      .withSSL(SSL.Trusted.withFallback(true))
-      .withTypingStrategy(TypingStrategy.SearchPath)
-      // .withDebug(true)
-      // Tag connections so they can be attributed per service in
-      // pg_stat_activity; see also the pool sizes in Config.Database.
-      .withConnectionParameters(
-        Session.DefaultConnectionParameters + ("application_name" -> "odb-obscalc")
-      )
+    config.connection
+      .sessionBuilder[F]("odb-obscalc")
       .pooled(config.maxObscalcConnections)
 
   def serviceUser[F[_]: Async: Network: Logger: TracerProvider: MeterProvider: ContextManager](c: Config): F[User] =

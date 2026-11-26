@@ -6,7 +6,6 @@ package lucuma.odb.service
 import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.effect.Resource
-import com.dimafeng.testcontainers.PostgreSQLContainer
 import db.migration.SmartFlamingos2Loader
 import db.migration.SmartGcalLoader
 import db.migration.SmartGmosLoader
@@ -42,9 +41,9 @@ class SmartGcalLoaderSuite extends OdbSuite:
       .make(
         IO.blocking:
           val c = DriverManager.getConnection(
-            s"jdbc:postgresql://${databaseConfig.host}:${databaseConfig.port}/${databaseConfig.database}",
-            PostgreSQLContainer.defaultUsername,
-            PostgreSQLContainer.defaultPassword
+            databaseConfig.connection.jdbcUrl,
+            databaseConfig.connection.user,
+            databaseConfig.connection.password.value
           ).unwrap(classOf[BaseConnection])
           c.execSQLUpdate("BEGIN")
           c

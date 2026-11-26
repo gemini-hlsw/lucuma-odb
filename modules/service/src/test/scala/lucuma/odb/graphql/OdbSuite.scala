@@ -13,6 +13,7 @@ import cats.effect.std.UUIDGen
 import cats.effect.unsafe.IORuntime
 import cats.effect.unsafe.IORuntimeConfig
 import cats.implicits.*
+import ciris.Secret
 import clue.FetchClient
 import clue.GraphQLDocument
 import clue.GraphQLOperation
@@ -23,6 +24,8 @@ import clue.http4s.Http4sWebSocketBackend
 import clue.http4s.Http4sWebSocketClient
 import clue.model.GraphQLErrors
 import clue.websocket.WebSocketClient
+import com.comcast.ip4s.Host
+import com.comcast.ip4s.Port
 import com.dimafeng.testcontainers.GenericContainer
 import com.dimafeng.testcontainers.PostgreSQLContainer
 import com.dimafeng.testcontainers.munit.TestContainerForAll
@@ -48,6 +51,8 @@ import lucuma.catalog.goa.GoaClient
 import lucuma.catalog.goa.GoaClientMock
 import lucuma.catalog.telluric.TelluricTargetsClient
 import lucuma.catalog.votable.CatalogAdapter
+import lucuma.common.config.DatabaseConnection
+import lucuma.common.config.DatabaseSsl
 import lucuma.common.config.Environment
 import lucuma.common.middleware.UserContext
 import lucuma.core.data.EmailAddress
@@ -445,15 +450,18 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
 
   protected def databaseConfig: Config.Database =
     Config.Database(
+      connection = DatabaseConnection(
+        host     = Host.fromString(container.containerIpAddress).get,
+        port     = Port.fromInt(container.mappedPort(POSTGRESQL_PORT)).get,
+        database = PostgreSQLContainer.defaultDatabaseName,
+        user     = PostgreSQLContainer.defaultUsername,
+        password = Secret(PostgreSQLContainer.defaultPassword),
+        ssl      = DatabaseSsl.Prefer
+      ),
       maxConnections = 10,
       maxCalibrationConnections = 10,
       maxObscalcConnections = 10,
-      maxPdfSummaryConnections = 4,
-      host     = container.containerIpAddress,
-      port     = container.mappedPort(POSTGRESQL_PORT),
-      user     = PostgreSQLContainer.defaultUsername,
-      password = PostgreSQLContainer.defaultPassword,
-      database = PostgreSQLContainer.defaultDatabaseName,
+      maxPdfSummaryConnections = 4
     )
 
   // overriden in OdbSuiteWithS3 for tests that need it.

@@ -56,13 +56,6 @@ package object config {
       }
     }
 
-  /**
-   * Ciris config value that is read from the environment, falling back to Java system properties
-   * if the environment variable is not set.
-   */
-  def envOrProp(name: String): ConfigValue[Effect, String] =
-    env(name) or prop(name)
-
   private def optValue[A](key: String, value: => Option[A]): ConfigValue[Effect, A] =
     value.fold(ConfigValue.failed(ConfigError("Missing value"))): v =>
       ConfigValue.loaded(ConfigKey(key), v)

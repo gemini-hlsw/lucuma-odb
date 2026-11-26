@@ -10,6 +10,7 @@ import lucuma.common.config.Environment.Dev
 import lucuma.common.config.Environment.Local
 import lucuma.common.config.Environment.Production
 import lucuma.common.config.Environment.Staging
+import lucuma.common.config.envOrProp
 import org.http4s.Uri.Host
 import org.http4s.Uri.RegName
 

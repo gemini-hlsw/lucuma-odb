@@ -931,6 +931,7 @@ lazy val common = project
       "edu.gemini"    %% "lucuma-core"                           % lucumaCoreVersion,
       "edu.gemini"    %% "lucuma-graphql-routes"                 % lucumaGraphQLRoutesVersion,
       "is.cir"        %% "ciris"                                 % cirisVersion,
+      "is.cir"        %% "ciris-http4s"                          % cirisVersion,
       "org.http4s"    %% "http4s-client"                         % http4sVersion,
       "org.http4s"    %% "http4s-core"                           % http4sVersion,
       "org.http4s"    %% "http4s-server"                         % http4sVersion,
@@ -939,6 +940,7 @@ lazy val common = project
       "org.typelevel" %% "cats-effect"                           % catsEffectVersion,
       "org.typelevel" %% "log4cats-core"                         % log4catsVersion,
       "org.typelevel" %% "otel4s-core"                           % otel4sVersion,
+      "org.tpolecat"  %% "skunk-core"                            % skunkVersion,
       "org.scalameta" %% "munit"                                 % munitVersion % Test,
       "org.typelevel" %% "munit-cats-effect"                     % munitCatsEffectVersion % Test
     )

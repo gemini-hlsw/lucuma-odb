@@ -8,6 +8,7 @@ import cats.effect.Concurrent
 import cats.syntax.all.*
 import ciris.*
 import ciris.http4s.*
+import lucuma.common.config.envOrProp
 import lucuma.sso.client.SsoJwtReader
 import lucuma.sso.client.util.GpgPublicKeyReader
 import lucuma.sso.client.util.JwtDecoder
