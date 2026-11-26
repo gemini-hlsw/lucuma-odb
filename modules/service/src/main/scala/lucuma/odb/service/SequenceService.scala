@@ -548,12 +548,40 @@ object SequenceService:
           GnirsSequenceService.Statements.insertDynamics
         )
 
+      /**
+       * Resolves `batch` to a batch number.  Every caller has already locked
+       * the t_sequence_materialization row (markMaterializedOrUpdate /
+       * markMaterializedOrDoNothing), so this sees the batches of any
+       * concurrent writer that committed.
+       */
+      private def selectAtomBatch(
+        observationId: Observation.Id,
+        sequenceType:  SequenceType,
+        batch:         AtomBatch
+      ): F[Int] =
+        val query: Query[(Observation.Id, SequenceType), Int] =
+          batch match
+            case AtomBatch.Next    => Statements.SelectNextAtomBatch
+            case AtomBatch.Current => Statements.SelectCurrentAtomBatch
+        session.unique(query)(observationId, sequenceType)
+
       private def insertSequence[D](
         instrument:       Instrument,
         observationId:    Observation.Id,
         sequenceType:     SequenceType,
         sequence:         Stream[F, Atom[D]],
         batch:            AtomBatch,
+        insertInstConfig: (rows: List[(Step.Id, D)]) => Command[rows.type]
+      ): F[Unit] =
+        selectAtomBatch(observationId, sequenceType, batch).flatMap: b =>
+          insertSequenceInBatch(instrument, observationId, sequenceType, sequence, b, insertInstConfig)
+
+      private def insertSequenceInBatch[D](
+        instrument:       Instrument,
+        observationId:    Observation.Id,
+        sequenceType:     SequenceType,
+        sequence:         Stream[F, Atom[D]],
+        batch:            Int,
         insertInstConfig: (rows: List[(Step.Id, D)]) => Command[rows.type]
       ): F[Unit] =
 
@@ -614,19 +642,10 @@ object SequenceService:
             }
             .drain
 
-        val selectBatch: Query[(Observation.Id, SequenceType), Int] =
-          batch match
-            case AtomBatch.Next    => Statements.SelectNextAtomBatch
-            case AtomBatch.Current => Statements.SelectCurrentAtomBatch
-
-        // Every caller has already locked the t_sequence_materialization row
-        // (markMaterializedOrUpdate / markMaterializedOrDoNothing), so this
-        // statement sees the batches of any concurrent writer that committed.
-        session.unique(selectBatch)(observationId, sequenceType).flatMap: b =>
-          sequence
-            .broadcastThrough(atom(b), step, gcal, instrumentConfig)
-            .compile
-            .drain
+        sequence
+          .broadcastThrough(atom(batch), step, gcal, instrumentConfig)
+          .compile
+          .drain
 
       extension [D](p: ProtoStep[D])
         def toStep(sid: Step.Id, estimate: StepEstimate): Step[D] =
@@ -824,13 +843,20 @@ object SequenceService:
           //
           // The execution lock also keeps a step from starting between the
           // ongoing step check and the write.
+          //
+          // The batch is resolved before the unexecuted steps are deleted.
+          // Right after an acquisition reset nothing of the new batch has
+          // executed, so the delete removes the whole batch.  Resolving the
+          // current batch afterwards would then fall back to the previous run,
+          // and a later customized reset would copy that run's executed steps.
           for
             m <- ResultT.liftF(lockMaterialization(observationId, sequenceType))
             _ <- ResultT.liftF(lockObservationExecution(observationId).whenA(m))
             _ <- checkNoOngoingStep(observationId, sequenceType).unlessA(abandonOngoingStep)
             _ <- ResultT.liftF(markMaterializedOrUpdate(observationId, sequenceType, customized))
+            b <- ResultT.liftF(selectAtomBatch(observationId, sequenceType, batch))
             _ <- ResultT.liftF(abandonAndDeleteUnexecuted(observationId, sequenceType))
-            _ <- ResultT.liftF(insertSequence(instrument, observationId, sequenceType, atoms.covary[F], batch, insertInstConfig))
+            _ <- ResultT.liftF(insertSequenceInBatch(instrument, observationId, sequenceType, atoms.covary[F], b, insertInstConfig))
           yield atoms
 
         checkAtomLength *> checkUnsplittable *> checkDaytime.flatMap(doReplace)
