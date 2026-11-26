@@ -383,7 +383,7 @@ object ObservationWorkflowService {
           infos.values.toList.flatMap: info =>
             info.generatorParams.flatMap(_.toOption).collect:
               case ps if (info.calibrationRole.isEmpty || info.isUserDefinedTelluric.value) && info.tpe.hasProposal &&
-                         !info.isVisitor && !info.isExchange && !itcRes.contains(info.oid) =>
+                         !info.hasNoItc && !itcRes.contains(info.oid) =>
                 (info.pid, info.oid, ps)
 
         // Of the observations missing a cached result, those obscalc has finished

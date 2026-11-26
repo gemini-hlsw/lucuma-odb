@@ -11,7 +11,7 @@ import lucuma.odb.data.ObservationValidationMap
 
 class ItcValidator(itcFor: Observation.Id => Option[Itc]) extends ObservationValidator:
   def apply(info: ObservationValidationInfo): ObservationValidationMap =
-    if itcFor(info.oid).isDefined || info.isVisitor || info.isExchange then ObservationValidationMap.empty
+    if itcFor(info.oid).isDefined || info.hasNoItc then ObservationValidationMap.empty
     else ObservationValidationMap.singleton(ObservationValidation.itc("ITC results are not present."))
 
 object ItcValidator:
