@@ -186,6 +186,19 @@ class cloneObservationSequence extends query.ExecutionTestSupportForGmos with Re
       m   <- isMaterialized(c, SequenceType.Science)
     yield assert(!m)
 
+  test("cloneGroup with ALL_STEPS copies an observation's stored sequence"):
+    for
+      p <- createProgram
+      t <- createTargetWithProfileAs(pi, p)
+      o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      g <- createGroupAs(pi, p)
+      _ <- moveObservationAs(pi, o, Some(g))
+      _ <- replaceScience(o, atomInput("A", stepInput(GPrime), stepInput(RPrime)))
+      j <- query(pi, s"""mutation { cloneGroup(input: { groupId: "$g", sequence: ALL_STEPS }) { newGroup { id allElements { observation { id } } } } }""")
+      c  = j.hcursor.downFields("cloneGroup", "newGroup", "allElements").downArray.downFields("observation", "id").require[Observation.Id]
+      s <- storedScience(c)
+    yield assertEquals(s, List("A" -> filterTag(GPrime), "A" -> filterTag(RPrime)))
+
   test("ALL_STEPS on an unmaterialized source is a no-op"):
     for
       o <- longSlit

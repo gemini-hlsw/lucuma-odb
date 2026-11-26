@@ -32,6 +32,7 @@ import lucuma.odb.Config
 import lucuma.odb.graphql.binding.BooleanBinding
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.GroupConstraintWaiverView
+import lucuma.odb.graphql.table.GroupDescendantElementView
 import lucuma.odb.graphql.table.GroupElementView
 import lucuma.odb.graphql.table.GroupStandingView
 import lucuma.odb.graphql.table.GroupView
@@ -49,7 +50,7 @@ import org.http4s.client.Client
 import Services.Syntax.*
 
 
-trait GroupMapping[F[_]] extends GroupView[F] with ProgramView[F] with GroupElementView[F] with GroupStandingView[F] with GroupConstraintWaiverView[F] with KeyValueEffectHandler[F] with Predicates[F]:
+trait GroupMapping[F[_]] extends GroupView[F] with ProgramView[F] with GroupElementView[F] with GroupDescendantElementView[F] with GroupStandingView[F] with GroupConstraintWaiverView[F] with KeyValueEffectHandler[F] with Predicates[F]:
 
   def itcClient: ItcClient[F]
   def services(using User): Resource[F, Services[F]]
@@ -73,6 +74,7 @@ trait GroupMapping[F[_]] extends GroupView[F] with ProgramView[F] with GroupElem
       SqlField("minimumObservationsPerNight", GroupView.MinObsPerNight),
       SqlField("maximumObservationsPerNight", GroupView.MaxObsPerNight),
       SqlObject("elements", Join(GroupView.Id, GroupElementView.GroupId)),
+      SqlObject("allElements", Join(GroupView.Id, GroupDescendantElementView.AncestorId)),
       SqlObject("program", Join(GroupView.ProgramId, ProgramView.Id)),
 
       EffectField(RangeField,    groupHandler, List("id")),
@@ -99,6 +101,23 @@ trait GroupMapping[F[_]] extends GroupView[F] with ProgramView[F] with GroupElem
           FilterOrderByOffsetLimit(
             pred = Some(Predicates.groupElement.existence.includeDeleted(includeDeleted)),
             oss = Some(List(OrderSelection[NonNegShort](GroupElementType / "parentIndex"))),
+            offset = None,
+            limit = None,
+            child = child
+          )
+      }
+
+    case (GroupType, "allElements", List(
+      BooleanBinding("includeDeleted", rIncludeDeleted)
+    )) =>
+      Elab.transformChild { child =>
+        rIncludeDeleted.map: includeDeleted =>
+          FilterOrderByOffsetLimit(
+            pred = Some(Predicates.groupElement.existence.includeDeleted(includeDeleted)),
+            oss = Some(List(
+              OrderSelection[Option[Group.Id]](GroupElementType / "parentGroupId", true, true),
+              OrderSelection[NonNegShort](GroupElementType / "parentIndex", true, true)
+            )),
             offset = None,
             limit = None,
             child = child

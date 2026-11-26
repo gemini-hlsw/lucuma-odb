@@ -519,6 +519,7 @@ object OdbMapping {
                 ObservationQaMapping,
                 DatasetQaCountsMapping,
                 GroupElementMapping,
+                GroupAllElementsMapping,
                 Igrins2LongSlitMapping,
                 ScorpioLongSlitMapping,
                 ScorpioStaticMapping,

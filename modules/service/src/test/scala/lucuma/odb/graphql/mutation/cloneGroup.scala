@@ -4,6 +4,7 @@
 package lucuma.odb.graphql
 package mutation
 
+import cats.effect.IO
 import eu.timepit.refined.types.numeric.NonNegShort
 import io.circe.literal.*
 import lucuma.core.model.Group
@@ -169,6 +170,60 @@ class cloneGroup extends OdbSuite {
       case (Left(_), Left(_))   => true
       case (Right(_), Right(_)) => true
       case _                    => false
+  }
+
+  private def cloneWithSequence(gid: Group.Id, sequence: String): IO[Group.Id] =
+    query(
+      user = pi,
+      query = s"""
+        mutation {
+          cloneGroup(input: { groupId: "$gid", sequence: $sequence }) {
+            newGroup { id }
+          }
+        }
+      """
+    ).map(_.hcursor.downFields("cloneGroup", "newGroup", "id").require[Group.Id])
+
+  test("clone skips deleted observations") {
+    for
+      pid <- createProgramAs(pi)
+      gid <- createGroupAs(pi, pid)
+      _   <- createObservationInGroupAs(pi, pid, Some(gid))
+      x   <- createObservationInGroupAs(pi, pid, Some(gid))
+      _   <- deleteObservation(pi, x)
+      clo <- cloneGroupAs(pi, gid)
+      es0 <- groupElementsAs(pi, pid, Some(clo))
+      es1 <- groupElementsAs(pi, pid, Some(clo), includeDeleted = true)
+    yield
+      assertEquals(es0.length, 1)
+      assertEquals(es1.length, 1)
+      assert(es1.forall(_.isRight))
+  }
+
+  test("clone skips deleted sub-groups holding deleted observations") {
+    for
+      pid <- createProgramAs(pi)
+      gid <- createGroupAs(pi, pid)
+      sub <- createGroupAs(pi, pid, Some(gid))
+      x   <- createObservationInGroupAs(pi, pid, Some(sub))
+      _   <- deleteObservation(pi, x)
+      _   <- deleteGroup(pi, sub)
+      clo <- cloneGroupAs(pi, gid)
+      es0 <- groupElementsAs(pi, pid, Some(clo))
+      es1 <- groupElementsAs(pi, pid, Some(clo), includeDeleted = true)
+    yield
+      assertEquals(es0, Nil)
+      assertEquals(es1, Nil)
+  }
+
+  test("clone accepts a sequence mode when observations have no stored sequence") {
+    for
+      pid <- createProgramAs(pi)
+      gid <- createGroupAs(pi, pid)
+      _   <- createObservationInGroupAs(pi, pid, Some(gid))
+      clo <- cloneWithSequence(gid, "ALL_STEPS")
+      es  <- groupElementsAs(pi, pid, Some(clo))
+    yield assertEquals(es.length, 1)
   }
 
   test("can't clone a system group") {
