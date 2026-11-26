@@ -4,10 +4,13 @@
 package lucuma.resource.test
 
 import cats.effect.*
+import ciris.Secret
 import com.comcast.ip4s.*
 import com.dimafeng.testcontainers.GenericContainer
 import com.dimafeng.testcontainers.PostgreSQLContainer
 import com.dimafeng.testcontainers.munit.TestContainerForAll
+import lucuma.common.config.DatabaseConnection
+import lucuma.common.config.DatabaseSsl
 import lucuma.common.config.Environment
 import lucuma.otel.OtelServices
 import lucuma.otel.OtelServices.given
@@ -24,7 +27,6 @@ import org.typelevel.otel4s.trace.TracerProvider
 import resource.model.config.DatabaseConfiguration
 import resource.server.http4s.ResourceMain
 import skunk.Session
-import skunk.TypingStrategy
 
 import java.nio.file.Paths
 import scala.concurrent.duration.*
@@ -88,24 +90,19 @@ trait DatabaseFixtures
   def session: Resource[IO, Session[IO]] =
     given TracerProvider[IO] = TracerProvider.noop
     given MeterProvider[IO]  = MeterProvider.noop
-    val config               = databaseConfig
-    Session
-      .Builder[IO]
-      .withHost(config.host)
-      .withPort(config.port)
-      .withUserAndPassword(config.user, config.password)
-      .withDatabase(config.database)
-      .withTypingStrategy(TypingStrategy.SearchPath)
-      .single
+    databaseConfig.connection.sessionBuilder[IO]("lucuma-resource-test").single
 
   protected def databaseConfig: DatabaseConfiguration =
     DatabaseConfiguration(
+      connection = DatabaseConnection(
+        host = Host.fromString(container.host).get,
+        port = Port.fromInt(container.mappedPort(POSTGRESQL_PORT)).get,
+        database = PostgreSQLContainer.defaultDatabaseName,
+        user = PostgreSQLContainer.defaultUsername,
+        password = Secret(PostgreSQLContainer.defaultPassword),
+        ssl = DatabaseSsl.Prefer
+      ),
       maxConnections = 10,
-      host = Host.fromString(container.host).get,
-      port = Port.fromInt(container.mappedPort(POSTGRESQL_PORT)).get,
-      user = PostgreSQLContainer.defaultUsername,
-      password = PostgreSQLContainer.defaultPassword,
-      database = PostgreSQLContainer.defaultDatabaseName,
       resetDatabase = false,
       skipMigration = true // migrations are baked into the container image
     )

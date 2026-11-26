@@ -50,8 +50,8 @@ object ResourceMain extends IOApp.Simple {
       conf           <- ResourceConfiguration.fromCiris.load[F].toResource
       _              <- printBanner(conf).toResource
 
-      _ <- resetDatabase(conf.database.jdbcUrl, conf.database).toResource
-      _ <- migrateDatabase(conf.database.jdbcUrl, conf.database).toResource
+      _ <- resetDatabase(conf.database).toResource
+      _ <- migrateDatabase(conf.database).toResource
       _ <- runStartupDiagnostics(conf.database).toResource
 
       given OtelServices[F] <- OtelSetup.resource(
@@ -127,15 +127,7 @@ object ResourceMain extends IOApp.Simple {
   private def sessionBuilder[F[_]: {Temporal, TracerProvider, MeterProvider, Console, Network}](
     config: DatabaseConfiguration
   ): Session.Builder[F] =
-    Session
-      .Builder[F]
-      .withHost(config.host)
-      .withPort(config.port)
-      .withUserAndPassword(config.user, config.password)
-      .withDatabase(config.database)
-      // .withDebug(true)
-      .withSSL(SSL.Trusted.withFallback(true))
-      .withTypingStrategy(TypingStrategy.SearchPath)
+    config.connection.sessionBuilder[F]("lucuma-resource")
 
   /**
    * Compares every Resource Postgres enum with its Scala enum and fails if any differs or if a
@@ -190,15 +182,17 @@ object ResourceMain extends IOApp.Simple {
    * migrate.
    */
   def resetDatabase[F[_]: {Sync, Logger}](
-    jdbcUrl: String,
-    config:  DatabaseConfiguration
+    config: DatabaseConfiguration
   ): F[Unit] =
-    (Logger[F].warn(s"Resetting database '${config.database}'") *>
+    (Logger[F].warn(s"Resetting database '${config.connection.database}'") *>
       Sync[F].delay {
         Flyway
           .configure()
           .loggers("slf4j")
-          .dataSource(jdbcUrl, config.user, config.password)
+          .dataSource(config.connection.jdbcUrl,
+                      config.connection.user,
+                      config.connection.password.value
+          )
           .cleanDisabled(false)
           .load()
           .clean()
@@ -208,15 +202,17 @@ object ResourceMain extends IOApp.Simple {
    * A startup action that runs database migrations using Flyway.
    */
   def migrateDatabase[F[_]: {Sync, Logger}](
-    jdbcUrl: String,
-    config:  DatabaseConfiguration
+    config: DatabaseConfiguration
   ): F[Unit] =
     Sync[F]
       .delay {
         Flyway
           .configure()
           .loggers("slf4j")
-          .dataSource(jdbcUrl, config.user, config.password)
+          .dataSource(config.connection.jdbcUrl,
+                      config.connection.user,
+                      config.connection.password.value
+          )
           .baselineOnMigrate(true)
           .load()
           .migrate()

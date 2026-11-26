@@ -5,7 +5,9 @@ package lucuma.itc.service.config
 
 import cats.syntax.all.*
 import ciris.*
+import ciris.http4s.*
 import lucuma.common.config.Environment
+import lucuma.common.config.envOrProp
 import lucuma.otel.OtelConfig
 import org.http4s.Uri
 
@@ -25,11 +27,6 @@ final case class Config(
 )
 
 object Config:
-
-  given ConfigDecoder[String, Uri] =
-    ConfigDecoder[String].mapOption("URI") { s =>
-      Uri.fromString(s).toOption
-    }
 
   def config: ConfigValue[Effect, Config] =
     val environment = Environment.fromCiris("ODB_ENVIRONMENT")

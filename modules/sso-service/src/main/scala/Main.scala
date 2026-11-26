@@ -14,6 +14,7 @@ import com.comcast.ip4s.Port
 import com.monovore.decline.*
 import com.monovore.decline.effect.CommandIOApp
 import fs2.io.net.Network
+import lucuma.common.config.DatabaseConnection
 import lucuma.common.config.Environment
 import lucuma.common.middleware.LoggingMiddleware
 import lucuma.core.model.StandardRole
@@ -143,7 +144,7 @@ object FMain extends AnsiColor {
 
   /** A resource that yields a Skunk session pool. */
   def databasePoolResource[F[_]: Temporal: Network: Console](
-    config: DatabaseConfig
+    config: DatabaseConnection
   ): Resource[F, Resource[F, Session[F]]] =
     dbSessionBuilder(config)
       .pooled(MaxConnections)
@@ -252,45 +253,33 @@ object FMain extends AnsiColor {
   }
 
   /** A startup action that runs database migrations using Flyway. */
-  def migrateDatabase[F[_]: Sync](config: DatabaseConfig): F[MigrateResult] =
+  def migrateDatabase[F[_]: Sync](config: DatabaseConnection): F[MigrateResult] =
     Sync[F].delay {
       Flyway
         .configure()
-        .dataSource(config.jdbcUrl, config.user, config.password.orEmpty)
+        .loggers("slf4j")
+        .dataSource(config.jdbcUrl, config.user, config.password.value)
         .baselineOnMigrate(true)
         .load()
         .migrate()
     }
 
-  private def dbSessionBuilder[F[_]: Temporal: Console: Network](
-    config: DatabaseConfig,
-    database: Option[String] = None
-  ) =
+  private def dbSessionBuilder[F[_]: Temporal: Console: Network](config: DatabaseConnection) =
     given TracerProvider[F] = TracerProvider.noop
     given MeterProvider[F]  = MeterProvider.noop
-    Session.Builder[F]
-      .withHost(config.host)
-      .withPort(config.port)
-      .withUserAndPassword(config.user, config.password.getOrElse(""))
-      .withDatabase(database.getOrElse(config.database))
-      .withSSL(SSL.Trusted.withFallback(true))
-      .withTypingStrategy(TypingStrategy.SearchPath)
-      // .withDebug(true)
+    config.sessionBuilder[F](ServiceName)
 
-  def singleSession[F[_]: Temporal: Console: Network](
-    config:   DatabaseConfig,
-    database: Option[String] = None
-  ): Resource[F, Session[F]] =
-    dbSessionBuilder(config, database).single
+  def singleSession[F[_]: Temporal: Console: Network](config: DatabaseConnection): Resource[F, Session[F]] =
+    dbSessionBuilder(config).single
 
-  def resetDatabase[F[_]: Async : Console : Network](config: DatabaseConfig): F[Unit] =
+  def resetDatabase[F[_]: Async : Console : Network](config: DatabaseConnection): F[Unit] =
     import skunk.*
     import skunk.implicits.*
 
     val drop   = sql"""DROP DATABASE "#${config.database}"""".command
     val create = sql"""CREATE DATABASE "#${config.database}"""".command
 
-    singleSession(config, "postgres".some).use: s =>
+    singleSession(config.copy(database = "postgres")).use: s =>
       for
         _ <- s.execute(drop).void
         _ <- s.execute(create).void
@@ -323,7 +312,7 @@ object FMain extends AnsiColor {
 
   /** Standalone single-use database instance for one-off commands. */
   def standaloneDatabase[F[_]: Temporal: Network: Console](
-    config: DatabaseConfig
+    config: DatabaseConnection
   ): Resource[F, Database[F]] = {
     import Tracer.Implicits.noop
     databasePoolResource(config).flatten.map(Database.fromSession(_))

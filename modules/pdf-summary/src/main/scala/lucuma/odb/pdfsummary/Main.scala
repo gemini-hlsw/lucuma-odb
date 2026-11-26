@@ -104,16 +104,8 @@ object PMain extends MainParams:
     config: Config.Database,
     max:    Int
   ): Resource[F, Resource[F, Session[F]]] =
-    Session.Builder[F]
-      .withHost(config.host)
-      .withPort(config.port)
-      .withUserAndPassword(config.user, config.password)
-      .withDatabase(config.database)
-      .withSSL(SSL.Trusted.withFallback(true))
-      .withTypingStrategy(TypingStrategy.SearchPath)
-      .withConnectionParameters(
-        Session.DefaultConnectionParameters + ("application_name" -> "odb-pdf-summary")
-      )
+    config.connection
+      .sessionBuilder[F]("odb-pdf-summary")
       .pooled(max = max)
 
   def serviceUser[F[_]: Async: Network: Logger: TracerProvider: MeterProvider: ContextManager](c: Config): F[Either[String, User]] =

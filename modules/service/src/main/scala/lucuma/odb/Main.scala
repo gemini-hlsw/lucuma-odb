@@ -322,7 +322,7 @@ object FMain extends MainParams {
     Flyway
       .configure()
       .loggers("slf4j")
-      .dataSource(config.jdbcUrl, config.user, config.password)
+      .dataSource(config.connection.jdbcUrl, config.connection.user, config.connection.password.value)
       .baselineOnMigrate(true)
       .load()
 
@@ -381,41 +381,27 @@ object FMain extends MainParams {
 
   private def dbSessionBuilder[F[_]: Temporal: Console: Network: TracerProvider: MeterProvider](
     config:          Config.Database,
-    database:        Option[String] = None,
-    applicationName: String         = "odb-web"
+    applicationName: String = "odb-web"
   ) =
-    Session.Builder[F]
-      .withHost(config.host)
-      .withPort(config.port)
-      .withUserAndPassword(config.user, config.password)
-      .withDatabase(database.getOrElse(config.database))
-      .withSSL(SSL.Trusted.withFallback(true))
-      .withTypingStrategy(TypingStrategy.SearchPath)
-      // .withDebug(true)
-      // Tag connections so they can be attributed per service in
-      // pg_stat_activity; see also the pool sizes in Config.Database.
-      .withConnectionParameters(
-        Session.DefaultConnectionParameters + ("application_name" -> applicationName)
-      )
+    config.connection.sessionBuilder[F](applicationName)
 
   def singleSession[F[_]: Temporal: Console: Network](
     config:          Config.Database,
-    database:        Option[String] = None,
-    applicationName: String         = "odb-web"
+    applicationName: String = "odb-web"
   ): Resource[F, Session[F]] =
     given TracerProvider[F] = TracerProvider.noop
     given MeterProvider[F]  = MeterProvider.noop
-    dbSessionBuilder(config, database, applicationName).single
+    dbSessionBuilder(config, applicationName).single
 
   def resetDatabase[F[_]: Async : Console : Network](config: Config.Database): F[Unit] = {
 
     import skunk.*
     import skunk.implicits.*
 
-    val drop   = sql"""DROP DATABASE "#${config.database}"""".command
-    val create = sql"""CREATE DATABASE "#${config.database}"""".command
+    val drop   = sql"""DROP DATABASE "#${config.connection.database}"""".command
+    val create = sql"""CREATE DATABASE "#${config.connection.database}"""".command
 
-    singleSession(config, "postgres".some).use { s =>
+    singleSession(config.copy(connection = config.connection.copy(database = "postgres"))).use { s =>
       for {
         _ <- s.execute(drop).void
         _ <- s.execute(create).void
