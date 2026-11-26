@@ -90,6 +90,6 @@ object LongSlit:
       val science =
         AtomBuilder
           .instantiate(estimator, Static, namespace, SequenceType.Science)
-          .buildStream(Stream.emits(List.fill(config.repeats.value)(cycle)))
+          .buildStream(Stream.emit(cycle).repeatN(config.repeats.value.toLong))
 
       StreamingExecutionConfig(Static, Stream.empty, science)

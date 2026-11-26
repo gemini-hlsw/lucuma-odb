@@ -513,6 +513,7 @@ object GeneratorStreaming:
         (for
           cfg <- extractMode(ObservingMode.ScorpioLongSlitName, context)(_.asScorpioLongSlit)
           rol  = context.params.calibrationRole
+          _   <- EitherT.cond[F](cfg.repeats.value <= Generator.SequenceAtomLimit, (), GeneratorError.sequenceTooLong(context.oid))
           _   <- EitherT.fromEither(LongSlit.dynamicFrom(context.oid, cfg).flatMap(supported))
           gen <- EitherT.fromEither(LongSlit.instantiate(context.oid, calculator.scorpioStep, context.namespace, cfg, rol))
           res <- collapseIfNecessary(context, gen)

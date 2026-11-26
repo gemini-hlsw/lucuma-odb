@@ -1402,7 +1402,8 @@ object SequenceService:
       )(using Transaction[F]): F[Result[Stream[Pure, Atom[ScorpioDynamicConfig]]]] =
         (for
           _ <- ResultT.fromResult(sequence.flatMap(_.steps.toList).traverse_(step => ScorpioSequenceService.checkDynamic(step.value)))
-          s <- ResultT.liftF(selectOrComputeScorpioStatic(observationId))
+          s <- staticFor(observationId, Instrument.Scorpio, ScorpioLongSlit.Static):
+                 ResultT.liftF(selectOrComputeScorpioStatic(observationId))
           b <- ResultT.liftF(atomBuilder(sequenceType, s, namespace, estimator.scorpioStep))
           r <- replaceSequence(
                  Instrument.Scorpio,
@@ -1437,8 +1438,11 @@ object SequenceService:
         stream:        StreamingExecutionConfig[F, ScorpioStaticConfig, ScorpioDynamicConfig],
         sequenceTypes: Set[SequenceType]
       )(using Transaction[F], Services.ServiceAccess): F[Unit] =
-        // The generator has already checked the config.
-        materializeExecutionConfig(observationId, stream, sequenceTypes, scorpioSequenceService.insertStatic(_, _).map(_.toOption.flatten))(insertScorpioSequence)
+        def insertStatic(oid: Observation.Id, static: ScorpioStaticConfig): F[Option[Long]] =
+          scorpioSequenceService.insertStatic(oid, static).flatMap: r =>
+            r.toOption.liftTo[F](new RuntimeException(s"Could not store the SCORPIO static config of $oid: ${r.toProblems.toList.map(_.message).mkString("; ")}"))
+
+        materializeExecutionConfig(observationId, stream, sequenceTypes, insertStatic)(insertScorpioSequence)
 
       override def selectScorpioSequence(
         observationId: Observation.Id,

@@ -11,6 +11,7 @@ import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.odb.logic.Generator.SequenceAtomLimit
 
 class executionSciScorpioLongSlit extends ExecutionTestSupport:
 
@@ -21,7 +22,7 @@ class executionSciScorpioLongSlit extends ExecutionTestSupport:
     s"{ timeAndCount: { time: { seconds: $seconds }, count: $count, at: { nanometers: $nm } } }"
 
   // The default telescope configs: q = 0, -15, +15, 0 arcsec.
-  private val ScorpioInput: String =
+  private def scorpioInput(repeats: Int): String =
     s"""
       scorpioLongSlit: {
         fpu: LONG_SLIT_0_54
@@ -29,9 +30,12 @@ class executionSciScorpioLongSlit extends ExecutionTestSupport:
         r: ${timeAndCount(300, 2, 622)}
         i: ${timeAndCount(120, 4, 755)}
         z: ${timeAndCount(120, 4, 889)}
-        repeats: 2
+        repeats: $repeats
       }
     """
+
+  private val ScorpioInput: String =
+    scorpioInput(2)
 
   private val ChannelQuery: String =
     "{ exposureTime { seconds } exposureCount readoutMode }"
@@ -167,6 +171,14 @@ class executionSciScorpioLongSlit extends ExecutionTestSupport:
       p <- createProgram
       o <- createObservationWithModeAs(pi, p, Nil, ScorpioInput)
       _ <- expect(pi, scienceQuery(o), List(s"Could not generate a sequence for $o: observation is missing target").asLeft)
+    yield ()
+
+  test("generation - too many repeats"):
+    for
+      p <- createProgram
+      t <- createTargetWithProfileAs(pi, p)
+      o <- createObservationWithModeAs(pi, p, List(t), scorpioInput(SequenceAtomLimit + 1))
+      _ <- expect(pi, scienceQuery(o), List(s"Could not generate a sequence for $o: The generated sequence is too long (more than $SequenceAtomLimit atoms).").asLeft)
     yield ()
 
   test("execution - the recorded step and static config are read back"):
