@@ -6,6 +6,7 @@ package lucuma.odb.sequence.daytimecal
 import cats.data.NonEmptyList
 import cats.syntax.option.*
 import lucuma.core.enums.ObserveClass
+import lucuma.core.enums.OffsetPurpose
 import lucuma.core.enums.StepGuideState
 import lucuma.core.math.Offset
 import lucuma.core.model.sequence.StepConfig
@@ -17,7 +18,7 @@ import munit.FunSuite
 class DaytimeCalibrationSuite extends FunSuite:
 
   private def step(setup: Int, config: StepConfig): ProtoStep[Int] =
-    ProtoStep(setup, config, TelescopeConfig(Offset.Zero, StepGuideState.Disabled), ObserveClass.DayCal)
+    ProtoStep(setup, config, TelescopeConfig(Offset.Zero, StepGuideState.Disabled, OffsetPurpose.Object), ObserveClass.DayCal)
 
   test("no steps give no atom"):
     assertEquals(DaytimeCalibration.singleAtom(List.empty[ProtoStep[Int]]), Nil)

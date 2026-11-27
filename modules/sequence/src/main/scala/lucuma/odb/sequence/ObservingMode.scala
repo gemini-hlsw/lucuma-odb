@@ -194,6 +194,20 @@ object ObservingMode:
           case _: ScorpioLongSlit                 => ObservingModeType.ScorpioLongSlit
           case v: Visitor                         => v.mode
 
+      /**
+       * How the purpose of a telescope position the user left unspecified is
+       * derived for this mode: from its science aperture where it has one with
+       * a known shape, otherwise always `Object`.
+       */
+      def defaultOffsetPurpose: OffsetPurposeDefaults.Resolver =
+        m match
+          case c: Flamingos2LongSlit => OffsetPurposeDefaults.flamingos2Spectroscopy(c.equivalentFpu)
+          case c: Flamingos2Mos      => OffsetPurposeDefaults.flamingos2Spectroscopy(c.equivalentFpu)
+          case c: GnirsSpectroscopy  => OffsetPurposeDefaults.gnirsSpectroscopy(c.fpu, c.camera, c.prism)
+          case _: Igrins2LongSlit    => OffsetPurposeDefaults.igrins2LongSlit
+          case c: ScorpioLongSlit    => OffsetPurposeDefaults.scorpioLongSlit(c.fpu)
+          case _                     => OffsetPurposeDefaults.AlwaysObject
+
       def asDaytimeCalibration: Option[DaytimeCalibration] =
         m match
           case a @ DaytimeCalibration(_, _, _, _) => a.some

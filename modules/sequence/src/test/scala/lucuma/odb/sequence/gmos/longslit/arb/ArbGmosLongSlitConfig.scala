@@ -95,7 +95,7 @@ object ArbGmosLongSlitConfig:
         u <- arbitrary[GmosNorthFpu]
         c <- arbitrary[spectroscopy.Config.Common]
         a <- arbitrary[AcquisitionConfig.GmosNorth]
-        t <- arbitrary[SlitTelescopeConfigs].map(_.telescopeConfigs)
+        t <- arbitrary[SlitTelescopeConfigs].map(_.telescopeConfigs(OffsetPurposeDefaults.AlwaysObject))
       yield Config.GmosNorth(g, f, u, c, t, a)
 
   given Arbitrary[Config.GmosSouth] =
@@ -106,5 +106,5 @@ object ArbGmosLongSlitConfig:
         u <- arbitrary[GmosSouthFpu]
         c <- arbitrary[spectroscopy.Config.Common]
         a <- arbitrary[AcquisitionConfig.GmosSouth]
-        t <- arbitrary[SlitTelescopeConfigs].map(_.telescopeConfigs)
+        t <- arbitrary[SlitTelescopeConfigs].map(_.telescopeConfigs(OffsetPurposeDefaults.AlwaysObject))
       yield Config.GmosSouth(g, f, u, c, t, a)

@@ -11,13 +11,12 @@ import io.circe.Encoder
 import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.enums.SlitOffsetMode
-import lucuma.core.enums.StepGuideState
-import lucuma.core.math.Offset
 import lucuma.core.model.SlitTelescopeConfigs
-import lucuma.core.model.sequence.TelescopeConfig
+import lucuma.core.model.sequence.TelescopeConfigAlongSlit
+import lucuma.core.model.sequence.TelescopeConfigSpec
 import lucuma.odb.format.telescopeConfigs.*
 import lucuma.odb.json.offset.query.given
-import lucuma.odb.json.stepconfig.given
+import lucuma.odb.json.telescopeConfigSpec.query.given
 
 /**
  * Shared encoding of the GraphQL `SlitTelescopeConfigs` output type from the two DB columns
@@ -30,10 +29,11 @@ import lucuma.odb.json.stepconfig.given
  */
 trait SlitTelescopeConfigsMapping[F[_]] extends BaseMapping[F]:
 
-  private def telescopeConfigAlongSlitJson(q: Offset.Q, guiding: StepGuideState): Json =
+  private def telescopeConfigAlongSlitJson(c: TelescopeConfigAlongSlit): Json =
     Json.obj(
-      "q"       -> q.asJson,
-      "guiding" -> guiding.asJson
+      "q"               -> c.offset.asJson,
+      "guiding"         -> c.guiding.asJson,
+      "explicitPurpose" -> c.explicitPurpose.asJson
     )
 
   /**
@@ -48,7 +48,7 @@ trait SlitTelescopeConfigsMapping[F[_]] extends BaseMapping[F]:
       case Some(SlitTelescopeConfigs.AlongSlit(nel)) =>
         Result(Json.obj(
           "offsetMode" -> mode.asJson,
-          "alongSlit"  -> nel.toList.map(c => telescopeConfigAlongSlitJson(c.offset, c.guiding)).asJson,
+          "alongSlit"  -> nel.toList.map(telescopeConfigAlongSlitJson).asJson,
           "toSky"      -> Json.Null
         ))
       case Some(SlitTelescopeConfigs.ToSky(nel)) =>
@@ -61,7 +61,7 @@ trait SlitTelescopeConfigsMapping[F[_]] extends BaseMapping[F]:
         Result.failure(s"Could not parse persisted telescope configs '$json' (mode ${mode.tag}).")
 
   /**
-   * Encodes a plain `[TelescopeConfig]` blob (no slit offset mode) — used by GNIRS IFU, whose
+   * Encodes a plain `[TelescopeConfigSpec]` blob (no slit offset mode) — used by GNIRS IFU, whose
    * configs are stored as a single value with no default / explicit split. Fails on a blob that
    * does not parse.
    */
@@ -70,7 +70,7 @@ trait SlitTelescopeConfigsMapping[F[_]] extends BaseMapping[F]:
       case Some(nel) => Result(nel.toList.asJson)
       case None      => Result.failure(s"Could not parse persisted telescope configs '$json'.")
 
-  protected def telescopeConfigsJson(nel: NonEmptyList[TelescopeConfig]): Json =
+  protected def telescopeConfigsJson(nel: NonEmptyList[TelescopeConfigSpec]): Json =
     nel.toList.asJson
 
   /**
@@ -96,7 +96,7 @@ trait SlitTelescopeConfigsMapping[F[_]] extends BaseMapping[F]:
       case SlitTelescopeConfigs.AlongSlit(nel) =>
         Json.obj(
           "offsetMode" -> SlitOffsetMode.NodAlongSlit.asJson,
-          "alongSlit"  -> nel.toList.map(c => telescopeConfigAlongSlitJson(c.offset, c.guiding)).asJson,
+          "alongSlit"  -> nel.toList.map(telescopeConfigAlongSlitJson).asJson,
           "toSky"      -> Json.Null
         )
       case SlitTelescopeConfigs.ToSky(nel) =>
@@ -107,7 +107,7 @@ trait SlitTelescopeConfigsMapping[F[_]] extends BaseMapping[F]:
         )
 
   /**
-   * Cursor field for a non-null plain `[TelescopeConfig!]!` column, for the modes with no slit to
+   * Cursor field for a non-null plain `[TelescopeConfigSpec!]!` column, for the modes with no slit to
    * nod along (GMOS MOS). Used for the view's `_default` and `_effective` columns.
    */
   protected def plainTelescopeConfigsField(name: String, tcCol: String): CursorFieldJson =
@@ -117,7 +117,7 @@ trait SlitTelescopeConfigsMapping[F[_]] extends BaseMapping[F]:
       List(tcCol)
     )
 
-  /** Cursor field for a nullable explicit plain `[TelescopeConfig!]`. */
+  /** Cursor field for a nullable explicit plain `[TelescopeConfigSpec!]`. */
   protected def explicitTelescopeConfigsField(name: String, tcCol: String): CursorFieldJson =
     CursorFieldJson(
       name,

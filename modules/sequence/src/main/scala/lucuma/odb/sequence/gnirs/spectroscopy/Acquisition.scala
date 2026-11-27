@@ -24,6 +24,7 @@ import lucuma.core.enums.GnirsFpuIfu
 import lucuma.core.enums.GnirsFpuOther
 import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.ObserveClass
+import lucuma.core.enums.OffsetPurpose
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepGuideState.Disabled
 import lucuma.core.enums.StepGuideState.Enabled
@@ -161,7 +162,8 @@ object Acquisition:
           slitImage      <- scienceStep(
                               TelescopeConfig(
                                 Offset(Offset.P(10.arcsec), Offset.Q(0.arcsec)),
-                                Disabled
+                                Disabled,
+                                OffsetPurpose.Sky
                               ),
                               ObserveClass.Acquisition
                             )
@@ -177,14 +179,14 @@ object Acquisition:
                                 filter   = selectedFilter
                               )
           fieldSkyOpt    <- skyOffsetOpt.traverse: sky =>
-                              scienceStep(TelescopeConfig(sky, Enabled), ObserveClass.Acquisition)
+                              scienceStep(TelescopeConfig(sky, Enabled, OffsetPurpose.Sky), ObserveClass.Acquisition)
           field          <- scienceStep(0.arcsec, 0.arcsec, ObserveClass.Acquisition)
           // Back to the science aperture (decker/FPU) for the through-slit steps, keeping the
           // acquisition coadds.
           _              <- State.modify[GnirsDynamicConfig]:
                               _.copy(decker = specDecker, fpu = config.fpu)
           tSlitSkyOpt    <- skyOffsetOpt.traverse: sky =>
-                              scienceStep(TelescopeConfig(sky, Enabled), ObserveClass.Acquisition)
+                              scienceStep(TelescopeConfig(sky, Enabled, OffsetPurpose.Sky), ObserveClass.Acquisition)
           throughSlit    <- scienceStep(0.arcsec, 0.arcsec, ObserveClass.Acquisition)
         yield Steps(
           slitImage      = slitImage,
@@ -217,7 +219,7 @@ object Acquisition:
                    camera            = config.camera,
                    focus             = config.focus
                  )
-          f <- flatStep(TelescopeConfig(Offset.Zero, Disabled), ObserveClass.Acquisition)
+          f <- flatStep(TelescopeConfig(Offset.Zero, Disabled, OffsetPurpose.Object), ObserveClass.Acquisition)
         yield f
 
     def computeIfu(
@@ -254,7 +256,7 @@ object Acquisition:
                              fpu               = GnirsFpu.Other(GnirsFpuOther.Acquisition)
                            )
           fieldSkyOpt <- skyOffsetOpt.traverse: sky =>
-                           scienceStep(TelescopeConfig(sky, Enabled), ObserveClass.Acquisition)
+                           scienceStep(TelescopeConfig(sky, Enabled, OffsetPurpose.Sky), ObserveClass.Acquisition)
           field       <- scienceStep(0.arcsec, 0.arcsec, ObserveClass.Acquisition)
           // Very Bright / Bright image the sky through the IFU with a fixed short
           // single-coadd exposure in H; Faint takes a full through-IFU sky instead.
@@ -269,7 +271,7 @@ object Acquisition:
                                       decker   = ifuDecker,
                                       fpu      = config.fpu
                                     )
-                             s <- scienceStep(TelescopeConfig(GnirsAcquisitionMode.Faint.DefaultIfuSkyOffset, Enabled), ObserveClass.Acquisition)
+                             s <- scienceStep(TelescopeConfig(GnirsAcquisitionMode.Faint.DefaultIfuSkyOffset, Enabled, OffsetPurpose.Sky), ObserveClass.Acquisition)
                            yield s
           // Through-IFU steps: back to the IFU decker/FPU, keeping the acquisition coadds.
           _           <- State.modify[GnirsDynamicConfig]:
@@ -282,7 +284,7 @@ object Acquisition:
                              fpu      = config.fpu
                            )
           tSkyOpt     <- skyOffsetOpt.traverse: sky =>
-                           scienceStep(TelescopeConfig(sky, Enabled), ObserveClass.Acquisition)
+                           scienceStep(TelescopeConfig(sky, Enabled, OffsetPurpose.Sky), ObserveClass.Acquisition)
           through     <- scienceStep(0.arcsec, 0.arcsec, ObserveClass.Acquisition)
         yield IfuSteps(
           flats      = flats,

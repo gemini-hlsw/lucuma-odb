@@ -23,6 +23,7 @@ import lucuma.core.enums.GnirsPrism
 import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.GnirsWellDepth
 import lucuma.core.enums.ObserveClass
+import lucuma.core.enums.OffsetPurpose
 import lucuma.core.enums.StepGuideState
 import lucuma.core.math.Angle
 import lucuma.core.math.Offset
@@ -65,7 +66,7 @@ class ScienceCadenceSuite extends FunSuite:
   private val ThermalInfrared: Wavelength = Wavelength.fromIntNanometers(3500).get
 
   private def offsetQ(arcsec: Int): TelescopeConfig =
-    TelescopeConfig(Offset(Offset.P.Zero, Offset.Q(Angle.fromDoubleArcseconds(arcsec.toDouble))), StepGuideState.Enabled)
+    TelescopeConfig(Offset(Offset.P.Zero, Offset.Q(Angle.fromDoubleArcseconds(arcsec.toDouble))), StepGuideState.Enabled, OffsetPurpose.Object)
 
   private val abbaOffsets: NonEmptyList[TelescopeConfig] =
     NonEmptyList.of(offsetQ(2), offsetQ(-4), offsetQ(-4), offsetQ(2))

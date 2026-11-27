@@ -4,10 +4,12 @@
 package lucuma.odb.sequence.util
 
 import cats.data.NonEmptyList
+import cats.syntax.eq.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.numeric.PosLong
 import io.circe.Encoder
+import lucuma.core.enums.OffsetPurpose
 import lucuma.core.enums.StepGuideState
 import lucuma.core.math.Angle
 import lucuma.core.math.Coordinates
@@ -138,8 +140,20 @@ object HashBytes:
   given HashBytes[Coordinates] =
     HashBytes.by2(_.ra.toAngle, _.dec.toAngle)
 
+  // The purpose is deliberately left out: guide star selections are keyed on
+  // these bytes, and the purpose has no bearing on guiding.  Configs that hash
+  // their telescope configs add `purposeHashBytes` alongside.
   given HashBytes[TelescopeConfig] =
     HashBytes.by2(_.guiding, _.offset)
+
+  /**
+   * Hash bytes for the purposes of a list of telescope configs, to accompany
+   * their `HashBytes`.  Empty when every purpose is `Object`, so the hash of a
+   * config without sky positions is the one it had before purposes existed.
+   */
+  def purposeHashBytes(tcs: Iterable[TelescopeConfig]): Array[Byte] =
+    if tcs.forall(_.purpose === OffsetPurpose.Object) then Array.emptyByteArray
+    else HashBytes[List[OffsetPurpose]].hashBytes(tcs.toList.map(_.purpose))
 
   given HashBytes[Wavelength] =
     HashBytes.by(_.toPicometers.value)

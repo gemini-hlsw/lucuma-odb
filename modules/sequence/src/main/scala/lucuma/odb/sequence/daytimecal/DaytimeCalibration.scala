@@ -12,6 +12,7 @@ import fs2.Pure
 import fs2.Stream
 import lucuma.core.enums.CalibrationSetType
 import lucuma.core.enums.ObserveClass
+import lucuma.core.enums.OffsetPurpose
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.SmartGcalType
 import lucuma.core.enums.StepGuideState
@@ -44,7 +45,7 @@ object DaytimeCalibration:
     NonEmptyString.unsafeFrom("Daytime Calibration")
 
   private val Telescope: TelescopeConfig =
-    TelescopeConfig(Offset.Zero, StepGuideState.Disabled)
+    TelescopeConfig(Offset.Zero, StepGuideState.Disabled, OffsetPurpose.Object)
 
   // Numbered from one, as the user sees the rows.
   private def unavailable(oid: Observation.Id, index: Int, kind: CalibrationSetType, msg: String): OdbError =

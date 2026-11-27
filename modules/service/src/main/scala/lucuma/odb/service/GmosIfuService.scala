@@ -33,6 +33,7 @@ import lucuma.odb.data.Nullable
 import lucuma.odb.format.telescopeConfigs.*
 import lucuma.odb.graphql.input.GmosIfuInput
 import lucuma.odb.graphql.input.GmosLongSlitInput
+import lucuma.odb.sequence.OffsetPurposeDefaults
 import lucuma.odb.sequence.gmos.ifu.AcquisitionConfig
 import lucuma.odb.sequence.gmos.ifu.Config.GmosNorth
 import lucuma.odb.sequence.gmos.ifu.Config.GmosSouth
@@ -148,7 +149,10 @@ object GmosIfuService {
       /** The effective positions, explicit or default, as the view resolves them. */
       val telescope_configs: Decoder[NonEmptyList[TelescopeConfig]] =
         text.emap: json =>
-          ToSkyFormat.getOption(json).toRight(s"Could not parse '$json' as telescope configs.")
+          ToSkyFormat
+            .getOption(json)
+            .map(_.map(_.toTelescopeConfig(OffsetPurposeDefaults.AlwaysObject)))
+            .toRight(s"Could not parse '$json' as telescope configs.")
 
       /** At most one column is set; neither means the default sampling applies. */
       val ifu_analysis: Decoder[Option[GmosIfuAnalysis]] =

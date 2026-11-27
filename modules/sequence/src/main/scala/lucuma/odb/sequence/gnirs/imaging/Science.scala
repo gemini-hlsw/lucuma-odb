@@ -23,6 +23,7 @@ import lucuma.core.enums.GnirsFilter
 import lucuma.core.enums.GnirsFpuOther.Acquisition
 import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.ObserveClass
+import lucuma.core.enums.OffsetPurpose
 import lucuma.core.enums.StepGuideState
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.StepConfig
@@ -260,8 +261,8 @@ object Science:
               g
 
           for
-            o <- offsets.generate(cnt)
-            s <- skyOffsets.generate(skyCount, StepGuideState.Disabled)
+            o <- offsets.generate(cnt, OffsetPurpose.Object)
+            s <- skyOffsets.generate(skyCount, OffsetPurpose.Sky, StepGuideState.Disabled)
           yield (o, s)
 
         def protoAtoms(flats: Flats): F[Stream[Pure, ProtoAtom[ProtoStep[GnirsDynamicConfig]]]] = config.variant match
@@ -283,7 +284,7 @@ object Science:
             // Pre-imaging is grouped imaging over the four named positions,
             // cycled as needed.
             val offsets    = TelescopeConfigGenerator.Enumerated:
-              NonEmptyList.of(o1, o2, o3, o4).map(o => TelescopeConfig(o, StepGuideState.Enabled))
+              NonEmptyList.of(o1, o2, o3, o4).map(o => TelescopeConfig(o, StepGuideState.Enabled, OffsetPurpose.Object))
             val skyOffsets = TelescopeConfigGenerator.NoGenerator
             generateOffsets(offsets, NonNegInt.MinValue, skyOffsets)(ExposuresPerOffset.groupedOffsetCount(_, exposuresPerOffset)).map: (o, s) =>
               ProtoSequences.grouped(config, nem, readModes, flats, o, s, exposuresPerOffset)

@@ -23,6 +23,7 @@ import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.ObserveClass
+import lucuma.core.enums.OffsetPurpose
 import lucuma.core.enums.StepGuideState
 import lucuma.core.math.Offset
 import lucuma.core.model.Observation
@@ -200,8 +201,8 @@ object Science:
               g
 
           for
-            o <- offsets.generate(cnt)
-            s <- skyOffsets.generate(skyCount, StepGuideState.Disabled)
+            o <- offsets.generate(cnt, OffsetPurpose.Object)
+            s <- skyOffsets.generate(skyCount, OffsetPurpose.Sky, StepGuideState.Disabled)
           yield (o, s)
 
         val protoAtoms = config.variant match
@@ -223,7 +224,7 @@ object Science:
             // Pre-imaging is grouped imaging over the four named positions,
             // cycled as needed.
             val offsets    = TelescopeConfigGenerator.Enumerated:
-              NonEmptyList.of(o1, o2, o3, o4).map(o => TelescopeConfig(o, StepGuideState.Enabled))
+              NonEmptyList.of(o1, o2, o3, o4).map(o => TelescopeConfig(o, StepGuideState.Enabled, OffsetPurpose.Object))
             val skyOffsets = TelescopeConfigGenerator.NoGenerator
             generateOffsets(offsets, NonNegInt.MinValue, skyOffsets)(ExposuresPerOffset.groupedOffsetCount(_, exposuresPerOffset)).map: (o, s) =>
               ProtoSequences.grouped(config, nem, readModes, o, s, exposuresPerOffset)
@@ -250,7 +251,7 @@ object Science:
       (for
         _ <- ProtoSequences.setup(config)
         _ <- F2.filter   := filter
-        f <- ProtoSequences.flatStep(TelescopeConfig(Offset.Zero, StepGuideState.Disabled), ObserveClass.DayCal)
+        f <- ProtoSequences.flatStep(TelescopeConfig(Offset.Zero, StepGuideState.Disabled, OffsetPurpose.Object), ObserveClass.DayCal)
       yield f).runA(ProtoSequences.initialDynamicConfig).value
 
     // The science sequence takes the filters in wavelength order, so the flats do too.

@@ -29,6 +29,7 @@ import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.format.telescopeConfigs.*
 import lucuma.odb.graphql.input.GmosLongSlitInput
+import lucuma.odb.sequence.OffsetPurposeDefaults
 import lucuma.odb.sequence.gmos.longslit.AcquisitionConfig
 import lucuma.odb.sequence.gmos.longslit.Config.GmosNorth
 import lucuma.odb.sequence.gmos.longslit.Config.GmosSouth
@@ -127,7 +128,7 @@ object GmosLongSlitService {
         (slit_offset_mode *: text).emap: (mode, json) =>
           SlitTelescopeConfigsFormat
             .getOption((mode, json))
-            .map(_.telescopeConfigs)
+            .map(_.telescopeConfigs(OffsetPurposeDefaults.AlwaysObject))
             .toRight(s"Could not parse '$json' as telescope configs (mode ${mode.tag}).")
 
       val north_acquisition: Decoder[AcquisitionConfig.GmosNorth] =

@@ -7,6 +7,7 @@ import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.syntax.foldable.*
 import eu.timepit.refined.types.numeric.NonNegInt
+import lucuma.core.enums.OffsetPurpose
 import lucuma.core.enums.StepGuideState
 import lucuma.core.geom.OffsetGenerator
 import lucuma.core.math.Angle
@@ -27,7 +28,7 @@ class TelescopeConfigGeneratorSuite extends CatsEffectSuite with ScalaCheckEffec
       c: Int,
       d: StepGuideState = StepGuideState.Enabled
     ): IO[List[TelescopeConfig]] =
-      g.generate[IO](NonNegInt.unsafeFrom(c), d)
+      g.generate[IO](NonNegInt.unsafeFrom(c), OffsetPurpose.Object, d)
 
   private def offset(
     p: Int,
@@ -40,7 +41,7 @@ class TelescopeConfigGeneratorSuite extends CatsEffectSuite with ScalaCheckEffec
     q: Int,
     g: StepGuideState = StepGuideState.Enabled
   ): TelescopeConfig =
-    TelescopeConfig(offset(p, q), g)
+    TelescopeConfig(offset(p, q), g, OffsetPurpose.Object)
 
   def runTests(ts: (IO[List[TelescopeConfig]], List[TelescopeConfig])*): IO[Unit] =
     ts.toList.traverse_ { case (result, expected) =>
@@ -73,7 +74,7 @@ class TelescopeConfigGeneratorSuite extends CatsEffectSuite with ScalaCheckEffec
   test("uniform"):
     def row(q: Int)(ps: Int*): List[TelescopeConfig] =
       ps.toList.map: p =>
-        TelescopeConfig(Offset.signedMicroarcseconds.reverseGet(p, q), StepGuideState.Enabled)
+        TelescopeConfig(Offset.signedMicroarcseconds.reverseGet(p, q), StepGuideState.Enabled, OffsetPurpose.Object)
 
     // 2:1 aspect ratio
     val gen = TelescopeConfigGenerator.Uniform(OffsetGenerator.Uniform(offset(10, 10), offset(30, 20)))
@@ -109,7 +110,7 @@ class TelescopeConfigGeneratorSuite extends CatsEffectSuite with ScalaCheckEffec
   ): PropF[IO] =
     forAllF: (c: NonNegInt) =>
       assertIOBoolean:
-        gen.generate[IO](c).map: lst =>
+        gen.generate[IO](c, OffsetPurpose.Object).map: lst =>
           val sizeCorrect     = lst.sizeIs == (c.value)
           val withinSizeLimit = lst.forall(_.offset.distance(Offset.Zero).toMicroarcseconds < (sizeArcseconds * 1_000_000))
           val notRepeating    = lst == lst.distinctBy(_.offset)

@@ -17,6 +17,7 @@ import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.Flamingos2ReadoutMode
 import lucuma.core.enums.Flamingos2Reads
 import lucuma.core.enums.ImagingVariantType
+import lucuma.core.enums.OffsetPurpose
 import lucuma.core.enums.WavelengthOrder
 import lucuma.core.math.Offset
 import lucuma.core.model.ExposureTimeMode
@@ -24,7 +25,6 @@ import lucuma.core.model.Observation
 import lucuma.odb.data.ExposureTimeModeId
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.ObservingModeRowVersion
-import lucuma.odb.data.TelescopeConfigGeneratorRole
 import lucuma.odb.graphql.input.Flamingos2ImagingInput
 import lucuma.odb.graphql.input.ImagingVariantInput
 import lucuma.odb.graphql.input.TelescopeConfigGeneratorInput
@@ -94,8 +94,8 @@ object Flamingos2ImagingService:
 
             for
               c <- precursorMap
-              o <- services.telescopeConfigGeneratorService.select(oids, TelescopeConfigGeneratorRole.Object)
-              s <- services.telescopeConfigGeneratorService.select(oids, TelescopeConfigGeneratorRole.Sky)
+              o <- services.telescopeConfigGeneratorService.select(oids, OffsetPurpose.Object)
+              s <- services.telescopeConfigGeneratorService.select(oids, OffsetPurpose.Sky)
             yield c.view.map { case (oid, (fs, vf, rf)) =>
               val og = o.getOrElse(oid, TelescopeConfigGenerator.NoGenerator)
               val sg = s.getOrElse(oid, TelescopeConfigGenerator.NoGenerator)
@@ -162,8 +162,8 @@ object Flamingos2ImagingService:
               _   <- ResultT.liftF(insertFilters(cur, ObservingModeRowVersion.Current))
 
               // Insert the offset generators
-              _   <- ResultT.liftF(services.telescopeConfigGeneratorService.insert(oids, offsets, TelescopeConfigGeneratorRole.Object))
-              _   <- ResultT.liftF(services.telescopeConfigGeneratorService.insert(oids, skyOffsets, TelescopeConfigGeneratorRole.Sky))
+              _   <- ResultT.liftF(services.telescopeConfigGeneratorService.insert(oids, offsets, OffsetPurpose.Object))
+              _   <- ResultT.liftF(services.telescopeConfigGeneratorService.insert(oids, skyOffsets, OffsetPurpose.Sky))
             yield ()
           .value
 
@@ -206,7 +206,7 @@ object Flamingos2ImagingService:
           def updateOffsetForRole(
             input:   Nullable[TelescopeConfigGeneratorInput],
             variant: ImagingVariantType,
-            role:    TelescopeConfigGeneratorRole
+            role:    OffsetPurpose
           ): F[Unit] =
             input.toOptionOption.fold(
               // the offset generator field was Absent, which means we should
@@ -226,8 +226,8 @@ object Flamingos2ImagingService:
                 case ImagingVariantInput.Grouped(_, offsets, _, skyOffsets, _)  => (offsets, skyOffsets)
                 case ImagingVariantInput.Interleaved(offsets, _, skyOffsets, _) => (offsets, skyOffsets)
                 case _                                                       => (Nullable.Null, Nullable.Null)
-              updateOffsetForRole(o, v.variantType, TelescopeConfigGeneratorRole.Object) *>
-              updateOffsetForRole(s, v.variantType, TelescopeConfigGeneratorRole.Sky)
+              updateOffsetForRole(o, v.variantType, OffsetPurpose.Object) *>
+              updateOffsetForRole(s, v.variantType, OffsetPurpose.Sky)
 
           (for
             _ <- ResultT.liftF(offsetUpdates)

@@ -24,6 +24,7 @@ import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.enums.OffsetPurpose
 import lucuma.core.enums.Site
 import lucuma.core.enums.StepGuideState
 import lucuma.core.math.Offset
@@ -154,7 +155,8 @@ class executionSciGmosNorthImaging extends ExecutionTestSupportForGmos:
             offset._1.toLong * 1_000_000L,
             offset._2.toLong * 1_000_000L
           )),
-          StepGuideState.Enabled
+          StepGuideState.Enabled,
+          OffsetPurpose.Object
         ),
         obsClass
       )

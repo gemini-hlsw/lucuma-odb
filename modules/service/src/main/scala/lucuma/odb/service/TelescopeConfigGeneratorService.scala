@@ -11,6 +11,7 @@ import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import lucuma.core.enums.ImagingVariantType
+import lucuma.core.enums.OffsetPurpose
 import lucuma.core.enums.StepGuideState
 import lucuma.core.enums.TelescopeConfigGeneratorType
 import lucuma.core.geom.OffsetGenerator
@@ -18,7 +19,7 @@ import lucuma.core.math.Angle
 import lucuma.core.math.Offset
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.TelescopeConfig
-import lucuma.odb.data.TelescopeConfigGeneratorRole
+import lucuma.core.model.sequence.TelescopeConfigSpec
 import lucuma.odb.graphql.input.TelescopeConfigGeneratorInput
 import lucuma.odb.sequence.data.TelescopeConfigGenerator
 import lucuma.odb.util.Codecs.angle_µas
@@ -26,7 +27,7 @@ import lucuma.odb.util.Codecs.guide_state
 import lucuma.odb.util.Codecs.imaging_variant
 import lucuma.odb.util.Codecs.observation_id
 import lucuma.odb.util.Codecs.offset
-import lucuma.odb.util.Codecs.offset_generator_role
+import lucuma.odb.util.Codecs.offset_purpose
 import lucuma.odb.util.Codecs.telescope_config
 import lucuma.odb.util.Codecs.telescope_config_generator_type
 import skunk.*
@@ -40,31 +41,31 @@ sealed trait TelescopeConfigGeneratorService[F[_]]:
 
   def select(
     oids: NonEmptyList[Observation.Id],
-    role: TelescopeConfigGeneratorRole
+    role: OffsetPurpose
   ): F[Map[Observation.Id, TelescopeConfigGenerator]]
 
   def insert(
     oids:  NonEmptyList[Observation.Id],
     input: TelescopeConfigGeneratorInput,
-    role:  TelescopeConfigGeneratorRole,
+    role:  OffsetPurpose,
   ): F[Unit]
 
   def delete(
     oids: NonEmptyList[Observation.Id],
-    role: TelescopeConfigGeneratorRole
+    role: OffsetPurpose
   ): F[Unit]
 
   def resetWhenVariantNotMatching(
     oids:          NonEmptyList[Observation.Id],
     modeTableName: String,
     newVariant:    ImagingVariantType,
-    role:          TelescopeConfigGeneratorRole
+    role:          OffsetPurpose
   ): F[Unit]
 
   def replace(
     oids:  NonEmptyList[Observation.Id],
     input: Option[TelescopeConfigGeneratorInput],
-    role:  TelescopeConfigGeneratorRole
+    role:  OffsetPurpose
   ): F[Unit]
 
   def clone(
@@ -79,7 +80,7 @@ object TelescopeConfigGeneratorService:
 
       override def select(
         oids: NonEmptyList[Observation.Id],
-        role: TelescopeConfigGeneratorRole
+        role: OffsetPurpose
       ): F[Map[Observation.Id, TelescopeConfigGenerator]] =
 
         val generatorData: F[Map[Observation.Id, Either[Unit, TelescopeConfigGenerator]]] =
@@ -117,7 +118,7 @@ object TelescopeConfigGeneratorService:
       override def insert(
         oids:  NonEmptyList[Observation.Id],
         input: TelescopeConfigGeneratorInput,
-        role:  TelescopeConfigGeneratorRole,
+        role:  OffsetPurpose,
       ): F[Unit] =
         val unit = Concurrent[F].unit
 
@@ -132,7 +133,7 @@ object TelescopeConfigGeneratorService:
 
       override def delete(
         oids: NonEmptyList[Observation.Id],
-        role: TelescopeConfigGeneratorRole
+        role: OffsetPurpose
       ): F[Unit] =
         session.exec(Statements.deleteOffsetGenerator(oids, role)) // cascades to enumerated offsets
 
@@ -140,7 +141,7 @@ object TelescopeConfigGeneratorService:
         oids:          NonEmptyList[Observation.Id],
         modeTableName: String,
         newVariant:    ImagingVariantType,
-        role:          TelescopeConfigGeneratorRole
+        role:          OffsetPurpose
       ): F[Unit] =
         session.exec:
           Statements.resetWhenVariantNotMatching(
@@ -153,7 +154,7 @@ object TelescopeConfigGeneratorService:
       override def replace(
         oids:  NonEmptyList[Observation.Id],
         input: Option[TelescopeConfigGeneratorInput],
-        role:  TelescopeConfigGeneratorRole
+        role:  OffsetPurpose
       ): F[Unit] =
         delete(oids, role) *>
         insert(oids, input.getOrElse(TelescopeConfigGeneratorInput.NoGeneratorInput), role)
@@ -199,7 +200,7 @@ object TelescopeConfigGeneratorService:
 
     def select(
       oids: NonEmptyList[Observation.Id],
-      role: TelescopeConfigGeneratorRole
+      role: OffsetPurpose
     ): AppliedFragment =
       void"""
         SELECT
@@ -215,33 +216,34 @@ object TelescopeConfigGeneratorService:
           c_seed
         FROM t_offset_generator
         WHERE
-      """ |+| observationIdIn(oids) |+| sql" AND c_role = $offset_generator_role"(role)
+      """ |+| observationIdIn(oids) |+| sql" AND c_role = $offset_purpose"(role)
 
     def selectEnumeratedOffsets(
       oids: NonEmptyList[Observation.Id],
-      role: TelescopeConfigGeneratorRole
+      role: OffsetPurpose
     ): AppliedFragment =
       sql"""
         SELECT
           c_observation_id,
           c_offset_p,
           c_offset_q,
-          c_guide_state
+          c_guide_state,
+          c_role
         FROM t_enumerated_offset
         WHERE
-         c_role = $offset_generator_role AND
+         c_role = $offset_purpose AND
        """.apply(role) |+| observationIdIn(oids) |+| void" ORDER BY c_observation_id, c_index"
 
     def insert(
       which: NonEmptyList[Observation.Id],
       ogi:   TelescopeConfigGeneratorInput,
-      role:  TelescopeConfigGeneratorRole
+      role:  OffsetPurpose
     ): AppliedFragment =
       val values =
         which.map: oid =>
           sql"""(
             $observation_id,
-            $offset_generator_role,
+            $offset_purpose,
             $telescope_config_generator_type,
             $angle_µas,
             $angle_µas,
@@ -283,7 +285,7 @@ object TelescopeConfigGeneratorService:
       which:        NonEmptyList[Observation.Id],
       imgTableName: String,
       newVariant:   ImagingVariantType,
-      role:         TelescopeConfigGeneratorRole
+      role:         OffsetPurpose
     ): AppliedFragment =
       val input = TelescopeConfigGeneratorInput.NoGeneratorInput
 
@@ -298,7 +300,7 @@ object TelescopeConfigGeneratorService:
           c_size               = $angle_µas,
           c_center_offset_p    = $angle_µas,
           c_center_offset_q    = $angle_µas
-        WHERE og.c_role = $offset_generator_role
+        WHERE og.c_role = $offset_purpose
           AND og.c_observation_id IN ${observation_id.list(which.length).values}
           AND EXISTS (
             SELECT 1
@@ -322,15 +324,15 @@ object TelescopeConfigGeneratorService:
 
     def insertEnumeratedOffsets(
       which: NonEmptyList[Observation.Id],
-      offs:  NonEmptyList[TelescopeConfig],
-      role:  TelescopeConfigGeneratorRole
+      offs:  NonEmptyList[TelescopeConfigSpec],
+      role:  OffsetPurpose
     ): AppliedFragment =
       val values =
         which.flatMap: oid =>
           offs.zipWithIndex.map: (off, idx) =>
             sql"""(
               $observation_id,
-              $offset_generator_role,
+              $offset_purpose,
               $int4,
               $angle_µas,
               $angle_µas,
@@ -357,12 +359,12 @@ object TelescopeConfigGeneratorService:
 
     def deleteOffsetGenerator(
       which: NonEmptyList[Observation.Id],
-      role:  TelescopeConfigGeneratorRole
+      role:  OffsetPurpose
     ): AppliedFragment =
       sql"""
         DELETE FROM t_offset_generator
         WHERE
-          c_role = $offset_generator_role AND
+          c_role = $offset_purpose AND
           c_observation_id IN ${observation_id.list(which.length).values}
       """.apply(role, which.toList)
 

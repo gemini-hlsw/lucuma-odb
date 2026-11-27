@@ -16,6 +16,7 @@ import lucuma.core.model.Observation
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.format.telescopeConfigs.*
 import lucuma.odb.graphql.input.Flamingos2LongSlitInput
+import lucuma.odb.sequence.OffsetPurposeDefaults
 import lucuma.odb.sequence.flamingos2.longslit.Config
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Flamingos2Codecs.*
@@ -81,7 +82,7 @@ object Flamingos2LongSlitService:
          observing_mode_type.opt
         ).emap { case (disperser, filter, fpu, sci, acq, readMode, reads, decker, readoutMode, offsetMode, tcJson, telluricType, telluricScienceMode) =>
           SlitTelescopeConfigsFormat.getOption((offsetMode, tcJson))
-            .map(_.telescopeConfigs)
+            .map(_.telescopeConfigs(OffsetPurposeDefaults.flamingos2Spectroscopy(fpu)))
             .toRight(s"Could not parse '$tcJson' as telescope configs.")
             .map { telescopeConfigs =>
               Config(disperser, filter, fpu, sci, acq, telescopeConfigs, readMode, reads, decker, readoutMode, telluricType, telluricScienceMode)

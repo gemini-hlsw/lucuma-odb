@@ -34,6 +34,7 @@ import lucuma.core.syntax.timespan.*
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.format.telescopeConfigs.*
 import lucuma.odb.graphql.input.Flamingos2MosInput
+import lucuma.odb.sequence.OffsetPurposeDefaults
 import lucuma.odb.sequence.flamingos2.longslit.DefaultFlamingos2ReadoutMode
 import lucuma.odb.sequence.flamingos2.mos.Config
 import lucuma.odb.sequence.flamingos2.spectroscopy.Config.Common
@@ -97,9 +98,10 @@ object Flamingos2MosService:
          telluric_type
         ).emap: (disperser, filter, mask, sci, acq, readMode, reads, decker, readoutMode, offsetMode, tcJson, telluricType) =>
           for
+            fpu <- Config.equivalentFpu(mask.slitWidth)
             tcs <- SlitTelescopeConfigsFormat
                      .getOption((offsetMode, tcJson))
-                     .map(_.telescopeConfigs)
+                     .map(_.telescopeConfigs(OffsetPurposeDefaults.flamingos2Spectroscopy(fpu)))
                      .toRight(s"Could not parse '$tcJson' as telescope configs.")
             cfg <- Config(
                      disperser,

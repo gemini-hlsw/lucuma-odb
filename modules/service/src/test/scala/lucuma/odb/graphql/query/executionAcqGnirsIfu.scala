@@ -9,6 +9,7 @@ import cats.syntax.option.*
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.OffsetPurpose
 import lucuma.core.enums.StepGuideState
 import lucuma.core.math.Offset
 import lucuma.core.model.ExposureTimeMode
@@ -145,7 +146,7 @@ class executionAcqGnirsIfu extends ExecutionTestSupportForGnirs:
           "readMode":  "BRIGHT"
         },
         "stepConfig": { "stepType": "GCAL" },
-        "telescopeConfig": ${expectedTelescopeConfig(TelescopeConfig(Offset.Zero, StepGuideState.Disabled))},
+        "telescopeConfig": ${expectedTelescopeConfig(TelescopeConfig(Offset.Zero, StepGuideState.Disabled, OffsetPurpose.Object))},
         "observeClass": "ACQUISITION",
         "breakpoint":   "DISABLED"
       }

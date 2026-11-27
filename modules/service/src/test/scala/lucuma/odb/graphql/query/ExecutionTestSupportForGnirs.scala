@@ -27,6 +27,7 @@ import lucuma.core.enums.GnirsPixelScale
 import lucuma.core.enums.GnirsPrism
 import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.GnirsWellDepth
+import lucuma.core.enums.OffsetPurpose
 import lucuma.core.enums.StepGuideState
 import lucuma.core.math.BoundedInterval
 import lucuma.core.math.Offset
@@ -768,7 +769,8 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
         Offset.P.signedDecimalArcseconds.reverseGet(p),
         Offset.Q.signedDecimalArcseconds.reverseGet(q)
       ),
-      g
+      g,
+      OffsetPurpose.Object
     )
     json"""
       {
@@ -824,7 +826,8 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
         Offset.P.signedDecimalArcseconds.reverseGet(p),
         Offset.Q.signedDecimalArcseconds.reverseGet(q)
       ),
-      StepGuideState.Disabled
+      StepGuideState.Disabled,
+      OffsetPurpose.Object
     )
     val readMode = GnirsReadMode.forExposureTime(exposure).tag.toScreamingSnakeCase
     json"""

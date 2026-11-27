@@ -24,6 +24,7 @@ import lucuma.core.enums.GnirsFilter
 import lucuma.core.enums.GnirsFpuOther
 import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.ObserveClass
+import lucuma.core.enums.OffsetPurpose
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepGuideState.Disabled
 import lucuma.core.math.Offset
@@ -128,7 +129,7 @@ object Acquisition:
                             decker            = GnirsDecker.Acquisition,
                             fpu               = GnirsFpu.Other(GnirsFpuOther.Acquisition)
                           )
-          fieldImage <- scienceStep(TelescopeConfig(fieldOffset, Disabled), ObserveClass.Acquisition)
+          fieldImage <- scienceStep(TelescopeConfig(fieldOffset, Disabled, OffsetPurpose.Sky), ObserveClass.Acquisition)
           // The on-target image always uses the acquisition exposure and coadds, through
           // the selected filter (H2 for Very Bright, whose exposure comes from the H2 ITC
           // pass, unless the filter was explicitly overridden).

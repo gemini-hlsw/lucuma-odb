@@ -3706,6 +3706,23 @@ enum GuideState {
 }
 
 """
+What a telescope position is for.  Only object positions count toward the
+exposures an observation requests.  For an observation whose object is the sky
+itself (e.g., a sky calibration) the positions are OBJECT.
+"""
+enum OffsetPurpose {
+  """
+  Observing the object being measured.
+  """
+  OBJECT
+
+  """
+  Observing the sky background, for subtraction.
+  """
+  SKY
+}
+
+"""
 Hour angle range creation parameters
 """
 input HourAngleRangeInput {
@@ -4895,7 +4912,8 @@ type EnumeratedTelescopeConfigGenerator {
 
 input EnumeratedTelescopeConfigGeneratorInput {
   # TelescopeConfigInput groups an offset position with a guide state (guided or not guided).
-  # Not-guided offsets are intended for sky positions.
+  # Not-guided offsets are intended for sky positions.  A position's purpose is that of its
+  # list (object or sky offsets), so `explicitPurpose` may not be given.
   values: [TelescopeConfigInput!]!
 }
 
@@ -7737,6 +7755,38 @@ type TelescopeConfig {
   Guide State (whether guiding is enabled for this step)
   """
   guiding: GuideState!
+
+  """
+  What the position is for: observing the object or the sky.  Only object
+  positions count toward the exposures an observation requests.
+  """
+  purpose: OffsetPurpose!
+}
+
+"""
+A user-specified telescope position in an observation's offset pattern.  The
+purpose may be left unspecified, in which case it is derived from the
+instrument geometry: a position is on the object when the target falls inside
+(or on the edge of) the slit or IFU field.  This applies to IGRINS-2, GNIRS,
+Flamingos 2 and SCORPIO; other modes (e.g., GMOS, GHOST) treat a position with
+no explicit purpose as on the object.
+"""
+type TelescopeConfigSpec {
+  """
+  Offset
+  """
+  offset: Offset!
+
+  """
+  Guide State (whether guiding is enabled at this position)
+  """
+  guiding: GuideState!
+
+  """
+  The purpose, if specified explicitly.  Null when it is derived (see
+  `TelescopeConfigSpec`).
+  """
+  explicitPurpose: OffsetPurpose
 }
 
 """
@@ -7749,9 +7799,18 @@ input TelescopeConfigInput {
   offset: OffsetInput
 
   """
-  Whether guiding is enabled for this step (defaults to 'ENABLED').
+  Whether guiding is enabled for this step.  Defaults to 'DISABLED' when
+  `explicitPurpose` is SKY and to 'ENABLED' otherwise.
   """
   guiding: GuideState
+
+  """
+  What the position is for.  When omitted it is derived from the instrument
+  geometry: on the object when the target falls inside (or on the edge of) the
+  slit or IFU field, otherwise on the sky.  Modes without a modeled science
+  aperture (e.g., GMOS, GHOST) treat an omitted purpose as OBJECT.
+  """
+  explicitPurpose: OffsetPurpose
 }
 
 """
@@ -12749,19 +12808,19 @@ type Igrins2SvcConfig {
   """
   Effective SVC telescope configs (explicit override coalesced with the default).
   """
-  telescopeConfigs: [TelescopeConfig!]!
+  telescopeConfigs: [TelescopeConfigSpec!]!
 
   """
   Default SVC telescope configs: the p-offset dither (0,0) and (5,0) arcsec,
   both guided.
   """
-  defaultTelescopeConfigs: [TelescopeConfig!]!
+  defaultTelescopeConfigs: [TelescopeConfigSpec!]!
 
   """
   Optional explicitly specified SVC telescope configs. If set they override the
   default.
   """
-  explicitTelescopeConfigs: [TelescopeConfig!]
+  explicitTelescopeConfigs: [TelescopeConfigSpec!]
 
 }
 
@@ -13147,7 +13206,7 @@ type GnirsSpectroscopyIfu {
   Telescope configs (full p/q offsets). Unlike the long slit these have no derived
   default: they are seeded from the FPU at creation and then edited in place.
   """
-  telescopeConfigs: [TelescopeConfig!]!
+  telescopeConfigs: [TelescopeConfigSpec!]!
 }
 
 """
@@ -13257,7 +13316,7 @@ type GnirsIfu {
   Telescope configs (full p/q offsets). Unlike the long slit these have no derived
   default: they are seeded from the FPU at creation and then edited in place.
   """
-  telescopeConfigs: [TelescopeConfig!]!
+  telescopeConfigs: [TelescopeConfigSpec!]!
 
   filter: GnirsFilter!
   initialFilter: GnirsFilter!
@@ -13304,6 +13363,12 @@ Telescope configuration along the slit: a single `q` offset plus guide state.
 type TelescopeConfigAlongSlit {
   q: OffsetQ!
   guiding: GuideState!
+
+  """
+  The purpose, if specified explicitly.  Null when it is derived from the
+  slit geometry.
+  """
+  explicitPurpose: OffsetPurpose
 }
 
 """
@@ -13313,12 +13378,20 @@ A list of telescope configurations associated with a slit. The discriminant
 type SlitTelescopeConfigs {
   offsetMode: SlitOffsetMode!
   alongSlit: [TelescopeConfigAlongSlit!]
-  toSky: [TelescopeConfig!]
+  toSky: [TelescopeConfigSpec!]
 }
 
 input TelescopeConfigAlongSlitInput {
   q: OffsetComponentInput!
   guiding: GuideState!
+
+  """
+  What the position is for.  When omitted it is derived from the slit
+  geometry: on the object when the target stays within (or on the edge of) the
+  slit.  Modes without a modeled slit (e.g., GMOS) treat an omitted purpose as
+  OBJECT.
+  """
+  explicitPurpose: OffsetPurpose
 }
 
 input SlitTelescopeConfigsInput @oneOf {
@@ -15398,19 +15471,19 @@ type GmosNorthIfu {
   taken from defaultTelescopeConfigs.  The IFU has no slit to nod along, so
   these are plain offsets rather than slit telescope configurations.
   """
-  telescopeConfigs: [TelescopeConfig!]!
+  telescopeConfigs: [TelescopeConfigSpec!]!
 
   """
   Default telescope configurations: a single guided position on target.  The
   IFU has a dedicated sky field, so it does not nod for background.
   """
-  defaultTelescopeConfigs: [TelescopeConfig!]!
+  defaultTelescopeConfigs: [TelescopeConfigSpec!]!
 
   """
   Optional explicitly specified telescope configurations. If set it overrides
   the default.
   """
-  explicitTelescopeConfigs: [TelescopeConfig!]
+  explicitTelescopeConfigs: [TelescopeConfigSpec!]
 
   """
   The grating as it was initially selected.  See the `grating` field for the
@@ -15649,19 +15722,19 @@ type GmosSouthIfu {
   taken from defaultTelescopeConfigs.  The IFU has no slit to nod along, so
   these are plain offsets rather than slit telescope configurations.
   """
-  telescopeConfigs: [TelescopeConfig!]!
+  telescopeConfigs: [TelescopeConfigSpec!]!
 
   """
   Default telescope configurations: a single guided position on target.  The
   IFU has a dedicated sky field, so it does not nod for background.
   """
-  defaultTelescopeConfigs: [TelescopeConfig!]!
+  defaultTelescopeConfigs: [TelescopeConfigSpec!]!
 
   """
   Optional explicitly specified telescope configurations. If set it overrides
   the default.
   """
-  explicitTelescopeConfigs: [TelescopeConfig!]
+  explicitTelescopeConfigs: [TelescopeConfigSpec!]
 
   """
   The grating as it was initially selected.  See the `grating` field for the
@@ -15869,18 +15942,18 @@ type GmosNorthMos {
   taken from defaultTelescopeConfigs.  A MOS mask has no single slit to nod
   along, so these are plain offsets rather than slit telescope configurations.
   """
-  telescopeConfigs: [TelescopeConfig!]!
+  telescopeConfigs: [TelescopeConfigSpec!]!
 
   """
   Default telescope configurations: a single guided position on target.
   """
-  defaultTelescopeConfigs: [TelescopeConfig!]!
+  defaultTelescopeConfigs: [TelescopeConfigSpec!]!
 
   """
   Optional explicitly specified telescope configurations. If set it overrides
   the default.
   """
-  explicitTelescopeConfigs: [TelescopeConfig!]
+  explicitTelescopeConfigs: [TelescopeConfigSpec!]
 
   """
   The grating as it was initially selected.  See the `grating` field for the
@@ -16091,18 +16164,18 @@ type GmosSouthMos {
   taken from defaultTelescopeConfigs.  A MOS mask has no single slit to nod
   along, so these are plain offsets rather than slit telescope configurations.
   """
-  telescopeConfigs: [TelescopeConfig!]!
+  telescopeConfigs: [TelescopeConfigSpec!]!
 
   """
   Default telescope configurations: a single guided position on target.
   """
-  defaultTelescopeConfigs: [TelescopeConfig!]!
+  defaultTelescopeConfigs: [TelescopeConfigSpec!]!
 
   """
   Optional explicitly specified telescope configurations. If set it overrides
   the default.
   """
-  explicitTelescopeConfigs: [TelescopeConfig!]
+  explicitTelescopeConfigs: [TelescopeConfigSpec!]
 
   """
   The grating as it was initially selected.  See the `grating` field for the

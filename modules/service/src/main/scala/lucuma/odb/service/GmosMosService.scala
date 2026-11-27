@@ -37,6 +37,7 @@ import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.format.telescopeConfigs.*
 import lucuma.odb.graphql.input.GmosLongSlitInput
 import lucuma.odb.graphql.input.GmosMosInput
+import lucuma.odb.sequence.OffsetPurposeDefaults
 import lucuma.odb.sequence.gmos.mos.AcquisitionConfig
 import lucuma.odb.sequence.gmos.mos.Config.GmosNorth
 import lucuma.odb.sequence.gmos.mos.Config.GmosSouth
@@ -164,7 +165,10 @@ object GmosMosService {
       /** The effective positions, explicit or default, as the view resolves them. */
       val telescope_configs: Decoder[NonEmptyList[TelescopeConfig]] =
         text.emap: json =>
-          ToSkyFormat.getOption(json).toRight(s"Could not parse '$json' as telescope configs.")
+          ToSkyFormat
+            .getOption(json)
+            .map(_.map(_.toTelescopeConfig(OffsetPurposeDefaults.AlwaysObject)))
+            .toRight(s"Could not parse '$json' as telescope configs.")
 
       val north: Decoder[GmosNorth] =
         (gmos_north_grating       *:

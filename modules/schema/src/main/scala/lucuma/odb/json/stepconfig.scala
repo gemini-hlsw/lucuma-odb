@@ -14,6 +14,7 @@ import lucuma.core.enums.GcalContinuum
 import lucuma.core.enums.GcalDiffuser
 import lucuma.core.enums.GcalFilter
 import lucuma.core.enums.GcalShutter
+import lucuma.core.enums.OffsetPurpose
 import lucuma.core.enums.SmartGcalType
 import lucuma.core.enums.StepGuideState
 import lucuma.core.enums.StepType
@@ -30,13 +31,15 @@ trait StepConfigCodec:
       for
         o <- c.downField("offset").as[Offset]
         g <- c.downField("guiding").as[StepGuideState]
-      yield TelescopeConfig(o, g)
+        p <- c.downField("purpose").as[OffsetPurpose]
+      yield TelescopeConfig(o, g, p)
 
   given (using Encoder[Offset]): Encoder[TelescopeConfig] =
     Encoder.instance: a =>
       Json.obj(
         "offset"  -> a.offset.asJson,
-        "guiding" -> a.guiding.asJson
+        "guiding" -> a.guiding.asJson,
+        "purpose" -> a.purpose.asJson
       )
 
   given given_Decoder_Lamp: Decoder[StepConfig.Gcal.Lamp] =

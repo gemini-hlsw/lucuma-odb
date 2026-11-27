@@ -10,6 +10,7 @@ import io.circe.testing.ArbitraryInstances
 import io.circe.testing.CodecTests
 import lucuma.core.enums.ExecutionState
 import lucuma.core.enums.ObserveClass
+import lucuma.core.enums.OffsetPurpose
 import lucuma.core.enums.ScorpioChannelSelection
 import lucuma.core.enums.ScorpioFpu
 import lucuma.core.enums.StepGuideState
@@ -118,9 +119,9 @@ class SequenceSuite extends DisciplineSuite with ArbitraryInstances:
     val offset1 = Offset.Zero
     val offset2 = Offset.Zero.copy(q = Offset.Q.signedDecimalArcseconds.reverseGet(BigDecimal(10)))
     val configs = SortedSet(
-      TelescopeConfig(offset1, StepGuideState.Enabled),
-      TelescopeConfig(offset1, StepGuideState.Disabled),
-      TelescopeConfig(offset2, StepGuideState.Enabled)
+      TelescopeConfig(offset1, StepGuideState.Enabled, OffsetPurpose.Object),
+      TelescopeConfig(offset1, StepGuideState.Disabled, OffsetPurpose.Object),
+      TelescopeConfig(offset2, StepGuideState.Enabled, OffsetPurpose.Object)
     )
     val digest = SequenceDigest.Zero.copy(
       observeClass     = ObserveClass.Science,

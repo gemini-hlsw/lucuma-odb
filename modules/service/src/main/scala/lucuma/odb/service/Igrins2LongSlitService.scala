@@ -12,12 +12,13 @@ import lucuma.core.enums.SlitOffsetMode
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.core.model.TelluricType
-import lucuma.core.model.sequence.TelescopeConfig
+import lucuma.core.model.sequence.TelescopeConfigSpec
 import lucuma.core.model.sequence.igrins2.SvcDefaultExposure
 import lucuma.core.model.sequence.igrins2.SvcDefaultTelescopeConfigs
 import lucuma.core.util.TimeSpan
 import lucuma.odb.format.telescopeConfigs.*
 import lucuma.odb.graphql.input.Igrins2LongSlitInput
+import lucuma.odb.sequence.OffsetPurposeDefaults
 import lucuma.odb.sequence.igrins2.longslit.Config
 import lucuma.odb.util.Codecs.*
 import skunk.*
@@ -81,7 +82,9 @@ object Igrins2LongSlitService:
               val svc = Option.when(saveSVC):
                 Config.Svc(
                   svcExposureRaw.getOrElse(SvcDefaultExposure),
-                  svcConfigs.getOrElse(SvcDefaultTelescopeConfigs)
+                  svcConfigs
+                    .getOrElse(SvcDefaultTelescopeConfigs)
+                    .map(_.toTelescopeConfig(OffsetPurposeDefaults.igrins2Svc))
                 )
               Config(sci, svc, configs, telluricType)
 
@@ -204,7 +207,7 @@ object Igrins2LongSlitService:
        """.contramap { (o, s, e, st, m, tc, tt) => (o, s, e, st, m, tc, tt, o) }
 
     /** Encode explicit SVC telescope configs; an empty list reverts to the default (`None`). */
-    private def encodeSvcTelescopeConfigs(tcs: List[TelescopeConfig]): Option[String] =
+    private def encodeSvcTelescopeConfigs(tcs: List[TelescopeConfigSpec]): Option[String] =
       NonEmptyList.fromList(tcs).map(ToSkyFormat.reverseGet)
 
     def insertIgrins2LongSlit(

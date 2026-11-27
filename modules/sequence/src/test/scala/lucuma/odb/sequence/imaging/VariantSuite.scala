@@ -7,6 +7,7 @@ package imaging
 import cats.data.NonEmptyList
 import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.PosInt
+import lucuma.core.enums.OffsetPurpose
 import lucuma.core.enums.StepGuideState
 import lucuma.core.enums.WavelengthOrder
 import lucuma.core.math.Offset
@@ -20,7 +21,7 @@ class VariantSuite extends munit.FunSuite:
     Offset(Offset.P.signedDecimalArcseconds.reverseGet(BigDecimal(1)), Offset.Q.signedDecimalArcseconds.reverseGet(BigDecimal(2)))
 
   private val gen: TelescopeConfigGenerator =
-    TelescopeConfigGenerator.Enumerated(NonEmptyList.of(TelescopeConfig(offset, StepGuideState.Enabled)))
+    TelescopeConfigGenerator.Enumerated(NonEmptyList.of(TelescopeConfig(offset, StepGuideState.Enabled, OffsetPurpose.Object)))
 
   private val grouped: Variant.Grouped =
     Variant.Grouped(WavelengthOrder.Decreasing, gen, NonNegInt.unsafeFrom(2), TelescopeConfigGenerator.NoGenerator, PosInt.MinValue)

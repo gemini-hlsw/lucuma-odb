@@ -9,12 +9,12 @@ import cats.effect.IO
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.GnirsFpuIfu
 import lucuma.core.model.Observation
-import lucuma.core.model.sequence.TelescopeConfig
+import lucuma.core.model.sequence.TelescopeConfigSpec
 import lucuma.core.model.sequence.gnirs.gnirsIfuTelescopeConfigPresets
 import lucuma.core.syntax.string.*
 import lucuma.odb.graphql.feature.TelluricCalibrationsTestSupport
 import lucuma.odb.graphql.query.ExecutionTestSupportForGnirs
-import lucuma.odb.json.stepconfig.given
+import lucuma.odb.json.telescopeConfigSpec.decoder.given
 
 import java.time.Instant
 
@@ -27,7 +27,7 @@ class ShortCut_9993
 
   val when: Instant = Instant.parse("2024-01-01T12:00:00Z")
 
-  private val HighResolutionPresets: Map[String, NonEmptyList[TelescopeConfig]] =
+  private val HighResolutionPresets: Map[String, NonEmptyList[TelescopeConfigSpec]] =
     gnirsIfuTelescopeConfigPresets(GnirsFpuIfu.HighResolution).toList.toMap
 
   // The HR IFU goes with the long camera.
@@ -53,7 +53,7 @@ class ShortCut_9993
       """
     ).void
 
-  private def ifuTelescopeConfigs(oid: Observation.Id): IO[List[TelescopeConfig]] =
+  private def ifuTelescopeConfigs(oid: Observation.Id): IO[List[TelescopeConfigSpec]] =
     query(
       pi,
       s"""
@@ -65,6 +65,7 @@ class ShortCut_9993
                   telescopeConfigs {
                     offset { p { microarcseconds } q { microarcseconds } }
                     guiding
+                    explicitPurpose
                   }
                 }
               }
@@ -75,7 +76,7 @@ class ShortCut_9993
     ).map:
       _.hcursor
         .downFields("observation", "observingMode", "gnirsSpectroscopy", "ifu", "telescopeConfigs")
-        .require[List[TelescopeConfig]]
+        .require[List[TelescopeConfigSpec]]
 
   test("an HR-IFU telluric takes the Telluric offset preset"):
     for

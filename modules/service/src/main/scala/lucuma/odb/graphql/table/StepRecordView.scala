@@ -34,6 +34,7 @@ trait StepRecordView[F[_]] extends BaseMapping[F]:
     val OffsetP: ColumnRef        = col("c_offset_p",         angle_µas)
     val OffsetQ: ColumnRef        = col("c_offset_q",         angle_µas)
     val GuideState: ColumnRef     = col("c_guide_state",      guide_state)
+    val OffsetPurpose: ColumnRef  = col("c_offset_purpose",   offset_purpose)
     val QaState: ColumnRef        = col("c_qa_state",         dataset_qa_state.opt)
 
     object Gcal:

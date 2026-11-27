@@ -9,6 +9,7 @@ import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.numeric.PosLong
+import lucuma.core.enums.OffsetPurpose
 import lucuma.core.enums.StepGuideState
 import lucuma.core.math.Angle
 import lucuma.core.math.Offset
@@ -62,7 +63,8 @@ class ScienceSuite extends ScalaCheckSuite:
       spatial.map: q =>
         TelescopeConfig(
           Offset(Offset.P.Zero, Offset.Q.signedDecimalArcseconds.reverseGet(BigDecimal(q))),
-          StepGuideState.Enabled
+          StepGuideState.Enabled,
+          OffsetPurpose.Object
         ),
       PosLong.unsafeFrom(μs),
       PosInt.unsafeFrom(num)

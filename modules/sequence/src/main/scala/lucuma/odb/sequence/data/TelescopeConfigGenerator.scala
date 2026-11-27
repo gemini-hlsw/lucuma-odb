@@ -16,6 +16,7 @@ import cats.syntax.functor.*
 import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.PosInt
+import lucuma.core.enums.OffsetPurpose
 import lucuma.core.enums.StepGuideState
 import lucuma.core.enums.TelescopeConfigGeneratorType
 import lucuma.core.geom.OffsetGenerator
@@ -43,8 +44,14 @@ sealed trait TelescopeConfigGenerator:
       case Spiral(_, _)  => TelescopeConfigGeneratorType.Spiral
       case Uniform(_)    => TelescopeConfigGeneratorType.Uniform
 
+  /**
+   * Generates `count` positions, all with the given `purpose`: whether a
+   * position is on the object or the sky follows from which generator (object
+   * or sky) produced it.
+   */
   def generate[F[_]: Sync](
-    count: NonNegInt,
+    count:             NonNegInt,
+    purpose:           OffsetPurpose,
     defaultGuideState: StepGuideState = StepGuideState.Enabled
   ): F[List[TelescopeConfig]] =
     def withSeededRandom(seed: Long)(
@@ -52,7 +59,7 @@ sealed trait TelescopeConfigGenerator:
     ): F[List[TelescopeConfig]] =
       CatsRandom.scalaUtilRandomSeedLong(seed).flatMap: r =>
         given CatsRandom[F] = r
-        fa.map(_.toList.map(o => TelescopeConfig(o, defaultGuideState)))
+        fa.map(_.toList.map(o => TelescopeConfig(o, defaultGuideState, purpose)))
 
     PosInt.unapply(count.value).fold(List.empty[TelescopeConfig].pure[F]): posN =>
       this match
@@ -62,7 +69,7 @@ sealed trait TelescopeConfigGenerator:
         case Enumerated(lst) =>
           // Enumerated positions come with an explicit guide state so the
           // default is ignored.
-          LazyList.continually(lst.toList).flatten.take(count.value).toList.pure[F]
+          LazyList.continually(lst.toList).flatten.take(count.value).toList.map(_.copy(purpose = purpose)).pure[F]
 
         case Random(og, s)   =>
           withSeededRandom(s):

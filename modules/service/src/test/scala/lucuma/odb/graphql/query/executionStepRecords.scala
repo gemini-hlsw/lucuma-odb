@@ -307,6 +307,44 @@ class executionStepRecords extends OdbSuite with ExecutionTestSupportForGmos wit
     assertIO(res, StepExecutionState.Stopped)
   }
 
+  test("telescopeConfig purpose mapping works") {
+    // GMOS long slit steps are all on the object.
+    for
+      on <- recordAll(pi, serviceUser, mode, offset = 510, atomCount = 2, stepCount = 5)
+      _  <- expect(
+              pi,
+              s"""
+                query {
+                  observation(observationId: "${on.id}") {
+                    execution {
+                      atomRecords {
+                        matches {
+                          steps {
+                            matches {
+                              telescopeConfig { purpose }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              """,
+              {
+                val step  = Json.obj("telescopeConfig" -> Json.obj("purpose" -> "OBJECT".asJson))
+                val atom  = Json.obj("steps" -> Json.obj("matches" -> List.fill(5)(step).asJson))
+                Json.obj(
+                  "observation" -> Json.obj(
+                    "execution" -> Json.obj(
+                      "atomRecords" -> Json.obj("matches" -> List.fill(2)(atom).asJson)
+                    )
+                  )
+                ).asRight
+              }
+            )
+    yield ()
+  }
+
   test("telescopeConfig mapping works") {
     for
       on <- recordAll(pi, serviceUser, mode, offset = 500, atomCount = 2, stepCount = 5)

@@ -15,6 +15,7 @@ import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.DatasetStage
 import lucuma.core.enums.ObserveClass
+import lucuma.core.enums.OffsetPurpose
 import lucuma.core.enums.StepGuideState
 import lucuma.core.math.Angle
 import lucuma.core.math.Offset
@@ -164,7 +165,8 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations wi
         Offset.P.signedDecimalArcseconds.reverseGet(BigDecimal(p)),
         Offset.Q.signedDecimalArcseconds.reverseGet(BigDecimal(q))
       ),
-      g
+      g,
+      OffsetPurpose.Object
     )
 
   def acqTelescopeConfig(p: Int): TelescopeConfig =

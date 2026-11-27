@@ -13,6 +13,7 @@ import cats.syntax.option.*
 import fs2.Pure
 import fs2.Stream
 import lucuma.core.enums.ObserveClass
+import lucuma.core.enums.OffsetPurpose
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepGuideState
 import lucuma.core.math.Offset
@@ -74,7 +75,7 @@ object Science:
             ProtoStep(
               instrumentConfig,
               StepConfig.Science,
-              TelescopeConfig(Offset.Zero, StepGuideState.Enabled),
+              TelescopeConfig(Offset.Zero, StepGuideState.Enabled, OffsetPurpose.Object),
               ObserveClass.Science
             )
         )

@@ -21,6 +21,7 @@ import lucuma.core.enums.GcalDiffuser
 import lucuma.core.enums.GcalFilter
 import lucuma.core.enums.GcalShutter
 import lucuma.core.enums.ObserveClass
+import lucuma.core.enums.OffsetPurpose
 import lucuma.core.enums.StepGuideState
 import lucuma.core.math.Angle
 import lucuma.core.math.Offset
@@ -71,7 +72,7 @@ class MosLongSlitSequencesSuite extends FunSuite:
   private val ExposureTime: TimeSpan = 5.minTimeSpan
 
   private def offsetQ(arcsec: Int): TelescopeConfig =
-    TelescopeConfig(Offset(Offset.P.Zero, Offset.Q(Angle.fromDoubleArcseconds(arcsec.toDouble))), StepGuideState.Enabled)
+    TelescopeConfig(Offset(Offset.P.Zero, Offset.Q(Angle.fromDoubleArcseconds(arcsec.toDouble))), StepGuideState.Enabled, OffsetPurpose.Object)
 
   private val abbaOffsets: NonEmptyList[TelescopeConfig] =
     NonEmptyList.of(offsetQ(15), offsetQ(-15), offsetQ(-15), offsetQ(15))

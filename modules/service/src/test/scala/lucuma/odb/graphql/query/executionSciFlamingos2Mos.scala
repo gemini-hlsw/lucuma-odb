@@ -14,6 +14,7 @@ import lucuma.core.enums.Breakpoint
 import lucuma.core.enums.Flamingos2CustomSlitWidth
 import lucuma.core.enums.Flamingos2Decker
 import lucuma.core.enums.Flamingos2Filter
+import lucuma.core.enums.OffsetPurpose
 import lucuma.core.enums.StepGuideState
 import lucuma.core.enums.StepGuideState.Disabled
 import lucuma.core.enums.StepGuideState.Enabled
@@ -131,7 +132,7 @@ class executionSciFlamingos2Mos extends ExecutionTestSupportForFlamingos2 with U
     )
 
   private def tc(qArcsec: BigDecimal, g: StepGuideState): TelescopeConfig =
-    TelescopeConfig(Offset(Offset.P.Zero, Offset.Q(Angle.fromBigDecimalArcseconds(qArcsec))), g)
+    TelescopeConfig(Offset(Offset.P.Zero, Offset.Q(Angle.fromBigDecimalArcseconds(qArcsec))), g, OffsetPurpose.Object)
 
   private def setupWith(mode: String): IO[Observation.Id] =
     setupWithProgram(mode).map(_._2)

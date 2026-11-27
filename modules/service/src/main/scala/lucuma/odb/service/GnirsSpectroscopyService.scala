@@ -29,6 +29,7 @@ import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.core.model.TelluricType
 import lucuma.core.model.sequence.TelescopeConfig
+import lucuma.core.model.sequence.TelescopeConfigSpec
 import lucuma.core.model.sequence.gnirs.GnirsAcquisitionMode
 import lucuma.core.model.sequence.gnirs.GnirsFocus
 import lucuma.core.model.sequence.gnirs.GnirsFocusMotorStep
@@ -45,6 +46,7 @@ import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.format.telescopeConfigs.*
 import lucuma.odb.graphql.input.GnirsCentralWavelengthConfigInput
 import lucuma.odb.graphql.input.GnirsSpectroscopyInput
+import lucuma.odb.sequence.OffsetPurposeDefaults
 import lucuma.odb.sequence.gnirs as gnirs
 import lucuma.odb.sequence.gnirs.AcquisitionConfig
 import lucuma.odb.sequence.gnirs.spectroscopy.Acquisition
@@ -107,7 +109,7 @@ object GnirsSpectroscopyService:
   val CentralWavelengthConfigTableName: String = "t_gnirs_central_wavelength_config"
 
   // Core keys the IFU presets by display name; only the HR IFU has a telluric one.
-  private val HighResolutionIfuTelluricConfigs: Option[NonEmptyList[TelescopeConfig]] =
+  private val HighResolutionIfuTelluricConfigs: Option[NonEmptyList[TelescopeConfigSpec]] =
     gnirsIfuTelescopeConfigPresets(GnirsFpuIfu.HighResolution).collectFirst:
       case ("Telluric", configs) => configs
 
@@ -172,15 +174,17 @@ object GnirsSpectroscopyService:
               slitOffsetModeEff *: tcEff *:
               acqType *: acqCoadds *: acqFilterExp *: acqSkyOffP *: acqSkyOffQ *:
               acqEtm *: acqEtmExplicit *: telluricType *: EmptyTuple) =>
-          // IFU (slit offset mode NULL) carries a plain [TelescopeConfig]; long slit resolves
-          // its SlitTelescopeConfigs to the same.
+          // IFU (slit offset mode NULL) carries a plain [TelescopeConfigSpec]; long slit
+          // carries SlitTelescopeConfigs.  Both resolve to [TelescopeConfig].
+          // Purposes left unspecified are resolved against the slit or IFU field.
+          val defaultPurpose = OffsetPurposeDefaults.gnirsSpectroscopy(fpu, camera, prismEff)
           val telescopeConfigs: Either[String, NonEmptyList[TelescopeConfig]] =
             slitOffsetModeEff match
               case Some(mode) =>
-                SlitTelescopeConfigsFormat.getOption((mode, tcEff)).map(_.telescopeConfigs)
+                SlitTelescopeConfigsFormat.getOption((mode, tcEff)).map(_.telescopeConfigs(defaultPurpose))
                   .toRight(s"Could not parse telescope configs from '$tcEff'")
               case None       =>
-                ToSkyFormat.getOption(tcEff)
+                ToSkyFormat.getOption(tcEff).map(_.map(_.toTelescopeConfig(defaultPurpose)))
                   .toRight(s"Could not parse IFU telescope configs from '$tcEff'")
           telescopeConfigs.flatMap { resolvedTC =>
                 PosInt.from(coadds)
@@ -764,7 +768,7 @@ object GnirsSpectroscopyService:
     // role-aware; IFU offsets have no derived default, so they stay.
     def applyGnirsTelluricDefaults(
       oid:                 Observation.Id,
-      ifuTelluricConfigs:  Option[NonEmptyList[TelescopeConfig]]
+      ifuTelluricConfigs:  Option[NonEmptyList[TelescopeConfigSpec]]
     ): AppliedFragment =
       sql"""
         UPDATE t_gnirs_spectroscopy

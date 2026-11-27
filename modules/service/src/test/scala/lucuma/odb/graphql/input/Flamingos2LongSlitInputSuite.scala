@@ -14,7 +14,7 @@ import lucuma.core.enums.StepGuideState
 import lucuma.core.math.Offset
 import lucuma.core.model.SlitTelescopeConfigs
 import lucuma.core.model.TelluricType
-import lucuma.core.model.sequence.TelescopeConfig
+import lucuma.core.model.sequence.TelescopeConfigSpec
 import lucuma.core.syntax.all.*
 import lucuma.core.util.arb.ArbEnumerated.given
 import lucuma.odb.graphql.input.arb.ArbFlamingos2LongSlitInput.given
@@ -55,8 +55,8 @@ class Flamingos2LongSlitInputSuite extends DisciplineSuite with ArbitraryInstanc
 
   private val configs = SlitTelescopeConfigs.ToSky(
     NonEmptyList.of(
-      TelescopeConfig(Offset.Zero.copy(q =  5.arcseconds.q), StepGuideState.Enabled),
-      TelescopeConfig(Offset.Zero.copy(q = 10.arcseconds.q), StepGuideState.Disabled)
+      TelescopeConfigSpec(Offset.Zero.copy(q =  5.arcseconds.q), StepGuideState.Enabled),
+      TelescopeConfigSpec(Offset.Zero.copy(q = 10.arcseconds.q), StepGuideState.Disabled)
     )
   )
 

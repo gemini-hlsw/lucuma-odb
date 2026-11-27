@@ -144,6 +144,8 @@ class executionSciFlamingos2 extends ExecutionTestSupportForFlamingos2:
       )
 
   test("not on slit"):
+    // Every position misses the slit: p = 60" is across its width, and q = 300"
+    // is past its end (the slit is about 264" long).
     val setup: IO[Observation.Id] =
       for
         p <- createProgram
@@ -164,11 +166,11 @@ class executionSciFlamingos2 extends ExecutionTestSupportForFlamingos2:
                     guiding: DISABLED
                   },
                   {
-                    offset: { p: { arcseconds:   0 }, q: { arcseconds: 100 } }
+                    offset: { p: { arcseconds:   0 }, q: { arcseconds: 300 } }
                     guiding: DISABLED
                   },
                   {
-                    offset: { p: { arcseconds:   0 }, q: { arcseconds: 100 } }
+                    offset: { p: { arcseconds:   0 }, q: { arcseconds: 300 } }
                     guiding: DISABLED
                   },
                   {
@@ -187,7 +189,7 @@ class executionSciFlamingos2 extends ExecutionTestSupportForFlamingos2:
         query    = flamingos2ScienceQuery(oid),
         expected =
           List(
-            s"Could not generate a sequence for $oid: At least one exposure must be on slit (if longslit) or guided (if IFU)."
+            s"Could not generate a sequence for $oid: At least one position must be on the object (inside the slit or IFU field)."
           ).asLeft
       )
 

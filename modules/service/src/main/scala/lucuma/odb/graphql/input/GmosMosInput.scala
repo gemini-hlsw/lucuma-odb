@@ -29,7 +29,7 @@ import lucuma.core.math.Wavelength
 import lucuma.core.math.WavelengthDither
 import lucuma.core.model.Access
 import lucuma.core.model.ExposureTimeMode
-import lucuma.core.model.sequence.TelescopeConfig
+import lucuma.core.model.sequence.TelescopeConfigSpec
 import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.OdbError
@@ -112,7 +112,7 @@ object GmosMosInput extends AcquisitionFilterCheck:
       explicitAmpGain:     Option[GmosAmpGain],
       explicitRoi:         Option[GmosRoi],
       explicitλDithers:         Option[List[WavelengthDither]],
-      explicitTelescopeConfigs: Option[NonEmptyList[TelescopeConfig]]
+      explicitTelescopeConfigs: Option[NonEmptyList[TelescopeConfigSpec]]
     ) derives Eq:
 
       // Formatted to store in a text column in the database with a regex constraint
@@ -175,7 +175,7 @@ object GmosMosInput extends AcquisitionFilterCheck:
       explicitAmpGain:     Nullable[GmosAmpGain],
       explicitRoi:         Nullable[GmosRoi],
       explicitλDithers:         Nullable[List[WavelengthDither]],
-      explicitTelescopeConfigs: Nullable[NonEmptyList[TelescopeConfig]]
+      explicitTelescopeConfigs: Nullable[NonEmptyList[TelescopeConfigSpec]]
     ) derives Eq:
 
       def toCreate(site: Site): Result[Create.Common] =

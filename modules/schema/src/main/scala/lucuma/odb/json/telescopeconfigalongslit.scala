@@ -7,6 +7,7 @@ import io.circe.Decoder
 import io.circe.Encoder
 import io.circe.Json
 import io.circe.syntax.*
+import lucuma.core.enums.OffsetPurpose
 import lucuma.core.enums.StepGuideState
 import lucuma.core.math.Offset
 import lucuma.core.model.sequence.TelescopeConfigAlongSlit
@@ -21,7 +22,8 @@ object telescopeConfigAlongSlit {
         for
           q <- c.downField("q").as[Offset.Q]
           g <- c.downField("guiding").as[StepGuideState]
-        yield TelescopeConfigAlongSlit(q, g)
+          p <- c.downField("explicitPurpose").as[Option[OffsetPurpose]]
+        yield TelescopeConfigAlongSlit(q, g, p)
   }
 
   object decoder extends DecoderTelescopeConfigAlongSlit
@@ -32,22 +34,26 @@ object telescopeConfigAlongSlit {
     given Encoder[TelescopeConfigAlongSlit] =
       Encoder.instance: a =>
         Json.obj(
-          "q"       -> a.offset.asJson,
-          "guiding" -> a.guiding.asJson
+          "q"               -> a.offset.asJson,
+          "guiding"         -> a.guiding.asJson,
+          "explicitPurpose" -> a.explicitPurpose.asJson
         )
   }
 
   object query extends QueryCodec
 
+  // Stored form: `explicitPurpose` is omitted when unspecified, so patterns
+  // without one serialize exactly as they did before purposes existed.
   trait TransportCodec extends DecoderTelescopeConfigAlongSlit {
     import offset.transport.given
 
     given Encoder[TelescopeConfigAlongSlit] =
       Encoder.instance: a =>
         Json.obj(
-          "q"       -> a.offset.asJson,
-          "guiding" -> a.guiding.asJson
-        )
+          "q"               -> a.offset.asJson,
+          "guiding"         -> a.guiding.asJson,
+          "explicitPurpose" -> a.explicitPurpose.asJson
+        ).dropNullValues
   }
 
   object transport extends TransportCodec

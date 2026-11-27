@@ -18,7 +18,7 @@ object Flamingos2SpectroscopyInput:
 
   // Flamingos2's ABBA science pattern requires exactly 4 telescope configs.
   def validateTelescopeConfigs(tc: SlitTelescopeConfigs): Result[SlitTelescopeConfigs] =
-    val n = tc.telescopeConfigs.size
+    val n = tc.specs.size
     if n === 4 then Result(tc)
     else Result.failure(s"Flamingos2 must have exactly 4 offsets, but $n were provided.")
 

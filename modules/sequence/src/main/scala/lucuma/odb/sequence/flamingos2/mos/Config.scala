@@ -17,6 +17,7 @@ import lucuma.odb.sequence.flamingos2.spectroscopy
 import lucuma.odb.sequence.flamingos2.spectroscopy.AcquisitionConfig
 import lucuma.odb.sequence.flamingos2.spectroscopy.Config.Common
 import lucuma.odb.sequence.syntax.all.*
+import lucuma.odb.sequence.util.HashBytes
 
 import java.io.ByteArrayOutputStream
 import java.io.DataOutputStream
@@ -62,6 +63,8 @@ case class Config private (
 
     telescopeConfigs.toList.foreach: tc =>
       out.write(tc.hashBytes)
+
+    out.write(HashBytes.purposeHashBytes(telescopeConfigs.toList))
 
     out.write(telluricType.hashBytes)
 

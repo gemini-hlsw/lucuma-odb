@@ -490,7 +490,7 @@ class executionSciGnirsLongSlit extends ExecutionTestSupportForGnirs:
         query    = gnirsScienceQuery(oid),
         expected =
           List(
-            s"Could not generate a sequence for $oid: At least one exposure must be on slit (if longslit) or guided (if IFU)."
+            s"Could not generate a sequence for $oid: At least one position must be on the object (inside the slit or IFU field)."
           ).asLeft
       )
 

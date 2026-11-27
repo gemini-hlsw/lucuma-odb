@@ -37,6 +37,7 @@ import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
 import lucuma.core.enums.ObserveClass
+import lucuma.core.enums.OffsetPurpose
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepGuideState
 import lucuma.core.math.Offset
@@ -132,7 +133,7 @@ object Science:
       val guiding =
         if p.telescopeConfig.guiding === StepGuideState.Disabled then StepGuideState.Disabled
         else tc.guiding
-      (ProtoStep.telescopeConfig[D]).replace(TelescopeConfig(tc.offset, guiding))(p)
+      (ProtoStep.telescopeConfig[D]).replace(tc.copy(guiding = guiding))(p)
 
   /**
    * Science exposure count goals for a given wavelength dither.
@@ -192,7 +193,7 @@ object Science:
 
       // Now spread the positions around as well as possible across the dithers.
 
-      val qs      = nel(positions, TelescopeConfig(Offset.Zero, StepGuideState.Enabled))
+      val qs      = nel(positions, TelescopeConfig(Offset.Zero, StepGuideState.Enabled, OffsetPurpose.Object))
       val qCount  = qs.size
 
       val runningSums =
@@ -307,9 +308,9 @@ object Science:
               for
                 _ <- setup(config, TimeSpan.unsafeFromMicroseconds(expTimeμs.value))
                 _ <- optics.wavelength := λ.offset(g.Δλ).getOrElse(λ)
-                a <- arcStep(TelescopeConfig(Offset.Zero, StepGuideState.Disabled), gcalClass)
-                f <- flatStep(TelescopeConfig(Offset.Zero, StepGuideState.Disabled), gcalClass)
-                s <- scienceStep(TelescopeConfig(Offset.Zero, sciGuiding), sciClass)
+                a <- arcStep(TelescopeConfig(Offset.Zero, StepGuideState.Disabled, OffsetPurpose.Object), gcalClass)
+                f <- flatStep(TelescopeConfig(Offset.Zero, StepGuideState.Disabled, OffsetPurpose.Object), gcalClass)
+                s <- scienceStep(TelescopeConfig(Offset.Zero, sciGuiding, OffsetPurpose.Object), sciClass)
               yield (a, f, s)
 
           def expand(include: Boolean, step: ProtoStep[D], calibration: Calibration): F[(List[StepViolation], List[ProtoStep[D]])] =
@@ -336,7 +337,7 @@ object Science:
             for
               _ <- setup(config, TimeSpan.Zero)
               _ <- optics.wavelength := λ.offset(Δλ).getOrElse(λ)
-              a <- arcStep(TelescopeConfig(Offset.Zero, StepGuideState.Disabled), ObserveClass.DayCal)
+              a <- arcStep(TelescopeConfig(Offset.Zero, StepGuideState.Disabled, OffsetPurpose.Object), ObserveClass.DayCal)
             yield a
 
       def rFilter: L
@@ -357,7 +358,7 @@ object Science:
             _ <- optics.ampReadMode := GmosAmpReadMode.Fast
             _ <- optics.ampGain     := GmosAmpGain.Low
             _ <- optics.roi         := GmosRoi.FullFrame
-            f <- flatStep(TelescopeConfig(Offset.Zero, StepGuideState.Disabled), ObserveClass.DayCal)
+            f <- flatStep(TelescopeConfig(Offset.Zero, StepGuideState.Disabled, OffsetPurpose.Object), ObserveClass.DayCal)
           yield f
         NonEmptyList.one(flat)
 
@@ -456,7 +457,7 @@ object Science:
       val dithers = if c.wavelengthDithers.exists(_.toPicometers.value.abs > limit) then c.wavelengthDithers
                     else List(WavelengthDither.Zero)
       c.withWavelengthDithers(dithers.some)
-       .withTelescopeConfigs(NonEmptyList.one(TelescopeConfig(Offset.Zero, StepGuideState.Enabled)))
+       .withTelescopeConfigs(NonEmptyList.one(TelescopeConfig(Offset.Zero, StepGuideState.Enabled, OffsetPurpose.Object)))
 
     def instantiate[F[_]: Monad, S, D, G, L, U](
       oid:       Observation.Id,
