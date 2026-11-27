@@ -16,9 +16,10 @@ object TelescopeConfigAlongSlitInput:
     ObjectFieldsBinding.rmap:
       case List(
         OffsetComponentInput.BindingQ("q", rQ),
-        StepGuideStateBinding("guiding", rGuiding)
+        StepGuideStateBinding("guiding", rGuiding),
+        OffsetPurposeBinding.Option("explicitPurpose", rPurpose)
       ) =>
-        (rQ, rGuiding).parMapN(TelescopeConfigAlongSlit.apply)
+        (rQ, rGuiding, rPurpose).parMapN(TelescopeConfigAlongSlit(_, _, _))
 
 object SlitTelescopeConfigsInput:
   val Binding: Matcher[SlitTelescopeConfigs] =

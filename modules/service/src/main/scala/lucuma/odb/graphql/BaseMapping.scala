@@ -318,6 +318,7 @@ trait BaseMapping[F[_]]
   lazy val GroupElementType                        = schema.ref("GroupElement")
   lazy val GuideProbeType                          = schema.ref("GuideProbe")
   lazy val GuideStateType                          = schema.ref("GuideState")
+  lazy val OffsetPurposeType                       = schema.ref("OffsetPurpose")
   lazy val HasExchangePartnerType                  = schema.ref("HasExchangePartner")
   lazy val HasNonPartnerType                       = schema.ref("HasNonPartner")
   lazy val HasGeminiPartnerType                    = schema.ref("HasGeminiPartner")

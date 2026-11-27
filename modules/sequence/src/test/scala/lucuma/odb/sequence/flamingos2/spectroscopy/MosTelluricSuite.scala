@@ -43,6 +43,7 @@ import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
 import lucuma.itc.ItcResultReadMode
 import lucuma.odb.data.OdbError
+import lucuma.odb.sequence.OffsetPurposeDefaults
 import lucuma.odb.sequence.SmartGcalExpander
 import lucuma.odb.sequence.StepTimeEstimateCalculator
 import lucuma.odb.sequence.data.ProtoStep
@@ -74,7 +75,7 @@ class MosTelluricSuite extends FunSuite:
     ExposureTimeMode.SignalToNoiseMode(SignalToNoise.unsafeFromBigDecimalExact(BigDecimal(100)), At)
 
   private def config(
-    telescopeConfigs:    NonEmptyList[TelescopeConfig] = MosTelluricTelescopeConfigs.telescopeConfigs,
+    telescopeConfigs:    NonEmptyList[TelescopeConfig] = MosTelluricTelescopeConfigs.telescopeConfigs(OffsetPurposeDefaults.AlwaysObject),
     telluricScienceMode: Option[ObservingModeType]     = ObservingModeType.Flamingos2Mos.some
   ): longslit.Config =
     longslit.Config(
@@ -161,7 +162,7 @@ class MosTelluricSuite extends FunSuite:
     assertEquals(titles(atoms), List("Telluric", "Telluric", "Telluric", "Nighttime Calibrations"))
 
   test("a long slit observation's own telluric keeps the ABBA cadence"):
-    val atoms = generate(cfg = config(defaultTelluricTelescopeConfigs(Flamingos2TelluricOffsetPreset.Telluric).telescopeConfigs
+    val atoms = generate(cfg = config(defaultTelluricTelescopeConfigs(Flamingos2TelluricOffsetPreset.Telluric).telescopeConfigs(OffsetPurposeDefaults.AlwaysObject)
 , none)).science.toList
 
     assertEquals(titles(atoms).distinct, List("Nighttime Calibrations", "ABBA Cycle"))

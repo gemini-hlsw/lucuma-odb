@@ -14,6 +14,7 @@ trait TelescopeConfigMapping[F[_]] extends EnumeratedOffsetView[F] with StepReco
   private def telescopeConfigMappingAtPath(
     path:          Path,
     guidingColumn: ColumnRef,
+    purposeColumn: ColumnRef,
     idColumns:     (String, ColumnRef)*
   ): ObjectMapping =
     ObjectMapping(path)(
@@ -22,7 +23,8 @@ trait TelescopeConfigMapping[F[_]] extends EnumeratedOffsetView[F] with StepReco
           SqlField(name, ref, key = true, hidden = true)
       ) ++ List(
         SqlObject("offset"),
-        SqlField("guiding", guidingColumn)
+        SqlField("guiding", guidingColumn),
+        SqlField("purpose", purposeColumn)
       )*
     )
 
@@ -31,6 +33,8 @@ trait TelescopeConfigMapping[F[_]] extends EnumeratedOffsetView[F] with StepReco
       telescopeConfigMappingAtPath(
         EnumeratedTelescopeConfigGeneratorType / "values",
         EnumeratedOffsetView.GuideState,
+        // An enumerated position's purpose is that of its (object or sky) generator.
+        EnumeratedOffsetView.OffsetGeneratorRole,
         "observationId" -> EnumeratedOffsetView.ObservationId,
         "role"          -> EnumeratedOffsetView.OffsetGeneratorRole,
         "index"         -> EnumeratedOffsetView.Index
@@ -39,6 +43,7 @@ trait TelescopeConfigMapping[F[_]] extends EnumeratedOffsetView[F] with StepReco
       telescopeConfigMappingAtPath(
         StepRecordType / "telescopeConfig",
         StepRecordView.GuideState,
+        StepRecordView.OffsetPurpose,
         "id" -> StepRecordView.Id
       )
     )

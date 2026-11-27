@@ -5,7 +5,11 @@ package lucuma.odb.graphql.input
 
 import cats.syntax.parallel.*
 import lucuma.core.enums.Breakpoint
-import lucuma.core.model.sequence.TelescopeConfig
+import lucuma.core.enums.ObserveClass
+import lucuma.core.enums.OffsetPurpose
+import lucuma.core.math.Offset
+import lucuma.core.model.sequence.StepConfig
+import lucuma.core.model.sequence.TelescopeConfigSpec
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.model.sequence.ghost.GhostDynamicConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
@@ -17,9 +21,24 @@ import lucuma.odb.sequence.data.ProtoStep
 
 object StepInput:
 
+  /**
+   * A step as given in a sequence edit.  Its telescope position may leave the
+   * purpose unspecified, to be derived from the observation's observing mode
+   * when the step is stored.
+   */
+  final case class Spec[D](
+    value:           D,
+    stepConfig:      StepConfig,
+    telescopeConfig: TelescopeConfigSpec,
+    observeClass:    ObserveClass,
+    breakpoint:      Breakpoint
+  ):
+    def resolve(defaultPurpose: Offset => OffsetPurpose): ProtoStep[D] =
+      ProtoStep(value, stepConfig, telescopeConfig.toTelescopeConfig(defaultPurpose), observeClass, breakpoint)
+
   private def binding[D](
     instrumentMatcher: Matcher[D]
-  ): Matcher[ProtoStep[D]] =
+  ): Matcher[Spec[D]] =
     ObjectFieldsBinding.rmap:
       case List(
         instrumentMatcher("instrumentConfig", rInstrument),
@@ -29,28 +48,28 @@ object StepInput:
         ObserveClassBinding("observeClass", rObserveClass),
       ) => (rInstrument, rBreakpoint, rStepConfig, rTelescopeConfig, rObserveClass).parMapN:
         (instrument, breakpoint, step, telescope, oclass) =>
-          ProtoStep(
+          Spec(
             instrument,
             step,
-            telescope.getOrElse(TelescopeConfig.Default),
+            telescope.getOrElse(TelescopeConfigSpec.Default),
             oclass,
             breakpoint.getOrElse(Breakpoint.Disabled)
           )
 
-  val Flamingos2Binding: Matcher[ProtoStep[Flamingos2DynamicConfig]] =
+  val Flamingos2Binding: Matcher[Spec[Flamingos2DynamicConfig]] =
     binding(Flamingos2DynamicInput.Binding)
 
-  val GmosNorthBinding: Matcher[ProtoStep[GmosNorth]] =
+  val GmosNorthBinding: Matcher[Spec[GmosNorth]] =
     binding(GmosNorthDynamicInput.Binding)
 
-  val GmosSouthBinding: Matcher[ProtoStep[GmosSouth]] =
+  val GmosSouthBinding: Matcher[Spec[GmosSouth]] =
     binding(GmosSouthDynamicInput.Binding)
 
-  val Igrins2Binding: Matcher[ProtoStep[Igrins2DynamicConfig]] =
+  val Igrins2Binding: Matcher[Spec[Igrins2DynamicConfig]] =
     binding(Igrins2DynamicInput.Binding)
 
-  val GnirsBinding: Matcher[ProtoStep[GnirsDynamicConfig]] =
+  val GnirsBinding: Matcher[Spec[GnirsDynamicConfig]] =
     binding(GnirsDynamicInput.Binding)
 
-  val GhostBinding: Matcher[ProtoStep[GhostDynamicConfig]] =
+  val GhostBinding: Matcher[Spec[GhostDynamicConfig]] =
     binding(GhostDynamicInput.Binding)

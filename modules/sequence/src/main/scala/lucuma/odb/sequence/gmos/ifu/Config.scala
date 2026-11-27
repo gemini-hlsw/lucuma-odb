@@ -14,6 +14,7 @@ import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosSouthIfuFpu
+import lucuma.core.enums.OffsetPurpose
 import lucuma.core.enums.StepGuideState
 import lucuma.core.math.Offset
 import lucuma.core.math.WavelengthDelta
@@ -26,6 +27,7 @@ import lucuma.odb.sequence.gmos.longslit.Config as LongSlitConfig
 import lucuma.odb.sequence.gmos.spectroscopy
 import lucuma.odb.sequence.gmos.spectroscopy.Config.Common
 import lucuma.odb.sequence.syntax.hash.*
+import lucuma.odb.sequence.util.HashBytes
 
 import java.io.ByteArrayOutputStream
 import java.io.DataOutputStream
@@ -91,6 +93,7 @@ sealed trait Config[G: Enumerated, L: Enumerated, U: Enumerated] extends spectro
       out.writeLong(tc.offset.p.toAngle.toMicroarcseconds)
       out.writeLong(tc.offset.q.toAngle.toMicroarcseconds)
       out.writeChars(tc.guiding.tag)
+    out.write(HashBytes.purposeHashBytes(telescopeConfigs.toList))
     out.write(acquisition.hashBytes)
 
     out.close()
@@ -177,4 +180,4 @@ object Config:
         )
 
   val DefaultTelescopeConfigs: NonEmptyList[TelescopeConfig] =
-    NonEmptyList.one(TelescopeConfig(Offset.Zero, StepGuideState.Enabled))
+    NonEmptyList.one(TelescopeConfig(Offset.Zero, StepGuideState.Enabled, OffsetPurpose.Object))

@@ -190,6 +190,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F]:
       LeafMapping[GroupStandingStatus](GroupStandingStatusType),
       LeafMapping[GuideProbe](GuideProbeType),
       LeafMapping[StepGuideState](GuideStateType),
+      LeafMapping[OffsetPurpose](OffsetPurposeType),
       LeafMapping[IdempotencyKey](IdempotencyKeyType),
       LeafMapping[SlitOffsetMode](SlitOffsetModeType),
       LeafMapping[String](IgnoreType),

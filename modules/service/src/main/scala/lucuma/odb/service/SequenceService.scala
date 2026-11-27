@@ -31,6 +31,7 @@ import lucuma.core.enums.GhostResolutionMode
 import lucuma.core.enums.GnirsWellDepth
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObserveClass
+import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.SmartGcalType
 import lucuma.core.enums.StepGuideState
@@ -63,10 +64,13 @@ import lucuma.core.util.TimeSpan
 import lucuma.core.util.Uid
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
+import lucuma.odb.graphql.input.StepInput
 import lucuma.odb.graphql.mapping.AccessControl.CheckedWithId
 import lucuma.odb.logic.Generator.SequenceAtomLimit
 import lucuma.odb.logic.SmartGcalImplementation
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
+import lucuma.odb.sequence.ObservingMode
+import lucuma.odb.sequence.OffsetPurposeDefaults
 import lucuma.odb.sequence.SmartGcalExpander
 import lucuma.odb.sequence.StepTimeEstimateCalculator
 import lucuma.odb.sequence.data.ProtoAtom
@@ -147,7 +151,7 @@ trait SequenceService[F[_]]:
   )(using Transaction[F]): F[Result[Stream[Pure, Atom[Flamingos2DynamicConfig]]]]
 
   def replaceFlamingos2Sequence(
-    checked: CheckedWithId[(SequenceType, List[ProtoAtom[ProtoStep[Flamingos2DynamicConfig]]]), Observation.Id],
+    checked: CheckedWithId[(SequenceType, List[ProtoAtom[StepInput.Spec[Flamingos2DynamicConfig]]]), Observation.Id],
     abandonOngoingStep: Boolean
   )(using Transaction[F]): F[Result[Stream[Pure, Atom[Flamingos2DynamicConfig]]]]
 
@@ -166,7 +170,7 @@ trait SequenceService[F[_]]:
   )(using Transaction[F]): F[Result[Stream[Pure, Atom[GhostDynamicConfig]]]]
 
   def replaceGhostSequence(
-    checked: CheckedWithId[(SequenceType, List[ProtoAtom[ProtoStep[GhostDynamicConfig]]]), Observation.Id],
+    checked: CheckedWithId[(SequenceType, List[ProtoAtom[StepInput.Spec[GhostDynamicConfig]]]), Observation.Id],
     abandonOngoingStep: Boolean
   )(using Transaction[F]): F[Result[Stream[Pure, Atom[GhostDynamicConfig]]]]
 
@@ -181,7 +185,7 @@ trait SequenceService[F[_]]:
   )(using Transaction[F]): F[Result[Stream[Pure, Atom[GmosNorth]]]]
 
   def replaceGmosNorthSequence(
-    checked: CheckedWithId[(SequenceType, List[ProtoAtom[ProtoStep[GmosNorth]]]), Observation.Id],
+    checked: CheckedWithId[(SequenceType, List[ProtoAtom[StepInput.Spec[GmosNorth]]]), Observation.Id],
     abandonOngoingStep: Boolean
   )(using Transaction[F]): F[Result[Stream[Pure, Atom[GmosNorth]]]]
 
@@ -196,7 +200,7 @@ trait SequenceService[F[_]]:
   )(using Transaction[F]): F[Result[Stream[Pure, Atom[GmosSouth]]]]
 
   def replaceGmosSouthSequence(
-    checked: CheckedWithId[(SequenceType, List[ProtoAtom[ProtoStep[GmosSouth]]]), Observation.Id],
+    checked: CheckedWithId[(SequenceType, List[ProtoAtom[StepInput.Spec[GmosSouth]]]), Observation.Id],
     abandonOngoingStep: Boolean
   )(using Transaction[F]): F[Result[Stream[Pure, Atom[GmosSouth]]]]
 
@@ -316,7 +320,7 @@ trait SequenceService[F[_]]:
   )(using Transaction[F]): F[Result[Stream[Pure, Atom[Igrins2DynamicConfig]]]]
 
   def replaceIgrins2Sequence(
-    checked: CheckedWithId[(SequenceType, List[ProtoAtom[ProtoStep[Igrins2DynamicConfig]]]), Observation.Id],
+    checked: CheckedWithId[(SequenceType, List[ProtoAtom[StepInput.Spec[Igrins2DynamicConfig]]]), Observation.Id],
     abandonOngoingStep: Boolean
   )(using Transaction[F]): F[Result[Stream[Pure, Atom[Igrins2DynamicConfig]]]]
 
@@ -381,7 +385,7 @@ trait SequenceService[F[_]]:
   )(using Transaction[F]): F[Result[Stream[Pure, Atom[GnirsDynamicConfig]]]]
 
   def replaceGnirsSequence(
-    checked: CheckedWithId[(SequenceType, List[ProtoAtom[ProtoStep[GnirsDynamicConfig]]]), Observation.Id],
+    checked: CheckedWithId[(SequenceType, List[ProtoAtom[StepInput.Spec[GnirsDynamicConfig]]]), Observation.Id],
     abandonOngoingStep: Boolean
   )(using Transaction[F]): F[Result[Stream[Pure, Atom[GnirsDynamicConfig]]]]
 
@@ -983,17 +987,18 @@ object SequenceService:
         yield r).value
 
       override def replaceFlamingos2Sequence(
-        checked: CheckedWithId[(SequenceType, List[ProtoAtom[ProtoStep[Flamingos2DynamicConfig]]]), Observation.Id],
+        checked: CheckedWithId[(SequenceType, List[ProtoAtom[StepInput.Spec[Flamingos2DynamicConfig]]]), Observation.Id],
         abandonOngoingStep: Boolean
       )(using Transaction[F]): F[Result[Stream[Pure, Atom[Flamingos2DynamicConfig]]]] =
-        checked.foldWithId(OdbError.InvalidArgument().asFailureF[F, Stream[Pure, Atom[Flamingos2DynamicConfig]]]) { case ((sequenceType, sequence), oid) =>
-          replaceFlamingos2Sequence(
-            oid,
-            sequenceType,
-            sequence,
-            AtomBatch.Current,
-            abandonOngoingStep
-          )
+        checked.foldWithId(OdbError.InvalidArgument().asFailureF[F, Stream[Pure, Atom[Flamingos2DynamicConfig]]]) { case ((sequenceType, specs), oid) =>
+          resolveStepPurposes(oid, specs).flatMap: sequence =>
+            replaceFlamingos2Sequence(
+              oid,
+              sequenceType,
+              sequence,
+              AtomBatch.Current,
+              abandonOngoingStep
+            )
         }
 
       override def selectOrComputeGhostStatic(
@@ -1031,17 +1036,18 @@ object SequenceService:
         yield r).value
 
       override def replaceGhostSequence(
-        checked: CheckedWithId[(SequenceType, List[ProtoAtom[ProtoStep[GhostDynamicConfig]]]), Observation.Id],
+        checked: CheckedWithId[(SequenceType, List[ProtoAtom[StepInput.Spec[GhostDynamicConfig]]]), Observation.Id],
         abandonOngoingStep: Boolean
       )(using Transaction[F]): F[Result[Stream[Pure, Atom[GhostDynamicConfig]]]] =
-        checked.foldWithId(OdbError.InvalidArgument().asFailureF[F, Stream[Pure, Atom[GhostDynamicConfig]]]) { case ((sequenceType, sequence), oid) =>
-          replaceGhostSequence(
-            oid,
-            sequenceType,
-            sequence,
-            AtomBatch.Current,
-            abandonOngoingStep
-          )
+        checked.foldWithId(OdbError.InvalidArgument().asFailureF[F, Stream[Pure, Atom[GhostDynamicConfig]]]) { case ((sequenceType, specs), oid) =>
+          resolveStepPurposes(oid, specs).flatMap: sequence =>
+            replaceGhostSequence(
+              oid,
+              sequenceType,
+              sequence,
+              AtomBatch.Current,
+              abandonOngoingStep
+            )
         }
 
       override def replaceGmosNorthSequence(
@@ -1071,17 +1077,18 @@ object SequenceService:
         yield r).value
 
       override def replaceGmosNorthSequence(
-        checked: CheckedWithId[(SequenceType, List[ProtoAtom[ProtoStep[GmosNorth]]]), Observation.Id],
+        checked: CheckedWithId[(SequenceType, List[ProtoAtom[StepInput.Spec[GmosNorth]]]), Observation.Id],
         abandonOngoingStep: Boolean
       )(using Transaction[F]): F[Result[Stream[Pure, Atom[GmosNorth]]]] =
-        checked.foldWithId(OdbError.InvalidArgument().asFailureF[F, Stream[Pure, Atom[GmosNorth]]]) { case ((sequenceType, sequence), oid) =>
-          replaceGmosNorthSequence(
-            oid,
-            sequenceType,
-            sequence,
-            AtomBatch.Current,
-            abandonOngoingStep
-          )
+        checked.foldWithId(OdbError.InvalidArgument().asFailureF[F, Stream[Pure, Atom[GmosNorth]]]) { case ((sequenceType, specs), oid) =>
+          resolveStepPurposes(oid, specs).flatMap: sequence =>
+            replaceGmosNorthSequence(
+              oid,
+              sequenceType,
+              sequence,
+              AtomBatch.Current,
+              abandonOngoingStep
+            )
         }
 
       override def replaceGmosSouthSequence(
@@ -1112,17 +1119,18 @@ object SequenceService:
 
 
       override def replaceGmosSouthSequence(
-        checked: CheckedWithId[(SequenceType, List[ProtoAtom[ProtoStep[GmosSouth]]]), Observation.Id],
+        checked: CheckedWithId[(SequenceType, List[ProtoAtom[StepInput.Spec[GmosSouth]]]), Observation.Id],
         abandonOngoingStep: Boolean
       )(using Transaction[F]): F[Result[Stream[Pure, Atom[GmosSouth]]]] =
-        checked.foldWithId(OdbError.InvalidArgument().asFailureF[F, Stream[Pure, Atom[GmosSouth]]]) { case ((sequenceType, sequence), oid) =>
-          replaceGmosSouthSequence(
-            oid,
-            sequenceType,
-            sequence,
-            AtomBatch.Current,
-            abandonOngoingStep
-          )
+        checked.foldWithId(OdbError.InvalidArgument().asFailureF[F, Stream[Pure, Atom[GmosSouth]]]) { case ((sequenceType, specs), oid) =>
+          resolveStepPurposes(oid, specs).flatMap: sequence =>
+            replaceGmosSouthSequence(
+              oid,
+              sequenceType,
+              sequence,
+              AtomBatch.Current,
+              abandonOngoingStep
+            )
         }
 
       override def replaceIgrins2Sequence(
@@ -1152,17 +1160,18 @@ object SequenceService:
         yield r).value
 
       override def replaceIgrins2Sequence(
-        checked: CheckedWithId[(SequenceType, List[ProtoAtom[ProtoStep[Igrins2DynamicConfig]]]), Observation.Id],
+        checked: CheckedWithId[(SequenceType, List[ProtoAtom[StepInput.Spec[Igrins2DynamicConfig]]]), Observation.Id],
         abandonOngoingStep: Boolean
       )(using Transaction[F]): F[Result[Stream[Pure, Atom[Igrins2DynamicConfig]]]] =
-        checked.foldWithId(OdbError.InvalidArgument().asFailureF[F, Stream[Pure, Atom[Igrins2DynamicConfig]]]) { case ((sequenceType, sequence), oid) =>
-          replaceIgrins2Sequence(
-            oid,
-            sequenceType,
-            sequence,
-            AtomBatch.Current,
-            abandonOngoingStep
-          )
+        checked.foldWithId(OdbError.InvalidArgument().asFailureF[F, Stream[Pure, Atom[Igrins2DynamicConfig]]]) { case ((sequenceType, specs), oid) =>
+          resolveStepPurposes(oid, specs).flatMap: sequence =>
+            replaceIgrins2Sequence(
+              oid,
+              sequenceType,
+              sequence,
+              AtomBatch.Current,
+              abandonOngoingStep
+            )
         }
 
       override def replaceGnirsSequence(
@@ -1192,18 +1201,38 @@ object SequenceService:
         yield r).value
 
       override def replaceGnirsSequence(
-        checked: CheckedWithId[(SequenceType, List[ProtoAtom[ProtoStep[GnirsDynamicConfig]]]), Observation.Id],
+        checked: CheckedWithId[(SequenceType, List[ProtoAtom[StepInput.Spec[GnirsDynamicConfig]]]), Observation.Id],
         abandonOngoingStep: Boolean
       )(using Transaction[F]): F[Result[Stream[Pure, Atom[GnirsDynamicConfig]]]] =
-        checked.foldWithId(OdbError.InvalidArgument().asFailureF[F, Stream[Pure, Atom[GnirsDynamicConfig]]]) { case ((sequenceType, sequence), oid) =>
-          replaceGnirsSequence(
-            oid,
-            sequenceType,
-            sequence,
-            AtomBatch.Current,
-            abandonOngoingStep
-          )
+        checked.foldWithId(OdbError.InvalidArgument().asFailureF[F, Stream[Pure, Atom[GnirsDynamicConfig]]]) { case ((sequenceType, specs), oid) =>
+          resolveStepPurposes(oid, specs).flatMap: sequence =>
+            replaceGnirsSequence(
+              oid,
+              sequenceType,
+              sequence,
+              AtomBatch.Current,
+              abandonOngoingStep
+            )
         }
+
+      // A sequence edit may leave a step's purpose unspecified.  It is derived
+      // from the observation's observing mode, as for a generated sequence.
+      private def resolveStepPurposes[D](
+        observationId: Observation.Id,
+        sequence:      List[ProtoAtom[StepInput.Spec[D]]]
+      )(using Transaction[F]): F[List[ProtoAtom[ProtoStep[D]]]] =
+        session
+          .option(Statements.SelectObservingModeType)(observationId)
+          .flatMap: omt =>
+            Services.asSuperUser:
+              omt.flatten.traverse: t =>
+                observingModeServices.selectObservingMode(List((observationId, t)))
+          .map: modes =>
+            val defaultPurpose =
+              modes
+                .flatMap(_.get(observationId))
+                .fold(OffsetPurposeDefaults.AlwaysObject)(ObservingMode.Syntax.defaultOffsetPurpose)
+            sequence.map(_.map(_.resolve(defaultPurpose)))
 
       private def resetAcquisition[D](
         observationId:      Observation.Id,
@@ -1637,7 +1666,7 @@ object SequenceService:
           val smart = ProtoStep(
             reference.value,
             StepConfig.SmartGcal(sgt),
-            TelescopeConfig(reference.telescopeConfig.offset, StepGuideState.Disabled),
+            reference.telescopeConfig.copy(guiding = StepGuideState.Disabled),
             observation.calibrationRole.gcalClass
           )
           ResultT:
@@ -1787,6 +1816,13 @@ object SequenceService:
 
   object Statements:
 
+    val SelectObservingModeType: Query[Observation.Id, Option[ObservingModeType]] =
+      sql"""
+        SELECT c_observing_mode_type
+          FROM t_observation
+         WHERE c_observation_id = $observation_id
+      """.query(observing_mode_type.opt)
+
     val SelectDaytimeCalibration: Query[Observation.Id, Option[Instrument]] =
       sql"""
         SELECT c_instrument
@@ -1901,6 +1937,7 @@ object SequenceService:
           c_offset_p,
           c_offset_q,
           c_guide_state,
+          c_offset_purpose,
           c_breakpoint
         ) VALUES $enc
       """.command
@@ -2099,6 +2136,7 @@ object SequenceService:
           s.c_offset_p,
           s.c_offset_q,
           s.c_guide_state,
+          s.c_offset_purpose,
           s.c_observe_class,
           s.c_breakpoint
       """

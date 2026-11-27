@@ -20,6 +20,7 @@ import lucuma.core.model.sequence.gnirs.GnirsFocus
 import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.odb.sequence.gnirs.AcquisitionConfig
 import lucuma.odb.sequence.syntax.all.*
+import lucuma.odb.sequence.util.HashBytes
 
 import java.io.ByteArrayOutputStream
 import java.io.DataOutputStream
@@ -97,6 +98,8 @@ case class Config(
 
     telescopeConfigs.toList.foreach: tc =>
       out.write(tc.hashBytes)
+
+    out.write(HashBytes.purposeHashBytes(telescopeConfigs.toList))
 
     out.write(acquisition.hashBytes)
     out.write(telluricType.hashBytes)

@@ -8,6 +8,8 @@ import cats.syntax.all.*
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.model.User
+import lucuma.odb.data.OdbError
+import lucuma.odb.graphql.input.TelescopeConfigGeneratorInput
 
 class createObservation_Flamingos2Imaging extends OdbSuite:
 
@@ -204,6 +206,136 @@ class createObservation_Flamingos2Imaging extends OdbSuite:
             }
           }
         """.asRight)
+
+  test("enumerated offsets take their purpose from their list"):
+    createProgramAs(pi).flatMap: pid =>
+      createTargetAs(pi, pid).flatMap: tid =>
+        expect(pi, s"""
+          mutation {
+            createObservation(input: {
+              programId: ${pid.asJson}
+              SET: {
+                targetEnvironment: {
+                  asterism: [${tid.asJson}]
+                }
+                scienceRequirements: {
+                  exposureTimeMode: {
+                    signalToNoise: {
+                      value: 100.0
+                      at: { nanometers: 500.0 }
+                    }
+                  }
+                }
+                observingMode: {
+                  flamingos2Imaging: {
+                    variant: {
+                      grouped: {
+                        offsets: {
+                          enumerated: {
+                            values: [ { offset: { p: { microarcseconds: 10000000 }, q: { microarcseconds: 0 } } } ]
+                          }
+                        }
+                        skyCount: 1
+                        skyOffsets: {
+                          enumerated: {
+                            values: [ { offset: { p: { microarcseconds: 0 }, q: { microarcseconds: 300000000 } }, guiding: DISABLED } ]
+                          }
+                        }
+                      }
+                    }
+                    filters: [
+                      { filter: Y }
+                    ]
+                  }
+                }
+              }
+            }) {
+              observation {
+                observingMode {
+                  flamingos2Imaging {
+                    variant {
+                      grouped {
+                        offsets { enumerated { values { purpose } } }
+                        skyOffsets { enumerated { values { purpose } } }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """,
+        json"""
+          {
+            "createObservation": {
+              "observation": {
+                "observingMode": {
+                  "flamingos2Imaging": {
+                    "variant": {
+                      "grouped": {
+                        "offsets":    { "enumerated": { "values": [ { "purpose": "OBJECT" } ] } },
+                        "skyOffsets": { "enumerated": { "values": [ { "purpose": "SKY" } ] } }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """.asRight)
+
+  test("an enumerated offset may not carry an explicit purpose"):
+    // Its purpose is that of its list (object or sky offsets).
+    createProgramAs(pi).flatMap: pid =>
+      createTargetAs(pi, pid).flatMap: tid =>
+        expectOdbError(
+          user     = pi,
+          query    = s"""
+            mutation {
+              createObservation(input: {
+                programId: ${pid.asJson}
+                SET: {
+                  targetEnvironment: {
+                    asterism: [${tid.asJson}]
+                  }
+                  scienceRequirements: {
+                    exposureTimeMode: {
+                      signalToNoise: {
+                        value: 100.0
+                        at: { nanometers: 500.0 }
+                      }
+                    }
+                  }
+                  observingMode: {
+                    flamingos2Imaging: {
+                      variant: {
+                        grouped: {
+                          offsets: {
+                            enumerated: {
+                              values: [
+                                { offset: { p: { microarcseconds: 10000000 }, q: { microarcseconds: 0 } } },
+                                { offset: { p: { microarcseconds: 0 }, q: { microarcseconds: 0 } }, explicitPurpose: SKY }
+                              ]
+                            }
+                          }
+                        }
+                      }
+                      filters: [
+                        { filter: Y }
+                      ]
+                    }
+                  }
+                }
+              }) {
+                observation { id }
+              }
+            }
+          """,
+          expected = {
+            case OdbError.InvalidArgument(Some(msg)) =>
+              assert(msg.contains(TelescopeConfigGeneratorInput.EnumeratedPurposeMessage), msg)
+          }
+        )
 
   test("create Flamingos2 imaging without a variant uses the defaults"):
     createProgramAs(pi).flatMap: pid =>

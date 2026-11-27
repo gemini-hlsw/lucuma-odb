@@ -275,8 +275,10 @@ import lucuma.odb.json.telescopeConfigAlongSlit.transport.given
 - `TelescopeConfigsFormat` / `object telescopeConfigs` in `modules/schema/src/main/scala/lucuma/odb/format/TelescopeConfigsFormat.scala` handles the round-trip.
 - The JSON blob uses the **transport** codec (integer microarcseconds, no extra unit fields).
 - `AlongSlitFormat` — `String ↔ NonEmptyList[TelescopeConfigAlongSlit]`
-- `ToSkyFormat` — `String ↔ NonEmptyList[TelescopeConfig]`
+- `ToSkyFormat` — `String ↔ NonEmptyList[TelescopeConfigSpec]` (also used for the plain IFU/MOS pattern lists)
 - `SlitTelescopeConfigsFormat` — `(SlitOffsetMode, String) ↔ SlitTelescopeConfigs` (dispatches based on mode tag)
+
+Pattern entries are *specs*: `TelescopeConfigSpec` / `TelescopeConfigAlongSlit` carry an optional `explicitPurpose`, which the transport encoders omit when unset (so patterns stored before purposes existed are unchanged). Never store resolved `TelescopeConfig`s here: the purpose of a position the user left unspecified is derived from the mode's geometry each time the sequence is generated (`OffsetPurposeDefaults`), and storing it would freeze it as explicit.
 
 ## Mode Table Conventions
 

@@ -37,6 +37,7 @@ import lucuma.core.model.sequence.gmos.longslit.DefaultSlitTelescopeConfigs
 import lucuma.core.model.sequence.gmos.mos.DefaultTelescopeConfigs
 import lucuma.core.syntax.timespan.*
 import lucuma.itc.IntegrationTime
+import lucuma.odb.sequence.OffsetPurposeDefaults
 import lucuma.odb.sequence.SmartGcalExpander
 import lucuma.odb.sequence.StepTimeEstimateCalculator
 import lucuma.odb.sequence.data.ProtoStep
@@ -78,7 +79,7 @@ class MosLongSlitSequencesSuite extends FunSuite:
       Filter,
       Fpu,
       common,
-      DefaultSlitTelescopeConfigs.telescopeConfigs,
+      DefaultSlitTelescopeConfigs.telescopeConfigs(OffsetPurposeDefaults.AlwaysObject),
       longslit.AcquisitionConfig.GmosNorth(
         common.exposureTimeMode,
         GmosNorthFilter.GPrime,
@@ -100,7 +101,7 @@ class MosLongSlitSequencesSuite extends FunSuite:
         none
       ),
       common,
-      DefaultTelescopeConfigs
+      DefaultTelescopeConfigs.map(_.toTelescopeConfig(OffsetPurposeDefaults.AlwaysObject))
     )
 
   private val mosConfigAtLongSlitOffsets: mos.Config.GmosNorth =
@@ -153,7 +154,7 @@ class MosLongSlitSequencesSuite extends FunSuite:
     assertEquals(ms.map(withoutFpu), ls.map(withoutFpu))
 
   test("MOS does not nod by default"):
-    assertEquals(mosConfig.telescopeConfigs, DefaultTelescopeConfigs)
+    assertEquals(mosConfig.telescopeConfigs, DefaultTelescopeConfigs.map(_.toTelescopeConfig(OffsetPurposeDefaults.AlwaysObject)))
 
     val qs = generate(mosConfig).flatMap(_.steps.toList).map(_.telescopeConfig.offset.q)
     assert(qs.nonEmpty)

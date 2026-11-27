@@ -31,7 +31,6 @@ import lucuma.itc.IntegrationTime
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
-import lucuma.odb.sequence.syntax.all.*
 import lucuma.odb.sequence.util.AtomBuilder
 import lucuma.odb.sequence.util.definitionError
 
@@ -60,7 +59,7 @@ object MosTelluric:
     cals:    List[ProtoStep[F2]]
   ):
     def cycleCount(t: IntegrationTime): Either[String, NonNegInt] =
-      calculateCycleCount[F2](s => s.telescopeConfig.guiding.isGuided, science.toList, t)
+      calculateCycleCount[F2](science.toList, t)
 
   private object StepComputer extends SequenceState[F2] with Flamingos2InitialDynamicConfig:
 

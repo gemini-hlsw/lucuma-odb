@@ -8,7 +8,7 @@ import cats.data.NonEmptyList
 import cats.syntax.parallel.*
 import cats.syntax.traverse.*
 import grackle.Result
-import lucuma.core.model.sequence.TelescopeConfig
+import lucuma.core.model.sequence.TelescopeConfigSpec
 import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.*
@@ -59,8 +59,8 @@ object GnirsIfuInput:
   // A supplied list replaces the stored one wholesale, so an empty list would leave
   // the observation with no offsets at all.
   private def resolveTelescopeConfigs(
-    tcs: List[TelescopeConfig]
-  ): Result[NonEmptyList[TelescopeConfig]] =
+    tcs: List[TelescopeConfigSpec]
+  ): Result[NonEmptyList[TelescopeConfigSpec]] =
     Result.fromOption(
       NonEmptyList.fromList(tcs),
       "'telescopeConfigs' must not be empty"

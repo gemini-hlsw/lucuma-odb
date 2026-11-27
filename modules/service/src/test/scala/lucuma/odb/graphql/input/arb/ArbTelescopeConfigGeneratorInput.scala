@@ -10,8 +10,8 @@ import lucuma.core.math.Angle
 import lucuma.core.math.Offset
 import lucuma.core.math.arb.ArbAngle
 import lucuma.core.math.arb.ArbOffset
-import lucuma.core.model.sequence.TelescopeConfig
-import lucuma.core.model.sequence.arb.ArbTelescopeConfig
+import lucuma.core.model.sequence.TelescopeConfigSpec
+import lucuma.core.model.sequence.arb.ArbTelescopeConfigSpec
 import org.scalacheck.*
 import org.scalacheck.Arbitrary.arbitrary
 
@@ -19,7 +19,7 @@ trait ArbTelescopeConfigGeneratorInput:
 
   import ArbAngle.given
   import ArbOffset.given
-  import ArbTelescopeConfig.given
+  import ArbTelescopeConfigSpec.given
 
   given Arbitrary[TelescopeConfigGeneratorInput.NoGeneratorInput.type] =
     Arbitrary:
@@ -28,9 +28,10 @@ trait ArbTelescopeConfigGeneratorInput:
   given Arbitrary[TelescopeConfigGeneratorInput.EnumeratedInput] =
     Arbitrary:
       for
-        tc0 <- arbitrary[TelescopeConfig]
-        tcs <- arbitrary[List[TelescopeConfig]]
-      yield TelescopeConfigGeneratorInput.EnumeratedInput(NonEmptyList(tc0, tcs))
+        tc0 <- arbitrary[TelescopeConfigSpec]
+        tcs <- arbitrary[List[TelescopeConfigSpec]]
+      // An enumerated position's purpose comes from its list, never explicitly.
+      yield TelescopeConfigGeneratorInput.EnumeratedInput(NonEmptyList(tc0, tcs).map(_.copy(explicitPurpose = None)))
 
   given Arbitrary[TelescopeConfigGeneratorInput.RandomInput] =
     Arbitrary:

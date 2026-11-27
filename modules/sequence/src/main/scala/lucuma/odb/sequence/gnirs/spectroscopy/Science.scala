@@ -25,6 +25,7 @@ import lucuma.core.enums.GnirsFpuOther
 import lucuma.core.enums.GnirsPixelScale
 import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.ObserveClass
+import lucuma.core.enums.OffsetPurpose
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepGuideState
 import lucuma.core.math.Offset
@@ -43,7 +44,6 @@ import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.SmartGcalExpander.Calibration
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
-import lucuma.odb.sequence.syntax.all.*
 import lucuma.odb.sequence.util.AtomBuilder
 import lucuma.odb.sequence.util.DaytimeSmartGcal
 import lucuma.odb.sequence.util.definitionError
@@ -77,13 +77,11 @@ object Science:
     /**
      * Cycle count: round up so that we always deliver at least the requested
      * number of on-source exposures. Sky steps don't contribute to the S/N, so
-     * cycles with sky offsets require extra repeats.
-     * On-source means guided, the dither positions are guided, the large sky offsets unguided.
-     * Keyed on the per-offset guide state, so the configured guiding
-     * drives the cycle count for both slit and IFU.
+     * cycles with sky offsets require extra repeats.  On-source means each
+     * step's resolved offset purpose is `Object`, for both slit and IFU.
      */
     def cycleCount(t: IntegrationTime): Either[String, NonNegInt] =
-      calculateCycleCount[GnirsDynamicConfig](s => s.telescopeConfig.guiding.isGuided, scienceSteps.toList, t)
+      calculateCycleCount[GnirsDynamicConfig](scienceSteps.toList, t)
 
   object StepDefinition:
 
@@ -302,7 +300,7 @@ object Science:
                    camera            = config.camera,
                    focus             = config.focus
                  )
-          f <- SeqState.flatStep(TelescopeConfig(Offset.Zero, StepGuideState.Disabled), ObserveClass.DayCal)
+          f <- SeqState.flatStep(TelescopeConfig(Offset.Zero, StepGuideState.Disabled, OffsetPurpose.Object), ObserveClass.DayCal)
         yield f
 
     // `distinctBy` keeps the first occurrence, so a repeated wavelength contributes one

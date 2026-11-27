@@ -32,6 +32,7 @@ import lucuma.core.model.sequence.gmos.StaticConfig
 import lucuma.core.model.sequence.gmos.mos.DefaultTelescopeConfigs
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
+import lucuma.odb.sequence.OffsetPurposeDefaults
 import lucuma.odb.sequence.StepTimeEstimateCalculator
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.gmos.InitialConfigs
@@ -82,7 +83,7 @@ class AcquisitionSuite extends FunSuite:
       acquisitionType,
       acq,
       common,
-      DefaultTelescopeConfigs
+      DefaultTelescopeConfigs.map(_.toTelescopeConfig(OffsetPurposeDefaults.AlwaysObject))
     )
 
   private val estimator: StepTimeEstimateCalculator[StaticConfig.GmosNorth, DynamicConfig.GmosNorth] =

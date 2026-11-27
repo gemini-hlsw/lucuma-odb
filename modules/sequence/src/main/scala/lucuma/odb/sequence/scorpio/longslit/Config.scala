@@ -15,7 +15,9 @@ import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.SlitTelescopeConfigs
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.scorpio.defaultSlitTelescopeConfigs
+import lucuma.odb.sequence.OffsetPurposeDefaults
 import lucuma.odb.sequence.syntax.all.*
+import lucuma.odb.sequence.util.HashBytes
 import lucuma.refined.*
 
 import java.io.ByteArrayOutputStream
@@ -40,8 +42,9 @@ case class Config(
       ScorpioFilter.Z -> z
     )
 
+  /** The positions, each purpose resolved against the slit when unspecified. */
   def steps: NonEmptyList[TelescopeConfig] =
-    telescopeConfigs.telescopeConfigs
+    telescopeConfigs.telescopeConfigs(OffsetPurposeDefaults.scorpioLongSlit(fpu))
 
   def hashBytes: Array[Byte] =
     val bao = new ByteArrayOutputStream(256)
@@ -53,6 +56,7 @@ case class Config(
     out.writeChars(telescopeConfigs.offsetsType.tag)
     steps.toList.foreach: tc =>
       out.write(tc.hashBytes)
+    out.write(HashBytes.purposeHashBytes(steps.toList))
     out.writeInt(repeats.value)
 
     out.close()

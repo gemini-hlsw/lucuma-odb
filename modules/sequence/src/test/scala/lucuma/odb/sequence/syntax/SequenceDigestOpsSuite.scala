@@ -55,7 +55,7 @@ class SequenceDigestOpsSuite extends ScalaCheckSuite:
   property("preserves ordering of atom steps"):
     forAll: (a: Atom[Unit]) =>
       val sd     = SequenceDigest.Zero.add(a, ctx)
-      val result = a.steps.toList.map(s => TelescopeConfig(s.telescopeConfig.offset, s.telescopeConfig.guiding))
+      val result = a.steps.toList.map(s => TelescopeConfig(s.telescopeConfig.offset, s.telescopeConfig.guiding, s.telescopeConfig.purpose))
       sd.telescopeConfigs === SortedSet.from(result)
 
   private def matches(sd: StepDigest, steps: List[Step[Unit]]): Boolean =

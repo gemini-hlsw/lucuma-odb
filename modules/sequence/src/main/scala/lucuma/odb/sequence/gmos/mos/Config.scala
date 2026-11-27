@@ -25,6 +25,7 @@ import lucuma.odb.sequence.gmos.longslit.Config as LongSlitConfig
 import lucuma.odb.sequence.gmos.spectroscopy
 import lucuma.odb.sequence.gmos.spectroscopy.Config.Common
 import lucuma.odb.sequence.syntax.hash.*
+import lucuma.odb.sequence.util.HashBytes
 
 import java.io.ByteArrayOutputStream
 import java.io.DataOutputStream
@@ -85,6 +86,7 @@ sealed trait Config[G: Enumerated, L: Enumerated, U] extends spectroscopy.Config
       out.writeLong(tc.offset.p.toAngle.toMicroarcseconds)
       out.writeLong(tc.offset.q.toAngle.toMicroarcseconds)
       out.writeChars(tc.guiding.tag)
+    out.write(HashBytes.purposeHashBytes(telescopeConfigs.toList))
     out.write(acquisition.hashBytes)
 
     out.close()

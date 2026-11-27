@@ -22,12 +22,15 @@ import lucuma.core.enums.Flamingos2LyotWheel
 import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.Flamingos2ReadoutMode
 import lucuma.core.enums.ObserveClass
+import lucuma.core.enums.OffsetPurpose
 import lucuma.core.enums.SequenceType
+import lucuma.core.enums.StepGuideState
 import lucuma.core.math.Offset
 import lucuma.core.math.Wavelength
 import lucuma.core.math.syntax.int.*
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Atom
+import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2AcquisitionMode
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig as F2
 import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
@@ -94,7 +97,7 @@ object Acquisition:
           _  <- F2.readoutMode := Flamingos2ReadoutMode.Science
           _  <- F2.reads       := readMode.readCount
           s0 <- scienceStep(0.arcsec,  0.arcsec, ObserveClass.Acquisition)
-          s1 <- skyOffset.traverse(scienceStep(_, ObserveClass.Acquisition))
+          s1 <- skyOffset.traverse(o => scienceStep(TelescopeConfig(o, StepGuideState.Enabled, OffsetPurpose.Sky), ObserveClass.Acquisition))
 
           _  <- F2.exposure    := 10.secondTimeSpan  // Fixed
           _  <- F2.fpu         := Flamingos2FpuMask.Builtin(builtin)
@@ -102,7 +105,7 @@ object Acquisition:
           s2 <- scienceStep(10.arcsec,  0.arcsec, ObserveClass.Acquisition)
 
           _  <- F2.exposure    := exposureTime
-          s3 <- skyOffset.traverse(scienceStep(_, ObserveClass.Acquisition))
+          s3 <- skyOffset.traverse(o => scienceStep(TelescopeConfig(o, StepGuideState.Enabled, OffsetPurpose.Sky), ObserveClass.Acquisition))
 
           s4 <- scienceStep( 0.arcsec,  0.arcsec, ObserveClass.Acquisition)
         yield Steps(s0, s1, s2, s3, s4)

@@ -19,6 +19,7 @@ import lucuma.core.data.EmailAddress
 import lucuma.core.enums.*
 import lucuma.core.enums.ImagingCapability
 import lucuma.core.enums.ImagingVariantType
+import lucuma.core.enums.OffsetPurpose
 import lucuma.core.enums.ProposalSummaryGenerationState
 import lucuma.core.math.Angle
 import lucuma.core.math.BoundedInterval
@@ -79,7 +80,6 @@ import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.StepExecutionState
 import lucuma.odb.data.SummaryStyle
 import lucuma.odb.data.Tag
-import lucuma.odb.data.TelescopeConfigGeneratorRole
 import lucuma.odb.data.TimeCharge.DiscountDiscriminator
 import lucuma.odb.data.TimingWindowEndTypeEnum
 import lucuma.odb.data.TooTrigger
@@ -499,8 +499,8 @@ trait Codecs extends CoreCodecs {
   val observation_qa_state: Codec[ObservationQaState] =
     enumerated(Type("e_observation_qa_state"))
 
-  val offset_generator_role: Codec[TelescopeConfigGeneratorRole] =
-    enumerated(Type("e_offset_generator_role"))
+  val offset_purpose: Codec[OffsetPurpose] =
+    enumerated(Type("e_offset_purpose"))
 
   val telescope_config_generator_type: Codec[TelescopeConfigGeneratorType] =
     enumerated(Type("e_offset_generator_type"))
@@ -712,6 +712,9 @@ trait Codecs extends CoreCodecs {
   val _guide_state: Codec[List[StepGuideState]] =
     _enumerated[StepGuideState](Type("_e_guide_state", List(Type("e_guide_state"))))
 
+  val _offset_purpose: Codec[List[OffsetPurpose]] =
+    _enumerated[OffsetPurpose](Type("_e_offset_purpose", List(Type("e_offset_purpose"))))
+
   lazy val setup_time: Codec[SetupTime] =
     (time_span *: time_span).to[SetupTime]
 
@@ -743,9 +746,11 @@ trait Codecs extends CoreCodecs {
     (step_digest *: step_digest *: step_digest *: step_digest *: step_digest).to[StepDigests]
 
   lazy val sequence_digest: Codec[SequenceDigest] =
-    (obs_class *: categorized_time *: _offset_array.opt *: _guide_state.opt *: int4_nonneg *: int4_nonneg *: step_digests *: execution_state *: _step_violation).imap {
-      case (oClass, pTime, offsets, guideStates, aCount, gcalSets, steps, execState, violations) =>
-        val config = offsets.getOrElse(Nil).zip(guideStates.getOrElse(Nil)).map(TelescopeConfig.apply.tupled)
+    (obs_class *: categorized_time *: _offset_array.opt *: _guide_state.opt *: _offset_purpose.opt *: int4_nonneg *: int4_nonneg *: step_digests *: execution_state *: _step_violation).imap {
+      case (oClass, pTime, offsets, guideStates, purposes, aCount, gcalSets, steps, execState, violations) =>
+        val os     = offsets.getOrElse(Nil)
+        val ps     = purposes.getOrElse(List.fill(os.length)(OffsetPurpose.Object))
+        val config = os.lazyZip(guideStates.getOrElse(Nil)).lazyZip(ps).map(TelescopeConfig.apply)
         SequenceDigest(oClass, pTime, SortedSet.from(config), aCount, gcalSets, steps, execState, violations)
     } { sd =>
       // Don't inline to get a consistent sort
@@ -755,6 +760,7 @@ trait Codecs extends CoreCodecs {
         sd.timeEstimate,
         Some(telescopeConfigs.map(_.offset)),
         Some(telescopeConfigs.map(_.guiding)),
+        Some(telescopeConfigs.map(_.purpose)),
         sd.atomCount,
         sd.gcalSets,
         sd.steps,
@@ -1043,7 +1049,7 @@ trait Codecs extends CoreCodecs {
     smart_gcal_type.to[StepConfig.SmartGcal]
 
   val telescope_config: Codec[TelescopeConfig] =
-    (offset *: guide_state).to[TelescopeConfig]
+    (offset *: guide_state *: offset_purpose).to[TelescopeConfig]
 
   val timestamp_interval_tsrange: Codec[TimestampInterval] = {
     Codec.simple(

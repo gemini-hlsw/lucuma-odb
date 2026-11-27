@@ -6,7 +6,7 @@ package table
 
 import lucuma.odb.util.Codecs.angle_µas
 import lucuma.odb.util.Codecs.observation_id
-import lucuma.odb.util.Codecs.offset_generator_role
+import lucuma.odb.util.Codecs.offset_purpose
 import lucuma.odb.util.Codecs.telescope_config_generator_type
 import skunk.codec.numeric.int8
 
@@ -17,25 +17,25 @@ trait TelescopeConfigGeneratorView[F[_]] extends BaseMapping[F]:
     val ObservationId: ColumnRef       = col("c_observation_id", observation_id)
     val ObjectObservationId: ColumnRef = col("c_object_observation_id", observation_id.embedded)
     val SkyObservationId: ColumnRef    = col("c_sky_observation_id", observation_id.embedded)
-    val Role: ColumnRef                = col("c_role", offset_generator_role)
+    val Role: ColumnRef                = col("c_role", offset_purpose)
 
     object Enumerated:
       val ObservationId: ColumnRef = col("c_enumerated_observation_id", observation_id.embedded)
-      val Role: ColumnRef          = col("c_enumerated_role", offset_generator_role.embedded)
+      val Role: ColumnRef          = col("c_enumerated_role", offset_purpose.embedded)
 
     object Random:
       val ObservationId: ColumnRef = col("c_random_observation_id", observation_id.embedded)
-      val Role: ColumnRef          = col("c_random_role", offset_generator_role.embedded)
+      val Role: ColumnRef          = col("c_random_role", offset_purpose.embedded)
       val Seed: ColumnRef          = col("c_random_seed", int8.embedded)
 
     object Spiral:
       val ObservationId: ColumnRef = col("c_spiral_observation_id", observation_id.embedded)
-      val Role: ColumnRef          = col("c_spiral_role", offset_generator_role.embedded)
+      val Role: ColumnRef          = col("c_spiral_role", offset_purpose.embedded)
       val Seed: ColumnRef          = col("c_spiral_seed", int8.embedded)
 
     object Uniform:
       val ObservationId: ColumnRef = col("c_uniform_observation_id", observation_id.embedded)
-      val Role: ColumnRef          = col("c_uniform_role", offset_generator_role.embedded)
+      val Role: ColumnRef          = col("c_uniform_role", offset_purpose.embedded)
 
     val TelescopeConfigGeneratorType: ColumnRef = col("c_type", telescope_config_generator_type)
 

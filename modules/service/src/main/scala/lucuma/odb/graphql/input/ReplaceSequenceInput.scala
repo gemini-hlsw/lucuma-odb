@@ -16,21 +16,20 @@ import lucuma.core.model.sequence.gnirs.GnirsDynamicConfig
 import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.sequence.data.ProtoAtom
-import lucuma.odb.sequence.data.ProtoStep
 
 
 case class ReplaceSequenceInput[D](
   observationId:      Option[Observation.Id],
   observationRef:     Option[ObservationReference],
   sequenceType:       SequenceType,
-  sequence:           List[ProtoAtom[ProtoStep[D]]],
+  sequence:           List[ProtoAtom[StepInput.Spec[D]]],
   abandonOngoingStep: Boolean
 )
 
 object ReplaceSequenceInput:
 
   def binding[D](
-    atomBinding: Matcher[ProtoAtom[ProtoStep[D]]]
+    atomBinding: Matcher[ProtoAtom[StepInput.Spec[D]]]
   ): Matcher[ReplaceSequenceInput[D]] =
     ObjectFieldsBinding.rmap:
       case List(

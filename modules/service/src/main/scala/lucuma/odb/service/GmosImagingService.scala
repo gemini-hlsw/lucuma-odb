@@ -12,6 +12,7 @@ import grackle.Result
 import grackle.ResultT
 import grackle.syntax.*
 import lucuma.core.enums.ImagingVariantType
+import lucuma.core.enums.OffsetPurpose
 import lucuma.core.enums.Site
 import lucuma.core.enums.WavelengthOrder
 import lucuma.core.math.Offset
@@ -21,7 +22,6 @@ import lucuma.odb.data.ExposureTimeModeId
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.ObservingModeRowVersion
-import lucuma.odb.data.TelescopeConfigGeneratorRole
 import lucuma.odb.graphql.input.GmosImagingFilterInput
 import lucuma.odb.graphql.input.GmosImagingInput
 import lucuma.odb.graphql.input.ImagingVariantInput
@@ -147,8 +147,8 @@ object GmosImagingService:
 
             for
               c <- precursorMap
-              o <- services.telescopeConfigGeneratorService.select(oids, TelescopeConfigGeneratorRole.Object)
-              s <- services.telescopeConfigGeneratorService.select(oids, TelescopeConfigGeneratorRole.Sky)
+              o <- services.telescopeConfigGeneratorService.select(oids, OffsetPurpose.Object)
+              s <- services.telescopeConfigGeneratorService.select(oids, OffsetPurpose.Sky)
             yield c.view.map { case (oid, (fs, variantFields, common)) =>
               val og = o.getOrElse(oid, TelescopeConfigGenerator.NoGenerator)
               val sg = s.getOrElse(oid, TelescopeConfigGenerator.NoGenerator)
@@ -206,10 +206,10 @@ object GmosImagingService:
 
               // Insert the offset generators
               _  <- ResultT.liftF:
-                      services.telescopeConfigGeneratorService.insert(oids, offsets, TelescopeConfigGeneratorRole.Object)
+                      services.telescopeConfigGeneratorService.insert(oids, offsets, OffsetPurpose.Object)
 
               _  <- ResultT.liftF:
-                      services.telescopeConfigGeneratorService.insert(oids, skyOffsets, TelescopeConfigGeneratorRole.Sky)
+                      services.telescopeConfigGeneratorService.insert(oids, skyOffsets, OffsetPurpose.Sky)
 
             yield ()
           .value
@@ -305,7 +305,7 @@ object GmosImagingService:
           def updateOffsetForRole(
             input:   Nullable[TelescopeConfigGeneratorInput],
             variant: ImagingVariantType,
-            role:    TelescopeConfigGeneratorRole
+            role:    OffsetPurpose
           ): F[Unit] =
             input.toOptionOption.fold(
               // the offset generator field was Absent, which means we should
@@ -328,8 +328,8 @@ object GmosImagingService:
                 case ImagingVariantInput.Interleaved(offsets, _, skyOffsets, _) => (offsets, skyOffsets)
                 case _                                                           => (Nullable.Null, Nullable.Null)
 
-              updateOffsetForRole(o, v.variantType, TelescopeConfigGeneratorRole.Object) *>
-              updateOffsetForRole(s, v.variantType, TelescopeConfigGeneratorRole.Sky)
+              updateOffsetForRole(o, v.variantType, OffsetPurpose.Object) *>
+              updateOffsetForRole(s, v.variantType, OffsetPurpose.Sky)
 
           (for
             _ <- ResultT.liftF(offsetUpdates)

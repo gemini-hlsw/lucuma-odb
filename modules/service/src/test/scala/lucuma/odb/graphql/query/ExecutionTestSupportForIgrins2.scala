@@ -8,6 +8,7 @@ import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.ObserveClass
+import lucuma.core.enums.OffsetPurpose
 import lucuma.core.enums.SlitOffsetMode
 import lucuma.core.enums.StepGuideState
 import lucuma.core.math.Offset
@@ -127,7 +128,8 @@ trait ExecutionTestSupportForIgrins2 extends ExecutionTestSupport:
         Offset.P.signedDecimalArcseconds.reverseGet(p),
         Offset.Q.signedDecimalArcseconds.reverseGet(q)
       ),
-      g
+      g,
+      OffsetPurpose.Object
     )
     json"""
       {
@@ -175,7 +177,8 @@ trait ExecutionTestSupportForIgrins2 extends ExecutionTestSupport:
         Offset.P.signedDecimalArcseconds.reverseGet(p),
         Offset.Q.signedDecimalArcseconds.reverseGet(q)
       ),
-      g
+      g,
+      OffsetPurpose.Object
     )
     json"""
       {

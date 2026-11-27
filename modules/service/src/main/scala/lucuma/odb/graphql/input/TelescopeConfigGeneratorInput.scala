@@ -11,7 +11,7 @@ import grackle.syntax.*
 import lucuma.core.enums.TelescopeConfigGeneratorType
 import lucuma.core.math.Angle
 import lucuma.core.math.Offset
-import lucuma.core.model.sequence.TelescopeConfig
+import lucuma.core.model.sequence.TelescopeConfigSpec
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.binding.*
@@ -30,8 +30,10 @@ object TelescopeConfigGeneratorInput:
     override def generatorType: TelescopeConfigGeneratorType =
       TelescopeConfigGeneratorType.NoGenerator
 
+  // The purpose of an enumerated position is that of the generator (object or
+  // sky offsets) holding it, so the binding rejects an explicit one.
   case class EnumeratedInput(
-    values: NonEmptyList[TelescopeConfig]
+    values: NonEmptyList[TelescopeConfigSpec]
   ) extends TelescopeConfigGeneratorInput:
     override def generatorType: TelescopeConfigGeneratorType =
       TelescopeConfigGeneratorType.Enumerated
@@ -41,10 +43,16 @@ object TelescopeConfigGeneratorInput:
       case List(
         TelescopeConfigInput.Binding.List("values", rValues)
       ) => rValues.flatMap: lst =>
-        NonEmptyList
-          .fromList(lst)
-          .fold(OdbError.InvalidArgument("'enumerated' offsets must have at least one offset position".some).asFailure): nel =>
-            EnumeratedInput(nel).success
+        if lst.exists(_.explicitPurpose.isDefined) then
+          OdbError.InvalidArgument(EnumeratedPurposeMessage.some).asFailure
+        else
+          NonEmptyList
+            .fromList(lst)
+            .fold(OdbError.InvalidArgument("'enumerated' offsets must have at least one offset position".some).asFailure): nel =>
+              EnumeratedInput(nel).success
+
+  val EnumeratedPurposeMessage: String =
+    "'enumerated' offsets take their purpose from their list (object or sky offsets), so 'explicitPurpose' may not be given."
 
   case class RandomInput(
     size:   Angle,

@@ -8,8 +8,8 @@ import io.circe.parser.decode
 import io.circe.syntax.*
 import lucuma.core.enums.SlitOffsetMode
 import lucuma.core.model.SlitTelescopeConfigs
-import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.TelescopeConfigAlongSlit
+import lucuma.core.model.sequence.TelescopeConfigSpec
 import lucuma.core.optics.Format
 
 /**
@@ -24,9 +24,8 @@ final case class StoredSlitTelescopeConfigs(slitOffsetMode: SlitOffsetMode, tele
  * - the JSON blob (`c_telescope_configs`).
  */
 trait TelescopeConfigsFormat:
-  import lucuma.odb.json.offset.transport.given
-  import lucuma.odb.json.stepconfig.given
   import lucuma.odb.json.telescopeConfigAlongSlit.transport.given
+  import lucuma.odb.json.telescopeConfigSpec.transport.given
 
   val AlongSlitFormat: Format[String, NonEmptyList[TelescopeConfigAlongSlit]] =
     Format(
@@ -34,9 +33,9 @@ trait TelescopeConfigsFormat:
       cs => cs.toList.asJson.noSpaces
     )
 
-  val ToSkyFormat: Format[String, NonEmptyList[TelescopeConfig]] =
+  val ToSkyFormat: Format[String, NonEmptyList[TelescopeConfigSpec]] =
     Format(
-      s => decode[List[TelescopeConfig]](s).toOption.flatMap(NonEmptyList.fromList),
+      s => decode[List[TelescopeConfigSpec]](s).toOption.flatMap(NonEmptyList.fromList),
       cs => cs.toList.asJson.noSpaces
     )
 

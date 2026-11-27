@@ -26,7 +26,6 @@ import lucuma.itc.IntegrationTime
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
-import lucuma.odb.sequence.syntax.all.*
 import lucuma.odb.sequence.util.AtomBuilder
 import lucuma.odb.sequence.util.definitionError
 
@@ -50,7 +49,7 @@ object Science:
     scienceSteps: NonEmptyList[ProtoStep[Igrins2DynamicConfig]]
   ):
     def cycleCount(t: IntegrationTime): Either[String, NonNegInt] =
-      calculateCycleCount[Igrins2DynamicConfig](s => s.telescopeConfig.guiding.isGuided, scienceSteps.toList, t)
+      calculateCycleCount[Igrins2DynamicConfig](scienceSteps.toList, t)
 
   object StepDefinition:
 

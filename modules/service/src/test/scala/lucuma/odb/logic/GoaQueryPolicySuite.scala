@@ -25,6 +25,7 @@ import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.KeckInstrument
+import lucuma.core.enums.OffsetPurpose
 import lucuma.core.enums.ScienceMode
 import lucuma.core.enums.StepGuideState
 import lucuma.core.enums.VisitorObservingModeType
@@ -49,6 +50,7 @@ import lucuma.core.util.Enumerated
 import lucuma.odb.TestCoordinates.coords
 import lucuma.odb.data.ArchiveSearchPointing
 import lucuma.odb.logic.GoaQueryPolicy.TargetPointing
+import lucuma.odb.sequence.OffsetPurposeDefaults
 import lucuma.odb.sequence.exchange.Config as Exchange
 import lucuma.odb.sequence.flamingos2.mos.Config as Flamingos2Mos
 import lucuma.odb.sequence.flamingos2.spectroscopy.AcquisitionConfig as Flamingos2AcquisitionConfig
@@ -103,7 +105,7 @@ class GoaQueryPolicySuite extends FunSuite:
         explicitRoi               = GmosRoi.CentralSpectrum.some,
         explicitWavelengthDithers = none
       ),
-      telescopeConfigs = DefaultSlitTelescopeConfigs.telescopeConfigs,
+      telescopeConfigs = DefaultSlitTelescopeConfigs.telescopeConfigs(OffsetPurposeDefaults.AlwaysObject),
       acquisition = AcquisitionConfig.GmosNorth(
         exposureTimeMode = exposureTimeMode,
         defaultFilter    = GmosNorthFilter.GPrime,
@@ -130,7 +132,7 @@ class GoaQueryPolicySuite extends FunSuite:
         explicitDecker      = none,
         defaultReadoutMode  = Flamingos2ReadoutMode.Science,
         explicitReadoutMode = none,
-        telescopeConfigs    = NonEmptyList.one(TelescopeConfig(Offset.Zero, StepGuideState.Enabled)),
+        telescopeConfigs    = NonEmptyList.one(TelescopeConfig(Offset.Zero, StepGuideState.Enabled, OffsetPurpose.Object)),
         telluricType        = TelluricType.Hot
       )
     ).getOrElse(sys.error("Flamingos 2 MOS fixture is not valid"))

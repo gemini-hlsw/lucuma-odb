@@ -25,7 +25,7 @@ import lucuma.core.enums.ObservingModeType
 import lucuma.core.model.Access
 import lucuma.core.model.SlitTelescopeConfigs
 import lucuma.core.model.TelluricType
-import lucuma.core.model.sequence.TelescopeConfig
+import lucuma.core.model.sequence.TelescopeConfigSpec
 import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.*
@@ -74,7 +74,7 @@ object GnirsSpectroscopyInput:
   private def resolveCreate(
     slit: Option[GnirsSpectroscopyLongSlitInput.Value],
     ifu:  Option[GnirsSpectroscopyIfuInput.Value]
-  ): Result[(GnirsFpu.Spectroscopy, Option[SlitTelescopeConfigs], Option[NonEmptyList[TelescopeConfig]])] =
+  ): Result[(GnirsFpu.Spectroscopy, Option[SlitTelescopeConfigs], Option[NonEmptyList[TelescopeConfigSpec]])] =
     oneOrFail(slit.map(Left(_)) -> "slit", ifu.map(Right(_)) -> "ifu").flatMap:
       case Left(s)  =>
         s.fpu.toResult("'slit.fpu' is required.")
@@ -88,7 +88,7 @@ object GnirsSpectroscopyInput:
   private def resolveEdit(
     slit: Option[GnirsSpectroscopyLongSlitInput.Value],
     ifu:  Option[GnirsSpectroscopyIfuInput.Value]
-  ): Result[(Option[GnirsFpu.Spectroscopy], Nullable[SlitTelescopeConfigs], Option[NonEmptyList[TelescopeConfig]])] =
+  ): Result[(Option[GnirsFpu.Spectroscopy], Nullable[SlitTelescopeConfigs], Option[NonEmptyList[TelescopeConfigSpec]])] =
     oneOrDefault((None, Nullable.Absent, None))(
       slit.map(s => (s.fpu.map(GnirsFpu.Spectroscopy.Slit(_)), s.explicitTelescopeConfigs, None)) -> "slit",
       ifu.map(i => (i.fpu.map(GnirsFpu.Spectroscopy.Ifu(_)), Nullable.Absent, i.telescopeConfigs)) -> "ifu"
@@ -108,7 +108,7 @@ object GnirsSpectroscopyInput:
   // GnirsSpectroscopyIfuInput: fpu (required on create) + telescope configs (missing = unedited; on
   // create a missing value is seeded from the FPU in the service).
   object GnirsSpectroscopyIfuInput:
-    case class Value(fpu: Option[GnirsFpuIfu], telescopeConfigs: Option[NonEmptyList[TelescopeConfig]])
+    case class Value(fpu: Option[GnirsFpuIfu], telescopeConfigs: Option[NonEmptyList[TelescopeConfigSpec]])
     val Binding: Matcher[Value] =
       ObjectFieldsBinding.rmap:
         case List(
@@ -138,7 +138,7 @@ object GnirsSpectroscopyInput:
     explicitReadMode:             Option[GnirsReadMode]            = None,
     explicitWellDepth:            Option[GnirsWellDepth]           = None,
     explicitTelescopeConfigsSlit: Option[SlitTelescopeConfigs]     = None,
-    telescopeConfigsIfu:          Option[NonEmptyList[TelescopeConfig]] = None,
+    telescopeConfigsIfu:          Option[NonEmptyList[TelescopeConfigSpec]] = None,
     acquisition:                  Option[AcquisitionInput]         = None,
     telluricType:                 TelluricType                     = TelluricType.Hot
   ):
@@ -196,7 +196,7 @@ object GnirsSpectroscopyInput:
     explicitReadMode:          Nullable[GnirsReadMode],
     explicitWellDepth:         Nullable[GnirsWellDepth],
     explicitTelescopeConfigsSlit: Nullable[SlitTelescopeConfigs], // Nullable to allow clearing to default
-    telescopeConfigsIfu:          Option[NonEmptyList[TelescopeConfig]], // Option: set or skip (no clear; IFU always has a value)
+    telescopeConfigsIfu:          Option[NonEmptyList[TelescopeConfigSpec]], // Option: set or skip (no clear; IFU always has a value)
     acquisition:               Option[AcquisitionInput],
     telluricType:              Option[TelluricType]            // Option: set or skip; cannot be unset
   ) derives Eq:

@@ -25,6 +25,7 @@ import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.Flamingos2LyotWheel
 import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.ObserveClass
+import lucuma.core.enums.OffsetPurpose
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepGuideState.Disabled
 import lucuma.core.math.Offset
@@ -42,7 +43,6 @@ import lucuma.odb.sequence.*
 import lucuma.odb.sequence.SmartGcalExpander.Calibration
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
-import lucuma.odb.sequence.syntax.all.*
 import lucuma.odb.sequence.util.AtomBuilder
 import lucuma.odb.sequence.util.DaytimeSmartGcal
 import lucuma.odb.sequence.util.definitionError
@@ -79,7 +79,7 @@ object Science:
       NonEmptyList.of(a0, b0, b1, a1)
 
     def cycleCount(t: IntegrationTime): Either[String, NonNegInt] =
-      calculateCycleCount[F2](s => s.telescopeConfig.guiding.isGuided, abbaCycle.toList, t)
+      calculateCycleCount[F2](abbaCycle.toList, t)
 
   object StepDefinition extends SequenceState[F2] with Flamingos2InitialDynamicConfig:
 
@@ -204,7 +204,7 @@ object Science:
         _ <- F2.decker      := Flamingos2Decker.MOS
         _ <- F2.readoutMode := config.readoutMode
         _ <- F2.reads       := Flamingos2ReadMode.Bright.readCount
-        f <- StepDefinition.flatStep(TelescopeConfig(Offset.Zero, Disabled), ObserveClass.DayCal)
+        f <- StepDefinition.flatStep(TelescopeConfig(Offset.Zero, Disabled, OffsetPurpose.Object), ObserveClass.DayCal)
       yield f
     DaytimeSmartGcal.sequence(observationId, estimator, static, namespace, expander, Calibration.ImagingFlat, NonEmptyList.one(flat))
 

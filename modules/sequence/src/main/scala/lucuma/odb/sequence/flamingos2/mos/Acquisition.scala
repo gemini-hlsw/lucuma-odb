@@ -17,12 +17,15 @@ import lucuma.core.enums.Flamingos2LyotWheel
 import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.Flamingos2ReadoutMode
 import lucuma.core.enums.ObserveClass
+import lucuma.core.enums.OffsetPurpose
 import lucuma.core.enums.SequenceType
+import lucuma.core.enums.StepGuideState
 import lucuma.core.math.Offset
 import lucuma.core.math.syntax.int.*
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Atom
+import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2AcquisitionMode
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig as F2
 import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
@@ -100,14 +103,14 @@ object Acquisition:
           _  <- F2.fpu         := Flamingos2FpuMask.Imaging
           _  <- F2.decker      := Flamingos2FpuMask.Imaging.defaultDecker
           s0 <- scienceStep(0.arcsec, 0.arcsec, ObserveClass.Acquisition)
-          s1 <- skyOffset.traverse(scienceStep(_, ObserveClass.Acquisition))
+          s1 <- skyOffset.traverse(o => scienceStep(TelescopeConfig(o, StepGuideState.Enabled, OffsetPurpose.Sky), ObserveClass.Acquisition))
 
           // Through the mask, which the science steps carry whether or not its
           // attachment exists yet.
           _  <- F2.fpu         := customMask
           _  <- F2.decker      := customMask.defaultDecker
           s2 <- scienceStep(0.arcsec, 0.arcsec, ObserveClass.Acquisition)
-          s3 <- skyOffset.traverse(scienceStep(_, ObserveClass.Acquisition))
+          s3 <- skyOffset.traverse(o => scienceStep(TelescopeConfig(o, StepGuideState.Enabled, OffsetPurpose.Sky), ObserveClass.Acquisition))
         yield Steps(s0, s1, s2, s3)
 
   private class Generator(

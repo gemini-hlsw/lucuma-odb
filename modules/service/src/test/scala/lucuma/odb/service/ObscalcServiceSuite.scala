@@ -12,6 +12,7 @@ import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.ExecutionState
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObserveClass
+import lucuma.core.enums.OffsetPurpose
 import lucuma.core.enums.StepGuideState
 import lucuma.core.math.Offset
 import lucuma.core.model.Observation
@@ -216,8 +217,8 @@ class ObscalcServiceSuite extends ObscalcServiceSuiteSupport:
             ObserveClass.Acquisition,
             CategorizedTime(ChargeClass.Program -> TimeSpan.unsafeFromMicroseconds(617162500L)),
             SortedSet.from(List(
-              TelescopeConfig(Offset.Zero, StepGuideState.Enabled),
-              TelescopeConfig(Offset.microarcseconds.reverseGet(10000000L, 0L), StepGuideState.Enabled)
+              TelescopeConfig(Offset.Zero, StepGuideState.Enabled, OffsetPurpose.Object),
+              TelescopeConfig(Offset.microarcseconds.reverseGet(10000000L, 0L), StepGuideState.Enabled, OffsetPurpose.Sky)
             )),
             NonNegInt.unsafeFrom(1 + RepeatingAtomCount),
             NonNegInt.unsafeFrom(0),
@@ -231,10 +232,10 @@ class ObscalcServiceSuite extends ObscalcServiceSuiteSupport:
             ObserveClass.Science,
             CategorizedTime(ChargeClass.Program -> TimeSpan.FromSeconds.getOption(ScienceSequence).get),
             SortedSet.from(List(
-              TelescopeConfig(Offset.Zero, StepGuideState.Disabled),
-              TelescopeConfig(Offset.Zero, StepGuideState.Enabled),
-              TelescopeConfig(Offset.microarcseconds.reverseGet(0L, 15000000L), StepGuideState.Enabled),
-              TelescopeConfig(Offset.microarcseconds.reverseGet(0L, 1295985000000L), StepGuideState.Enabled)
+              TelescopeConfig(Offset.Zero, StepGuideState.Disabled, OffsetPurpose.Object),
+              TelescopeConfig(Offset.Zero, StepGuideState.Enabled, OffsetPurpose.Object),
+              TelescopeConfig(Offset.microarcseconds.reverseGet(0L, 15000000L), StepGuideState.Enabled, OffsetPurpose.Object),
+              TelescopeConfig(Offset.microarcseconds.reverseGet(0L, 1295985000000L), StepGuideState.Enabled, OffsetPurpose.Object)
             )),
             NonNegInt.unsafeFrom(4),
             NonNegInt.unsafeFrom(4),

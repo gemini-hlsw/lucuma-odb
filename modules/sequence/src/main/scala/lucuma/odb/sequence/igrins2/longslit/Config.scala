@@ -14,7 +14,9 @@ import lucuma.core.model.TelluricType
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.igrins2.*
 import lucuma.core.util.TimeSpan
+import lucuma.odb.sequence.OffsetPurposeDefaults
 import lucuma.odb.sequence.syntax.all.*
+import lucuma.odb.sequence.util.HashBytes
 
 import java.io.ByteArrayOutputStream
 import java.io.DataOutputStream
@@ -26,9 +28,12 @@ case class Config(
   telluricType: TelluricType
 ) derives Eq:
 
-  /** The telescope configs flattened for step generation. */
+  /**
+   * The telescope configs flattened for step generation, each purpose resolved
+   * against the slit when the user left it unspecified.
+   */
   def steps: NonEmptyList[TelescopeConfig] =
-    telescopeConfigs.telescopeConfigs
+    telescopeConfigs.telescopeConfigs(OffsetPurposeDefaults.igrins2LongSlit)
 
   /**
    * The offset preset recorded in the instrument static config, derived from the shape of
@@ -51,9 +56,11 @@ case class Config(
         out.writeBoolean(true)
         out.write(cfg.exposure.hashBytes)
         out.write(cfg.telescopeConfigs.hashBytes)
+        out.write(HashBytes.purposeHashBytes(cfg.telescopeConfigs.toList))
     out.writeChars(telescopeConfigs.offsetsType.tag)
     steps.toList.foreach: tc =>
       out.write(tc.hashBytes)
+    out.write(HashBytes.purposeHashBytes(steps.toList))
     out.write(telluricType.hashBytes)
 
     out.close()

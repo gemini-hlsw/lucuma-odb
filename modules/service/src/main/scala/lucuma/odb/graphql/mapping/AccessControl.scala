@@ -63,6 +63,7 @@ import lucuma.odb.graphql.input.SetGuideTargetInput
 import lucuma.odb.graphql.input.SetObservationWorkflowStateInput
 import lucuma.odb.graphql.input.SetProgramReferenceInput
 import lucuma.odb.graphql.input.SetTacFeedbackInput
+import lucuma.odb.graphql.input.StepInput
 import lucuma.odb.graphql.input.TacFeedbackInput
 import lucuma.odb.graphql.input.TargetPropertiesInput
 import lucuma.odb.graphql.input.UpdateAsterismsInput
@@ -78,7 +79,6 @@ import lucuma.odb.graphql.mapping.AccessControl.CheckedWithId
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.data.ProtoAtom
-import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.GroupService
 import lucuma.odb.service.NoTransaction
@@ -978,7 +978,7 @@ trait AccessControl[F[_]] extends Predicates[F] {
 
   def selectForUpdate[D](
     input: ReplaceSequenceInput[D]
-  )(using Services[F], NoTransaction[F]): F[Result[CheckedWithId[(SequenceType, List[ProtoAtom[ProtoStep[D]]]), Observation.Id]]] =
+  )(using Services[F], NoTransaction[F]): F[Result[CheckedWithId[(SequenceType, List[ProtoAtom[StepInput.Spec[D]]]), Observation.Id]]] =
     selectForSequenceEdit(input.observationId, input.observationRef, input.sequenceType -> input.sequence, "replace the sequence")
 
   def selectForUpdate(

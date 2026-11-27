@@ -21,11 +21,15 @@ import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
 import lucuma.core.enums.ObserveClass
+import lucuma.core.enums.OffsetPurpose
 import lucuma.core.enums.SequenceType
+import lucuma.core.enums.StepGuideState
+import lucuma.core.math.Offset
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
 import lucuma.core.math.syntax.int.*
 import lucuma.core.model.Observation
+import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
 import lucuma.core.model.sequence.gmos.GmosFpuMask
@@ -108,7 +112,11 @@ object Acquisition:
           _  <- optics.yBin          := GmosYBinning.One
           _  <- optics.ampReadMode   := GmosAmpReadMode.Fast
           _  <- optics.roi           := acqConfig.roi.slitRoi
-          s1 <- scienceStep(10.arcsec, 0.arcsec, ObserveClass.Acquisition)
+          // The slit image: the target is moved off the slit, so this is a sky position.
+          s1 <- scienceStep(
+                  TelescopeConfig(Offset(Offset.P(10.arcsec), Offset.Q.Zero), StepGuideState.Enabled, OffsetPurpose.Sky),
+                  ObserveClass.Acquisition
+                )
 
           _  <- optics.exposure      := lastExpTime(exposureTime)
           _  <- optics.ampReadMode   := readMode

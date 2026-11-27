@@ -19,6 +19,7 @@ import lucuma.core.syntax.timespan.*
 import lucuma.core.util.arb.ArbEnumerated.given
 import lucuma.odb.graphql.input.GmosLongSlitInput
 import lucuma.odb.graphql.input.GmosMosInput
+import lucuma.odb.sequence.OffsetPurposeDefaults
 import lucuma.odb.sequence.gmos.longslit.AcquisitionConfig
 import lucuma.odb.sequence.gmos.longslit.Config
 import lucuma.odb.sequence.gmos.spectroscopy
@@ -51,7 +52,7 @@ class CalibrationMatchersSuite extends ScalaCheckSuite:
         explicitRoi = roi.some,
         explicitWavelengthDithers = None
       ),
-      telescopeConfigs = DefaultSlitTelescopeConfigs.telescopeConfigs,
+      telescopeConfigs = DefaultSlitTelescopeConfigs.telescopeConfigs(OffsetPurposeDefaults.AlwaysObject),
       acquisition = AcquisitionConfig.GmosNorth(
         exposureTimeMode = e,
         defaultFilter  = GmosNorthFilter.GPrime,

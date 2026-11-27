@@ -13,7 +13,7 @@ import lucuma.core.enums.ObservingModeType
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.SlitTelescopeConfigs
 import lucuma.core.model.TelluricType
-import lucuma.core.model.sequence.TelescopeConfig
+import lucuma.core.model.sequence.TelescopeConfigSpec
 import lucuma.core.model.sequence.igrins2.MaxExposureTime
 import lucuma.core.model.sequence.igrins2.SvcMinExposureTime
 import lucuma.core.util.TimeSpan
@@ -43,7 +43,7 @@ object Igrins2LongSlitInput:
     /** Create semantics: each field is set-or-skip (`Option`). */
     case class Create(
       explicitExposure:         Option[TimeSpan],
-      explicitTelescopeConfigs: Option[List[TelescopeConfig]]
+      explicitTelescopeConfigs: Option[List[TelescopeConfigSpec]]
     )
 
     object Create:
@@ -58,7 +58,7 @@ object Igrins2LongSlitInput:
     /** Edit semantics: each field is set-clear-skip (`Nullable`). */
     case class Edit(
       explicitExposure:         Nullable[TimeSpan],
-      explicitTelescopeConfigs: Nullable[List[TelescopeConfig]]
+      explicitTelescopeConfigs: Nullable[List[TelescopeConfigSpec]]
     )
 
     object Edit:

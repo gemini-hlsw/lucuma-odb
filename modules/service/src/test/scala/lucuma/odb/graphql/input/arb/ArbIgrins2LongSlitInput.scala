@@ -9,9 +9,9 @@ import lucuma.core.model.SlitTelescopeConfigs
 import lucuma.core.model.TelluricType
 import lucuma.core.model.arb.ArbExposureTimeMode.given
 import lucuma.core.model.arb.ArbTelluricType.given
-import lucuma.core.model.sequence.TelescopeConfig
+import lucuma.core.model.sequence.TelescopeConfigSpec
 import lucuma.core.model.sequence.arb.ArbSlitTelescopeConfigs.given
-import lucuma.core.model.sequence.arb.ArbTelescopeConfig.given
+import lucuma.core.model.sequence.arb.ArbTelescopeConfigSpec.given
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.arb.ArbTimeSpan.given
 import lucuma.odb.data.Nullable
@@ -25,14 +25,14 @@ trait ArbIgrins2LongSlitInput:
     Arbitrary:
       for
         e  <- arbitrary[Option[TimeSpan]]
-        tc <- arbitrary[Option[List[TelescopeConfig]]]
+        tc <- arbitrary[Option[List[TelescopeConfigSpec]]]
       yield Igrins2LongSlitInput.Svc.Create(e, tc)
 
   given svcEdit: Arbitrary[Igrins2LongSlitInput.Svc.Edit] =
     Arbitrary:
       for
         e  <- arbitrary[Nullable[TimeSpan]]
-        tc <- arbitrary[Nullable[List[TelescopeConfig]]]
+        tc <- arbitrary[Nullable[List[TelescopeConfigSpec]]]
       yield Igrins2LongSlitInput.Svc.Edit(e, tc)
 
   given Arbitrary[Igrins2LongSlitInput.Create] =

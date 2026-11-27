@@ -15,13 +15,12 @@ import lucuma.core.model.sequence.gnirs.GnirsDynamicConfig
 import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.sequence.data.ProtoAtom
-import lucuma.odb.sequence.data.ProtoStep
 
 object AtomInput:
 
   def binding[D](
-    stepBinding: Matcher[ProtoStep[D]]
-  ): Matcher[ProtoAtom[ProtoStep[D]]] =
+    stepBinding: Matcher[StepInput.Spec[D]]
+  ): Matcher[ProtoAtom[StepInput.Spec[D]]] =
     ObjectFieldsBinding.rmap:
       case List(
         NonEmptyStringBinding.Option("description", rDescription),
@@ -32,20 +31,20 @@ object AtomInput:
           rSteps.flatMap(NonEmptyList.fromList(_).toResult("At least one step is required in an atom."))
         ).parMapN(ProtoAtom.apply)
 
-  val Flamingos2Binding: Matcher[ProtoAtom[ProtoStep[Flamingos2DynamicConfig]]] =
+  val Flamingos2Binding: Matcher[ProtoAtom[StepInput.Spec[Flamingos2DynamicConfig]]] =
     binding(StepInput.Flamingos2Binding)
 
-  val GmosNorthBinding: Matcher[ProtoAtom[ProtoStep[GmosNorth]]] =
+  val GmosNorthBinding: Matcher[ProtoAtom[StepInput.Spec[GmosNorth]]] =
     binding(StepInput.GmosNorthBinding)
 
-  val GmosSouthBinding: Matcher[ProtoAtom[ProtoStep[GmosSouth]]] =
+  val GmosSouthBinding: Matcher[ProtoAtom[StepInput.Spec[GmosSouth]]] =
     binding(StepInput.GmosSouthBinding)
 
-  val Igrins2Binding: Matcher[ProtoAtom[ProtoStep[Igrins2DynamicConfig]]] =
+  val Igrins2Binding: Matcher[ProtoAtom[StepInput.Spec[Igrins2DynamicConfig]]] =
     binding(StepInput.Igrins2Binding)
 
-  val GnirsBinding: Matcher[ProtoAtom[ProtoStep[GnirsDynamicConfig]]] =
+  val GnirsBinding: Matcher[ProtoAtom[StepInput.Spec[GnirsDynamicConfig]]] =
     binding(StepInput.GnirsBinding)
 
-  val GhostBinding: Matcher[ProtoAtom[ProtoStep[GhostDynamicConfig]]] =
+  val GhostBinding: Matcher[ProtoAtom[StepInput.Spec[GhostDynamicConfig]]] =
     binding(StepInput.GhostBinding)
