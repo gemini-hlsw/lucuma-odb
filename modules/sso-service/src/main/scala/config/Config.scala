@@ -6,9 +6,12 @@ package lucuma.sso.service.config
 import cats.effect.*
 import cats.syntax.all.*
 import ciris.*
-import com.comcast.ip4s.Port
+import com.comcast.ip4s.*
+import lucuma.common.config.DatabaseConnection
+import lucuma.common.config.DatabaseSsl
 import lucuma.common.config.Environment
 import lucuma.common.config.Environment.Local
+import lucuma.common.config.envOrProp
 import lucuma.otel.OtelConfig
 import lucuma.sso.client.SsoJwtReader
 import lucuma.sso.client.util.JwtDecoder
@@ -26,7 +29,7 @@ import scala.concurrent.duration.*
 
 final case class Config(
   environment:  Environment,
-  database:     DatabaseConfig,
+  database:     DatabaseConnection,
   orcid:        OrcidConfig,
   publicKey:    PublicKey,
   privateKey:   PrivateKey,
@@ -87,7 +90,14 @@ object Config {
     // And our canned config for local development.
     Config(
       Environment.Local,
-      DatabaseConfig.Local,
+      DatabaseConnection(
+        host     = host"localhost",
+        port     = port"5432",
+        database = "lucuma-sso",
+        user     = "jimmy",
+        password = Secret("banana"),
+        ssl      = DatabaseSsl.forEnvironment(Environment.Local)
+      ),
       orcid,
       keyPair.getPublic,
       keyPair.getPrivate,
@@ -119,7 +129,7 @@ object Config {
     otel:  Option[OtelConfig]
   ): ConfigValue[Effect, Config] = (
     envOrProp("PORT").as[Int].as[Port],
-    DatabaseConfig.config,
+    DatabaseConnection.fromCiris(env),
     envOrProp("GPG_SSO_PUBLIC_KEY").as[PublicKey],
     envOrProp("GPG_SSO_PRIVATE_KEY").redacted,
     envOrProp("GPG_SSO_PASSPHRASE").redacted,

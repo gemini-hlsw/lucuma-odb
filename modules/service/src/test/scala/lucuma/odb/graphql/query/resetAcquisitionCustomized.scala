@@ -192,6 +192,22 @@ class resetAcquisitionCustomized
       _         <- acquisition(oid).map(atoms => assertEquals(exposures(atoms), run))
     yield ()
 
+  test("an edit after a reacquisition starts a new run"):
+    for
+      p         <- createProgramAs(pi)
+      t         <- createTargetWithProfileAs(pi, p)
+      oid       <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      v         <- recordVisitAs(serviceUser, oid)
+      generated <- acquisition(oid)
+      _         <- addEndStepEvent(generated.head._2.head._1, v)
+      _         <- resetAcquisitionAs(serviceUser, oid)
+      _         <- expectGenerated(oid)
+      _         <- replaceAcquisition(serviceUser, oid, EditedExposures*)
+      _         <- expectEdited(oid)
+      _         <- resetAcquisitionAs(serviceUser, oid)
+      _         <- expectEdited(oid)
+    yield ()
+
   test("deleting the sequence restores the generated acquisition"):
     for
       oid <- setup

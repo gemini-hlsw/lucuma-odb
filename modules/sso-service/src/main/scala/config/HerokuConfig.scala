@@ -6,6 +6,7 @@ package lucuma.sso.service.config
 import buildinfo.BuildInfo
 import cats.implicits.*
 import ciris.*
+import lucuma.common.config.envOrProp
 import lucuma.sso.service.config.HerokuConfig.Default
 import lucuma.sso.service.config.HerokuConfig.Review
 

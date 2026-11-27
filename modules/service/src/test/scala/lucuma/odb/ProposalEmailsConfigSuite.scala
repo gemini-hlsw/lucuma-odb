@@ -14,7 +14,7 @@ import lucuma.core.enums.Partner
 import munit.CatsEffectSuite
 
 /**
- * Tests for the `PROPOSAL_EMAIL_*` configuration. `Config.envOrProp` falls back to system
+ * Tests for the `PROPOSAL_EMAIL_*` configuration. `envOrProp` falls back to system
  * properties, so the values can be set here without touching the environment. Note that a real
  * environment variable takes precedence over a system property, so the tests are skipped
  * entirely when any `PROPOSAL_EMAIL_*` variable is set in the environment (as it is in the nix

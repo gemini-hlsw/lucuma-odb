@@ -7,58 +7,26 @@ import cats.Eq
 import cats.derived.*
 import cats.syntax.all.*
 import ciris.*
-import ciris.http4s.*
-import com.comcast.ip4s.Host
-import com.comcast.ip4s.Port
-import org.http4s.*
+import lucuma.common.config.DatabaseConnection
+import lucuma.common.config.Environment
+import lucuma.common.config.envOrProp
 
 case class DatabaseConfiguration(
+  connection:     DatabaseConnection,
   maxConnections: Int,
-  host:           Host,
-  port:           Port,
-  database:       String,
-  user:           String,
-  password:       String,
   resetDatabase:  Boolean,
   skipMigration:  Boolean
-) derives Eq:
-  // We use Flyway (which uses JDBC) to perform schema migrations. Savor the irony.
-  def jdbcUrl: String = s"jdbc:postgresql://${host}:${port}/${database}?sslmode=require"
+) derives Eq
 
 object DatabaseConfiguration:
   object Default:
     val MaxConnections = Runtime.getRuntime.availableProcessors * 2 + 1
 
-  def fromDatabaseUrl(
-    maxConnections: Int,
-    uri:            Uri,
-    resetDatabase:  Boolean,
-    skipMigration:  Boolean
-  ): Option[DatabaseConfiguration] =
-    for
-      userInfo <- uri.userInfo
-      user      = userInfo.username
-      password <- userInfo.password
-      host     <- uri.host.map(_.value).flatMap(Host.fromString)
-      port     <- uri.port.flatMap(Port.fromInt)
-      database  = uri.path.renderString.stripPrefix("/")
-    yield DatabaseConfiguration(
-      maxConnections = maxConnections,
-      host = host,
-      port = port,
-      database = database,
-      user = user,
-      password = password,
-      resetDatabase = resetDatabase,
-      skipMigration = skipMigration
-    )
-
-  lazy val fromCiris: ConfigValue[Effect, DatabaseConfiguration] = (
+  def fromCiris(
+    environment: ConfigValue[Effect, Environment]
+  ): ConfigValue[Effect, DatabaseConfiguration] = (
+    environment.flatMap(DatabaseConnection.fromCiris),
     envOrProp("MAX_CONNECTIONS").as[Int].default(Default.MaxConnections),
-    envOrProp("DATABASE_URL").as[Uri].redacted, // passed by Heroku
     envOrProp("RESET_DATABASE").as[Boolean].default(false),
     envOrProp("SKIP_MIGRATION").as[Boolean].default(false)
-  ).parTupled.as[DatabaseConfiguration]
-
-  private given ConfigDecoder[(Int, Uri, Boolean, Boolean), DatabaseConfiguration] =
-    ConfigDecoder[(Int, Uri, Boolean, Boolean)].mapOption("DatabaseConfiguration")(fromDatabaseUrl)
+  ).parMapN(DatabaseConfiguration.apply)

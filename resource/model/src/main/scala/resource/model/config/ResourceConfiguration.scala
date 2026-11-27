@@ -10,6 +10,7 @@ import ciris.*
 import ciris.http4s.*
 import com.comcast.ip4s.*
 import lucuma.common.config.Environment
+import lucuma.common.config.envOrProp
 import lucuma.otel.OtelConfig
 
 final case class ResourceConfiguration(
@@ -24,7 +25,7 @@ final case class ResourceConfiguration(
 object ResourceConfiguration:
 
   lazy val fromCiris: ConfigValue[Effect, ResourceConfiguration] = (
-    DatabaseConfiguration.fromCiris,
+    DatabaseConfiguration.fromCiris(environment),
     environment,
     port,
     domain,
@@ -37,6 +38,3 @@ object ResourceConfiguration:
   private lazy val port = envOrProp("PORT").as[Port].default(port"8484")
 
   private lazy val domain = envOrProp("RESOURCE_DOMAIN").map(_.split(",").map(_.trim).toSeq)
-
-def envOrProp(name: String): ConfigValue[Effect, String] =
-  env(name).or(prop(name))

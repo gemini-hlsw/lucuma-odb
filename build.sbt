@@ -18,7 +18,7 @@ val catsVersion                  = "2.13.0"
 val circeVersion                 = "0.14.17"
 val circeRefinedVersion          = "0.15.1"
 val cirisVersion                 = "3.15.2"
-val clueVersion                  = "0.63.0"
+val clueVersion                  = "0.63.1"
 val declineVersion               = "2.6.2"
 val flywayVersion                = "13.13.0"
 val fs2AwsVersion                = "6.2.0"
@@ -931,6 +931,7 @@ lazy val common = project
       "edu.gemini"    %% "lucuma-core"                           % lucumaCoreVersion,
       "edu.gemini"    %% "lucuma-graphql-routes"                 % lucumaGraphQLRoutesVersion,
       "is.cir"        %% "ciris"                                 % cirisVersion,
+      "is.cir"        %% "ciris-http4s"                          % cirisVersion,
       "org.http4s"    %% "http4s-client"                         % http4sVersion,
       "org.http4s"    %% "http4s-core"                           % http4sVersion,
       "org.http4s"    %% "http4s-server"                         % http4sVersion,
@@ -939,6 +940,7 @@ lazy val common = project
       "org.typelevel" %% "cats-effect"                           % catsEffectVersion,
       "org.typelevel" %% "log4cats-core"                         % log4catsVersion,
       "org.typelevel" %% "otel4s-core"                           % otel4sVersion,
+      "org.tpolecat"  %% "skunk-core"                            % skunkVersion,
       "org.scalameta" %% "munit"                                 % munitVersion % Test,
       "org.typelevel" %% "munit-cats-effect"                     % munitCatsEffectVersion % Test
     )

@@ -8,17 +8,21 @@ import cats.Monad
 import cats.effect.*
 import cats.effect.std.Console
 import cats.syntax.all.*
+import ciris.Secret
+import com.comcast.ip4s.Host
+import com.comcast.ip4s.Port
 import com.dimafeng.testcontainers.GenericContainer
 import com.dimafeng.testcontainers.PostgreSQLContainer
 import com.dimafeng.testcontainers.munit.TestContainerForAll
 import fs2.io.net.Network
+import lucuma.common.config.DatabaseConnection
+import lucuma.common.config.DatabaseSsl
 import lucuma.common.config.Environment
 import lucuma.core.model.GuestUser
 import lucuma.core.model.ServiceUser
 import lucuma.core.model.StandardUser
 import lucuma.sso.client.SsoJwtReader
 import lucuma.sso.service.config.Config
-import lucuma.sso.service.config.DatabaseConfig
 import lucuma.sso.service.config.OrcidConfig
 import lucuma.sso.service.database.Database
 import lucuma.sso.service.graphql.GraphQLRoutes
@@ -113,12 +117,13 @@ trait SsoSimulator extends TestContainerForAll { self: Suite =>
     val config =
       Config.local(null, None)
         .copy(scheme = Uri.Scheme.https) // no ORCID config since we're faking ORCID
-        .copy(database = DatabaseConfig(
-          host     = container.containerIpAddress,
-          port     = container.mappedPort(POSTGRESQL_PORT),
+        .copy(database = DatabaseConnection(
+          host     = Host.fromString(container.containerIpAddress).get,
+          port     = Port.fromInt(container.mappedPort(POSTGRESQL_PORT)).get,
           database = PostgreSQLContainer.defaultDatabaseName,
           user     = PostgreSQLContainer.defaultUsername,
-          password = Some(PostgreSQLContainer.defaultPassword),
+          password = Secret(PostgreSQLContainer.defaultPassword),
+          ssl      = DatabaseSsl.Prefer
         ))
 
     // An OdbClient that just generates the request and returns.
