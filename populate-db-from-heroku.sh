@@ -259,6 +259,7 @@ export INVITATION_SENDER_EMAIL="noreply@example.com"
 export PROPOSAL_EMAIL_DEFAULT="noreply@example.com"
 export EXPLORE_URL="http://localhost:3000"
 export ODB_DOMAIN="localhost"
+export ODB_ENVIRONMENT="local"
 
 # Start the odb, it will attempt to migrate
 sbt -v -J-Xmx6g -J-Xss4M "service/run serve" > $SERVICE_LOG 2>&1 &

@@ -3684,6 +3684,12 @@ type GmosSouthStep {
 input CloneGroupInput {
   groupId: GroupId!
   SET: GroupPropertiesInput
+
+  """
+  Which steps of each cloned observation's stored sequences to copy.  An
+  observation with nothing to copy generates its sequence as usual.
+  """
+  sequence: CloneSequenceMode! = NONE
 }
 
 type CloneGroupResult {
@@ -8041,6 +8047,18 @@ input UpdateGroupsInput {
   Caps the number of results returned to the given value (if additional datasets match the WHERE clause they will be updated but not returned).
   """
   LIMIT: NonNegInt
+
+  """
+  When SET changes existence, also apply it to everything under each matched
+  group, at any depth: sub-groups and observations.  Deleting fails, changing
+  nothing, if an observation under a matched group can no longer be deleted
+  (for example it has started executing), or if one of their calibrations is
+  protected from deletion.  Restoring restores every deleted element under the
+  group, including ones deleted before the group was.  Calibration groups and
+  calibrations are not changed: they are removed afterwards, as when their
+  science observation is deleted.  Ignored when SET does not change existence.
+  """
+  cascade: Boolean! = false
 }
 
 type UpdateGroupsResult {
@@ -16349,6 +16367,12 @@ type Group {
 
   "Contained elements"
   elements(includeDeleted: Boolean! = false): [GroupElement!]!
+
+  """
+  All elements under this group at any depth, as a flat list in which each
+  element carries its direct parent.  This group itself is not included.
+  """
+  allElements(includeDeleted: Boolean! = false): [GroupElement!]!
 
   """
   Remaining execution time estimate range, assuming it can be calculated.  In

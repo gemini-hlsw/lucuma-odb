@@ -6,12 +6,14 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.all.*
+import lucuma.core.enums.CloneSequenceMode
 import lucuma.core.model.Group
 import lucuma.odb.graphql.binding.*
 
 final case class CloneGroupInput(
   groupId:  Group.Id,
   SET:      Option[GroupPropertiesInput.Edit],
+  sequence: CloneSequenceMode,
 )
 
 object CloneGroupInput {
@@ -21,8 +23,10 @@ object CloneGroupInput {
       case List(
         GroupIdBinding("groupId", rGroupId),
         GroupPropertiesInput.EditBinding.Option("SET", rSET),
+        CloneSequenceModeBinding.Option("sequence", rSequence)
       ) =>
-        (rGroupId, rSET).parMapN(CloneGroupInput.apply)
+        (rGroupId, rSET, rSequence).parMapN: (gid, set, seq) =>
+          CloneGroupInput(gid, set, seq.getOrElse(CloneSequenceMode.None))
     }
 
 }

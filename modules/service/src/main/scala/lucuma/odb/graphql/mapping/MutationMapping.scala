@@ -47,6 +47,7 @@ import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Dataset
 import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
+import lucuma.odb.data.Existence
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.asFailure
 import lucuma.odb.data.OdbErrorExtensions.asFailureF
@@ -65,6 +66,7 @@ import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.service.Services.Syntax.*
 import org.http4s.client.Client
 import org.tpolecat.typename.TypeName
+import skunk.AppliedFragment
 import skunk.SqlState
 import skunk.Transaction
 
@@ -1199,21 +1201,74 @@ trait MutationMapping[F[_]] extends AccessControl[F] with UserEnv {
 
   private lazy val UpdateGroups =
     MutationField("updateGroups", UpdateGroupsInput.binding(Path.from(GroupType))): (input, child) =>
-      services
-        .useTransactionally:
-          idSelectFromPredicate(
-            GroupType,
-            and(List(
-              Predicates.group.program.isWritableBy(user),
-              input.WHERE.getOrElse(True)
-            ))
-          ).flatTraverse: which =>
-            groupService.updateGroups(input.SET, which).map: r =>
-              r.flatMap: selected =>
-                groupResultSubquery(selected, input.LIMIT, child)
-        .recover: // need to recover here due to deferred constraints; nothing bad happens until we commit
+
+      def whichGroups: Result[AppliedFragment] =
+        idSelectFromPredicate(
+          GroupType,
+          and(List(
+            Predicates.group.program.isWritableBy(user),
+            input.WHERE.getOrElse(True)
+          ))
+        )
+
+      def recoverInconsistent(fa: F[Result[Query]]): F[Result[Query]] =
+        fa.recover: // need to recover here due to deferred constraints; nothing bad happens until we commit
           case SqlState.RaiseException(ex) =>
             OdbError.InconsistentGroupError(Some(ex.message)).asFailure
+
+      // Checks, outside any transaction, that every observation under the groups can take the existence change.
+      def checkCascade(which: AppliedFragment, target: Existence)(using Services[F], NoTransaction[F]): F[Result[AccessControl.Checked[ObservationPropertiesInput.Edit]]] =
+        // Checked outside the transaction, before anything changes: calibrations the Calibrations cleanup would keep.
+        val protectedCalibrations: F[List[Observation.Id]] =
+          if target === Existence.Deleted then groupService.selectProtectedCalibrations(which) else List.empty[Observation.Id].pure[F]
+        protectedCalibrations.flatMap:
+          case blocked if blocked.nonEmpty =>
+            OdbError.InvalidArgument(s"Cannot delete: calibration observation(s) ${blocked.mkString(", ")} are protected from deletion.".some).asFailureF
+          case _ => checkObservations(which, target)
+
+      def checkObservations(which: AppliedFragment, target: Existence)(using Services[F], NoTransaction[F]): F[Result[AccessControl.Checked[ObservationPropertiesInput.Edit]]] =
+        groupService.selectCascadeObservations(which, target).flatMap: candidates =>
+          if candidates.isEmpty then
+            Result[AccessControl.Checked[ObservationPropertiesInput.Edit]](AccessControl.Checked.Empty).pure[F]
+          else
+            selectForUpdate(
+              UpdateObservationsInput(
+                SET            = ObservationPropertiesInput.Edit.Empty.copy(existence = Some(target)),
+                WHERE          = Some(Predicates.observation.id.in(candidates)),
+                LIMIT          = None,
+                includeDeleted = Some(true)
+              ),
+              false // ignore calibrations
+            ).map: r =>
+              r.flatMap: checked =>
+                val allowed: Set[Observation.Id] = checked.idsOrEmpty.toSet
+                val blocked: List[Observation.Id] = candidates.filterNot(allowed.contains)
+                if blocked.isEmpty then Result(checked)
+                else OdbError.InvalidArgument(s"Cannot change the existence of observation(s) ${blocked.mkString(", ")}.".some).asFailure
+
+      input.SET.existence.filter(_ => input.cascade) match
+        case None         =>
+          recoverInconsistent:
+            services.useTransactionally:
+              whichGroups.flatTraverse: which =>
+                groupService.updateGroups(input.SET, which).map: r =>
+                  r.flatMap: selected =>
+                    groupResultSubquery(selected, input.LIMIT, child)
+        case Some(target) =>
+          whichGroups.flatTraverse: which =>
+            services
+              .useNonTransactionally(checkCascade(which, target))
+              .flatMap: approval =>
+                recoverInconsistent:
+                  services.useTransactionally:
+                    approval.flatTraverse: checked =>
+                      (for
+                        _        <- ResultT(groupService.cascadeExistence(target, which, checked))
+                        selected <- ResultT(groupService.updateGroups(input.SET, which))
+                      yield selected).value
+                        .map(_.flatMap(groupResultSubquery(_, input.LIMIT, child)))
+                        .flatTap: r =>
+                          transaction.rollback.unlessA(r.hasValue)
 
   // Anyone who may edit the group may waive its violations and revoke its
   // waivers.

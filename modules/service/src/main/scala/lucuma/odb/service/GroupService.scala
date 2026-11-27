@@ -33,6 +33,7 @@ import lucuma.odb.graphql.input.ObservationPropertiesInput
 import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.util.Codecs.*
+import org.typelevel.otel4s.trace.Tracer
 import skunk.*
 import skunk.codec.all.*
 import skunk.implicits.*
@@ -42,6 +43,20 @@ import Services.Syntax.*
 trait GroupService[F[_]] {
   def createGroup(input: AccessControl.CheckedWithId[GroupService.NewGroup, Program.Id], system: Boolean = false, calibrationRoles: List[CalibrationRole] = Nil)(using Transaction[F]): F[Result[Group.Id]]
   def updateGroups(SET: GroupPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F]): F[Result[List[Group.Id]]]
+  /** The science observations at any depth under the groups `which` selects, whose existence is not `existence`. */
+  def selectCascadeObservations(which: AppliedFragment, target: Existence): F[List[Observation.Id]]
+
+  /**
+   * Set `target` existence on everything under the groups `which` selects: the checked science
+   * observations and the non-system groups. Calibration groups are left to the Calibrations process.
+   */
+  def cascadeExistence(
+    target:       Existence,
+    which:        AppliedFragment,
+    observations: AccessControl.Checked[ObservationPropertiesInput.Edit]
+  )(using Transaction[F]): F[Result[Unit]]
+  /** The present calibrations under the groups `which` selects that the Calibrations cleanup would keep. */
+  def selectProtectedCalibrations(which: AppliedFragment): F[List[Observation.Id]]
   def selectGroups(
     programId: Program.Id,
     groupFilter: AppliedFragment = sql"c_existence = $existence"(Existence.Present),
@@ -83,8 +98,10 @@ object GroupService {
   /** A group to create */
   case class NewGroup(SET: GroupPropertiesInput.Create, initialContents: List[GroupElement.Id])
 
-  def instantiate[F[_]: Concurrent](using Services[F]): GroupService[F] =
+  def instantiate[F[_]: {Concurrent, Tracer}](using Services[F]): GroupService[F] =
     new GroupService[F] {
+
+      private val calibrationQueries: WorkflowStateQueries[F] = new WorkflowStateQueries[F] {}
 
       private def createGroupImpl(pid: Program.Id, SET: GroupPropertiesInput.Create, initialContents: List[Either[Group.Id, Observation.Id]], system: Boolean, calibrationRoles: List[CalibrationRole])(using Transaction[F]): F[Group.Id] =
         for {
@@ -176,7 +193,7 @@ object GroupService {
 
       override def deleteSystemGroup(pid: Program.Id, groupId: Group.Id)(using Transaction[F], ServiceAccess): F[Result[Unit]] =
         session.execute(sql"set constraints all deferred".command) *>
-        selectGroups(pid).flatMap: root =>
+        selectGroups(pid, groupFilter = void"").flatMap: root => // also finds a group under a deleted one
           root.findGroup(groupId) match
             case None    => OdbError.InvalidArgument(s"No such group $groupId in $pid.".some).asFailureF
             case Some(g) =>
@@ -216,7 +233,7 @@ object GroupService {
                   (groupId :: gs, os)
 
       // Clone `oid` into `dest`, at the end.
-      private def cloneObservationInto(oid: Observation.Id, dest: Option[Group.Id])(using Transaction[F]): ResultT[F, Observation.Id] =
+      private def cloneObservationInto(oid: Observation.Id, dest: Option[Group.Id], sequence: CloneSequenceMode)(using Transaction[F]): ResultT[F, Observation.Id] =
         ResultT(
           observationService.cloneObservation(
             Services.asSuperUser(
@@ -230,7 +247,7 @@ object GroupService {
                 observation_id
               )
             ),
-            CloneSequenceMode.None
+            sequence
           )
         ).map(_.cloneId)
 
@@ -240,18 +257,24 @@ object GroupService {
           ResultT(createGroupIn(pid, input.SET.copy(parentGroupId = dest, parentGroupIndex = None), Nil, false, roles))
 
       // Clone `gid` into `dest`, at the end, and clone its contents too.
-      private def cloneGroupInto(pid: Program.Id, gid: Group.Id, dest: Option[Group.Id])(using Transaction[F]): ResultT[F, Group.Id] =
+      private def cloneGroupInto(pid: Program.Id, gid: Group.Id, dest: Option[Group.Id], sequence: CloneSequenceMode)(using Transaction[F]): ResultT[F, Group.Id] =
         for
           gid0 <- cloneAsEmptyGroupInto(pid, gid, dest)
           es   <- selectGroupElements(gid) // find the children of the source group
-          _    <- es.traverse(cloneGroupElementInto(pid, _, Some(gid0))) // clone the children, recursively, into the new group
+          _    <- es.traverse(cloneGroupElementInto(pid, _, Some(gid0), sequence)) // clone the children, recursively, into the new group
         yield gid0
 
-      // Clone the `elem` into `dest`, at the end.
-      private def cloneGroupElementInto(pid: Program.Id, elem: GroupElement.Id, dest: Option[Group.Id])(using Transaction[F]): ResultT[F, GroupElement.Id] =
+      // Clone the `elem` into `dest`, at the end. A per-observation calibration group contributes
+      // only its science observations, since the Calibrations process builds the copy's own group.
+      private def cloneGroupElementInto(pid: Program.Id, elem: GroupElement.Id, dest: Option[Group.Id], sequence: CloneSequenceMode)(using Transaction[F]): ResultT[F, Unit] =
         elem match
-          case Left(gid)  => cloneGroupInto(pid, gid, dest).map(_.asLeft)
-          case Right(oid) => cloneObservationInto(oid, dest).map(_.asRight)
+          case Left(gid)  =>
+            ResultT.liftF(session.unique(Statements.SelectIsObsCalibrationGroup)((gid, ObsExtract.PerObservationCalibrationRoles))).flatMap:
+              case true  =>
+                ResultT.liftF(session.prepareR(Statements.SelectCalibrationGroupScience).use(_.stream(gid, 64).compile.toList)).flatMap: oids =>
+                  oids.traverse(cloneObservationInto(_, dest, sequence)).void
+              case false => cloneGroupInto(pid, gid, dest, sequence).void
+          case Right(oid) => cloneObservationInto(oid, dest, sequence).void
 
       /** Construct a CreateGroupInput that would clone `gid`. */
       private def selectGroupAsInput(gid: Group.Id): ResultT[F, (CreateGroupInput, List[CalibrationRole])] =
@@ -274,7 +297,7 @@ object GroupService {
           setʹ          = input.SET.foldLeft(cgi.SET)(_.withEdit(_))
           clone        <- ResultT(createGroupIn(pid, setʹ, Nil, false, roles))
           elems        <- selectGroupElements(input.groupId)
-          _            <- elems.traverse(cloneGroupElementInto(pid, _, Some(clone)))
+          _            <- elems.traverse(cloneGroupElementInto(pid, _, Some(clone), input.sequence))
         yield clone
 
       def cloneGroup(input: AccessControl.CheckedWithId[CloneGroupInput, Program.Id])(using Transaction[F]): F[Result[Group.Id]] =
@@ -328,6 +351,58 @@ object GroupService {
           _   <- ResultT(SET.minimumRequired.toOption.fold(Result.unit.pure[F])(checkMinimumRequiredOf(_, which, accessPredicate)))
           ids <- ResultT(update)
         yield ids).value
+
+      // The groups `which` selects that the user may edit.
+      private def editableGroups(which: AppliedFragment): AppliedFragment =
+        val access: AppliedFragment =
+          if mayEditSystemGroups(user) then void"" else void" AND c_system = FALSE"
+        void"SELECT c_group_id FROM t_group WHERE c_group_id IN (" |+| which |+| void")" |+| access
+
+      override def selectCascadeObservations(which: AppliedFragment, target: Existence): F[List[Observation.Id]] =
+        val af: AppliedFragment =
+          void"""
+            SELECT DISTINCT o.c_observation_id
+            FROM   v_group_ancestor a
+            JOIN   t_observation o ON o.c_group_id = a.c_group_id
+            WHERE  o.c_calibration_role IS NULL
+            AND    a.c_ancestor_id IN (""" |+| editableGroups(which) |+| void") AND o.c_existence <> " |+| sql"$existence"(target)
+        session.prepareR(af.fragment.query(observation_id)).use(_.stream(af.argument, 1024).compile.toList)
+
+      // The calibrations under the groups `which` selects that the Calibrations cleanup would keep.
+      override def selectProtectedCalibrations(which: AppliedFragment): F[List[Observation.Id]] =
+        val af: AppliedFragment =
+          void"""
+            SELECT DISTINCT o.c_observation_id
+            FROM   v_group_ancestor a
+            JOIN   t_observation o ON o.c_group_id = a.c_group_id
+            WHERE  o.c_calibration_role IS NOT NULL
+            AND    o.c_existence = 'present'
+            AND    a.c_ancestor_id IN (""" |+| editableGroups(which) |+| void")"
+        for
+          all       <- session.prepareR(af.fragment.query(observation_id)).use(_.stream(af.argument, 1024).compile.toList)
+          deletable <- calibrationQueries.excludeObsCalibrationsFromDeletion(all, identity[Observation.Id])
+        yield all.filterNot(deletable.toSet)
+
+      override def cascadeExistence(
+        target:       Existence,
+        which:        AppliedFragment,
+        observations: AccessControl.Checked[ObservationPropertiesInput.Edit]
+      )(using Transaction[F]): F[Result[Unit]] =
+        val below: AppliedFragment =
+          void"""
+            SELECT a.c_group_id FROM v_group_ancestor a
+            WHERE  a.c_group_id <> a.c_ancestor_id
+            AND    a.c_ancestor_id IN (""" |+| editableGroups(which) |+| void")"
+        val setGroups: AppliedFragment =
+          sql"""
+            UPDATE t_group SET c_existence = $existence
+            WHERE  c_system = FALSE
+            AND    c_group_id IN ("""(target) |+| below |+| void")"
+        for
+          _ <- session.execute(sql"SET CONSTRAINTS ALL DEFERRED".command)
+          r <- observationService.updateObservations(observations)
+          _ <- session.prepareR(setGroups.fragment.command).use(_.execute(setGroups.argument))
+        yield r.void
 
       def openHole(pid: Program.Id, gid: Option[Group.Id], index: Option[NonNegShort]): F[NonNegShort] =
         session.prepareR(Statements.OpenHole).use(_.unique(pid, gid, index))
@@ -610,10 +685,10 @@ object GroupService {
         SELECT c_group_id, c_observation_id
         FROM (
           SELECT null c_group_id, c_observation_id, c_group_index
-          FROM t_observation WHERE c_group_id = $group_id
+          FROM t_observation WHERE c_group_id = $group_id AND c_existence = 'present'
           UNION ALL
           SELECT c_group_id, null, c_parent_index
-          FROM t_group WHERE c_parent_id = $group_id
+          FROM t_group WHERE c_parent_id = $group_id AND c_existence = 'present'
         ) sub ORDER BY c_group_index, c_group_id, c_observation_id
       """
         .contramap[Group.Id](a => (a, a))
@@ -623,6 +698,23 @@ object GroupService {
             case (Some(gid), None) => Right(Left(gid))
             case (a, b)            => Left("SelectGroupElements: unpossible row: $a, $b")
         )
+
+    /** Whether the group is a per-observation calibration group. */
+    val SelectIsObsCalibrationGroup: Query[(Group.Id, List[CalibrationRole]), Boolean] =
+      sql"""
+        SELECT c_system AND c_calibration_roles && $_calibration_role
+        FROM   t_group
+        WHERE  c_group_id = $group_id
+      """.query(bool).contramap(_.swap)
+
+    /** Select the present science observations of a calibration group, in order. */
+    val SelectCalibrationGroupScience: Query[Group.Id, Observation.Id] =
+      sql"""
+        SELECT c_observation_id
+        FROM t_observation
+        WHERE c_group_id = $group_id AND c_calibration_role IS NULL AND c_existence = 'present'
+        ORDER BY c_group_index, c_observation_id
+      """.query(observation_id)
 
     /** Select a `CreateGroupInput` for a given `Group.Id` that can be used to create an empty clone. */
     val SelectGroupAsInput: Query[Group.Id, (CreateGroupInput, Boolean, List[CalibrationRole])] =
