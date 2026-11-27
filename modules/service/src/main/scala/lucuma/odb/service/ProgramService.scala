@@ -338,6 +338,7 @@ object ProgramService {
 
           (for
             _   <- ResultT.liftF(setup)
+            _   <- ResultT.fromResult(validateActivePeriodUpdate(SET.active))
             _   <- ResultT.fromResult(validateProprietaryPeriod(SET.goa.flatMap(_.proprietaryMonths)))
             _   <- ResultT.fromResult(validateExplicitStatus(SET.explicitStatus))
               _ <- ResultT.fromResult(validatedismissedWarnings(SET.dismissedWarnings))
