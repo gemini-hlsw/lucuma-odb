@@ -9,6 +9,7 @@ import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Pure
 import fs2.Stream
+import lucuma.core.enums.StepGuideState
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.StepViolation
@@ -31,7 +32,15 @@ case class StreamingExecutionConfig[F[_], S, D](
   science:               Stream[F, Atom[D]],
   acquisitionViolations: List[StepViolation] = List.empty,
   scienceViolations:     List[StepViolation] = List.empty
-)
+):
+
+  /** The same sequences with guiding disabled in every step. */
+  def unguided: StreamingExecutionConfig[F, S, D] =
+    def disable(atoms: Stream[F, Atom[D]]): Stream[F, Atom[D]] =
+      atoms.map: atom =>
+        atom.copy(steps = atom.steps.map: step =>
+          step.copy(telescopeConfig = step.telescopeConfig.copy(guiding = StepGuideState.Disabled)))
+    copy(acquisition = disable(acquisition), science = disable(science))
 
 object StreamingExecutionConfig:
 

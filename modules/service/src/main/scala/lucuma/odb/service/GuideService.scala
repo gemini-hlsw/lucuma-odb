@@ -397,6 +397,9 @@ object GuideService {
         (0 until 360 by 10).map(a => Angle.fromDoubleDegrees(a.toDouble)).toList
       )
 
+    def isUnguided: Boolean =
+      explicitGuideProbe.exists(_.isUnguided)
+
     val availabilityAngles: NonEmptyList[Angle] =
       posAngleConstraint match
         case PosAngleConstraint.Fixed(a)               => NonEmptyList.of(a)
@@ -1407,6 +1410,37 @@ object GuideService {
         T.span("getGuideEnvironment").surround:
           (for {
             obsInfo         <- ResultT(getObservationInfo(oid))
+            // An unguided observation has no guide stars whatever else is set.
+            result          <- if obsInfo.isUnguided then ResultT(unguidedEnvironment(oid, obsInfo))
+                               else ResultT(guidedEnvironment(oid, obsInfo))
+          } yield result).value
+
+      // Only the average parallactic angle depends on when the observation is taken.
+      private def unguidedEnvironment(oid: Observation.Id, obsInfo: ObservationInfo)(
+        using NoTransaction[F], SuperUserAccess
+      ): F[Result[GuideEnvironment]] =
+        obsInfo.posAngleConstraint match
+          case PosAngleConstraint.AverageParallactic =>
+            (for {
+              obsTime         <- ResultT.fromResult(obsInfo.obsTime)
+              obsDuration     <- ResultT.fromResult(obsInfo.obsDuration)
+              genInfo         <- ResultT(getGeneratorInfo(oid))
+              scienceDuration <- ResultT.fromResult(genInfo.getScienceDuration(obsDuration, oid))
+              scienceStart     = genInfo.getScienceStartTime(obsTime)
+              tracking        <- ResultT(trackingSnapshotAt(oid, obsTime))
+              angles          <- ResultT.fromResult(
+                                   obsInfo.posAngleConstraint
+                                     .anglesToTestAt(genInfo.site, tracking.base, scienceStart.toInstant, scienceDuration.toDuration)
+                                     .toResult(generalError(s"Cannot compute the average parallactic angle for observation $oid: the target is not observable at the observation time, or its position is unknown then.").asProblem)
+                                 )
+            } yield GuideEnvironment(angles.head, Nil)).value
+          case _                                     =>
+            Result(GuideEnvironment(obsInfo.availabilityAngles.head, Nil)).pure[F]
+
+      private def guidedEnvironment(oid: Observation.Id, obsInfo: ObservationInfo)(
+        using NoTransaction[F], SuperUserAccess
+      ): F[Result[GuideEnvironment]] =
+          (for {
             obsTime         <- ResultT.fromResult(obsInfo.obsTime)
             obsDuration     <- ResultT.fromResult(obsInfo.obsDuration)
             targets         <- ResultT(getSearchTargets(oid).map(nonEmpty(oid, _)))
@@ -1451,8 +1485,8 @@ object GuideService {
             scienceDuration <- ResultT.fromResult(generatorInfo.getScienceDuration(obsDuration, oid))
             scienceStart     = generatorInfo.getScienceStartTime(obsTime)
             targets         <- ResultT.liftF(getSearchTargets(oid))
-            // A calibration that does not guide never has a star; that is not an error.
-            resolution      <- if (generatorInfo.params.calibrationRole.isDayCalibration)
+            // An observation that does not guide never has a star; that is not an error.
+            resolution      <- if (generatorInfo.params.calibrationRole.isDayCalibration || obsInfo.isUnguided)
                                  ResultT.pure(GuideStarResolution.NotGuided)
                                else
                                  ResultT(lookupGuideStar(oid, obsInfo.guideStarSelection, obsInfo, generatorInfo, targets, obsTime, obsDuration, scienceStart, scienceDuration))
@@ -1481,6 +1515,17 @@ object GuideService {
                               ).asFailure
                             )
             obsInfo       <- ResultT(getObservationInfo(oid))
+            availability  <- if obsInfo.isUnguided then ResultT.pure[F, List[AvailabilityPeriod]](Nil)
+                             else ResultT(guidedAvailability(pid, oid, period, obsInfo))
+          } yield availability).value
+
+      private def guidedAvailability(
+        pid:     Program.Id,
+        oid:     Observation.Id,
+        period:  TimestampInterval,
+        obsInfo: ObservationInfo
+      )(using NoTransaction[F], SuperUserAccess): F[Result[List[AvailabilityPeriod]]] =
+          (for {
             genInfo       <- ResultT(getGeneratorInfo(oid))
             targets       <- ResultT.liftF(getSearchTargets(oid))
             blindOffset    = targets.blindOffsetAt(period.start.toInstant)

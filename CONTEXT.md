@@ -288,6 +288,10 @@ _Avoid_: copy sequence flag, duplicate sequence, regenerate.
 A guide star a user named for an observation, used in place of the one the automatic search would choose. It holds until the user clears or replaces it; no edit to the observation and no deploy discards it. If it stops being usable, that is reported rather than silently replaced.
 _Avoid_: manually selected guide star, selected guide star, guide target name, pick, selection.
 
+**Unguided Observation**:
+An observation a user has designated to run without a guide star, by choosing Unguided where a guide probe would be chosen. No guide star is searched for or required, no step of its acquisition or science sequence is guided whatever the steps themselves ask for, and it carries a warning saying so. Step guiding the user entered and any Guide Star Override are kept and apply again once a probe is chosen; the probe that was explicitly chosen before is not remembered. Two things do not come back: a step executed while unguided is recorded as not guided, and a sequence edited while unguided keeps the disabled guiding it was shown with. Never combined with Altair. An observation that does not guide by nature (a Daytime Calibration, a Twilight's steps) is not an Unguided Observation: it is not designated and carries no warning.
+_Avoid_: no-guide, guiding off, not guided, unguided flag, unguided probe (it is the absence of one).
+
 ### Daytime Calibrations
 
 **Daytime Calibration**:

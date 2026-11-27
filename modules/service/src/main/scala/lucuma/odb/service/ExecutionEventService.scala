@@ -202,8 +202,12 @@ object ExecutionEventService:
               case SqlState.CheckViolation(_)      => invalidVisit.asFailureF
               case SqlState.ForeignKeyViolation(_) => invalidStep.asFailureF
 
+        // A step first executed while its observation is unguided is recorded as not guided.
+        def recordUnguided(eid: Id, inserted: Boolean): F[Unit] =
+          session.execute(Statements.DisableGuidingOfUnguidedStep)(input.stepId, eid).whenA(inserted)
+
         ResultT(insert)
-          .map((eid, _) => eid)
+          .flatMap((eid, inserted) => ResultT.liftF(recordUnguided(eid, inserted).as(eid)))
           .value
 
       override def insertEvents(
@@ -470,6 +474,24 @@ object ExecutionEventService:
           xmax = 0 AS inserted
       """.query(execution_event_id *: bool)
          .contramap(in => (in.visitId, in.stepId, in.stepStage, in.clientTime, in.idempotencyKey, in.stepId))
+
+    val DisableGuidingOfUnguidedStep: Command[(Step.Id, Id)] =
+      sql"""
+        UPDATE t_step s
+           SET c_guide_state = 'disabled'
+          FROM t_atom a
+          JOIN t_observation o ON o.c_observation_id = a.c_observation_id
+         WHERE s.c_step_id              = $step_id
+           AND a.c_atom_id              = s.c_atom_id
+           AND o.c_explicit_guide_probe = 'Unguided'
+           AND s.c_guide_state         <> 'disabled'
+           AND NOT EXISTS (
+             SELECT 1
+               FROM t_execution_event e
+              WHERE e.c_step_id             = s.c_step_id
+                AND e.c_execution_event_id <> $execution_event_id
+           )
+      """.command
 
     val SelectSequenceEvents: Query[Observation.Id, ExecutionEvent.SequenceEvent] =
       sql"""

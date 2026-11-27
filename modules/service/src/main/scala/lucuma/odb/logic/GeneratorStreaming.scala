@@ -308,7 +308,10 @@ object GeneratorStreaming:
         val mode = context.params.observingMode
         EitherT.fromOption[F](f(mode), GeneratorError.unexpectedMode(context.oid, expected, mode))
 
+      // Stored steps keep the guiding they were given; an unguided observation
+      // has it disabled as the sequence is read.
       private def selectOrGenerate[S, D](
+        context:  GeneratorContext,
         static:   S,
         lookup:   (SequenceType, S) => (Transaction[F]) ?=> F[Option[Stream[F, Atom[D]]]],
         generate: F[Either[OdbError, StreamingExecutionConfig[F, S, D]]]
@@ -328,7 +331,7 @@ object GeneratorStreaming:
           a <- lookup(SequenceType.Acquisition, static)
           s <- lookup(SequenceType.Science,     static)
           r <- result(a, s)
-        yield r
+        yield if context.params.guideProbe.exists(_.isUnguided) then r.map(_.unguided) else r
 
       private def collapseIfNecessary[S, D](
         context: GeneratorContext,
@@ -368,6 +371,7 @@ object GeneratorStreaming:
         context: GeneratorContext
       )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, Flamingos2Static, Flamingos2Dynamic]]] =
         selectOrGenerate(
+          context,
           lucuma.odb.sequence.flamingos2.Static,
           sequenceService.selectFlamingos2Sequence(context.oid, _, _),
           generateFlamingos2LongSlit(context)
@@ -390,6 +394,7 @@ object GeneratorStreaming:
         context: GeneratorContext
       )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, Flamingos2Static, Flamingos2Dynamic]]] =
         selectOrGenerate(
+          context,
           lucuma.odb.sequence.flamingos2.Static,
           sequenceService.selectFlamingos2Sequence(context.oid, _, _),
           generateFlamingos2Mos(context)
@@ -413,6 +418,7 @@ object GeneratorStreaming:
         (for
           cfg <- extractMode(ObservingMode.Flamingos2ImagingName, context)(_.asFlamingos2Imaging)
           res <- EitherT(selectOrGenerate(
+            context,
             cfg.staticConfig,
             sequenceService.selectFlamingos2Sequence(context.oid, _, _),
             generateFlamingos2Imaging(context)
@@ -440,6 +446,7 @@ object GeneratorStreaming:
           stc <- EitherT(sequenceService.selectOrComputeGhostStatic(context.oid))
           res <- EitherT:
                    selectOrGenerate(
+                     context,
                      stc,
                      sequenceService.selectGhostSequence(context.oid, _, _),
                      generateGhost(context)
@@ -465,6 +472,7 @@ object GeneratorStreaming:
         (for
           cfg <- extractMode(ObservingMode.Igrins2LongSlitName, context)(_.asIgrins2LongSlit)
           res <- EitherT(selectOrGenerate(
+                   context,
                    LongSlit.staticFrom(cfg),
                    sequenceService.selectIgrins2Sequence(context.oid, _, _),
                    generateIgrins2LongSlit(context)
@@ -490,6 +498,7 @@ object GeneratorStreaming:
           _   <- extractMode(ObservingMode.ScorpioLongSlitName, context)(_.asScorpioLongSlit)
           stc <- EitherT.liftF(sequenceService.selectOrComputeScorpioStatic(context.oid))
           res <- EitherT(selectOrGenerate(
+                   context,
                    stc,
                    sequenceService.selectScorpioSequence(context.oid, _, _),
                    generateScorpioLongSlit(context)
@@ -526,6 +535,7 @@ object GeneratorStreaming:
         (for
           cfg <- extractMode(ObservingMode.GnirsSpectroscopyName, context)(_.asGnirsSpectroscopy)
           res <- EitherT(selectOrGenerate(
+                   context,
                    Spectroscopy.staticFrom(cfg),
                    sequenceService.selectGnirsSequence(context.oid, _, _),
                    generateGnirsSpectroscopy(context)
@@ -552,6 +562,7 @@ object GeneratorStreaming:
         (for
           cfg <- extractMode(ObservingMode.GnirsImagingName, context)(_.asGnirsImaging)
           res <- EitherT(selectOrGenerate(
+                   context,
                    cfg.staticConfig,
                    sequenceService.selectGnirsSequence(context.oid, _, _),
                    generateGnirsImaging(context)
@@ -577,6 +588,7 @@ object GeneratorStreaming:
         (for
           cfg <- extractMode(ObservingMode.GmosNorthImagingName, context)(_.asGmosNorthImaging)
           res <- EitherT(selectOrGenerate(
+            context,
             cfg.staticConfig,
             sequenceService.selectGmosNorthSequence(context.oid, _, _),
             generateGmosNorthImaging(context)
@@ -598,6 +610,7 @@ object GeneratorStreaming:
         context: GeneratorContext
       )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, GmosNorthStatic, GmosNorthDynamic]]] =
         selectOrGenerate(
+          context,
           lucuma.odb.sequence.gmos.InitialConfigs.GmosNorthStatic,
           sequenceService.selectGmosNorthSequence(context.oid, _, _),
           generateGmosNorthIfu(context)
@@ -621,6 +634,7 @@ object GeneratorStreaming:
         context: GeneratorContext
       )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, GmosNorthStatic, GmosNorthDynamic]]] =
         selectOrGenerate(
+          context,
           lucuma.odb.sequence.gmos.InitialConfigs.GmosNorthStatic,
           sequenceService.selectGmosNorthSequence(context.oid, _, _),
           generateGmosNorthLongSlit(context)
@@ -644,6 +658,7 @@ object GeneratorStreaming:
         context: GeneratorContext
       )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, GmosNorthStatic, GmosNorthDynamic]]] =
         selectOrGenerate(
+          context,
           lucuma.odb.sequence.gmos.InitialConfigs.GmosNorthStatic,
           sequenceService.selectGmosNorthSequence(context.oid, _, _),
           generateGmosNorthMos(context)
@@ -668,6 +683,7 @@ object GeneratorStreaming:
         (for
           cfg <- extractMode(ObservingMode.GmosSouthImagingName, context)(_.asGmosSouthImaging)
           res <- EitherT(selectOrGenerate(
+            context,
             cfg.staticConfig,
             sequenceService.selectGmosSouthSequence(context.oid, _, _),
             generateGmosSouthImaging(context)
@@ -690,6 +706,7 @@ object GeneratorStreaming:
         context: GeneratorContext
       )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, GmosSouthStatic, GmosSouthDynamic]]] =
         selectOrGenerate(
+          context,
           lucuma.odb.sequence.gmos.InitialConfigs.GmosSouthStatic,
           sequenceService.selectGmosSouthSequence(context.oid, _, _),
           generateGmosSouthIfu(context)
@@ -713,6 +730,7 @@ object GeneratorStreaming:
         context: GeneratorContext
       )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, GmosSouthStatic, GmosSouthDynamic]]] =
         selectOrGenerate(
+          context,
           lucuma.odb.sequence.gmos.InitialConfigs.GmosSouthStatic,
           sequenceService.selectGmosSouthSequence(context.oid, _, _),
           generateGmosSouthLongSlit(context)
@@ -735,6 +753,7 @@ object GeneratorStreaming:
         context: GeneratorContext
       )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, GmosSouthStatic, GmosSouthDynamic]]] =
         selectOrGenerate(
+          context,
           lucuma.odb.sequence.gmos.InitialConfigs.GmosSouthStatic,
           sequenceService.selectGmosSouthSequence(context.oid, _, _),
           generateGmosSouthMos(context)
