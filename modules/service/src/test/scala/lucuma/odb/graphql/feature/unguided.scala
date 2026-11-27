@@ -5,14 +5,33 @@ package lucuma.odb.graphql
 package feature
 
 import cats.effect.IO
+import cats.effect.Resource
 import cats.syntax.all.*
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.ags.GuideStarName
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.util.TimeSpan
+import lucuma.core.util.Timestamp
+import org.http4s.Request
+import org.http4s.Response
 
 class unguided extends query.ExecutionTestSupportForGmos with mutation.UpdateObservationsOps:
+
+  // An unguided observation never searches for a guide star.
+  override def httpRequestHandler: Request[IO] => Resource[IO, Response[IO]] =
+    _ => Resource.eval(IO.raiseError(Exception("Test failure, unexpected call to Gaia!!!")))
+
+  private val ObsTime: Timestamp =
+    Timestamp.FromString.getOption("2024-08-25T00:00:00Z").get
+
+  private val ObsDuration: TimeSpan =
+    TimeSpan.fromSeconds(32).get
+
+  private val OverrideName: String =
+    GuideStarName.gaiaSourceId.reverseGet(1L).value.value
 
   private val IdGraph: String =
     "observations { id }"
@@ -50,6 +69,32 @@ class unguided extends query.ExecutionTestSupportForGmos with mutation.UpdateObs
         }
       """
     ).map(_.findAllByKey("code").flatMap(_.asString))
+
+  private val timedUnguidedObservation: IO[(Program.Id, Observation.Id)] =
+    for
+      (pid, oid) <- observation
+      _          <- setProbe(oid, "UNGUIDED")
+      _          <- setObservationTimeAndDuration(pi, oid, ObsTime.some, ObsDuration.some)
+    yield (pid, oid)
+
+  private def expectNoGuideTargets(oid: Observation.Id): IO[Unit] =
+    expect(
+      pi,
+      s"""
+        query {
+          observation(observationId: ${oid.asJson}) {
+            targetEnvironment { guideEnvironment { guideTargets { name } } }
+          }
+        }
+      """,
+      json"""
+        {
+          "observation": {
+            "targetEnvironment": { "guideEnvironment": { "guideTargets": [] } }
+          }
+        }
+      """.asRight
+    )
 
   test("the probes report the designation, and the default is never unguided"):
     observation.flatMap: (_, oid) =>
@@ -126,23 +171,7 @@ class unguided extends query.ExecutionTestSupportForGmos with mutation.UpdateObs
     for
       (_, oid) <- observation
       _        <- setProbe(oid, "UNGUIDED")
-      _        <- expect(
-                    pi,
-                    s"""
-                      query {
-                        observation(observationId: ${oid.asJson}) {
-                          targetEnvironment { guideEnvironment { guideTargets { name } } }
-                        }
-                      }
-                    """,
-                    json"""
-                      {
-                        "observation": {
-                          "targetEnvironment": { "guideEnvironment": { "guideTargets": [] } }
-                        }
-                      }
-                    """.asRight
-                  )
+      _        <- expectNoGuideTargets(oid)
     yield ()
 
   test("an unguided observation has no guide availability"):
@@ -169,3 +198,43 @@ class unguided extends query.ExecutionTestSupportForGmos with mutation.UpdateObs
                     """.asRight
                   )
     yield ()
+
+  test("the background calculation settles an unguided observation that has a time"):
+    for
+      (pid, oid) <- timedUnguidedObservation
+      _          <- runObscalcUpdate(pid, oid)
+      codes      <- validationCodes(oid)
+      sci        <- scienceGuiding(oid)
+    yield
+      assertEquals(codes, List("UNGUIDED"))
+      assert(sci.nonEmpty && sci.forall(_ === "DISABLED"), sci.toString)
+
+  test("an unguided observation that has a time has no guide targets"):
+    timedUnguidedObservation.flatMap: (_, oid) =>
+      expectNoGuideTargets(oid)
+
+  test("a guide star override is kept and ignored while unguided"):
+    for
+      (pid, oid) <- timedUnguidedObservation
+      _          <- setCatalogGuideTarget(pi, oid, OverrideName.some)
+      _          <- runObscalcUpdate(pid, oid)
+      codes      <- validationCodes(oid)
+      _          <- expectNoGuideTargets(oid)
+      _          <- expect(
+                      pi,
+                      s"""
+                        query {
+                          observation(observationId: ${oid.asJson}) {
+                            targetEnvironment { guideTargetName }
+                          }
+                        }
+                      """,
+                      json"""
+                        {
+                          "observation": {
+                            "targetEnvironment": { "guideTargetName": $OverrideName }
+                          }
+                        }
+                      """.asRight
+                    )
+    yield assertEquals(codes, List("UNGUIDED"))
