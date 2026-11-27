@@ -285,6 +285,15 @@ class updateObservations_altair extends OdbSuite with UpdateObservationsOps:
              )
     yield ()
 
+  test("an unguided observation cannot use Altair"):
+    for
+      oid <- gnirsObservationAs("{ mode: NGS }".some)
+      _   <- updateObservation(
+               pi, oid, "targetEnvironment: { explicitGuideProbe: UNGUIDED }", AltairGraph,
+               s"Observation $oid: ${GuideProbeRules.UnguidedWithAltairMessage}".asLeft
+             )
+    yield ()
+
   test("moving an Altair observation off GNIRS is rejected"):
     for
       oid <- gnirsObservationAs("{ mode: NGS }".some)

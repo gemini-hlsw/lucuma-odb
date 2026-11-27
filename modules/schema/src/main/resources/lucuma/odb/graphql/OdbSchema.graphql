@@ -7704,6 +7704,8 @@ input TargetEnvironmentInput {
   Overrides the guide probe that the automatic guide star search uses. The
   probe must be usable by the observing mode. Assign null to clear the
   override and fall back to the default probe for the mode and target type.
+  Assign UNGUIDED to take the observation without a guide star; guiding set on
+  offsets and steps is kept and applies again once a probe is chosen.
   """
   explicitGuideProbe: GuideProbe
 
@@ -17069,6 +17071,15 @@ enum GuideProbe {
   FLAMINGOS2_OIWFS
 
   ALTAIR_AOWFS
+
+  """
+  No probe: the observation is taken without a guide star.  Only ever an
+  explicit choice, never a default.  No guide star is searched for or required,
+  and every step of the acquisition and science sequences is produced with
+  guiding disabled, whatever guiding the steps themselves ask for.  Cannot be
+  combined with Altair.
+  """
+  UNGUIDED
 }
 
 """
@@ -19673,6 +19684,12 @@ enum ObservationValidationCode {
   unaffected.  The message names the calibration and the configuration.
   """
   MISSING_SMART_GCAL
+
+  """
+  The observation is unguided: its explicit guide probe is UNGUIDED, so it is
+  taken without a guide star.
+  """
+  UNGUIDED
 
 }
 
@@ -23511,7 +23528,8 @@ type TargetEnvironment {
   selected, Gaia will be searched for the best guide target available and,
   behind Altair, the science targets are also considered. An observation target,
   sidereal or non-sidereal, is returned as the target it is, so the telescope
-  follows it.
+  follows it. An unguided observation has no guide targets and is not searched
+  for any.
   """
   guideEnvironment: GuideEnvironment!
 
@@ -23519,6 +23537,7 @@ type TargetEnvironment {
   Availability of guide stars during a specified time range.
   There can be multiple `GuideAvailabilityPeriod`s returned if availability changes over the time
   range. In this case, the `end` of one period will be the same as the `start` of the next period.
+  An unguided observation has no periods.
   """
   guideAvailability(
     "The starting time of the time range of interest."
