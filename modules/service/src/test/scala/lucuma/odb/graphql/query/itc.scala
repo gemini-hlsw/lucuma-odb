@@ -17,7 +17,7 @@ import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.odb.json.wavelength.transport.given
 
-class itc extends OdbSuite with ObservingModeSetupOperations {
+class itc extends OdbSuite with ObservingModeSetupOperations with MosMaskSupport {
 
   val user: User = TestUsers.service(3)
 
@@ -687,6 +687,74 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
         expected = expected(t).asRight
       )
     yield ()
+
+  // GMOS MOS has an acquisition sequence, so it is costed with an acquisition
+  // ITC (an ItcSpectroscopy) rather than as science-only spectroscopy.
+  List(
+    "GMOS North" -> gmosNorthMosMode(None),
+    "GMOS South" -> gmosSouthMosMode(None)
+  ).foreach: (name, mode) =>
+    test(s"$name MOS has an acquisition ITC"):
+      def query(oid: Observation.Id) = s"""
+        query {
+          observation(observationId: "$oid") {
+            itc {
+              itcType
+              ... on ItcSpectroscopy {
+                acquisition {
+                  selected {
+                    targetId
+                    peakPixel {
+                      flux
+                      adu
+                    }
+                  }
+                }
+                spectroscopyScience {
+                  selected {
+                    targetId
+                  }
+                }
+              }
+            }
+          }
+        }
+      """
+
+      def expected(t: Target.Id) = json"""
+        {
+          "observation": {
+            "itc": {
+              "itcType": "SPECTROSCOPY",
+              "acquisition": {
+                "selected": {
+                  "targetId": ${t.asJson},
+                  "peakPixel": {
+                    "flux": ${FakeItcPeakPixel.flux},
+                    "adu": ${FakeItcPeakPixel.adu}
+                  }
+                }
+              },
+              "spectroscopyScience": {
+                "selected": {
+                  "targetId": ${t.asJson}
+                }
+              }
+            }
+          }
+        }
+      """
+
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(user, p)
+        o <- createObservationWithModeAs(user, p, List(t), mode)
+        _ <- expect(
+          user     = user,
+          query    = query(o),
+          expected = expected(t).asRight
+        )
+      yield ()
 
   // IGRINS-2 is science-only spectroscopy, so it serializes as
   // ItcScienceOnlySpectroscopy with a distinct `itcType`.

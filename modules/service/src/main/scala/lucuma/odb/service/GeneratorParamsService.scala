@@ -638,7 +638,7 @@ object GeneratorParamsService {
               sciMode  = sciMode
             ).asRight
 
-          case gnm @ gmos.mos.Config.GmosNorth(grating = g, filter = f, customMask = m, common = c) =>
+          case gnm @ gmos.mos.Config.GmosNorth(grating = g, filter = f, customMask = m, common = c, acquisition = a) =>
             val sciMode = InstrumentMode.GmosNorthSpectroscopy(
               c.exposureTimeMode,
               c.centralWavelength,
@@ -648,10 +648,17 @@ object GeneratorParamsService {
               gnm.ccdMode.some,
               gnm.roi.some
             )
+            spectroscopyGeneratorParams(
+              obsMode = gnm,
+              acqMode = InstrumentMode.GmosNorthImaging(
+                exposureTimeMode = a.exposureTimeMode,
+                filter  = a.filter,
+                ccdMode = sciMode.ccdMode
+              ),
+              sciMode  = sciMode
+            ).asRight
 
-            scienceOnlySpectroscopyGeneratorParams(gnm, sciMode).asRight
-
-          case gsm @ gmos.mos.Config.GmosSouth(grating = g, filter = f, customMask = m, common = c) =>
+          case gsm @ gmos.mos.Config.GmosSouth(grating = g, filter = f, customMask = m, common = c, acquisition = a) =>
             val sciMode = InstrumentMode.GmosSouthSpectroscopy(
               c.exposureTimeMode,
               c.centralWavelength,
@@ -661,8 +668,15 @@ object GeneratorParamsService {
               gsm.ccdMode.some,
               gsm.roi.some
             )
-
-            scienceOnlySpectroscopyGeneratorParams(gsm, sciMode).asRight
+            spectroscopyGeneratorParams(
+              obsMode = gsm,
+              acqMode = InstrumentMode.GmosSouthImaging(
+                exposureTimeMode = a.exposureTimeMode,
+                filter  = a.filter,
+                ccdMode = sciMode.ccdMode
+              ),
+              sciMode  = sciMode
+            ).asRight
 
           case gni @ gmos.ifu.Config.GmosNorth(grating = g, filter = f, acquisition = a, common = c) =>
             val sciMode = InstrumentMode.GmosNorthSpectroscopy(
