@@ -606,6 +606,37 @@ class updatePrograms extends OdbSuite {
           """.asRight
       )
 
+  test("cannot edit active period as pi"):
+    createProgramAs(pi).flatMap: pid =>
+      expect(
+        user     = pi,
+        query    = editActivePeriodQuery(pid),
+        expected = List(
+          "Only staff members may change the program active period."
+        ).asLeft
+      )
+
+  test("cannot edit activeStart alone as pi"):
+    createProgramAs(pi).flatMap: pid =>
+      expect(
+        user     = pi,
+        query    = s"""
+          mutation {
+            updatePrograms(
+              input: {
+                SET: { activeStart: "2020-01-01" }
+                WHERE: { id: { EQ: "$pid" } }
+              }
+            ) {
+              programs { id }
+            }
+          }
+        """,
+        expected = List(
+          "Only staff members may change the program active period."
+        ).asLeft
+      )
+
   test("changing CfP active period in non-default active period has no impact"):
     createGeminiCallForProposalsAs(staff, GeminiCallForProposalsType.RegularSemester).flatMap { cid =>
       createProgramAs(pi).flatMap { pid =>
