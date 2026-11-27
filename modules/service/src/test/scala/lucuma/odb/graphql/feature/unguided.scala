@@ -238,3 +238,41 @@ class unguided extends query.ExecutionTestSupportForGmos with mutation.UpdateObs
                       """.asRight
                     )
     yield assertEquals(codes, List("UNGUIDED"))
+
+  private def posAngleQuery(oid: Observation.Id): String =
+    s"""
+      query {
+        observation(observationId: ${oid.asJson}) {
+          targetEnvironment { guideEnvironment { posAngle { degrees } } }
+        }
+      }
+    """
+
+  private def averageParallacticUnguided(time: Option[Timestamp]): IO[Observation.Id] =
+    for
+      (_, oid) <- observation
+      _        <- updateObservation(
+                    pi,
+                    oid,
+                    "posAngleConstraint: { mode: AVERAGE_PARALLACTIC }, targetEnvironment: { explicitGuideProbe: UNGUIDED }",
+                    IdGraph,
+                    ids(oid).asRight
+                  )
+      _        <- setObservationTimeAndDuration(pi, oid, time, TimeSpan.fromHours(1).get.some)
+    yield oid
+
+  // The target is two hours past the meridian from Gemini North at this time.
+  private val PastMeridian: Timestamp =
+    Timestamp.FromString.getOption("2024-08-24T20:00:00Z").get
+
+  test("an unguided average parallactic observation reports the parallactic angle"):
+    for
+      oid   <- averageParallacticUnguided(PastMeridian.some)
+      angle <- query(pi, posAngleQuery(oid)).map(_.findAllByKey("degrees").flatMap(_.as[BigDecimal].toOption))
+    yield
+      assertEquals(angle.size, 1)
+      assert(angle.forall(a => a > 1 && a < 359), angle.toString)
+
+  test("an unguided average parallactic observation needs an observation time"):
+    averageParallacticUnguided(none).flatMap: oid =>
+      expect(pi, posAngleQuery(oid), List(s"Observation time not set for observation $oid.").asLeft)
