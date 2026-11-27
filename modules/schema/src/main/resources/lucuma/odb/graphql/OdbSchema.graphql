@@ -7705,7 +7705,11 @@ input TargetEnvironmentInput {
   probe must be usable by the observing mode. Assign null to clear the
   override and fall back to the default probe for the mode and target type.
   Assign UNGUIDED to take the observation without a guide star; guiding set on
-  offsets and steps is kept and applies again once a probe is chosen.
+  offsets and steps is kept and applies again once a probe is chosen.  There
+  are two exceptions.  A sequence is read with guiding disabled, so a sequence
+  that is read and written back while the observation is unguided is stored
+  with guiding disabled, and stays so when a probe is chosen.  A step executed
+  while the observation is unguided is recorded with guiding disabled.
   """
   explicitGuideProbe: GuideProbe
 

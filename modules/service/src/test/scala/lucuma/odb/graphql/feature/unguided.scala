@@ -13,6 +13,7 @@ import io.circe.syntax.*
 import lucuma.ags.GuideStarName
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.model.User
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import org.http4s.Request
@@ -39,8 +40,8 @@ class unguided extends query.ExecutionTestSupportForGmos with mutation.UpdateObs
   private def ids(oid: Observation.Id): Json =
     json"""{ "updateObservations": { "observations": [ { "id": $oid } ] } }"""
 
-  private def setProbe(oid: Observation.Id, probe: String): IO[Unit] =
-    updateObservation(pi, oid, s"targetEnvironment: { explicitGuideProbe: $probe }", IdGraph, ids(oid).asRight)
+  private def setProbe(oid: Observation.Id, probe: String, user: User = pi): IO[Unit] =
+    updateObservation(user, oid, s"targetEnvironment: { explicitGuideProbe: $probe }", IdGraph, ids(oid).asRight)
 
   private val observation: IO[(Program.Id, Observation.Id)] =
     for
@@ -276,3 +277,49 @@ class unguided extends query.ExecutionTestSupportForGmos with mutation.UpdateObs
   test("an unguided average parallactic observation needs an observation time"):
     averageParallacticUnguided(none).flatMap: oid =>
       expect(pi, posAngleQuery(oid), List(s"Observation time not set for observation $oid.").asLeft)
+
+  private def recordedGuiding(oid: Observation.Id): IO[List[String]] =
+    query(
+      pi,
+      s"""
+        query {
+          observation(observationId: ${oid.asJson}) {
+            execution {
+              atomRecords { matches { steps { matches { telescopeConfig { guiding } } } } }
+            }
+          }
+        }
+      """
+    ).map(guiding)
+
+  private def executeFirstScienceAtom(oid: Observation.Id): IO[Unit] =
+    for
+      vid  <- recordVisitAs(serviceUser, oid)
+      sids <- firstScienceAtomStepIds(serviceUser, oid)
+      _    <- sids.traverse_(addEndStepEvent(_, vid))
+    yield ()
+
+  test("steps executed while unguided are recorded as not guided, and stay so"):
+    for
+      (_, oid) <- observation
+      _        <- setProbe(oid, "UNGUIDED")
+      _        <- executeFirstScienceAtom(oid)
+      recorded <- recordedGuiding(oid)
+      _        <- setProbe(oid, "null", staff)
+      after    <- recordedGuiding(oid)
+      rest     <- scienceGuiding(oid)
+    yield
+      assert(recorded.nonEmpty && recorded.forall(_ === "DISABLED"), recorded.toString)
+      assertEquals(after, recorded)
+      assert(rest.contains("ENABLED"), rest.toString)
+
+  test("steps executed while guided keep their guiding when the observation becomes unguided"):
+    for
+      (_, oid) <- observation
+      _        <- executeFirstScienceAtom(oid)
+      recorded <- recordedGuiding(oid)
+      _        <- setProbe(oid, "UNGUIDED", staff)
+      after    <- recordedGuiding(oid)
+    yield
+      assert(recorded.contains("ENABLED"), recorded.toString)
+      assertEquals(after, recorded)
