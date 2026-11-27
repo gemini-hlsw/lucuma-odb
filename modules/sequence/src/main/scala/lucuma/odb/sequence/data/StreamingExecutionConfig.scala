@@ -32,19 +32,17 @@ case class StreamingExecutionConfig[F[_], S, D](
   science:               Stream[F, Atom[D]],
   acquisitionViolations: List[StepViolation] = List.empty,
   scienceViolations:     List[StepViolation] = List.empty
-)
+):
+
+  /** The same sequences with guiding disabled in every step. */
+  def unguided: StreamingExecutionConfig[F, S, D] =
+    def disable(atoms: Stream[F, Atom[D]]): Stream[F, Atom[D]] =
+      atoms.map: atom =>
+        atom.copy(steps = atom.steps.map: step =>
+          step.copy(telescopeConfig = step.telescopeConfig.copy(guiding = StepGuideState.Disabled)))
+    copy(acquisition = disable(acquisition), science = disable(science))
 
 object StreamingExecutionConfig:
-
-  extension [F[_], S, D](self: StreamingExecutionConfig[F, S, D])
-
-    /** The same sequences with guiding disabled in every step. */
-    def unguided: StreamingExecutionConfig[F, S, D] =
-      def disable(atoms: Stream[F, Atom[D]]): Stream[F, Atom[D]] =
-        atoms.map: atom =>
-          atom.copy(steps = atom.steps.map: step =>
-            step.copy(telescopeConfig = step.telescopeConfig.copy(guiding = StepGuideState.Disabled)))
-      self.copy(acquisition = disable(self.acquisition), science = disable(self.science))
 
   /** The sequences of a pair of generators, with the violations each reports. */
   def fromGenerators[S, D](
