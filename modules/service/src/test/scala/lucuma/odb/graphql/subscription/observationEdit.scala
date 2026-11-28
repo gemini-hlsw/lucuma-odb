@@ -673,7 +673,7 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
             "observingMode": {
               "flamingos2LongSlit": {
                 "disperser": ${disperser.tag},
-                "filter": "Y",
+                "filter": "J_LOW",
                 "fpu": "LONG_SLIT_2"
               }
             }

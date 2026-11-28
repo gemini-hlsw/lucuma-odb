@@ -28,7 +28,7 @@ class updateObservations_Flamingos2Imaging extends OdbSuite with UpdateObservati
       observingMode: {
         flamingos2Imaging: {
           filters: [
-            { filter: Y },
+            { filter: J_LOW },
             { filter: J }
           ]
           explicitReadMode: BRIGHT
@@ -71,12 +71,12 @@ class updateObservations_Flamingos2Imaging extends OdbSuite with UpdateObservati
                 "mode": "FLAMINGOS_2_IMAGING",
                 "flamingos2Imaging": {
                   "filters": [
-                    { "filter": "Y" },
-                    { "filter": "J" }
+                    { "filter": "J" },
+                    { "filter": "J_LOW" }
                   ],
                   "initialFilters": [
-                    { "filter": "Y" },
-                    { "filter": "J" }
+                    { "filter": "J" },
+                    { "filter": "J_LOW" }
                   ],
                   "defaultReadMode": "BRIGHT",
                   "explicitReadMode": "BRIGHT",
@@ -112,7 +112,7 @@ class updateObservations_Flamingos2Imaging extends OdbSuite with UpdateObservati
       observingMode: {
         flamingos2Imaging: {
           filters: [
-            { filter: Y },
+            { filter: J_LOW },
             { filter: J }
           ]
         }
@@ -142,8 +142,8 @@ class updateObservations_Flamingos2Imaging extends OdbSuite with UpdateObservati
                 "mode": "FLAMINGOS_2_IMAGING",
                 "flamingos2Imaging": {
                   "filters": [
-                    { "filter": "Y" },
-                    { "filter": "J" }
+                    { "filter": "J" },
+                    { "filter": "J_LOW" }
                   ]
                 }
               }
@@ -192,7 +192,7 @@ class updateObservations_Flamingos2Imaging extends OdbSuite with UpdateObservati
       observingMode: {
         flamingos2Imaging: {
           filters: [
-            { filter: Y },
+            { filter: J_LOW },
             { filter: J }
           ]
           explicitReadMode: BRIGHT
@@ -229,12 +229,12 @@ class updateObservations_Flamingos2Imaging extends OdbSuite with UpdateObservati
                 "mode": "FLAMINGOS_2_IMAGING",
                 "flamingos2Imaging": {
                   "filters": [
-                    { "filter": "Y" },
-                    { "filter": "J" }
+                    { "filter": "J" },
+                    { "filter": "J_LOW" }
                   ],
                   "initialFilters": [
-                    { "filter": "Y" },
-                    { "filter": "J" }
+                    { "filter": "J" },
+                    { "filter": "J_LOW" }
                   ],
                   "explicitReadMode": "BRIGHT",
                   "explicitDecker": "IMAGING",
@@ -251,7 +251,7 @@ class updateObservations_Flamingos2Imaging extends OdbSuite with UpdateObservati
       observingMode: {
         flamingos2Imaging: {
           filters: [
-            { filter: Y },
+            { filter: J_LOW },
             { filter: H },
             { filter: K_SHORT }
           ]
@@ -272,13 +272,13 @@ class updateObservations_Flamingos2Imaging extends OdbSuite with UpdateObservati
                 "mode": "FLAMINGOS_2_IMAGING",
                 "flamingos2Imaging": {
                   "filters": [
-                    { "filter": "Y" },
                     { "filter": "H" },
+                    { "filter": "J_LOW" },
                     { "filter": "K_SHORT" }
                   ],
                   "initialFilters": [
-                    { "filter": "Y" },
-                    { "filter": "J" }
+                    { "filter": "J" },
+                    { "filter": "J_LOW" }
                   ],
                   "explicitReadMode": "FAINT",
                   "explicitDecker": "IMAGING",
@@ -312,7 +312,7 @@ class updateObservations_Flamingos2Imaging extends OdbSuite with UpdateObservati
       observingMode: {
         flamingos2Imaging: {
           filters: [
-            { filter: Y },
+            { filter: J_LOW },
             { filter: J }
           ]
           variant: {
@@ -399,8 +399,8 @@ class updateObservations_Flamingos2Imaging extends OdbSuite with UpdateObservati
               "observingMode": {
                 "flamingos2Imaging": {
                   "filters": [
-                    { "filter": "Y" },
-                    { "filter": "J" }
+                    { "filter": "J" },
+                    { "filter": "J_LOW" }
                   ],
                   "variant": {
                     "grouped": {
@@ -480,8 +480,8 @@ class updateObservations_Flamingos2Imaging extends OdbSuite with UpdateObservati
               "observingMode": {
                 "flamingos2Imaging": {
                   "filters": [
-                    { "filter": "Y" },
-                    { "filter": "J" }
+                    { "filter": "J" },
+                    { "filter": "J_LOW" }
                   ],
                   "variant": {
                     "grouped": {
@@ -594,7 +594,7 @@ class updateObservations_Flamingos2Imaging extends OdbSuite with UpdateObservati
       observingMode: {
         flamingos2Imaging: {
           filters: [
-            { filter: Y },
+            { filter: J_LOW },
             { filter: J }
           ]
           variant: {
@@ -635,8 +635,8 @@ class updateObservations_Flamingos2Imaging extends OdbSuite with UpdateObservati
               "observingMode": {
                 "flamingos2Imaging": {
                   "filters": [
-                    { "filter": "Y" },
-                    { "filter": "J" }
+                    { "filter": "J" },
+                    { "filter": "J_LOW" }
                   ],
                   "variant": {
                     "grouped": {
@@ -694,8 +694,8 @@ class updateObservations_Flamingos2Imaging extends OdbSuite with UpdateObservati
               "observingMode": {
                 "flamingos2Imaging": {
                   "filters": [
-                    { "filter": "Y" },
-                    { "filter": "J" }
+                    { "filter": "J" },
+                    { "filter": "J_LOW" }
                   ],
                   "variant": {
                     "grouped": null,
@@ -740,8 +740,8 @@ class updateObservations_Flamingos2Imaging extends OdbSuite with UpdateObservati
               "observingMode": {
                 "flamingos2Imaging": {
                   "filters": [
-                    { "filter": "Y" },
-                    { "filter": "J" }
+                    { "filter": "J" },
+                    { "filter": "J_LOW" }
                   ],
                   "variant": {
                     "grouped": {
@@ -805,8 +805,8 @@ class updateObservations_Flamingos2Imaging extends OdbSuite with UpdateObservati
                 "observingMode": {
                   "flamingos2Imaging": {
                     "filters": [
-                      { "filter": "Y" },
-                      { "filter": "J" }
+                      { "filter": "J" },
+                      { "filter": "J_LOW" }
                     ],
                     "explicitReadMode": "BRIGHT"
                   }

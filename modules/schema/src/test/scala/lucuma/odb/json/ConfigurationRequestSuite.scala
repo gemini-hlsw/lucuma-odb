@@ -38,7 +38,7 @@ class ConfigurationRequestSuite extends FunSuite:
     roundTrip(ObservingMode.GnirsImaging(GnirsCamera.LongRed, List(GnirsFilter.Order6, GnirsFilter.H2)))
 
   test("Flamingos-2 imaging round trips its filters"):
-    roundTrip(ObservingMode.Flamingos2Imaging(List(Flamingos2Filter.Y, Flamingos2Filter.J)))
+    roundTrip(ObservingMode.Flamingos2Imaging(List(Flamingos2Filter.J, Flamingos2Filter.JLow)))
 
   test("GHOST IFU round trips its resolution mode"):
     GhostResolutionMode.values.foreach(r => roundTrip(ObservingMode.GhostIfu(r)))

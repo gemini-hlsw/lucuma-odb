@@ -32,22 +32,22 @@ class executionSciFlamingos2Imaging extends ExecutionTestSupportForFlamingos2:
   // The S/N results carry the read mode the ITC chose, neither the Bright imaging
   // default, so a step can only have it from the ITC.
   private val ReadModeJLow = Flamingos2ReadMode.Faint
-  private val ReadModeJ = Flamingos2ReadMode.Medium
+  private val ReadModeJ    = Flamingos2ReadMode.Medium
   private val TimeJLow     = IntegrationTime(10.secondTimeSpan, 2.refined, readMode = ItcResultReadMode.Flamingos2(ReadModeJLow).some)
-  private val TimeJ     = IntegrationTime(20.secondTimeSpan, 3.refined, readMode = ItcResultReadMode.Flamingos2(ReadModeJ).some)
+  private val TimeJ        = IntegrationTime(20.secondTimeSpan, 3.refined, readMode = ItcResultReadMode.Flamingos2(ReadModeJ).some)
 
   private def itcReadMode(filter: Flamingos2Filter): Flamingos2ReadMode =
     filter match
       case Flamingos2Filter.JLow => ReadModeJLow
-      case _                  => ReadModeJ
+      case _                     => ReadModeJ
 
   override def fakeItcImagingResultFor(input: ImagingInput): Option[IntegrationTime] =
     input.mode match
       case InstrumentMode.Flamingos2Imaging(filter = f) =>
         f match
           case Flamingos2Filter.JLow => TimeJLow.some
-          case Flamingos2Filter.J => TimeJ.some
-          case _                  => none
+          case Flamingos2Filter.J    => TimeJ.some
+          case _                     => none
       case _                                            => none
 
   private def imagingDynamic(filter: Flamingos2Filter, exposureTime: TimeSpan): Flamingos2DynamicConfig =
@@ -450,8 +450,8 @@ class executionSciFlamingos2Imaging extends ExecutionTestSupportForFlamingos2:
               "itc": {
                 "itcType": "FLAMINGOS_2_IMAGING",
                 "flamingos2ImagingScience": [
-                  { "filter": "J_LOW" },
-                  { "filter": "J" }
+                  { "filter": "J" },
+                  { "filter": "J_LOW" }
                 ]
               }
             }

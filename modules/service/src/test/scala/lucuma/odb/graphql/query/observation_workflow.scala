@@ -1401,7 +1401,7 @@ class observation_workflow
         observingMode: {
           flamingos2LongSlit: {
             disperser: R1200_JH
-            filter: Y
+            filter: J_LOW
             fpu: LONG_SLIT_2
             exposureTimeMode: {
               signalToNoise: {

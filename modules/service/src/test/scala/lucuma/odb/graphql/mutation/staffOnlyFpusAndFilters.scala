@@ -64,7 +64,7 @@ class staffOnlyFpusAndFilters extends OdbSuite:
     """{
       flamingos2LongSlit: {
         disperser: R1200_HK
-        filter: Y
+        filter: J_LOW
         fpu: PINHOLE
         exposureTimeMode: { signalToNoise: { value: 100.0 at: { nanometers: 2100 } } }
       }

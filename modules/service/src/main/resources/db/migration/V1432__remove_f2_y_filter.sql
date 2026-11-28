@@ -39,8 +39,8 @@ UPDATE t_flamingos_2_daytime_calibration_setup SET c_filter = 'J' WHERE c_filter
 -- Keep the array canonical: distinct and sorted.
 UPDATE t_configuration_request
    SET c_flamingos_2_imaging_filters = (
-     SELECT array_agg(DISTINCT t ORDER BY t COLLATE "C")
-       FROM unnest(array_replace(c_flamingos_2_imaging_filters, 'Y'::d_tag, 'J'::d_tag)) AS t
+     SELECT array_agg(t ORDER BY t COLLATE "C")
+       FROM (SELECT DISTINCT unnest(array_replace(c_flamingos_2_imaging_filters, 'Y'::d_tag, 'J'::d_tag)) AS t) u
    )
  WHERE 'Y' = ANY (c_flamingos_2_imaging_filters);
 
@@ -57,6 +57,6 @@ DELETE FROM t_imaging_config_option
 UPDATE t_spectroscopy_config_option_f2 SET c_filter = NULL WHERE c_filter = 'Y';
 
 -- Smart gcal is reloaded from the CSV by R__SmartFlamingos2.
-DELETE FROM t_smart_f2 WHERE c_filter = 'Y';
+DELETE FROM t_smart_flamingos2 WHERE c_filter = 'Y';
 
 DELETE FROM t_f2_filter WHERE c_tag = 'Y';

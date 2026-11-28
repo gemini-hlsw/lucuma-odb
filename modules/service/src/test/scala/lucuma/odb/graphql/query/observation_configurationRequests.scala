@@ -422,15 +422,15 @@ class observation_configurationRequests
   private def filterList(filters: String*): String =
     filters.map(f => s"{ filter: $f }").mkString("[", ", ", "]")
 
-  // createFlamingos2ImagingObservationAs uses filters Y and J.
+  // createFlamingos2ImagingObservationAs uses filters J_LOW and J.
   private val flamingos2Imaging: (Program.Id, Target.Id) => IO[Observation.Id] =
     (pid, tid) => createFlamingos2ImagingObservationAs(pi, pid, tid)
 
   test("[Flamingos2Imaging] request should apply after dropping a filter"):
-    assertCoverageAfter(flamingos2Imaging, s"flamingos2Imaging: { filters: ${filterList("Y")} }", covered = true)
+    assertCoverageAfter(flamingos2Imaging, s"flamingos2Imaging: { filters: ${filterList("J_LOW")} }", covered = true)
 
   test("[Flamingos2Imaging] request should not apply after adding a filter"):
-    assertCoverageAfter(flamingos2Imaging, s"flamingos2Imaging: { filters: ${filterList("Y", "J", "H")} }", covered = false)
+    assertCoverageAfter(flamingos2Imaging, s"flamingos2Imaging: { filters: ${filterList("J_LOW", "J", "H")} }", covered = false)
 
   // createGnirsImagingObservationAs uses the SHORT_BLUE camera with filters J and ORDER4.
   private val gnirsImaging: (Program.Id, Target.Id) => IO[Observation.Id] =

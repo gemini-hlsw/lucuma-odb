@@ -931,7 +931,7 @@ class observations extends OdbSuite with ObservingModeSetupOperations {
                             "observingMode": {
                               "flamingos2LongSlit": {
                                 "disperser": "R1200_HK",
-                                "filter": "Y",
+                                "filter": "J_LOW",
                                 "fpu": "LONG_SLIT_2",
                                 "telluricType": {
                                   "tag": "HOT",
@@ -962,7 +962,7 @@ class observations extends OdbSuite with ObservingModeSetupOperations {
                         observingMode: {
                           flamingos2LongSlit: {
                             disperser: R1200_HK
-                            filter: Y
+                            filter: J_LOW
                             fpu: LONG_SLIT_2
                             exposureTimeMode: {
                               signalToNoise: {
@@ -1050,7 +1050,7 @@ class observations extends OdbSuite with ObservingModeSetupOperations {
                s"""
                  flamingos2LongSlit: {
                    disperser: R1200_HK
-                   filter: Y
+                   filter: J_LOW
                    fpu: LONG_SLIT_2
                    acquisition: {
                      explicitFilter: J
@@ -1091,7 +1091,7 @@ class observations extends OdbSuite with ObservingModeSetupOperations {
                             "observingMode": {
                               "flamingos2LongSlit": {
                                 "disperser": "R1200_HK",
-                                "filter": "Y",
+                                "filter": "J_LOW",
                                 "fpu": "LONG_SLIT_2",
                                 "acquisition": { "filter": "J" }
                               }

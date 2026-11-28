@@ -68,7 +68,7 @@ class SmartGcalServiceSuite_NullKeys extends OdbSuite:
     Gmos.TableKey(none, GmosSouthFilter.GPrime.some, fpu, GmosXBinning.One, GmosYBinning.One, GmosAmpGain.Low)
 
   private def f2Key(fpu: Option[Flamingos2Fpu]): Flamingos2.TableKey =
-    Flamingos2.TableKey(none, Flamingos2Filter.Y, fpu)
+    Flamingos2.TableKey(none, Flamingos2Filter.JLow, fpu)
 
   private val line = PosLong.unsafeFrom(1)
 
