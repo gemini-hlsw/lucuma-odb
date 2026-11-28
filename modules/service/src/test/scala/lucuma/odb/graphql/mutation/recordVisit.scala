@@ -97,7 +97,7 @@ class recordVisit extends OdbSuite with query.GenerationTestSupport with Executi
   val f2_key_HK: Flamingos2.TableKey =
     Flamingos2.TableKey(
       Flamingos2Disperser.R1200HK.some,
-      Flamingos2Filter.Y,
+      Flamingos2Filter.JLow,
       Flamingos2Fpu.LongSlit2.some
     )
 

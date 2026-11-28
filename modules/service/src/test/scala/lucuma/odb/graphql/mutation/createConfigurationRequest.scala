@@ -298,7 +298,7 @@ class createConfigurationRequest extends OdbSuite with ObservingModeSetupOperati
                        "configuration": {
                          "observingMode": {
                            "mode": "FLAMINGOS_2_IMAGING",
-                           "flamingos2Imaging": { "filters": [ "J", "Y" ] }
+                           "flamingos2Imaging": { "filters": [ "J", "J_LOW" ] }
                          }
                        }
                      }

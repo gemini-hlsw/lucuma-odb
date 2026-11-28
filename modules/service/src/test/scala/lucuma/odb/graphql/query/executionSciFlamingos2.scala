@@ -191,9 +191,8 @@ class executionSciFlamingos2 extends ExecutionTestSupportForFlamingos2:
           ).asLeft
       )
 
-  test("[f2] R=3000 + Y filter yields flat-only calibrations, no arc"):
-    // R=3000 + Y filter has a flat but no arc in the smart gcal tables (the arc
-    // lamps don't reach the Y-band edge).
+  test("[f2] a flat with no matching arc yields flat-only calibrations"):
+    // The fixture gives R=3000 + J-low a flat but no arc.
     // The sequence must still generate with a flat and no arc.
     val setup: IO[Observation.Id] =
       for
@@ -206,7 +205,7 @@ class executionSciFlamingos2 extends ExecutionTestSupportForFlamingos2:
                """
                  flamingos2LongSlit: {
                    disperser: R3000
-                   filter: Y
+                   filter: J_LOW
                    fpu: LONG_SLIT_1
                  }
                """

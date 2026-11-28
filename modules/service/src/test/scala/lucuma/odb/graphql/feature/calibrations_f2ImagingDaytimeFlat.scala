@@ -64,7 +64,7 @@ class calibrations_f2ImagingDaytimeFlat
   override def dbInitialization: Option[Session[IO] => IO[Unit]] = Some: s =>
     val rows: List[Flamingos2.TableRow] =
       for
-        filter  <- List(Flamingos2Filter.Y, Flamingos2Filter.J, Flamingos2Filter.H)
+        filter  <- List(Flamingos2Filter.JLow, Flamingos2Filter.J, Flamingos2Filter.H)
         shutter <- List(GcalShutter.Open, GcalShutter.Closed)
       yield Flamingos2.TableRow(PosLong.unsafeFrom(1), Flamingos2.TableKey(none, filter, none), imagingDayFlat(shutter))
 
@@ -228,7 +228,7 @@ class calibrations_f2ImagingDaytimeFlat
     for
       (_, oid, flat) <- setup
       filters        <- queryImagingFilters(flat)
-    yield assertEquals(filters, List("Y", "J"))
+    yield assertEquals(filters, List("J", "J_LOW"))
 
   test("a second calibration pass keeps the one daytime flat"):
     for

@@ -326,10 +326,10 @@ class configurationRequests_UniquenessKey
     assertImagingDistinct(gnirsImagingWith("SHORT_BLUE", "J"), gnirsImagingWith("LONG_BLUE", "J"))
 
   test("Flamingos-2 imaging - a different filter set makes a new request"):
-    assertImagingDistinct(flamingos2Imaging("Y"), flamingos2Imaging("Y", "J"))
+    assertImagingDistinct(flamingos2Imaging("J_LOW"), flamingos2Imaging("J_LOW", "J"))
 
   test("Flamingos-2 imaging - the same filters in another order reuse the request"):
-    assertImagingCollapses(flamingos2Imaging("Y", "J"), flamingos2Imaging("J", "Y"))
+    assertImagingCollapses(flamingos2Imaging("J_LOW", "J"), flamingos2Imaging("J", "J_LOW"))
 
   // Requests for different modes are told apart by the observing mode type, which is part of
   // the key alongside each mode's own parameters (for imaging, the filters and the GNIRS camera).
@@ -347,7 +347,7 @@ class configurationRequests_UniquenessKey
     setup.flatMap: (pid, tid) =>
       for
         o1 <- createImagingObservation(pid, tid, gnirsImaging("J"))
-        o2 <- createImagingObservation(pid, tid, flamingos2Imaging("Y"))
+        o2 <- createImagingObservation(pid, tid, flamingos2Imaging("J_LOW"))
         r1 <- createConfigurationRequestAs(pi, o1)
         r2 <- createConfigurationRequestAs(pi, o2)
         _  <- IO(assertNotEquals(r1, r2))

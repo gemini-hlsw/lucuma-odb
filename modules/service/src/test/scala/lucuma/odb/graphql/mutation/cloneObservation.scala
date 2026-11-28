@@ -1723,12 +1723,12 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations with M
                   "observingMode": {
                     "flamingos2Imaging": {
                       "filters": [
-                        ${filterJson(Flamingos2Filter.Y, 100, 1210)},
-                        ${filterJson(Flamingos2Filter.J, 100, 1210)}
+                        ${filterJson(Flamingos2Filter.J, 100, 1210)},
+                        ${filterJson(Flamingos2Filter.JLow, 100, 1210)}
                       ],
                       "initialFilters": [
-                        ${filterJson(Flamingos2Filter.Y, 100, 1210)},
-                        ${filterJson(Flamingos2Filter.J, 100, 1210)}
+                        ${filterJson(Flamingos2Filter.J, 100, 1210)},
+                        ${filterJson(Flamingos2Filter.JLow, 100, 1210)}
                       ],
                       "defaultReadMode": "BRIGHT",
                       "explicitReadMode": "BRIGHT",
@@ -1794,7 +1794,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations with M
                         flamingos2Imaging: {
                           filters: [
                             {
-                              filter: Y,
+                              filter: J_LOW,
                               exposureTimeMode: {
                                 signalToNoise: {
                                   value: 101.0
@@ -1836,12 +1836,12 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations with M
                         "observingMode": {
                           "flamingos2Imaging": {
                             "filters": [
-                              ${filterJson(Flamingos2Filter.Y, 101, 501)},
-                              ${filterJson(Flamingos2Filter.J, 102, 502)}
+                              ${filterJson(Flamingos2Filter.J, 102, 502)},
+                              ${filterJson(Flamingos2Filter.JLow, 101, 501)}
                             ],
                             "initialFilters": [
-                              ${filterJson(Flamingos2Filter.Y, 100, 1210)},
-                              ${filterJson(Flamingos2Filter.J, 100, 1210)}
+                              ${filterJson(Flamingos2Filter.J, 100, 1210)},
+                              ${filterJson(Flamingos2Filter.JLow, 100, 1210)}
                             ]
                           }
                         }
@@ -1870,12 +1870,12 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations with M
                     "observingMode": {
                       "flamingos2Imaging": {
                         "filters": [
-                          ${filterJson(Flamingos2Filter.Y, 100, 1210)},
-                          ${filterJson(Flamingos2Filter.J, 100, 1210)}
+                          ${filterJson(Flamingos2Filter.J, 100, 1210)},
+                          ${filterJson(Flamingos2Filter.JLow, 100, 1210)}
                         ],
                         "initialFilters": [
-                          ${filterJson(Flamingos2Filter.Y, 100, 1210)},
-                          ${filterJson(Flamingos2Filter.J, 100, 1210)}
+                          ${filterJson(Flamingos2Filter.J, 100, 1210)},
+                          ${filterJson(Flamingos2Filter.JLow, 100, 1210)}
                         ]
                       }
                     }
@@ -2033,7 +2033,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations with M
                   observingMode: {
                     flamingos2Imaging: {
                       filters: [
-                        { filter: Y },
+                        { filter: J_LOW },
                         { filter: J }
                       ]
                       variant: {
@@ -2860,7 +2860,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations with M
       mode  = s"""
         flamingos2Mos: {
           disperser: R1200_HK
-          filter: Y
+          filter: J_LOW
           customMask: { slitWidth: CUSTOM_WIDTH_2_PIX, attachmentId: "$aid" }
           explicitReadMode: MEDIUM
           explicitReads: READS_4
@@ -2907,7 +2907,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations with M
                      "observingMode": {
                        "flamingos2Mos": {
                          "disperser": "R1200_HK",
-                         "filter": "Y",
+                         "filter": "J_LOW",
                          "customMask": {
                            "slitWidth": "CUSTOM_WIDTH_2_PIX",
                            "attachmentId": ${aid.asJson}
@@ -2941,7 +2941,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations with M
       mode  = s"""
         flamingos2Mos: {
           disperser: R1200_HK
-          filter: Y
+          filter: J_LOW
           customMask: { slitWidth: CUSTOM_WIDTH_2_PIX }
         }
       """

@@ -1512,7 +1512,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
       observingMode: {
         flamingos2LongSlit: {
           disperser: R1200_JH
-          filter: Y
+          filter: J_LOW
           fpu: LONG_SLIT_2
           exposureTimeMode: {
             signalToNoise: {
@@ -1535,7 +1535,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
                 "gmosNorthLongSlit": null,
                 "flamingos2LongSlit": {
                   "disperser": "R1200_JH",
-                  "filter": "Y",
+                  "filter": "J_LOW",
                   "fpu": "LONG_SLIT_2"
                 }
               }
@@ -1705,7 +1705,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
       observingMode: {
         flamingos2LongSlit: {
           disperser: R1200_JH
-          filter: Y
+          filter: J_LOW
           fpu: LONG_SLIT_2
           exposureTimeMode: {
             signalToNoise: {
@@ -1728,10 +1728,10 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
                 "gmosNorthLongSlit": null,
                 "flamingos2LongSlit": {
                   "disperser": "R1200_JH",
-                  "filter": "Y",
+                  "filter": "J_LOW",
                   "fpu": "LONG_SLIT_2",
                   "initialDisperser": "R1200_JH",
-                  "initialFilter": "Y",
+                  "initialFilter": "J_LOW",
                   "initialFpu": "LONG_SLIT_2"
                 }
               }
@@ -1745,7 +1745,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
       observingMode: {
         flamingos2LongSlit: {
           disperser: R1200_HK
-          filter: Y
+          filter: J_LOW
           fpu: LONG_SLIT_2
         }
       }
@@ -1762,10 +1762,10 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
                 "gmosNorthLongSlit": null,
                 "flamingos2LongSlit": {
                   "disperser": "R1200_HK",
-                  "filter": "Y",
+                  "filter": "J_LOW",
                   "fpu": "LONG_SLIT_2",
                   "initialDisperser": "R1200_JH",
-                  "initialFilter": "Y",
+                  "initialFilter": "J_LOW",
                   "initialFpu": "LONG_SLIT_2"
                 }
               }
@@ -2277,7 +2277,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
       observingMode: {
         flamingos2LongSlit: {
           disperser: R1200_JH
-          filter: Y
+          filter: J_LOW
           fpu: LONG_SLIT_2
           explicitTelescopeConfigs: {
             toSky: [
@@ -2328,7 +2328,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
               "observingMode": {
                 "flamingos2LongSlit": {
                   "disperser": "R1200_JH",
-                  "filter": "Y",
+                  "filter": "J_LOW",
                   "fpu": "LONG_SLIT_2",
                   "telescopeConfigs": {
                     "offsetMode": "NOD_TO_SKY",
@@ -2392,7 +2392,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
               "observingMode": {
                 "flamingos2LongSlit": {
                   "disperser": "R1200_JH",
-                  "filter": "Y",
+                  "filter": "J_LOW",
                   "fpu": "LONG_SLIT_2",
                   "telescopeConfigs": {
                     "offsetMode": "NOD_TO_SKY",
@@ -2449,7 +2449,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
               "observingMode": {
                 "flamingos2LongSlit": {
                   "disperser": "R1200_JH",
-                  "filter": "Y",
+                  "filter": "J_LOW",
                   "fpu": "LONG_SLIT_2",
                   "telescopeConfigs": {
                     "offsetMode": "NOD_ALONG_SLIT",
@@ -3335,7 +3335,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
       observingMode: {
         flamingos2LongSlit: {
           disperser: R1200_JH
-          filter: Y
+          filter: J_LOW
           fpu: LONG_SLIT_2
           exposureTimeMode: {
             signalToNoise: {
@@ -3923,7 +3923,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
                 observingMode: {
                   flamingos2LongSlit: {
                     disperser: R1200_HK
-                    filter: Y
+                    filter: J_LOW
                     fpu: LONG_SLIT_2
                     explicitTelescopeConfigs: {
                       toSky: [
@@ -3963,7 +3963,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
               observingMode: {
                 flamingos2LongSlit: {
                   disperser: R1200_HK
-                  filter: Y
+                  filter: J_LOW
                   fpu: LONG_SLIT_2
                   exposureTimeMode: {
                     signalToNoise: {
@@ -4031,7 +4031,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
               observingMode: {
                 flamingos2LongSlit: {
                   disperser: R1200_HK
-                  filter: Y
+                  filter: J_LOW
                   fpu: LONG_SLIT_2
                   exposureTimeMode: {
                     signalToNoise: {
@@ -4138,7 +4138,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
                         observingMode: {
                           flamingos2LongSlit: {
                             disperser: R1200_HK
-                            filter: Y
+                            filter: J_LOW
                             fpu: LONG_SLIT_2
                             exposureTimeMode: {
                               signalToNoise: {

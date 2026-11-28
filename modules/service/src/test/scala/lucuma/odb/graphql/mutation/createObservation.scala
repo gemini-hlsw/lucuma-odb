@@ -1294,7 +1294,7 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat with que
             observingMode: {
               flamingos2LongSlit: {
                 disperser: $grating
-                filter: Y
+                filter: J_LOW
                 fpu: $fpu
               }
             }
@@ -1372,7 +1372,7 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat with que
            longSlit.downIO[TelluricType]("telluricType")
           ).tupled,
           (Flamingos2Disperser.R1200HK,
-           Some(Flamingos2Filter.Y),
+           Some(Flamingos2Filter.JLow),
            Flamingos2Fpu.LongSlit2,
            10.0,
            234.56,
@@ -1387,7 +1387,7 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat with que
            Flamingos2ReadoutMode.Science,
            None,
            Flamingos2Disperser.R1200HK,
-           Some(Flamingos2Filter.Y),
+           Some(Flamingos2Filter.JLow),
            Flamingos2Fpu.LongSlit2,
            TelluricType.Hot
           )
@@ -1422,7 +1422,7 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat with que
             observingMode: {
               flamingos2LongSlit: {
                 disperser: ${disperser.tag.toScreamingSnakeCase}
-                filter: Y
+                filter: J_LOW
                 fpu: ${fpu.tag.toScreamingSnakeCase}
                 explicitReadMode: ${explicitReadMode.map(_.tag.toScreamingSnakeCase).getOrElse("null")}
                 explicitDecker: ${explicitDecker.map(_.tag.toScreamingSnakeCase).getOrElse("null")}
@@ -1488,7 +1488,7 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat with que
             longSlit.downIO[TelluricType]("telluricType")
           ).tupled, (
             Flamingos2Disperser.R1200HK,
-            Some(Flamingos2Filter.Y),
+            Some(Flamingos2Filter.JLow),
             Flamingos2Fpu.LongSlit2,
             Some(Flamingos2ReadMode.Bright),         // Explicitly set read mode
             None,                                    // Explicit reads is Empty
@@ -1531,7 +1531,7 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat with que
             longSlit.downIO[TelluricType]("telluricType")
           ).tupled, (
             Flamingos2Disperser.R1200HK,
-            Some(Flamingos2Filter.Y),
+            Some(Flamingos2Filter.JLow),
             Flamingos2Fpu.LongSlit2,
             None,
             Some(Flamingos2Reads.Reads_4),          // Explicit reads set to 4
@@ -1571,7 +1571,7 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat with que
             longSlit.downIO[TelluricType]("telluricType")
           ).tupled, (
             Flamingos2Disperser.R1200HK,
-            Some(Flamingos2Filter.Y),
+            Some(Flamingos2Filter.JLow),
             Flamingos2Fpu.LongSlit2,
             Some(Flamingos2ReadMode.Medium), // Explicitly set read mode
             Some(Flamingos2Reads.Reads_16),  // Explicit reads is 16
@@ -1602,7 +1602,7 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat with que
             observingMode: {
               flamingos2LongSlit: {
                 disperser: R1200_HK
-                filter: Y
+                filter: J_LOW
                 fpu: LONG_SLIT_2
                 explicitTelescopeConfigs: {
                   toSky: [
@@ -1680,7 +1680,7 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat with que
            longSlit.downIO[Json]("defaultTelescopeConfigs")
           ).tupled,
           (Flamingos2Disperser.R1200HK,
-           Some(Flamingos2Filter.Y),
+           Some(Flamingos2Filter.JLow),
            Flamingos2Fpu.LongSlit2,
            explicitToSky,
            explicitToSky,
@@ -1701,7 +1701,7 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat with que
                 observingMode: {
                   flamingos2LongSlit: {
                     disperser: R1200_HK
-                    filter: Y
+                    filter: J_LOW
                     fpu: LONG_SLIT_2
                     explicitTelescopeConfigs: {
                       toSky: [
@@ -2386,7 +2386,7 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat with que
               observingMode: {
                 flamingos2LongSlit: {
                   disperser: R1200_HK
-                  filter: Y
+                  filter: J_LOW
                   fpu: LONG_SLIT_2
                 }
               }

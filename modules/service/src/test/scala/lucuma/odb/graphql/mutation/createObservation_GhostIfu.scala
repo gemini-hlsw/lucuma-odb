@@ -412,7 +412,7 @@ class createObservation_GhostIfu extends OdbSuite:
                 observingMode: {
                   flamingos2LongSlit: {
                     disperser: R1200_HK
-                    filter: Y
+                    filter: J_LOW
                     fpu: LONG_SLIT_2
                   }
                 }

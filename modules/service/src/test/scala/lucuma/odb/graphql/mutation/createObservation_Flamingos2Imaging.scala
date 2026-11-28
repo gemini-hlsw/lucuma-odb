@@ -37,7 +37,7 @@ class createObservation_Flamingos2Imaging extends OdbSuite:
                 observingMode: {
                   flamingos2Imaging: {
                     filters: [
-                      { filter: Y },
+                      { filter: J_LOW },
                       { filter: J }
                     ]
                     explicitReadMode: BRIGHT
@@ -79,12 +79,12 @@ class createObservation_Flamingos2Imaging extends OdbSuite:
                   "mode": "FLAMINGOS_2_IMAGING",
                   "flamingos2Imaging": {
                     "filters": [
-                      { "filter": "Y" },
-                      { "filter": "J" }
+                      { "filter": "J" },
+                      { "filter": "J_LOW" }
                     ],
                     "initialFilters": [
-                      { "filter": "Y" },
-                      { "filter": "J" }
+                      { "filter": "J" },
+                      { "filter": "J_LOW" }
                     ],
                     "defaultReadMode": "BRIGHT",
                     "explicitReadMode": "BRIGHT",
@@ -137,7 +137,7 @@ class createObservation_Flamingos2Imaging extends OdbSuite:
                       }
                     }
                     filters: [
-                      { filter: Y }
+                      { filter: J_LOW }
                     ]
                   }
                 }
@@ -227,7 +227,7 @@ class createObservation_Flamingos2Imaging extends OdbSuite:
                 observingMode: {
                   flamingos2Imaging: {
                     filters: [
-                      { filter: Y }
+                      { filter: J_LOW }
                     ]
                   }
                 }

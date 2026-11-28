@@ -31,23 +31,23 @@ class executionSciFlamingos2Imaging extends ExecutionTestSupportForFlamingos2:
 
   // The S/N results carry the read mode the ITC chose, neither the Bright imaging
   // default, so a step can only have it from the ITC.
-  private val ReadModeY = Flamingos2ReadMode.Faint
-  private val ReadModeJ = Flamingos2ReadMode.Medium
-  private val TimeY     = IntegrationTime(10.secondTimeSpan, 2.refined, readMode = ItcResultReadMode.Flamingos2(ReadModeY).some)
-  private val TimeJ     = IntegrationTime(20.secondTimeSpan, 3.refined, readMode = ItcResultReadMode.Flamingos2(ReadModeJ).some)
+  private val ReadModeJLow = Flamingos2ReadMode.Faint
+  private val ReadModeJ    = Flamingos2ReadMode.Medium
+  private val TimeJLow     = IntegrationTime(10.secondTimeSpan, 2.refined, readMode = ItcResultReadMode.Flamingos2(ReadModeJLow).some)
+  private val TimeJ        = IntegrationTime(20.secondTimeSpan, 3.refined, readMode = ItcResultReadMode.Flamingos2(ReadModeJ).some)
 
   private def itcReadMode(filter: Flamingos2Filter): Flamingos2ReadMode =
     filter match
-      case Flamingos2Filter.Y => ReadModeY
-      case _                  => ReadModeJ
+      case Flamingos2Filter.JLow => ReadModeJLow
+      case _                     => ReadModeJ
 
   override def fakeItcImagingResultFor(input: ImagingInput): Option[IntegrationTime] =
     input.mode match
       case InstrumentMode.Flamingos2Imaging(filter = f) =>
         f match
-          case Flamingos2Filter.Y => TimeY.some
-          case Flamingos2Filter.J => TimeJ.some
-          case _                  => none
+          case Flamingos2Filter.JLow => TimeJLow.some
+          case Flamingos2Filter.J    => TimeJ.some
+          case _                     => none
       case _                                            => none
 
   private def imagingDynamic(filter: Flamingos2Filter, exposureTime: TimeSpan): Flamingos2DynamicConfig =
@@ -112,7 +112,7 @@ class executionSciFlamingos2Imaging extends ExecutionTestSupportForFlamingos2:
       s"""
         flamingos2Imaging: {
           variant: { grouped: { skyCount: 0 } }
-          filters: [ { filter: Y }, { filter: J } ]
+          filters: [ { filter: J_LOW }, { filter: J } ]
         }
       """
 
@@ -123,9 +123,9 @@ class executionSciFlamingos2Imaging extends ExecutionTestSupportForFlamingos2:
         o <- createObservationWithModeAs(pi, p, List(t), mode)
       yield o
 
-    // Increasing wavelength: Y (1.02um) before J (1.25um).
+    // Increasing wavelength: J-low (1.15um) before J (1.25um).
     val atoms =
-      List.fill(2)(sciAtom(Flamingos2Filter.Y, 10.secondTimeSpan)) ++
+      List.fill(2)(sciAtom(Flamingos2Filter.JLow, 10.secondTimeSpan)) ++
       List.fill(3)(sciAtom(Flamingos2Filter.J, 20.secondTimeSpan))
 
     setup.flatMap: oid =>
@@ -136,7 +136,7 @@ class executionSciFlamingos2Imaging extends ExecutionTestSupportForFlamingos2:
       s"""
         flamingos2Imaging: {
           variant: { grouped: { order: DECREASING, skyCount: 0 } }
-          filters: [ { filter: Y }, { filter: J } ]
+          filters: [ { filter: J_LOW }, { filter: J } ]
         }
       """
 
@@ -147,10 +147,10 @@ class executionSciFlamingos2Imaging extends ExecutionTestSupportForFlamingos2:
         o <- createObservationWithModeAs(pi, p, List(t), mode)
       yield o
 
-    // Decreasing wavelength: J before Y.
+    // Decreasing wavelength: J before J-low.
     val atoms =
       List.fill(3)(sciAtom(Flamingos2Filter.J, 20.secondTimeSpan)) ++
-      List.fill(2)(sciAtom(Flamingos2Filter.Y, 10.secondTimeSpan))
+      List.fill(2)(sciAtom(Flamingos2Filter.JLow, 10.secondTimeSpan))
 
     setup.flatMap: oid =>
       expect(pi, flamingos2ScienceQuery(oid, 100.some), expectedScience(atoms).asRight)
@@ -160,7 +160,7 @@ class executionSciFlamingos2Imaging extends ExecutionTestSupportForFlamingos2:
       s"""
         flamingos2Imaging: {
           variant: { interleaved: { skyCount: 0 } }
-          filters: [ { filter: Y }, { filter: J } ]
+          filters: [ { filter: J_LOW }, { filter: J } ]
         }
       """
 
@@ -171,13 +171,13 @@ class executionSciFlamingos2Imaging extends ExecutionTestSupportForFlamingos2:
         o <- createObservationWithModeAs(pi, p, List(t), mode)
       yield o
 
-    // groupCount = min(2, 3) = 2.  Group 0 gets Y x1, J x2; group 1 gets Y x1, J x1.
+    // groupCount = min(2, 3) = 2.  Group 0 gets J-low x1, J x2; group 1 gets J-low x1, J x1.
     val atoms =
       List(
-        sciAtom(Flamingos2Filter.Y, 10.secondTimeSpan),
+        sciAtom(Flamingos2Filter.JLow, 10.secondTimeSpan),
         sciAtom(Flamingos2Filter.J, 20.secondTimeSpan),
         sciAtom(Flamingos2Filter.J, 20.secondTimeSpan),
-        sciAtom(Flamingos2Filter.Y, 10.secondTimeSpan),
+        sciAtom(Flamingos2Filter.JLow, 10.secondTimeSpan),
         sciAtom(Flamingos2Filter.J, 20.secondTimeSpan)
       )
 
@@ -209,7 +209,7 @@ class executionSciFlamingos2Imaging extends ExecutionTestSupportForFlamingos2:
       s"""
         flamingos2Imaging: {
           variant: { grouped: { skyCount: 2, $skyOffsetsInput } }
-          filters: [ { filter: Y }, { filter: J } ]
+          filters: [ { filter: J_LOW }, { filter: J } ]
         }
       """
 
@@ -226,7 +226,7 @@ class executionSciFlamingos2Imaging extends ExecutionTestSupportForFlamingos2:
 
     val atoms =
       List(
-        mkAtom(Flamingos2Filter.Y, 10.secondTimeSpan, 2),
+        mkAtom(Flamingos2Filter.JLow, 10.secondTimeSpan, 2),
         mkAtom(Flamingos2Filter.J, 20.secondTimeSpan, 3)
       )
 
@@ -238,7 +238,7 @@ class executionSciFlamingos2Imaging extends ExecutionTestSupportForFlamingos2:
       s"""
         flamingos2Imaging: {
           variant: { interleaved: { skyCount: 2, $skyOffsetsInput } }
-          filters: [ { filter: Y }, { filter: J } ]
+          filters: [ { filter: J_LOW }, { filter: J } ]
         }
       """
 
@@ -249,7 +249,7 @@ class executionSciFlamingos2Imaging extends ExecutionTestSupportForFlamingos2:
         o <- createObservationWithModeAs(pi, p, List(t), mode)
       yield o
 
-    val Y = Flamingos2Filter.Y
+    val JL = Flamingos2Filter.JLow
     val J = Flamingos2Filter.J
     val ty = 10.secondTimeSpan
     val tj = 20.secondTimeSpan
@@ -257,13 +257,13 @@ class executionSciFlamingos2Imaging extends ExecutionTestSupportForFlamingos2:
     // Each atom is bracketed by the same guide-disabled sky steps (forward at
     // the head, reversed at the tail), with the interleaved object exposures in
     // between.  groupCount = min(2, 3) = 2, so there are two atoms.
-    val skyHead = skyPair(Y, ty) ++ skyPair(J, tj)
-    val skyTail = skyPair(J, tj).reverse ++ skyPair(Y, ty).reverse
+    val skyHead = skyPair(JL, ty) ++ skyPair(J, tj)
+    val skyTail = skyPair(J, tj).reverse ++ skyPair(JL, ty).reverse
 
     val atoms =
       List(
-        sciAtomOf((skyHead ++ List(sciStep(Y, ty), sciStep(J, tj), sciStep(J, tj)) ++ skyTail)*),
-        sciAtomOf((skyHead ++ List(sciStep(Y, ty), sciStep(J, tj)) ++ skyTail)*)
+        sciAtomOf((skyHead ++ List(sciStep(JL, ty), sciStep(J, tj), sciStep(J, tj)) ++ skyTail)*),
+        sciAtomOf((skyHead ++ List(sciStep(JL, ty), sciStep(J, tj)) ++ skyTail)*)
       )
 
     setup.flatMap: oid =>
@@ -281,7 +281,7 @@ class executionSciFlamingos2Imaging extends ExecutionTestSupportForFlamingos2:
               offset4: { p: { arcseconds: 4 }, q: { arcseconds: 4 } }
             }
           }
-          filters: [ { filter: Y }, { filter: J } ]
+          filters: [ { filter: J_LOW }, { filter: J } ]
         }
       """
 
@@ -292,11 +292,11 @@ class executionSciFlamingos2Imaging extends ExecutionTestSupportForFlamingos2:
         o <- createObservationWithModeAs(pi, p, List(t), mode)
       yield o
 
-    // Increasing order (Y, J); each filter cycles through the 4 offsets
+    // Increasing order (J-low, J); each filter cycles through the 4 offsets
     val atoms =
       List(
-        sciAtom(Flamingos2Filter.Y, 10.secondTimeSpan, 1, 1),
-        sciAtom(Flamingos2Filter.Y, 10.secondTimeSpan, 2, 2),
+        sciAtom(Flamingos2Filter.JLow, 10.secondTimeSpan, 1, 1),
+        sciAtom(Flamingos2Filter.JLow, 10.secondTimeSpan, 2, 2),
         sciAtom(Flamingos2Filter.J, 20.secondTimeSpan, 1, 1),
         sciAtom(Flamingos2Filter.J, 20.secondTimeSpan, 2, 2),
         sciAtom(Flamingos2Filter.J, 20.secondTimeSpan, 3, 3)
@@ -331,7 +331,7 @@ class executionSciFlamingos2Imaging extends ExecutionTestSupportForFlamingos2:
       s"""
         flamingos2Imaging: {
           variant: { $variant }
-          filters: [ { filter: Y }, { filter: J } ]
+          filters: [ { filter: J_LOW }, { filter: J } ]
         }
       """
 
@@ -343,13 +343,13 @@ class executionSciFlamingos2Imaging extends ExecutionTestSupportForFlamingos2:
     yield ()
 
   test("grouped, offsets, exposuresPerOffset"):
-    // Two exposures per position: Y (2) fills position 1, J (3) fills position
+    // Two exposures per position: J-low (2) fills position 1, J (3) fills position
     // 1 and takes one more at position 2.
     exposuresPerOffsetTest(
       s"grouped: { skyCount: 0, exposuresPerOffset: 2, $objectOffsetsInput }",
       List(
-        sciAtom(Flamingos2Filter.Y, 10.secondTimeSpan, 1, 1),
-        sciAtom(Flamingos2Filter.Y, 10.secondTimeSpan, 1, 1),
+        sciAtom(Flamingos2Filter.JLow, 10.secondTimeSpan, 1, 1),
+        sciAtom(Flamingos2Filter.JLow, 10.secondTimeSpan, 1, 1),
         sciAtom(Flamingos2Filter.J, 20.secondTimeSpan, 1, 1),
         sciAtom(Flamingos2Filter.J, 20.secondTimeSpan, 1, 1),
         sciAtom(Flamingos2Filter.J, 20.secondTimeSpan, 2, 2)
@@ -357,12 +357,12 @@ class executionSciFlamingos2Imaging extends ExecutionTestSupportForFlamingos2:
     )
 
   test("interleaved, offsets, exposuresPerOffset"):
-    // Stops: Y [2], J [2, 1].  A single group, with an offset position per stop.
+    // Stops: J-low [2], J [2, 1].  A single group, with an offset position per stop.
     exposuresPerOffsetTest(
       s"interleaved: { skyCount: 0, exposuresPerOffset: 2, $objectOffsetsInput }",
       List(
-        sciAtom(Flamingos2Filter.Y, 10.secondTimeSpan, 1, 1),
-        sciAtom(Flamingos2Filter.Y, 10.secondTimeSpan, 1, 1),
+        sciAtom(Flamingos2Filter.JLow, 10.secondTimeSpan, 1, 1),
+        sciAtom(Flamingos2Filter.JLow, 10.secondTimeSpan, 1, 1),
         sciAtom(Flamingos2Filter.J, 20.secondTimeSpan, 2, 2),
         sciAtom(Flamingos2Filter.J, 20.secondTimeSpan, 2, 2),
         sciAtom(Flamingos2Filter.J, 20.secondTimeSpan, 3, 3)
@@ -381,8 +381,8 @@ class executionSciFlamingos2Imaging extends ExecutionTestSupportForFlamingos2:
         }
       """,
       List(
-        sciAtom(Flamingos2Filter.Y, 10.secondTimeSpan, 1, 1),
-        sciAtom(Flamingos2Filter.Y, 10.secondTimeSpan, 1, 1),
+        sciAtom(Flamingos2Filter.JLow, 10.secondTimeSpan, 1, 1),
+        sciAtom(Flamingos2Filter.JLow, 10.secondTimeSpan, 1, 1),
         sciAtom(Flamingos2Filter.J, 20.secondTimeSpan, 1, 1),
         sciAtom(Flamingos2Filter.J, 20.secondTimeSpan, 1, 1),
         sciAtom(Flamingos2Filter.J, 20.secondTimeSpan, 2, 2)
@@ -394,7 +394,7 @@ class executionSciFlamingos2Imaging extends ExecutionTestSupportForFlamingos2:
       s"""
         flamingos2Imaging: {
           variant: { grouped: { skyCount: 0 } }
-          filters: [ { filter: Y }, { filter: J } ]
+          filters: [ { filter: J_LOW }, { filter: J } ]
         }
       """
 
@@ -418,7 +418,7 @@ class executionSciFlamingos2Imaging extends ExecutionTestSupportForFlamingos2:
       s"""
         flamingos2Imaging: {
           variant: { grouped: { skyCount: 0 } }
-          filters: [ { filter: Y }, { filter: J } ]
+          filters: [ { filter: J_LOW }, { filter: J } ]
         }
       """
 
@@ -450,8 +450,8 @@ class executionSciFlamingos2Imaging extends ExecutionTestSupportForFlamingos2:
               "itc": {
                 "itcType": "FLAMINGOS_2_IMAGING",
                 "flamingos2ImagingScience": [
-                  { "filter": "Y" },
-                  { "filter": "J" }
+                  { "filter": "J" },
+                  { "filter": "J_LOW" }
                 ]
               }
             }

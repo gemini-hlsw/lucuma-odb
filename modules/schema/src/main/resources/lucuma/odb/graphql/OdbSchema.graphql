@@ -11282,11 +11282,6 @@ Flamingos2 Filter
 """
 enum Flamingos2Filter {
   """
-  Flamingos2Filter Y (1.02 um)
-  """
-  Y
-
-  """
   Flamingos2Filter J (1.25 um)
   """
   J

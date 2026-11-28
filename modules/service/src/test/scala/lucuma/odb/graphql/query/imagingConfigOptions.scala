@@ -30,14 +30,14 @@ class imagingConfigOptions extends OdbSuite {
       s.execute(sql"insert into t_imaging_config_option (c_instrument, c_index, c_fov, c_filter_label, c_ao, c_site) values('GmosNorth', 2, 350000000, 'OVI', false, 'gn')".command) *>
       s.execute(sql"insert into t_imaging_config_option (c_instrument, c_index, c_fov, c_filter_label, c_ao, c_site) values('GmosSouth', 3, 150000000, 'OVIC', false, 'gs')".command) *>
       s.execute(sql"insert into t_imaging_config_option (c_instrument, c_index, c_fov, c_filter_label, c_ao, c_capability, c_site) values('Alopeke', 4, 3000000, 'EO466', false, 'speckle', 'gn')".command) *>
-      s.execute(sql"insert into t_imaging_config_option (c_instrument, c_index, c_fov, c_filter_label, c_ao, c_site) values('Flamingos2', 5, 366000000, 'Y', false, 'gs')".command) *>
+      s.execute(sql"insert into t_imaging_config_option (c_instrument, c_index, c_fov, c_filter_label, c_ao, c_site) values('Flamingos2', 5, 366000000, 'J-low', false, 'gs')".command) *>
       s.execute(sql"insert into t_imaging_config_option (c_instrument, c_index, c_fov, c_filter_label, c_ao, c_site) values('Flamingos2', 6, 366000000, 'K-short', false, 'gs')".command) *>
       s.execute(sql"insert into t_imaging_config_option (c_instrument, c_index, c_fov, c_filter_label, c_ao, c_site) values('Gnirs', 7, 20000000, 'H', true, 'gn')".command) *>
       s.execute(sql"insert into t_imaging_config_option (c_instrument, c_index, c_fov, c_filter_label, c_ao, c_site) values('Gnirs', 8, 16000000, 'Y', true, 'gn')".command) *>
       s.execute(sql"insert into t_imaging_config_option_gmos_north values('GmosNorth', 1, 'ZPrime_CaT')".command) *>
       s.execute(sql"insert into t_imaging_config_option_gmos_north values('GmosNorth', 2, 'OVI')".command) *>
       s.execute(sql"insert into t_imaging_config_option_gmos_south values('GmosSouth', 3, 'OVIC')".command) *>
-      s.execute(sql"insert into t_imaging_config_option_flamingos_2 values('Flamingos2', 5, 'Y')".command) *>
+      s.execute(sql"insert into t_imaging_config_option_flamingos_2 values('Flamingos2', 5, 'JLow')".command) *>
       s.execute(sql"insert into t_imaging_config_option_flamingos_2 values('Flamingos2', 6, 'KShort')".command) *>
       s.execute(sql"insert into t_imaging_config_option_gnirs values('Gnirs', 7, 'Order4', 'ShortBlue')".command) *>
       s.execute(sql"insert into t_imaging_config_option_gnirs values('Gnirs', 8, 'Y', 'LongBlue')".command) *>
@@ -366,12 +366,12 @@ class imagingConfigOptions extends OdbSuite {
           "imagingConfigOptions": [
             {
               "flamingos2": {
-                "filter": "K_SHORT"
+                "filter": "J_LOW"
               }
             },
             {
               "flamingos2": {
-                "filter": "Y"
+                "filter": "K_SHORT"
               }
             }
           ]

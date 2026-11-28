@@ -60,11 +60,11 @@ trait ExecutionTestSupportForFlamingos2 extends ExecutionTestSupport:
       Flamingos2Fpu.LongSlit2.some
     )
 
-  // R=3000 grism + Y filter has a flat but no arc in smart gcal tables
-  val f2_key_R3K_Y: Flamingos2.TableKey =
+  // R=3000 grism + J-low gets a flat but no arc in this fixture
+  val f2_key_R3K_JLow: Flamingos2.TableKey =
     Flamingos2.TableKey(
       Flamingos2Disperser.R3000.some,
-      Flamingos2Filter.Y,
+      Flamingos2Filter.JLow,
       Flamingos2Fpu.LongSlit1.some
     )
 
@@ -105,7 +105,7 @@ trait ExecutionTestSupportForFlamingos2 extends ExecutionTestSupport:
         Flamingos2.TableRow(PosLong.unsafeFrom(1), f2_key_JH1, f2_arc_JH1),
         Flamingos2.TableRow(PosLong.unsafeFrom(1), f2_key_JH2, f2_flat_JH1),
         Flamingos2.TableRow(PosLong.unsafeFrom(1), f2_key_JH2, f2_arc_JH1),
-        Flamingos2.TableRow(PosLong.unsafeFrom(1), f2_key_R3K_Y, f2_flat_JH1)
+        Flamingos2.TableRow(PosLong.unsafeFrom(1), f2_key_R3K_JLow, f2_flat_JH1)
       )
 
     servicesFor(pi /* doesn't matter*/).map(_(s)).use: services =>

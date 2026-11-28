@@ -1563,7 +1563,7 @@ trait DatabaseOperations { this: OdbSuite =>
         s"""{
           flamingos2Imaging: {
             filters: [
-              { filter: Y },
+              { filter: J_LOW },
               { filter: J }
             ]
             ${pinnedSpiralVariant(30)}
@@ -1573,7 +1573,7 @@ trait DatabaseOperations { this: OdbSuite =>
         """{
           flamingos2LongSlit: {
             disperser: R1200_HK
-            filter: Y
+            filter: J_LOW
             fpu: LONG_SLIT_2
           }
         }"""
@@ -1581,7 +1581,7 @@ trait DatabaseOperations { this: OdbSuite =>
         """{
           flamingos2Mos: {
             disperser: R1200_HK
-            filter: Y
+            filter: J_LOW
             customMask: {
               slitWidth: CUSTOM_WIDTH_2_PIX
             }
@@ -1813,7 +1813,7 @@ trait DatabaseOperations { this: OdbSuite =>
         s"""{
           flamingos2Imaging: {
             filters: [
-              { filter: Y },
+              { filter: J_LOW },
               { filter: J }
             ]
             explicitReadMode: BRIGHT
@@ -1838,7 +1838,7 @@ trait DatabaseOperations { this: OdbSuite =>
         s"""{
           flamingos2LongSlit: {
             disperser: R1200_HK
-            filter: Y
+            filter: J_LOW
             fpu: LONG_SLIT_2
             $offsetsField
           }
@@ -2913,7 +2913,7 @@ trait DatabaseOperations { this: OdbSuite =>
           seconds: 1200,
         },
         disperser: R1200_JH,
-        filter: Y,
+        filter: J_LOW,
         readMode: MEDIUM,
         lyotWheel: F16,
         fpu: {
